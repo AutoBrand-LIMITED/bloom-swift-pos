@@ -5,6 +5,7 @@ import { Flower2, ClipboardList, RotateCcw } from "lucide-react";
 import CustomerSection from "@/components/pos/CustomerSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
+import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
@@ -39,6 +40,9 @@ const Index = () => {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryPerson, setDeliveryPerson] = useState("");
 
+  // Gift card
+  const [giftCardEnabled, setGiftCardEnabled] = useState(false);
+  const [giftCardMessage, setGiftCardMessage] = useState("");
   // Payment
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [depositAmount, setDepositAmount] = useState(0);
@@ -82,6 +86,8 @@ const Index = () => {
     setRecipientName("");
     setRecipientPhone("");
     setDeliveryPerson("");
+    setGiftCardEnabled(false);
+    setGiftCardMessage("");
     setPaymentStatus("unpaid");
     setDepositAmount(0);
     setPriceOverridden(false);
@@ -124,6 +130,8 @@ const Index = () => {
       recipientName: recipientName.trim(),
       recipientPhone: recipientPhone.trim(),
       deliveryPerson: deliveryPerson.trim(),
+      giftCardEnabled,
+      giftCardMessage: giftCardEnabled ? giftCardMessage.trim() : "",
       notes: notes.trim(),
       createdAt: new Date().toISOString(),
     };
@@ -207,6 +215,13 @@ const Index = () => {
           onRecipientNameChange={setRecipientName}
           onRecipientPhoneChange={setRecipientPhone}
           onDeliveryPersonChange={setDeliveryPerson}
+        />
+
+        <GiftCardSection
+          enabled={giftCardEnabled}
+          message={giftCardMessage}
+          onEnabledChange={setGiftCardEnabled}
+          onMessageChange={setGiftCardMessage}
         />
 
         <PaymentSection
