@@ -25,8 +25,27 @@ const OrderItemsSection = ({
 }: OrderItemsSectionProps) => {
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
+  const PRESETS = [
+    { name: "玫瑰花束", price: 680 },
+    { name: "向日葵花束", price: 480 },
+    { name: "百合花束", price: 580 },
+    { name: "繡球花束", price: 780 },
+    { name: "鮮花籃", price: 880 },
+    { name: "蘭花盆栽", price: 1200 },
+    { name: "多肉植物", price: 280 },
+    { name: "花藝佈置", price: 0 },
+    { name: "園藝保養", price: 0 },
+    { name: "套票（100支花）", price: 8800 },
+  ];
 
-  const addItem = () => {
+  const addPreset = (preset: { name: string; price: number }) => {
+    onItemsChange([
+      ...items,
+      { id: crypto.randomUUID(), name: preset.name, price: preset.price, quantity: 1 },
+    ]);
+  };
+
+
     if (!newName.trim()) return;
     const price = parseFloat(newPrice) || 0;
     onItemsChange([
