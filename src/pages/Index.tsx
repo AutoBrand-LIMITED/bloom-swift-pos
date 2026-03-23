@@ -157,6 +157,24 @@ const Index = () => {
       toast.success("訂單已建立 ✓");
     }
 
+    // Show print dialog
+    toast("列印單據", {
+      duration: 15000,
+      description: "選擇要列印嘅單據：",
+      action: {
+        label: "收據",
+        onClick: () => printDocument(generateReceipt(order)),
+      },
+      cancel: {
+        label: "全部列印",
+        onClick: () => {
+          printDocument(generateReceipt(order));
+          setTimeout(() => printDocument(generateDeliveryNote(order)), 500);
+          setTimeout(() => printDocument(generatePickingList(order)), 1000);
+        },
+      },
+    });
+
     resetForm();
   };
 

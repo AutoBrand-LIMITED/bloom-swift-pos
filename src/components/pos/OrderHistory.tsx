@@ -69,6 +69,7 @@ const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
                       </span>
                       <span className="font-mono font-bold text-sm">${order.finalPrice.toLocaleString()}</span>
                     </div>
+                    <PrintButtons order={order} />
                   </div>
                 );
               })}
