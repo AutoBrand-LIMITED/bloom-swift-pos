@@ -146,7 +146,7 @@ const Index = () => {
       reminderOption,
       deliveryDate,
       deliveryTime,
-      deliveryAddress: deliveryAddress.trim(),
+      deliveryAddress: [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail.trim()].filter(Boolean).join(" "),
       recipientName: recipientName.trim(),
       recipientPhone: recipientPhone.trim(),
       deliveryPerson: deliveryPerson.trim(),
