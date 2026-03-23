@@ -217,6 +217,13 @@ const Index = () => {
           onDeliveryPersonChange={setDeliveryPerson}
         />
 
+        <GiftCardSection
+          enabled={giftCardEnabled}
+          message={giftCardMessage}
+          onEnabledChange={setGiftCardEnabled}
+          onMessageChange={setGiftCardMessage}
+        />
+
         <PaymentSection
           subtotal={subtotal}
           finalPrice={finalPrice}

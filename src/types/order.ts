@@ -25,6 +25,8 @@ export interface Order {
   recipientName: string;
   recipientPhone: string;
   deliveryPerson: string;
+  giftCardEnabled: boolean;
+  giftCardMessage: string;
   notes: string;
   createdAt: string;
 }
