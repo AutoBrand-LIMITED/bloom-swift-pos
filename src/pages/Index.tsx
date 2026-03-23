@@ -50,6 +50,7 @@ const Index = () => {
   // Payment
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [depositAmount, setDepositAmount] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
   const [reminderOption, setReminderOption] = useState("none");
   const [priceOverridden, setPriceOverridden] = useState(false);
@@ -98,6 +99,7 @@ const Index = () => {
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
     setDepositAmount(0);
+    setPaymentMethod("");
     setFollowUpDate(undefined);
     setReminderOption("none");
     setPriceOverridden(false);
@@ -272,6 +274,8 @@ const Index = () => {
           onResetPrice={resetPrice}
           paymentStatus={paymentStatus}
           onPaymentStatusChange={setPaymentStatus}
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={setPaymentMethod}
           depositAmount={depositAmount}
           onDepositAmountChange={setDepositAmount}
           followUpDate={followUpDate}

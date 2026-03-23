@@ -17,6 +17,8 @@ interface PaymentSectionProps {
   onResetPrice: () => void;
   paymentStatus: PaymentStatus;
   onPaymentStatusChange: (s: PaymentStatus) => void;
+  paymentMethod: string;
+  onPaymentMethodChange: (v: string) => void;
   depositAmount: number;
   onDepositAmountChange: (v: number) => void;
   followUpDate: Date | undefined;
@@ -28,14 +30,26 @@ interface PaymentSectionProps {
 
 const statusConfig: Record<PaymentStatus, { label: string; className: string }> = {
   unpaid: { label: "未付款", className: "bg-destructive text-destructive-foreground" },
-  paid: { label: "已付款", className: "bg-success text-success-foreground" },
+  paid: { label: "立即付款", className: "bg-success text-success-foreground" },
   deposit: { label: "已付訂金", className: "bg-warning text-warning-foreground" },
 };
+
+const PAYMENT_METHODS = [
+  { value: "fps", label: "FPS 轉數快" },
+  { value: "credit_card", label: "信用卡" },
+  { value: "alipay", label: "支付寶 Alipay" },
+  { value: "wechat_pay", label: "WeChat Pay" },
+  { value: "payme", label: "PayMe" },
+  { value: "octopus", label: "八達通" },
+  { value: "cash", label: "現金" },
+  { value: "bank_transfer", label: "銀行轉賬" },
+];
 
 const PaymentSection = ({
   subtotal, finalPrice, priceOverridden,
   onFinalPriceChange, onResetPrice,
   paymentStatus, onPaymentStatusChange,
+  paymentMethod, onPaymentMethodChange,
   depositAmount, onDepositAmountChange,
   followUpDate, onFollowUpDateChange,
   reminderOption, onReminderOptionChange,
@@ -102,6 +116,28 @@ const PaymentSection = ({
         })}
       </div>
     </div>
+
+    {/* Payment method - show for paid and deposit */}
+    {(paymentStatus === "paid" || paymentStatus === "deposit") && (
+      <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+        <Label className="text-xs">付款方式</Label>
+        <div className="grid grid-cols-4 gap-1.5">
+          {PAYMENT_METHODS.map((m) => (
+            <button
+              key={m.value}
+              onClick={() => onPaymentMethodChange(m.value)}
+              className={`rounded-lg py-2 px-2 text-xs font-medium transition-all border ${
+                paymentMethod === m.value
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-secondary text-secondary-foreground border-transparent hover:border-border"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
 
     {/* Deposit amount */}
     {paymentStatus === "deposit" && (
