@@ -1,16 +1,234 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useMemo, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Flower2, ClipboardList, RotateCcw } from "lucide-react";
+import CustomerSection from "@/components/pos/CustomerSection";
+import OrderItemsSection from "@/components/pos/OrderItemsSection";
+import DeliverySection from "@/components/pos/DeliverySection";
+import PaymentSection from "@/components/pos/PaymentSection";
+import OrderHistory from "@/components/pos/OrderHistory";
+import type { Order, OrderItem, PaymentStatus } from "@/types/order";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const STORAGE_KEY = "florist-pos-orders";
+
+function loadOrders(): Order[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+const Index = () => {
+  // Customer
+  const [phone, setPhone] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [phoneError, setPhoneError] = useState(false);
+
+  // Items
+  const [items, setItems] = useState<OrderItem[]>([]);
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [urgentFee, setUrgentFee] = useState(0);
+  const [notes, setNotes] = useState("");
+
+  // Delivery
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryTime, setDeliveryTime] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+
+  // Payment
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
+  const [depositAmount, setDepositAmount] = useState(0);
+  const [priceOverridden, setPriceOverridden] = useState(false);
+  const [manualPrice, setManualPrice] = useState<number | null>(null);
+
+  // History
+  const [orders, setOrders] = useState<Order[]>(loadOrders);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const subtotal = useMemo(() => {
+    const itemsTotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    return itemsTotal + deliveryFee + urgentFee;
+  }, [items, deliveryFee, urgentFee]);
+
+  const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
+
+  const handleFinalPriceChange = (v: number) => {
+    setManualPrice(v);
+    setPriceOverridden(true);
+  };
+
+  const resetPrice = () => {
+    setPriceOverridden(false);
+    setManualPrice(null);
+  };
+
+  const unpaidCount = useMemo(() => orders.filter((o) => o.paymentStatus === "unpaid").length, [orders]);
+
+  const resetForm = useCallback(() => {
+    setPhone("");
+    setCustomerName("");
+    setPhoneError(false);
+    setItems([]);
+    setDeliveryFee(0);
+    setUrgentFee(0);
+    setNotes("");
+    setDeliveryDate("");
+    setDeliveryTime("");
+    setDeliveryAddress("");
+    setPaymentStatus("unpaid");
+    setDepositAmount(0);
+    setPriceOverridden(false);
+    setManualPrice(null);
+  }, []);
+
+  const handleSubmit = () => {
+    // Validation
+    if (!phone.trim()) {
+      setPhoneError(true);
+      toast.error("請輸入客戶電話號碼");
+      return;
+    }
+    setPhoneError(false);
+
+    if (items.length === 0) {
+      toast.error("請至少加入一個項目");
+      return;
+    }
+
+    if (finalPrice === 0) {
+      toast.warning("價格為 $0，訂單仍會建立");
+    }
+
+    const order: Order = {
+      id: crypto.randomUUID(),
+      customerName: customerName.trim(),
+      phone: phone.trim(),
+      items,
+      deliveryFee,
+      urgentFee,
+      subtotal,
+      finalPrice,
+      priceOverridden,
+      paymentStatus,
+      depositAmount: paymentStatus === "deposit" ? depositAmount : 0,
+      deliveryDate,
+      deliveryTime,
+      deliveryAddress: deliveryAddress.trim(),
+      notes: notes.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [...orders, order];
+    setOrders(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+    if (paymentStatus === "unpaid") {
+      toast.warning("訂單已建立 — 未付款，請跟進！", { duration: 5000 });
+    } else if (paymentStatus === "deposit") {
+      toast.info(`訂單已建立 — 已收訂金 $${depositAmount}，尚欠 $${finalPrice - depositAmount}`);
+    } else {
+      toast.success("訂單已建立 ✓");
+    }
+
+    resetForm();
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Flower2 className="w-6 h-6 text-primary" />
+            <h1 className="text-lg font-bold tracking-tight">花店 POS</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs">
+              <RotateCcw className="w-3.5 h-3.5" /> 清空
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setHistoryOpen(true)}
+              className="gap-1.5 text-xs relative"
+            >
+              <ClipboardList className="w-3.5 h-3.5" /> 訂單記錄
+              {unpaidCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {unpaidCount}
+                </span>
+              )}
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main form */}
+      <main className="max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
+        <CustomerSection
+          phone={phone}
+          customerName={customerName}
+          onPhoneChange={(v) => { setPhone(v); if (v.trim()) setPhoneError(false); }}
+          onNameChange={setCustomerName}
+          phoneError={phoneError}
+        />
+
+        <OrderItemsSection
+          items={items}
+          onItemsChange={setItems}
+          deliveryFee={deliveryFee}
+          urgentFee={urgentFee}
+          onDeliveryFeeChange={setDeliveryFee}
+          onUrgentFeeChange={setUrgentFee}
+          notes={notes}
+          onNotesChange={setNotes}
+        />
+
+        <DeliverySection
+          deliveryDate={deliveryDate}
+          deliveryTime={deliveryTime}
+          deliveryAddress={deliveryAddress}
+          onDateChange={setDeliveryDate}
+          onTimeChange={setDeliveryTime}
+          onAddressChange={setDeliveryAddress}
+        />
+
+        <PaymentSection
+          subtotal={subtotal}
+          finalPrice={finalPrice}
+          priceOverridden={priceOverridden}
+          onFinalPriceChange={handleFinalPriceChange}
+          onResetPrice={resetPrice}
+          paymentStatus={paymentStatus}
+          onPaymentStatusChange={setPaymentStatus}
+          depositAmount={depositAmount}
+          onDepositAmountChange={setDepositAmount}
+          priceWarning={finalPrice === 0 && items.length > 0}
+        />
+      </main>
+
+      {/* Sticky submit */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">總計</p>
+            <p className="text-2xl font-bold font-mono tracking-tight">${finalPrice.toLocaleString()}</p>
+          </div>
+          <Button
+            onClick={handleSubmit}
+            size="lg"
+            className="px-8 text-base font-semibold shadow-lg"
+          >
+            確認訂單
+          </Button>
+        </div>
+      </div>
+
+      {/* Order history drawer */}
+      <OrderHistory orders={orders} open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
