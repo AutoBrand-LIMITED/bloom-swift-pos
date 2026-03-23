@@ -45,7 +45,7 @@ const OrderItemsSection = ({
     ]);
   };
 
-
+  const addItem = () => {
     if (!newName.trim()) return;
     const price = parseFloat(newPrice) || 0;
     onItemsChange([
