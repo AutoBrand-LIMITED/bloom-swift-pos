@@ -9,6 +9,7 @@ import DeliverySection from "@/components/pos/DeliverySection";
 import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
+import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
