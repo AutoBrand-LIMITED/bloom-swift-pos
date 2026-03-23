@@ -16,6 +16,9 @@ interface OrderItemsSectionProps {
   onUrgentFeeChange: (v: number) => void;
   notes: string;
   onNotesChange: (v: string) => void;
+  budget: number;
+  onBudgetChange: (v: number) => void;
+  subtotal: number;
 }
 
 const OrderItemsSection = ({
