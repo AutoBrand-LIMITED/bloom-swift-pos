@@ -28,6 +28,8 @@ const Index = () => {
   // Customer
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
+  const [companyName, setCompanyName] = useState("");
   const [phoneError, setPhoneError] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
 
