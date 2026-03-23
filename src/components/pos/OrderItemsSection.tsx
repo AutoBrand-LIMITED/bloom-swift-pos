@@ -26,6 +26,7 @@ const OrderItemsSection = ({
   deliveryFee, urgentFee,
   onDeliveryFeeChange, onUrgentFeeChange,
   notes, onNotesChange,
+  budget, onBudgetChange, subtotal,
 }: OrderItemsSectionProps) => {
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
