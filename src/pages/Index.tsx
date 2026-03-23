@@ -274,6 +274,8 @@ const Index = () => {
           onResetPrice={resetPrice}
           paymentStatus={paymentStatus}
           onPaymentStatusChange={setPaymentStatus}
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={setPaymentMethod}
           depositAmount={depositAmount}
           onDepositAmountChange={setDepositAmount}
           followUpDate={followUpDate}
