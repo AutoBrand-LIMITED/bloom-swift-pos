@@ -10,6 +10,7 @@ import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
+import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
 const STORAGE_KEY = "florist-pos-orders";
 
@@ -26,6 +27,7 @@ const Index = () => {
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [phoneError, setPhoneError] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
 
   // Items
   const [budget, setBudget] = useState(0);
@@ -80,6 +82,7 @@ const Index = () => {
     setPhone("");
     setCustomerName("");
     setPhoneError(false);
+    setSelectedCustomer(null);
     setItems([]);
     setBudget(0);
     setDeliveryFee(0);
@@ -215,7 +218,14 @@ const Index = () => {
           customerName={customerName}
           onPhoneChange={(v) => { setPhone(v); if (v.trim()) setPhoneError(false); }}
           onNameChange={setCustomerName}
+          onCustomerSelect={(c) => {
+            setSelectedCustomer(c);
+            setCustomerName(c.name);
+            setPhone(c.phone);
+            setPhoneError(false);
+          }}
           phoneError={phoneError}
+          selectedCustomer={selectedCustomer}
         />
 
         <OrderItemsSection
