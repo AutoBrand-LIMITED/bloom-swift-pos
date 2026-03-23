@@ -49,6 +49,7 @@ const PaymentSection = ({
   subtotal, finalPrice, priceOverridden,
   onFinalPriceChange, onResetPrice,
   paymentStatus, onPaymentStatusChange,
+  paymentMethod, onPaymentMethodChange,
   depositAmount, onDepositAmountChange,
   followUpDate, onFollowUpDateChange,
   reminderOption, onReminderOptionChange,
