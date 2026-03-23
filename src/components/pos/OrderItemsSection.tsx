@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Trash2, Package, Truck, Zap, Wallet } from "lucide-react";
+import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import type { OrderItem } from "@/types/order";
 
 interface OrderItemsSectionProps {
