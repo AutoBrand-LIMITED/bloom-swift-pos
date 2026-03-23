@@ -46,6 +46,8 @@ const Index = () => {
   // Payment
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [depositAmount, setDepositAmount] = useState(0);
+  const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
+  const [reminderOption, setReminderOption] = useState("none");
   const [priceOverridden, setPriceOverridden] = useState(false);
   const [manualPrice, setManualPrice] = useState<number | null>(null);
 
@@ -90,6 +92,8 @@ const Index = () => {
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
     setDepositAmount(0);
+    setFollowUpDate(undefined);
+    setReminderOption("none");
     setPriceOverridden(false);
     setManualPrice(null);
   }, []);
@@ -124,6 +128,8 @@ const Index = () => {
       priceOverridden,
       paymentStatus,
       depositAmount: paymentStatus === "deposit" ? depositAmount : 0,
+      followUpDate: followUpDate ? followUpDate.toISOString() : "",
+      reminderOption,
       deliveryDate,
       deliveryTime,
       deliveryAddress: deliveryAddress.trim(),
@@ -234,6 +240,10 @@ const Index = () => {
           onPaymentStatusChange={setPaymentStatus}
           depositAmount={depositAmount}
           onDepositAmountChange={setDepositAmount}
+          followUpDate={followUpDate}
+          onFollowUpDateChange={setFollowUpDate}
+          reminderOption={reminderOption}
+          onReminderOptionChange={setReminderOption}
           priceWarning={finalPrice === 0 && items.length > 0}
         />
       </main>

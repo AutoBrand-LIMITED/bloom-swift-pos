@@ -19,6 +19,8 @@ export interface Order {
   priceOverridden: boolean;
   paymentStatus: PaymentStatus;
   depositAmount: number;
+  followUpDate: string;
+  reminderOption: string;
   deliveryDate: string;
   deliveryTime: string;
   deliveryAddress: string;
