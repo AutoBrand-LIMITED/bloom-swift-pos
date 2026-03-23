@@ -5,6 +5,7 @@ import { Flower2, ClipboardList, RotateCcw } from "lucide-react";
 import CustomerSection from "@/components/pos/CustomerSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
+import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
