@@ -129,6 +129,8 @@ const Index = () => {
       recipientName: recipientName.trim(),
       recipientPhone: recipientPhone.trim(),
       deliveryPerson: deliveryPerson.trim(),
+      giftCardEnabled,
+      giftCardMessage: giftCardEnabled ? giftCardMessage.trim() : "",
       notes: notes.trim(),
       createdAt: new Date().toISOString(),
     };
