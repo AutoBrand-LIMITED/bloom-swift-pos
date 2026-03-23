@@ -92,6 +92,8 @@ const Index = () => {
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
     setDepositAmount(0);
+    setFollowUpDate(undefined);
+    setReminderOption("none");
     setPriceOverridden(false);
     setManualPrice(null);
   }, []);
