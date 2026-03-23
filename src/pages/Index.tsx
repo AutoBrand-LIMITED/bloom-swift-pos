@@ -39,7 +39,10 @@ const Index = () => {
   // Delivery
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
-  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryRegion, setDeliveryRegion] = useState("");
+  const [deliveryDistrict, setDeliveryDistrict] = useState("");
+  const [deliveryArea, setDeliveryArea] = useState("");
+  const [deliveryDetail, setDeliveryDetail] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryPerson, setDeliveryPerson] = useState("");
@@ -91,7 +94,10 @@ const Index = () => {
     setNotes("");
     setDeliveryDate("");
     setDeliveryTime("");
-    setDeliveryAddress("");
+    setDeliveryRegion("");
+    setDeliveryDistrict("");
+    setDeliveryArea("");
+    setDeliveryDetail("");
     setRecipientName("");
     setRecipientPhone("");
     setDeliveryPerson("");
@@ -140,7 +146,7 @@ const Index = () => {
       reminderOption,
       deliveryDate,
       deliveryTime,
-      deliveryAddress: deliveryAddress.trim(),
+      deliveryAddress: [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail.trim()].filter(Boolean).join(" "),
       recipientName: recipientName.trim(),
       recipientPhone: recipientPhone.trim(),
       deliveryPerson: deliveryPerson.trim(),
@@ -247,13 +253,19 @@ const Index = () => {
         <DeliverySection
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
-          deliveryAddress={deliveryAddress}
+          deliveryRegion={deliveryRegion}
+          deliveryDistrict={deliveryDistrict}
+          deliveryArea={deliveryArea}
+          deliveryDetail={deliveryDetail}
           recipientName={recipientName}
           recipientPhone={recipientPhone}
           deliveryPerson={deliveryPerson}
           onDateChange={setDeliveryDate}
           onTimeChange={setDeliveryTime}
-          onAddressChange={setDeliveryAddress}
+          onRegionChange={setDeliveryRegion}
+          onDistrictChange={setDeliveryDistrict}
+          onAreaChange={setDeliveryArea}
+          onDetailChange={setDeliveryDetail}
           onRecipientNameChange={setRecipientName}
           onRecipientPhoneChange={setRecipientPhone}
           onDeliveryPersonChange={setDeliveryPerson}
