@@ -4,11 +4,17 @@ import { Label } from "@/components/ui/label";
 import { User, Phone, ChevronDown, Building2 } from "lucide-react";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
+export type CustomerType = "personal" | "company";
+
 interface CustomerSectionProps {
   phone: string;
   customerName: string;
+  customerType: CustomerType;
+  companyName: string;
   onPhoneChange: (v: string) => void;
   onNameChange: (v: string) => void;
+  onCustomerTypeChange: (v: CustomerType) => void;
+  onCompanyNameChange: (v: string) => void;
   onCustomerSelect: (c: DemoCustomer) => void;
   phoneError: boolean;
   selectedCustomer: DemoCustomer | null;
