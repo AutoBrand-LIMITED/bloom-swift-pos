@@ -28,6 +28,8 @@ const Index = () => {
   // Customer
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
+  const [companyName, setCompanyName] = useState("");
   const [phoneError, setPhoneError] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
 
@@ -48,6 +50,7 @@ const Index = () => {
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryPerson, setDeliveryPerson] = useState("");
+  const [failedDeliveryAction, setFailedDeliveryAction] = useState("none");
 
   // Gift card
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
@@ -87,6 +90,8 @@ const Index = () => {
   const resetForm = useCallback(() => {
     setPhone("");
     setCustomerName("");
+    setCustomerType("personal");
+    setCompanyName("");
     setPhoneError(false);
     setSelectedCustomer(null);
     setItems([]);
@@ -103,6 +108,7 @@ const Index = () => {
     setRecipientName("");
     setRecipientPhone("");
     setDeliveryPerson("");
+    setFailedDeliveryAction("none");
     setGiftCardEnabled(false);
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
@@ -236,8 +242,12 @@ const Index = () => {
         <CustomerSection
           phone={phone}
           customerName={customerName}
+          customerType={customerType}
+          companyName={companyName}
           onPhoneChange={(v) => { setPhone(v); if (v.trim()) setPhoneError(false); }}
           onNameChange={setCustomerName}
+          onCustomerTypeChange={setCustomerType}
+          onCompanyNameChange={setCompanyName}
           onCustomerSelect={(c) => {
             setSelectedCustomer(c);
             setCustomerName(c.name);
@@ -281,6 +291,8 @@ const Index = () => {
           onRecipientNameChange={setRecipientName}
           onRecipientPhoneChange={setRecipientPhone}
           onDeliveryPersonChange={setDeliveryPerson}
+          failedDeliveryAction={failedDeliveryAction}
+          onFailedDeliveryActionChange={setFailedDeliveryAction}
         />
 
         <GiftCardSection

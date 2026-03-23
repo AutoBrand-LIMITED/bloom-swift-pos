@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Calendar, Clock, User, UserCheck } from "lucide-react";
+import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle } from "lucide-react";
 
 const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
   "香港島": {
@@ -42,6 +42,7 @@ interface DeliverySectionProps {
   recipientName: string;
   recipientPhone: string;
   deliveryPerson: string;
+  failedDeliveryAction: string;
   onDateChange: (v: string) => void;
   onTimeChange: (v: string) => void;
   onRegionChange: (v: string) => void;
@@ -51,15 +52,17 @@ interface DeliverySectionProps {
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
   onDeliveryPersonChange: (v: string) => void;
+  onFailedDeliveryActionChange: (v: string) => void;
 }
 
 const DeliverySection = ({
   deliveryDate, deliveryTime,
   deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
-  recipientName, recipientPhone, deliveryPerson,
+  recipientName, recipientPhone, deliveryPerson, failedDeliveryAction,
   onDateChange, onTimeChange,
   onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
   onRecipientNameChange, onRecipientPhoneChange, onDeliveryPersonChange,
+  onFailedDeliveryActionChange,
 }: DeliverySectionProps) => {
   const districts = deliveryRegion ? Object.keys(HK_DISTRICTS[deliveryRegion] || {}) : [];
   const areas = deliveryRegion && deliveryDistrict
@@ -191,17 +194,38 @@ const DeliverySection = ({
       </div>
 
       {/* Delivery person */}
-      <div className="space-y-1">
-        <Label className="text-xs flex items-center gap-1">
-          <UserCheck className="w-3.5 h-3.5" /> 送貨人
-        </Label>
-        <Input
-          placeholder="負責送貨嘅同事名"
-          value={deliveryPerson}
-          onChange={(e) => onDeliveryPersonChange(e.target.value)}
-          className="text-sm"
-          maxLength={100}
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs flex items-center gap-1">
+            <UserCheck className="w-3.5 h-3.5" /> 送貨人
+          </Label>
+          <Input
+            placeholder="負責送貨嘅同事名"
+            value={deliveryPerson}
+            onChange={(e) => onDeliveryPersonChange(e.target.value)}
+            className="text-sm"
+            maxLength={100}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs flex items-center gap-1">
+            <AlertCircle className="w-3.5 h-3.5" /> 無法聯繫收件人
+          </Label>
+          <Select value={failedDeliveryAction} onValueChange={onFailedDeliveryActionChange}>
+            <SelectTrigger className="text-sm">
+              <SelectValue placeholder="選擇處理方式" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">不適用</SelectItem>
+              <SelectItem value="leave_door">放門口</SelectItem>
+              <SelectItem value="leave_security">交管理處 / 保安</SelectItem>
+              <SelectItem value="leave_neighbor">交鄰居</SelectItem>
+              <SelectItem value="return">帶回公司</SelectItem>
+              <SelectItem value="reschedule">改期再送</SelectItem>
+              <SelectItem value="call_sender">聯繫寄件人</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );
