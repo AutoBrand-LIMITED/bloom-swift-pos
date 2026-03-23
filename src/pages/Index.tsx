@@ -253,13 +253,19 @@ const Index = () => {
         <DeliverySection
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
-          deliveryAddress={deliveryAddress}
+          deliveryRegion={deliveryRegion}
+          deliveryDistrict={deliveryDistrict}
+          deliveryArea={deliveryArea}
+          deliveryDetail={deliveryDetail}
           recipientName={recipientName}
           recipientPhone={recipientPhone}
           deliveryPerson={deliveryPerson}
           onDateChange={setDeliveryDate}
           onTimeChange={setDeliveryTime}
-          onAddressChange={setDeliveryAddress}
+          onRegionChange={setDeliveryRegion}
+          onDistrictChange={setDeliveryDistrict}
+          onAreaChange={setDeliveryArea}
+          onDetailChange={setDeliveryDetail}
           onRecipientNameChange={setRecipientName}
           onRecipientPhoneChange={setRecipientPhone}
           onDeliveryPersonChange={setDeliveryPerson}
