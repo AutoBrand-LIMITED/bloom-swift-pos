@@ -39,7 +39,10 @@ const Index = () => {
   // Delivery
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
-  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryRegion, setDeliveryRegion] = useState("");
+  const [deliveryDistrict, setDeliveryDistrict] = useState("");
+  const [deliveryArea, setDeliveryArea] = useState("");
+  const [deliveryDetail, setDeliveryDetail] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryPerson, setDeliveryPerson] = useState("");
