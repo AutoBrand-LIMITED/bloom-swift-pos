@@ -90,6 +90,8 @@ const Index = () => {
   const resetForm = useCallback(() => {
     setPhone("");
     setCustomerName("");
+    setCustomerType("personal");
+    setCompanyName("");
     setPhoneError(false);
     setSelectedCustomer(null);
     setItems([]);
