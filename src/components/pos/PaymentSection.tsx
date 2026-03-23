@@ -117,6 +117,28 @@ const PaymentSection = ({
       </div>
     </div>
 
+    {/* Payment method - show for paid and deposit */}
+    {(paymentStatus === "paid" || paymentStatus === "deposit") && (
+      <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+        <Label className="text-xs">付款方式</Label>
+        <div className="grid grid-cols-4 gap-1.5">
+          {PAYMENT_METHODS.map((m) => (
+            <button
+              key={m.value}
+              onClick={() => onPaymentMethodChange(m.value)}
+              className={`rounded-lg py-2 px-2 text-xs font-medium transition-all border ${
+                paymentMethod === m.value
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-secondary text-secondary-foreground border-transparent hover:border-border"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+
     {/* Deposit amount */}
     {paymentStatus === "deposit" && (
       <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
