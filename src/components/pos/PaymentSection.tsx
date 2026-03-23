@@ -1,7 +1,12 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { CreditCard, AlertTriangle } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CreditCard, AlertTriangle, CalendarIcon, Bell } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import type { PaymentStatus } from "@/types/order";
 
 interface PaymentSectionProps {
