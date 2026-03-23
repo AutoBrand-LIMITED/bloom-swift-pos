@@ -39,6 +39,9 @@ const Index = () => {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryPerson, setDeliveryPerson] = useState("");
 
+  // Gift card
+  const [giftCardEnabled, setGiftCardEnabled] = useState(false);
+  const [giftCardMessage, setGiftCardMessage] = useState("");
   // Payment
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [depositAmount, setDepositAmount] = useState(0);
