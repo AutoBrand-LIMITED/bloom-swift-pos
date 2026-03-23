@@ -114,6 +114,7 @@ const CustomerSection = ({
             </div>
           )}
         </div>
+      </div>
     </div>
   );
 };
