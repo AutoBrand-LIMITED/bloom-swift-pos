@@ -7,10 +7,12 @@ interface AddOnsSectionProps {
 }
 
 const ADDONS = [
+  { name: "樓梯送貨（每層）", price: 50, emoji: "🪜" },
+  { name: "Soft Teddy", price: 180, emoji: "🧸" },
+  { name: "玻璃花樽 (6\"x16\"H或以下)", price: 250, emoji: "🫙" },
   { name: "精美陶瓷花盆", price: 180, emoji: "🏺" },
   { name: "日式花盆", price: 220, emoji: "🪴" },
   { name: "竹編花籃", price: 150, emoji: "🧺" },
-  { name: "玻璃花瓶", price: 120, emoji: "🫙" },
   { name: "保鮮花處理", price: 80, emoji: "💎" },
   { name: "花束包裝升級", price: 60, emoji: "🎀" },
   { name: "手寫賀卡", price: 30, emoji: "✉️" },
