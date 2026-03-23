@@ -35,6 +35,9 @@ const Index = () => {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [deliveryPerson, setDeliveryPerson] = useState("");
 
   // Payment
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
