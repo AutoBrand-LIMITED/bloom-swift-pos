@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Calendar, Clock, User, UserCheck } from "lucide-react";
+import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle } from "lucide-react";
 
 const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
   "香港島": {
