@@ -41,7 +41,6 @@ const PaymentSection = ({
   reminderOption, onReminderOptionChange,
   priceWarning,
 }: PaymentSectionProps) => (
-}: PaymentSectionProps) => (
   <div className="rounded-xl border border-border bg-card p-4 space-y-4">
     <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
       <CreditCard className="w-4 h-4" />
