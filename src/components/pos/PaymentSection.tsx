@@ -30,9 +30,20 @@ interface PaymentSectionProps {
 
 const statusConfig: Record<PaymentStatus, { label: string; className: string }> = {
   unpaid: { label: "未付款", className: "bg-destructive text-destructive-foreground" },
-  paid: { label: "已付款", className: "bg-success text-success-foreground" },
+  paid: { label: "立即付款", className: "bg-success text-success-foreground" },
   deposit: { label: "已付訂金", className: "bg-warning text-warning-foreground" },
 };
+
+const PAYMENT_METHODS = [
+  { value: "fps", label: "FPS 轉數快" },
+  { value: "credit_card", label: "信用卡" },
+  { value: "alipay", label: "支付寶 Alipay" },
+  { value: "wechat_pay", label: "WeChat Pay" },
+  { value: "payme", label: "PayMe" },
+  { value: "octopus", label: "八達通" },
+  { value: "cash", label: "現金" },
+  { value: "bank_transfer", label: "銀行轉賬" },
+];
 
 const PaymentSection = ({
   subtotal, finalPrice, priceOverridden,
