@@ -50,6 +50,7 @@ const Index = () => {
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryPerson, setDeliveryPerson] = useState("");
+  const [failedDeliveryAction, setFailedDeliveryAction] = useState("none");
 
   // Gift card
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
