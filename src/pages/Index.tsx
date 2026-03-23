@@ -242,8 +242,12 @@ const Index = () => {
         <CustomerSection
           phone={phone}
           customerName={customerName}
+          customerType={customerType}
+          companyName={companyName}
           onPhoneChange={(v) => { setPhone(v); if (v.trim()) setPhoneError(false); }}
           onNameChange={setCustomerName}
+          onCustomerTypeChange={setCustomerType}
+          onCompanyNameChange={setCompanyName}
           onCustomerSelect={(c) => {
             setSelectedCustomer(c);
             setCustomerName(c.name);
