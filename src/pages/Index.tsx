@@ -10,6 +10,7 @@ import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
+import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
 const STORAGE_KEY = "florist-pos-orders";
 
