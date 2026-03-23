@@ -27,6 +27,7 @@ const Index = () => {
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [phoneError, setPhoneError] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
 
   // Items
   const [budget, setBudget] = useState(0);
