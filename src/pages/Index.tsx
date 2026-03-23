@@ -198,9 +198,15 @@ const Index = () => {
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
           deliveryAddress={deliveryAddress}
+          recipientName={recipientName}
+          recipientPhone={recipientPhone}
+          deliveryPerson={deliveryPerson}
           onDateChange={setDeliveryDate}
           onTimeChange={setDeliveryTime}
           onAddressChange={setDeliveryAddress}
+          onRecipientNameChange={setRecipientName}
+          onRecipientPhoneChange={setRecipientPhone}
+          onDeliveryPersonChange={setDeliveryPerson}
         />
 
         <PaymentSection

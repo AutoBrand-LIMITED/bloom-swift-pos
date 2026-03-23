@@ -22,6 +22,9 @@ export interface Order {
   deliveryDate: string;
   deliveryTime: string;
   deliveryAddress: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryPerson: string;
   notes: string;
   createdAt: string;
 }
