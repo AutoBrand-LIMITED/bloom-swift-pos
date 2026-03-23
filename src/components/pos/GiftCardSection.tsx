@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Gift } from "lucide-react";
+import VoiceInputButton from "@/components/pos/VoiceInputButton";
 
 interface GiftCardSectionProps {
   enabled: boolean;
@@ -51,12 +52,18 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange }:
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label className="text-xs">卡片內容（支援 Markdown）</Label>
-              <button
-                onClick={() => setPreview(!preview)}
-                className="text-xs text-primary hover:underline"
-              >
-                {preview ? "編輯" : "預覽"}
-              </button>
+              <div className="flex items-center gap-2">
+                <VoiceInputButton
+                  onResult={(text) => onMessageChange(message ? `${message} ${text}` : text)}
+                  className="h-7 w-7"
+                />
+                <button
+                  onClick={() => setPreview(!preview)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  {preview ? "編輯" : "預覽"}
+                </button>
+              </div>
             </div>
 
             {preview ? (
