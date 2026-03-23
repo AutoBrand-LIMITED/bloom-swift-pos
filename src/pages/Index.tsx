@@ -291,6 +291,8 @@ const Index = () => {
           onRecipientNameChange={setRecipientName}
           onRecipientPhoneChange={setRecipientPhone}
           onDeliveryPersonChange={setDeliveryPerson}
+          failedDeliveryAction={failedDeliveryAction}
+          onFailedDeliveryActionChange={setFailedDeliveryAction}
         />
 
         <GiftCardSection
