@@ -9,6 +9,7 @@ import DeliverySection from "@/components/pos/DeliverySection";
 import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
+import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
@@ -190,10 +191,10 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Flower2 className="w-6 h-6 text-primary" />
             <h1 className="text-lg font-bold tracking-tight">花店 POS</h1>
@@ -219,8 +220,18 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main form */}
-      <main className="max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
+      {/* Body: left panel + main */}
+      <div className="flex flex-1">
+        {/* Left: Customer history panel */}
+        {selectedCustomer && (
+          <CustomerHistoryPanel
+            customer={selectedCustomer}
+            onClose={() => setSelectedCustomer(null)}
+          />
+        )}
+
+        {/* Main form */}
+        <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
         <CustomerSection
           phone={phone}
           customerName={customerName}
@@ -297,7 +308,7 @@ const Index = () => {
           priceWarning={finalPrice === 0 && items.length > 0}
         />
       </main>
-
+      </div>
       {/* Sticky submit */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
