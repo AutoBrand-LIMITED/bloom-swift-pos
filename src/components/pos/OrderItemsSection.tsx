@@ -3,7 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Package, Truck, Zap } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Plus, Trash2, Package, Truck, Zap, Wallet } from "lucide-react";
 import type { OrderItem } from "@/types/order";
 
 interface OrderItemsSectionProps {
