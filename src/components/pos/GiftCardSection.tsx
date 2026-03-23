@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Gift } from "lucide-react";
+import VoiceInputButton from "@/components/pos/VoiceInputButton";
 
 interface GiftCardSectionProps {
   enabled: boolean;
