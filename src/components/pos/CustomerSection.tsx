@@ -51,10 +51,50 @@ const CustomerSection = ({
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
-        <User className="w-4 h-4" />
-        客戶資料
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+          <User className="w-4 h-4" />
+          客戶資料
+        </h2>
+        <div className="flex rounded-lg overflow-hidden border border-border">
+          <button
+            onClick={() => onCustomerTypeChange("personal")}
+            className={`px-3 py-1 text-xs font-medium transition-colors ${
+              customerType === "personal"
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-secondary-foreground hover:bg-accent"
+            }`}
+          >
+            個人
+          </button>
+          <button
+            onClick={() => onCustomerTypeChange("company")}
+            className={`px-3 py-1 text-xs font-medium transition-colors ${
+              customerType === "company"
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-secondary-foreground hover:bg-accent"
+            }`}
+          >
+            <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> 公司</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Company name */}
+      {customerType === "company" && (
+        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+          <Label className="text-xs font-medium flex items-center gap-1">
+            <Building2 className="w-3.5 h-3.5" /> 公司名稱
+          </Label>
+          <Input
+            placeholder="輸入公司名稱"
+            value={companyName}
+            onChange={(e) => onCompanyNameChange(e.target.value)}
+            className="text-base"
+            maxLength={100}
+          />
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="phone" className="text-xs font-medium">
