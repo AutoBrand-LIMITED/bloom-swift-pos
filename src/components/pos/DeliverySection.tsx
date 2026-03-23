@@ -58,10 +58,11 @@ interface DeliverySectionProps {
 const DeliverySection = ({
   deliveryDate, deliveryTime,
   deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
-  recipientName, recipientPhone, deliveryPerson,
+  recipientName, recipientPhone, deliveryPerson, failedDeliveryAction,
   onDateChange, onTimeChange,
   onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
   onRecipientNameChange, onRecipientPhoneChange, onDeliveryPersonChange,
+  onFailedDeliveryActionChange,
 }: DeliverySectionProps) => {
   const districts = deliveryRegion ? Object.keys(HK_DISTRICTS[deliveryRegion] || {}) : [];
   const areas = deliveryRegion && deliveryDistrict
