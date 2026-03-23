@@ -232,7 +232,13 @@ const OrderItemsSection = ({
 
       {/* Notes */}
       <div className="space-y-1 pt-2 border-t border-border">
-        <Label className="text-xs">備註</Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">備註</Label>
+          <VoiceInputButton
+            onResult={(text) => onNotesChange(notes ? `${notes} ${text}` : text)}
+            className="h-7 w-7"
+          />
+        </div>
         <Textarea
           placeholder="例如：紅白配、不要滿天星、附卡片寫..."
           value={notes}
