@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, Printer } from "lucide-react";
+import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
 import CustomerSection from "@/components/pos/CustomerSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
