@@ -35,6 +35,9 @@ const Index = () => {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [deliveryPerson, setDeliveryPerson] = useState("");
 
   // Payment
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
@@ -76,6 +79,9 @@ const Index = () => {
     setDeliveryDate("");
     setDeliveryTime("");
     setDeliveryAddress("");
+    setRecipientName("");
+    setRecipientPhone("");
+    setDeliveryPerson("");
     setPaymentStatus("unpaid");
     setDepositAmount(0);
     setPriceOverridden(false);
@@ -115,6 +121,9 @@ const Index = () => {
       deliveryDate,
       deliveryTime,
       deliveryAddress: deliveryAddress.trim(),
+      recipientName: recipientName.trim(),
+      recipientPhone: recipientPhone.trim(),
+      deliveryPerson: deliveryPerson.trim(),
       notes: notes.trim(),
       createdAt: new Date().toISOString(),
     };
@@ -189,9 +198,15 @@ const Index = () => {
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
           deliveryAddress={deliveryAddress}
+          recipientName={recipientName}
+          recipientPhone={recipientPhone}
+          deliveryPerson={deliveryPerson}
           onDateChange={setDeliveryDate}
           onTimeChange={setDeliveryTime}
           onAddressChange={setDeliveryAddress}
+          onRecipientNameChange={setRecipientName}
+          onRecipientPhoneChange={setRecipientPhone}
+          onDeliveryPersonChange={setDeliveryPerson}
         />
 
         <PaymentSection
