@@ -21,7 +21,8 @@ interface CustomerSectionProps {
 }
 
 const CustomerSection = ({
-  phone, customerName, onPhoneChange, onNameChange,
+  phone, customerName, customerType, companyName,
+  onPhoneChange, onNameChange, onCustomerTypeChange, onCompanyNameChange,
   onCustomerSelect, phoneError, selectedCustomer,
 }: CustomerSectionProps) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
