@@ -42,6 +42,7 @@ interface DeliverySectionProps {
   recipientName: string;
   recipientPhone: string;
   deliveryPerson: string;
+  failedDeliveryAction: string;
   onDateChange: (v: string) => void;
   onTimeChange: (v: string) => void;
   onRegionChange: (v: string) => void;
@@ -51,6 +52,7 @@ interface DeliverySectionProps {
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
   onDeliveryPersonChange: (v: string) => void;
+  onFailedDeliveryActionChange: (v: string) => void;
 }
 
 const DeliverySection = ({
