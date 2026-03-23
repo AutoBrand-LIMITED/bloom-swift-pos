@@ -1,0 +1,27 @@
+export interface OrderItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export type PaymentStatus = "unpaid" | "paid" | "deposit";
+
+export interface Order {
+  id: string;
+  customerName: string;
+  phone: string;
+  items: OrderItem[];
+  deliveryFee: number;
+  urgentFee: number;
+  subtotal: number;
+  finalPrice: number;
+  priceOverridden: boolean;
+  paymentStatus: PaymentStatus;
+  depositAmount: number;
+  deliveryDate: string;
+  deliveryTime: string;
+  deliveryAddress: string;
+  notes: string;
+  createdAt: string;
+}
