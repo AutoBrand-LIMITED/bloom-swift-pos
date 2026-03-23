@@ -8,6 +8,7 @@ import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
 import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
+import AddOnsSection from "@/components/pos/AddOnsSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
@@ -306,6 +307,11 @@ const Index = () => {
           reminderOption={reminderOption}
           onReminderOptionChange={setReminderOption}
           priceWarning={finalPrice === 0 && items.length > 0}
+        />
+
+        <AddOnsSection
+          items={items}
+          onItemsChange={setItems}
         />
       </main>
       </div>
