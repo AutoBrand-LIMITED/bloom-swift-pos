@@ -121,6 +121,9 @@ const Index = () => {
       deliveryDate,
       deliveryTime,
       deliveryAddress: deliveryAddress.trim(),
+      recipientName: recipientName.trim(),
+      recipientPhone: recipientPhone.trim(),
+      deliveryPerson: deliveryPerson.trim(),
       notes: notes.trim(),
       createdAt: new Date().toISOString(),
     };
