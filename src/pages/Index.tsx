@@ -46,6 +46,8 @@ const Index = () => {
   // Payment
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [depositAmount, setDepositAmount] = useState(0);
+  const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
+  const [reminderOption, setReminderOption] = useState("none");
   const [priceOverridden, setPriceOverridden] = useState(false);
   const [manualPrice, setManualPrice] = useState<number | null>(null);
 
