@@ -27,6 +27,7 @@ const Index = () => {
   const [phoneError, setPhoneError] = useState(false);
 
   // Items
+  const [budget, setBudget] = useState(0);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [urgentFee, setUrgentFee] = useState(0);
@@ -79,6 +80,7 @@ const Index = () => {
     setCustomerName("");
     setPhoneError(false);
     setItems([]);
+    setBudget(0);
     setDeliveryFee(0);
     setUrgentFee(0);
     setNotes("");
@@ -206,6 +208,9 @@ const Index = () => {
           onUrgentFeeChange={setUrgentFee}
           notes={notes}
           onNotesChange={setNotes}
+          budget={budget}
+          onBudgetChange={setBudget}
+          subtotal={subtotal}
         />
 
         <DeliverySection
