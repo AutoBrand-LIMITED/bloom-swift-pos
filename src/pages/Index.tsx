@@ -108,6 +108,7 @@ const Index = () => {
     setRecipientName("");
     setRecipientPhone("");
     setDeliveryPerson("");
+    setFailedDeliveryAction("none");
     setGiftCardEnabled(false);
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
