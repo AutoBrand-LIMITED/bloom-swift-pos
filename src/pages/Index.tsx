@@ -82,6 +82,7 @@ const Index = () => {
     setPhone("");
     setCustomerName("");
     setPhoneError(false);
+    setSelectedCustomer(null);
     setItems([]);
     setBudget(0);
     setDeliveryFee(0);
