@@ -114,50 +114,6 @@ const CustomerSection = ({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Purchase history */}
-      {selectedCustomer && (
-        <div className="mt-2 rounded-lg border border-border bg-secondary/30 p-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground">
-              <History className="w-3.5 h-3.5" />
-              {selectedCustomer.name} 嘅購買記錄
-            </h3>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-muted-foreground">
-                累計消費 <span className="font-mono font-semibold text-foreground">${totalSpent.toLocaleString()}</span>
-              </span>
-              {unpaidCount > 0 && (
-                <span className="text-destructive font-medium">{unpaidCount} 筆未付款</span>
-              )}
-            </div>
-          </div>
-          <div className="space-y-1">
-            {selectedCustomer.history.map((h, i) => (
-              <div
-                key={i}
-                className={`flex items-center justify-between py-1.5 px-2 rounded text-xs ${
-                  h.status === "unpaid" ? "bg-destructive/5" : ""
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground font-mono w-20 shrink-0">{h.date}</span>
-                  <span>{h.items}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-medium">${h.total.toLocaleString()}</span>
-                  {h.status === "unpaid" ? (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">未付</span>
-                  ) : (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">已付</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
