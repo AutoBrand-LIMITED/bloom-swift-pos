@@ -27,6 +27,7 @@ const Index = () => {
   const [phoneError, setPhoneError] = useState(false);
 
   // Items
+  const [budget, setBudget] = useState(0);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [urgentFee, setUrgentFee] = useState(0);
