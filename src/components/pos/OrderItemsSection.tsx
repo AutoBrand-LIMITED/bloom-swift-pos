@@ -47,10 +47,26 @@ const OrderItemsSection = ({
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-      <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
-        <Package className="w-4 h-4" />
-        訂單內容
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+          <Package className="w-4 h-4" />
+          訂單內容
+        </h2>
+      </div>
+
+      {/* Quick presets */}
+      <div className="flex flex-wrap gap-1.5">
+        {PRESETS.map((p) => (
+          <button
+            key={p.name}
+            onClick={() => addPreset(p)}
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary/60 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground"
+          >
+            <Plus className="w-3 h-3" />
+            {p.name} {p.price > 0 && <span className="font-mono opacity-70">${p.price}</span>}
+          </button>
+        ))}
+      </div>
 
       {/* Item list */}
       {items.length > 0 && (
