@@ -85,6 +85,8 @@ const Index = () => {
     setRecipientName("");
     setRecipientPhone("");
     setDeliveryPerson("");
+    setGiftCardEnabled(false);
+    setGiftCardMessage("");
     setPaymentStatus("unpaid");
     setDepositAmount(0);
     setPriceOverridden(false);
