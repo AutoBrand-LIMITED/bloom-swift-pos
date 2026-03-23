@@ -218,7 +218,14 @@ const Index = () => {
           customerName={customerName}
           onPhoneChange={(v) => { setPhone(v); if (v.trim()) setPhoneError(false); }}
           onNameChange={setCustomerName}
+          onCustomerSelect={(c) => {
+            setSelectedCustomer(c);
+            setCustomerName(c.name);
+            setPhone(c.phone);
+            setPhoneError(false);
+          }}
           phoneError={phoneError}
+          selectedCustomer={selectedCustomer}
         />
 
         <OrderItemsSection
