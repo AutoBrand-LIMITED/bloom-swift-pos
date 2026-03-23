@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Trash2, Package, Truck, Zap, Wallet } from "lucide-react";
+import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import type { OrderItem } from "@/types/order";
 
 interface OrderItemsSectionProps {
@@ -170,14 +171,17 @@ const OrderItemsSection = ({
       <div className="flex items-end gap-2">
         <div className="flex-1 space-y-1">
           <Label className="text-xs">新增項目</Label>
-          <Input
-            placeholder="例如：玫瑰花束、植物盆栽"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addItem()}
-            className="text-sm"
-            maxLength={100}
-          />
+          <div className="flex gap-1.5">
+            <Input
+              placeholder="例如：玫瑰花束、植物盆栽"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addItem()}
+              className="text-sm"
+              maxLength={100}
+            />
+            <VoiceInputButton onResult={(text) => setNewName((prev) => prev ? `${prev} ${text}` : text)} />
+          </div>
         </div>
         <div className="w-28 space-y-1">
           <Label className="text-xs">價格 ($)</Label>
@@ -228,7 +232,13 @@ const OrderItemsSection = ({
 
       {/* Notes */}
       <div className="space-y-1 pt-2 border-t border-border">
-        <Label className="text-xs">備註</Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">備註</Label>
+          <VoiceInputButton
+            onResult={(text) => onNotesChange(notes ? `${notes} ${text}` : text)}
+            className="h-7 w-7"
+          />
+        </div>
         <Textarea
           placeholder="例如：紅白配、不要滿天星、附卡片寫..."
           value={notes}
