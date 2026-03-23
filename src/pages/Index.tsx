@@ -128,6 +128,8 @@ const Index = () => {
       priceOverridden,
       paymentStatus,
       depositAmount: paymentStatus === "deposit" ? depositAmount : 0,
+      followUpDate: followUpDate ? followUpDate.toISOString() : "",
+      reminderOption,
       deliveryDate,
       deliveryTime,
       deliveryAddress: deliveryAddress.trim(),
