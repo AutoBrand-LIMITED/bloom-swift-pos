@@ -208,6 +208,9 @@ const Index = () => {
           onUrgentFeeChange={setUrgentFee}
           notes={notes}
           onNotesChange={setNotes}
+          budget={budget}
+          onBudgetChange={setBudget}
+          subtotal={subtotal}
         />
 
         <DeliverySection

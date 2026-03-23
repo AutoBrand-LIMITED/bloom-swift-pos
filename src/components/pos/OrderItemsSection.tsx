@@ -78,6 +78,41 @@ const OrderItemsSection = ({
         </h2>
       </div>
 
+      {/* Budget */}
+      <div className="space-y-2 rounded-lg bg-secondary/50 p-3">
+        <div className="flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-primary" />
+          <Label className="text-xs font-medium">客人預算</Label>
+          <div className="flex items-center gap-1 ml-auto">
+            <span className="text-xs text-muted-foreground">$</span>
+            <Input
+              type="number"
+              value={budget || ""}
+              onChange={(e) => onBudgetChange(parseFloat(e.target.value) || 0)}
+              placeholder="輸入預算"
+              className="w-28 h-8 text-sm font-mono text-right bg-card"
+              min={0}
+            />
+          </div>
+        </div>
+        {budget > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">已用 ${subtotal.toLocaleString()}</span>
+              <span className={`font-mono font-medium ${budget - subtotal < 0 ? "text-destructive" : "text-primary"}`}>
+                {budget - subtotal >= 0
+                  ? `剩餘 $${(budget - subtotal).toLocaleString()}`
+                  : `超出 $${(subtotal - budget).toLocaleString()}`}
+              </span>
+            </div>
+            <Progress
+              value={Math.min((subtotal / budget) * 100, 100)}
+              className={`h-2 ${subtotal > budget ? "[&>div]:bg-destructive" : "[&>div]:bg-primary"}`}
+            />
+          </div>
+        )}
+      </div>
+
       {/* Quick presets */}
       <div className="flex flex-wrap gap-1.5">
         {PRESETS.map((p) => (
