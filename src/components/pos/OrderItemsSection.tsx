@@ -79,7 +79,24 @@ const OrderItemsSection = ({
           <Package className="w-4 h-4" />
           訂單內容
         </h2>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 text-xs"
+          onClick={() => setCustomOrderOpen(true)}
+        >
+          <Sparkles className="w-3.5 h-3.5" /> 客制訂單
+        </Button>
       </div>
+
+      <CustomOrderDialog
+        open={customOrderOpen}
+        onClose={() => setCustomOrderOpen(false)}
+        onConfirm={(summary) => {
+          onNotesChange(notes ? `${notes}\n\n${summary}` : summary);
+          setCustomOrderOpen(false);
+        }}
+      />
 
       {/* Budget */}
       <div className="space-y-2 rounded-lg bg-secondary/50 p-3">
