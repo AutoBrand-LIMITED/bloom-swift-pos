@@ -308,6 +308,11 @@ const Index = () => {
           onReminderOptionChange={setReminderOption}
           priceWarning={finalPrice === 0 && items.length > 0}
         />
+
+        <AddOnsSection
+          items={items}
+          onItemsChange={setItems}
+        />
       </main>
       </div>
       {/* Sticky submit */}
