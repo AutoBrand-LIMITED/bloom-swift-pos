@@ -17,6 +17,8 @@ interface PaymentSectionProps {
   onResetPrice: () => void;
   paymentStatus: PaymentStatus;
   onPaymentStatusChange: (s: PaymentStatus) => void;
+  paymentMethod: string;
+  onPaymentMethodChange: (v: string) => void;
   depositAmount: number;
   onDepositAmountChange: (v: number) => void;
   followUpDate: Date | undefined;
