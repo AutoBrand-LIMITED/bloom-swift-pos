@@ -19,6 +19,10 @@ interface PaymentSectionProps {
   onPaymentStatusChange: (s: PaymentStatus) => void;
   depositAmount: number;
   onDepositAmountChange: (v: number) => void;
+  followUpDate: Date | undefined;
+  onFollowUpDateChange: (d: Date | undefined) => void;
+  reminderOption: string;
+  onReminderOptionChange: (v: string) => void;
   priceWarning: boolean;
 }
 
