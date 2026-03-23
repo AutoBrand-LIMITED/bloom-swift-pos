@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Phone, ChevronDown, History, X } from "lucide-react";
+import { User, Phone, ChevronDown } from "lucide-react";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
 interface CustomerSectionProps {
