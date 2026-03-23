@@ -94,7 +94,10 @@ const Index = () => {
     setNotes("");
     setDeliveryDate("");
     setDeliveryTime("");
-    setDeliveryAddress("");
+    setDeliveryRegion("");
+    setDeliveryDistrict("");
+    setDeliveryArea("");
+    setDeliveryDetail("");
     setRecipientName("");
     setRecipientPhone("");
     setDeliveryPerson("");
