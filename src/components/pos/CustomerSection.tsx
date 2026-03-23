@@ -42,13 +42,6 @@ const CustomerSection = ({
     setSearch("");
   };
 
-  const totalSpent = selectedCustomer
-    ? selectedCustomer.history.reduce((s, h) => s + h.total, 0)
-    : 0;
-  const unpaidCount = selectedCustomer
-    ? selectedCustomer.history.filter((h) => h.status === "unpaid").length
-    : 0;
-
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
