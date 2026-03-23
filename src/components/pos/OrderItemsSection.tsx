@@ -32,6 +32,7 @@ const OrderItemsSection = ({
 }: OrderItemsSectionProps) => {
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
+  const [customOrderOpen, setCustomOrderOpen] = useState(false);
   const PRESETS = [
     { name: "玫瑰花束", price: 680 },
     { name: "向日葵花束", price: 480 },
