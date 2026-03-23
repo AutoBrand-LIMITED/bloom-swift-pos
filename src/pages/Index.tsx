@@ -99,6 +99,7 @@ const Index = () => {
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
     setDepositAmount(0);
+    setPaymentMethod("");
     setFollowUpDate(undefined);
     setReminderOption("none");
     setPriceOverridden(false);
