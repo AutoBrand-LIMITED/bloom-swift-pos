@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Trash2, Package, Truck, Zap, Wallet } from "lucide-react";
+import { Plus, Trash2, Package, Truck, Zap, Wallet, Sparkles } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
+import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
 
 interface OrderItemsSectionProps {
@@ -31,6 +32,7 @@ const OrderItemsSection = ({
 }: OrderItemsSectionProps) => {
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
+  const [customOrderOpen, setCustomOrderOpen] = useState(false);
   const PRESETS = [
     { name: "玫瑰花束", price: 680 },
     { name: "向日葵花束", price: 480 },
@@ -77,7 +79,24 @@ const OrderItemsSection = ({
           <Package className="w-4 h-4" />
           訂單內容
         </h2>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 text-xs"
+          onClick={() => setCustomOrderOpen(true)}
+        >
+          <Sparkles className="w-3.5 h-3.5" /> 客制訂單
+        </Button>
       </div>
+
+      <CustomOrderDialog
+        open={customOrderOpen}
+        onClose={() => setCustomOrderOpen(false)}
+        onConfirm={(summary) => {
+          onNotesChange(notes ? `${notes}\n\n${summary}` : summary);
+          setCustomOrderOpen(false);
+        }}
+      />
 
       {/* Budget */}
       <div className="space-y-2 rounded-lg bg-secondary/50 p-3">
