@@ -240,6 +240,10 @@ const Index = () => {
           onPaymentStatusChange={setPaymentStatus}
           depositAmount={depositAmount}
           onDepositAmountChange={setDepositAmount}
+          followUpDate={followUpDate}
+          onFollowUpDateChange={setFollowUpDate}
+          reminderOption={reminderOption}
+          onReminderOptionChange={setReminderOption}
           priceWarning={finalPrice === 0 && items.length > 0}
         />
       </main>
