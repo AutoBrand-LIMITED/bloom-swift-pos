@@ -79,6 +79,9 @@ const Index = () => {
     setDeliveryDate("");
     setDeliveryTime("");
     setDeliveryAddress("");
+    setRecipientName("");
+    setRecipientPhone("");
+    setDeliveryPerson("");
     setPaymentStatus("unpaid");
     setDepositAmount(0);
     setPriceOverridden(false);
