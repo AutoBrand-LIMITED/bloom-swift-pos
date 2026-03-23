@@ -194,17 +194,38 @@ const DeliverySection = ({
       </div>
 
       {/* Delivery person */}
-      <div className="space-y-1">
-        <Label className="text-xs flex items-center gap-1">
-          <UserCheck className="w-3.5 h-3.5" /> 送貨人
-        </Label>
-        <Input
-          placeholder="負責送貨嘅同事名"
-          value={deliveryPerson}
-          onChange={(e) => onDeliveryPersonChange(e.target.value)}
-          className="text-sm"
-          maxLength={100}
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs flex items-center gap-1">
+            <UserCheck className="w-3.5 h-3.5" /> 送貨人
+          </Label>
+          <Input
+            placeholder="負責送貨嘅同事名"
+            value={deliveryPerson}
+            onChange={(e) => onDeliveryPersonChange(e.target.value)}
+            className="text-sm"
+            maxLength={100}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs flex items-center gap-1">
+            <AlertCircle className="w-3.5 h-3.5" /> 無法聯繫收件人
+          </Label>
+          <Select value={failedDeliveryAction} onValueChange={onFailedDeliveryActionChange}>
+            <SelectTrigger className="text-sm">
+              <SelectValue placeholder="選擇處理方式" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">不適用</SelectItem>
+              <SelectItem value="leave_door">放門口</SelectItem>
+              <SelectItem value="leave_security">交管理處 / 保安</SelectItem>
+              <SelectItem value="leave_neighbor">交鄰居</SelectItem>
+              <SelectItem value="return">帶回公司</SelectItem>
+              <SelectItem value="reschedule">改期再送</SelectItem>
+              <SelectItem value="call_sender">聯繫寄件人</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );
