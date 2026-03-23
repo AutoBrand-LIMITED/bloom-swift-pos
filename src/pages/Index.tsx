@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, Printer } from "lucide-react";
+import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
 import CustomerSection from "@/components/pos/CustomerSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
@@ -155,6 +156,24 @@ const Index = () => {
     } else {
       toast.success("訂單已建立 ✓");
     }
+
+    // Show print dialog
+    toast("列印單據", {
+      duration: 15000,
+      description: "選擇要列印嘅單據：",
+      action: {
+        label: "收據",
+        onClick: () => printDocument(generateReceipt(order)),
+      },
+      cancel: {
+        label: "全部列印",
+        onClick: () => {
+          printDocument(generateReceipt(order));
+          setTimeout(() => printDocument(generateDeliveryNote(order)), 500);
+          setTimeout(() => printDocument(generatePickingList(order)), 1000);
+        },
+      },
+    });
 
     resetForm();
   };

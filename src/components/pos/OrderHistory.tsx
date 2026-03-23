@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClipboardList, X } from "lucide-react";
+import PrintButtons from "@/components/pos/PrintButtons";
 import type { Order, PaymentStatus } from "@/types/order";
 
 interface OrderHistoryProps {
@@ -68,6 +69,7 @@ const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
                       </span>
                       <span className="font-mono font-bold text-sm">${order.finalPrice.toLocaleString()}</span>
                     </div>
+                    <PrintButtons order={order} />
                   </div>
                 );
               })}
