@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { User, Phone, ChevronDown, Building2 } from "lucide-react";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
+import { loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
 
 export type CustomerType = "personal" | "company";
 
@@ -18,12 +19,13 @@ interface CustomerSectionProps {
   onCustomerSelect: (c: DemoCustomer) => void;
   phoneError: boolean;
   selectedCustomer: DemoCustomer | null;
+  refreshKey?: number;
 }
 
 const CustomerSection = ({
   phone, customerName, customerType, companyName,
   onPhoneChange, onNameChange, onCustomerTypeChange, onCompanyNameChange,
-  onCustomerSelect, phoneError, selectedCustomer,
+  onCustomerSelect, phoneError, selectedCustomer, refreshKey,
 }: CustomerSectionProps) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -39,8 +41,15 @@ const CustomerSection = ({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const filtered = DEMO_CUSTOMERS.filter(
-    (c) => c.name.includes(search) || c.phone.includes(search)
+  // Merge demo customers with imported customers from localStorage
+  const allCustomers = useMemo(() => {
+    const stored = loadStoredCustomers();
+    return mergeCustomers(DEMO_CUSTOMERS, stored);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
+
+  const filtered = allCustomers.filter(
+    (c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search)
   );
 
   const handleSelect = (c: DemoCustomer) => {
