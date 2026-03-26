@@ -209,7 +209,7 @@ const Index = () => {
             <h1 className="text-lg font-bold tracking-tight">花店 POS</h1>
           </div>
           <div className="flex items-center gap-2">
-            <CsvImportButton existingOrders={orders} onImport={setOrders} onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
+            <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
             <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs">
               <RotateCcw className="w-3.5 h-3.5" /> 清空
             </Button>
