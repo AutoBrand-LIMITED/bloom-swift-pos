@@ -13,6 +13,8 @@ import AddOnsSection from "@/components/pos/AddOnsSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
+import { SALES_STAFF } from "@/types/order";
+import SalesIdSection from "@/components/pos/SalesIdSection";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
 const STORAGE_KEY = "florist-pos-orders";
@@ -62,6 +64,7 @@ const Index = () => {
   const [depositAmount, setDepositAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
+  const [salesId, setSalesId] = useState("");
   const [reminderOption, setReminderOption] = useState("none");
   const [priceOverridden, setPriceOverridden] = useState(false);
   const [manualPrice, setManualPrice] = useState<number | null>(null);
@@ -120,6 +123,7 @@ const Index = () => {
     setReminderOption("none");
     setPriceOverridden(false);
     setManualPrice(null);
+    setSalesId("");
   }, []);
 
   const handleSubmit = () => {
@@ -142,7 +146,7 @@ const Index = () => {
 
     const order: Order = {
       id: crypto.randomUUID(),
-      customerName: customerName.trim(),
+      salesId,
       phone: phone.trim(),
       items,
       deliveryFee,

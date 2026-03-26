@@ -155,7 +155,7 @@ export function parseCsvToOrders(csvText: string): Order[] {
 
     const order: Order = {
       id: crypto.randomUUID(),
-      customerName,
+      salesId: first.salesPerson || "",
       phone,
       items,
       deliveryFee: 0,
