@@ -11,9 +11,27 @@ interface CustomerHistoryPanelProps {
 }
 
 const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHistoryPanelProps) => {
-  if (!customer) return null;
+  const totalSpent = customer?.history.reduce((s, h) => s + h.total, 0) ?? 0;
+  const unpaidCount = customer?.history.filter((h) => h.status === "unpaid").length ?? 0;
+  const unpaidTotal = customer?.history
+    .filter((h) => h.status === "unpaid")
+    .reduce((s, h) => s + h.total, 0) ?? 0;
 
-  const totalSpent = customer.history.reduce((s, h) => s + h.total, 0);
+  const pastAddresses = useMemo(() => {
+    if (!customer) return [];
+    const seen = new Set<string>();
+    const addrs: { address: string; recipientName?: string; date: string }[] = [];
+    for (const h of customer.history) {
+      const addr = h.deliveryAddress?.trim();
+      if (addr && !seen.has(addr)) {
+        seen.add(addr);
+        addrs.push({ address: addr, recipientName: h.recipientName, date: h.date });
+      }
+    }
+    return addrs;
+  }, [customer]);
+
+  if (!customer) return null;
   const unpaidCount = customer.history.filter((h) => h.status === "unpaid").length;
   const unpaidTotal = customer.history
     .filter((h) => h.status === "unpaid")
