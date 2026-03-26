@@ -85,7 +85,7 @@ const DeliverySection = ({
     .filter(Boolean)
     .join(" ");
 
-  return (
+  const mapQuery = encodeURIComponent(fullAddress + " 香港");
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
         <MapPin className="w-4 h-4" />

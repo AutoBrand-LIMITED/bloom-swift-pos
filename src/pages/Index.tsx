@@ -147,6 +147,7 @@ const Index = () => {
     const order: Order = {
       id: crypto.randomUUID(),
       salesId,
+      customerName: customerName.trim(),
       phone: phone.trim(),
       items,
       deliveryFee,
