@@ -85,6 +85,8 @@ const DeliverySection = ({
     .filter(Boolean)
     .join(" ");
 
+  const mapQuery = encodeURIComponent(fullAddress + " 香港");
+
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
@@ -164,6 +166,19 @@ const DeliverySection = ({
           <p className="text-xs text-muted-foreground">
             📍 {fullAddress}
           </p>
+        )}
+        {fullAddress.length > 2 && (
+          <div className="rounded-lg overflow-hidden border border-border mt-2">
+            <iframe
+              title="Google Map"
+              width="100%"
+              height="200"
+              style={{ border: 0 }}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
+            />
+          </div>
         )}
       </div>
 

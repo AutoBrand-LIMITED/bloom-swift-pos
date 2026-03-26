@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
 import CustomerSection from "@/components/pos/CustomerSection";
@@ -13,6 +14,8 @@ import AddOnsSection from "@/components/pos/AddOnsSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
+import { SALES_STAFF } from "@/types/order";
+import SalesIdSection from "@/components/pos/SalesIdSection";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
 const STORAGE_KEY = "florist-pos-orders";
@@ -26,6 +29,7 @@ function loadOrders(): Order[] {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
   // Customer
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -62,6 +66,7 @@ const Index = () => {
   const [depositAmount, setDepositAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
+  const [salesId, setSalesId] = useState("");
   const [reminderOption, setReminderOption] = useState("none");
   const [priceOverridden, setPriceOverridden] = useState(false);
   const [manualPrice, setManualPrice] = useState<number | null>(null);
@@ -120,6 +125,7 @@ const Index = () => {
     setReminderOption("none");
     setPriceOverridden(false);
     setManualPrice(null);
+    setSalesId("");
   }, []);
 
   const handleSubmit = () => {
@@ -142,6 +148,7 @@ const Index = () => {
 
     const order: Order = {
       id: crypto.randomUUID(),
+      salesId,
       customerName: customerName.trim(),
       phone: phone.trim(),
       items,
@@ -210,6 +217,9 @@ const Index = () => {
           </div>
           <div className="flex items-center gap-2">
             <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
+            <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
+              <BarChart3 className="w-3.5 h-3.5" /> 報告
+            </Button>
             <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs">
               <RotateCcw className="w-3.5 h-3.5" /> 清空
             </Button>
@@ -261,6 +271,8 @@ const Index = () => {
            selectedCustomer={selectedCustomer}
            refreshKey={customerRefreshKey}
         />
+
+        <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} />
 
         <OrderItemsSection
           items={items}

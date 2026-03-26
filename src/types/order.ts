@@ -9,6 +9,7 @@ export type PaymentStatus = "unpaid" | "paid" | "deposit";
 
 export interface Order {
   id: string;
+  salesId: string;
   customerName: string;
   phone: string;
   items: OrderItem[];
@@ -32,3 +33,11 @@ export interface Order {
   notes: string;
   createdAt: string;
 }
+
+export const SALES_STAFF = [
+  { id: "S001", name: "陳小明" },
+  { id: "S002", name: "李美玲" },
+  { id: "S003", name: "張大偉" },
+  { id: "S004", name: "王曉華" },
+  { id: "S005", name: "林志強" },
+];
