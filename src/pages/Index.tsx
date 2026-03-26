@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
 import CustomerSection from "@/components/pos/CustomerSection";
@@ -215,6 +216,9 @@ const Index = () => {
           </div>
           <div className="flex items-center gap-2">
             <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
+            <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
+              <BarChart3 className="w-3.5 h-3.5" /> 報告
+            </Button>
             <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs">
               <RotateCcw className="w-3.5 h-3.5" /> 清空
             </Button>
@@ -266,6 +270,8 @@ const Index = () => {
            selectedCustomer={selectedCustomer}
            refreshKey={customerRefreshKey}
         />
+
+        <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} />
 
         <OrderItemsSection
           items={items}
