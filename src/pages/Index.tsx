@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, Printer } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw } from "lucide-react";
+import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
 import CustomerSection from "@/components/pos/CustomerSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
@@ -207,6 +208,7 @@ const Index = () => {
             <h1 className="text-lg font-bold tracking-tight">花店 POS</h1>
           </div>
           <div className="flex items-center gap-2">
+            <CsvImportButton existingOrders={orders} onImport={setOrders} />
             <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs">
               <RotateCcw className="w-3.5 h-3.5" /> 清空
             </Button>
