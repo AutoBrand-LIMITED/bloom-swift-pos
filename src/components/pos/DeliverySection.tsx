@@ -165,6 +165,19 @@ const DeliverySection = ({
             📍 {fullAddress}
           </p>
         )}
+        {fullAddress.length > 2 && (
+          <div className="rounded-lg overflow-hidden border border-border mt-2">
+            <iframe
+              title="Google Map"
+              width="100%"
+              height="200"
+              style={{ border: 0 }}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
+            />
+          </div>
+        )}
       </div>
 
       {/* Recipient info */}
