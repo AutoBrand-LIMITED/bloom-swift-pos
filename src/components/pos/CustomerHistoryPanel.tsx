@@ -1,21 +1,37 @@
-import { History, X, TrendingUp } from "lucide-react";
+import { History, X, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useMemo } from "react";
 import type { DemoCustomer } from "@/data/demo-customers";
 
 interface CustomerHistoryPanelProps {
   customer: DemoCustomer | null;
   onClose: () => void;
+  onUseAddress?: (address: string, recipientName?: string) => void;
 }
 
-const CustomerHistoryPanel = ({ customer, onClose }: CustomerHistoryPanelProps) => {
-  if (!customer) return null;
-
-  const totalSpent = customer.history.reduce((s, h) => s + h.total, 0);
-  const unpaidCount = customer.history.filter((h) => h.status === "unpaid").length;
-  const unpaidTotal = customer.history
+const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHistoryPanelProps) => {
+  const totalSpent = customer?.history.reduce((s, h) => s + h.total, 0) ?? 0;
+  const unpaidCount = customer?.history.filter((h) => h.status === "unpaid").length ?? 0;
+  const unpaidTotal = customer?.history
     .filter((h) => h.status === "unpaid")
-    .reduce((s, h) => s + h.total, 0);
+    .reduce((s, h) => s + h.total, 0) ?? 0;
+
+  const pastAddresses = useMemo(() => {
+    if (!customer) return [];
+    const seen = new Set<string>();
+    const addrs: { address: string; recipientName?: string; date: string }[] = [];
+    for (const h of customer.history) {
+      const addr = h.deliveryAddress?.trim();
+      if (addr && !seen.has(addr)) {
+        seen.add(addr);
+        addrs.push({ address: addr, recipientName: h.recipientName, date: h.date });
+      }
+    }
+    return addrs;
+  }, [customer]);
+
+  if (!customer) return null;
 
   return (
     <div className="w-72 shrink-0 border-r border-border bg-card flex flex-col h-[calc(100vh-49px)] sticky top-[49px]">
@@ -59,6 +75,31 @@ const CustomerHistoryPanel = ({ customer, onClose }: CustomerHistoryPanelProps) 
         )}
       </div>
 
+      {/* Past addresses */}
+      {pastAddresses.length > 0 && (
+        <div className="p-3 border-b border-border space-y-1.5">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+            <MapPin className="w-3 h-3" /> 過往送貨地址
+          </p>
+          {pastAddresses.map((a, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onUseAddress?.(a.address, a.recipientName)}
+              className="w-full text-left rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 p-2 transition-colors group"
+            >
+              <p className="text-xs leading-relaxed">{a.address}</p>
+              {a.recipientName && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">收貨人：{a.recipientName}</p>
+              )}
+              <p className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+                點擊使用此地址 →
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* History list */}
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-1.5">
@@ -79,6 +120,11 @@ const CustomerHistoryPanel = ({ customer, onClose }: CustomerHistoryPanelProps) 
                 )}
               </div>
               <p className="text-xs">{h.items}</p>
+              {h.deliveryAddress && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                  <MapPin className="w-2.5 h-2.5 inline" /> {h.deliveryAddress}
+                </p>
+              )}
               <p className="text-xs font-mono font-semibold text-right">${h.total.toLocaleString()}</p>
             </div>
           ))}

@@ -10,6 +10,8 @@ export interface PurchaseRecord {
   items: string;
   total: number;
   status: "paid" | "unpaid";
+  deliveryAddress?: string;
+  recipientName?: string;
 }
 
 export const DEMO_CUSTOMERS: DemoCustomer[] = [

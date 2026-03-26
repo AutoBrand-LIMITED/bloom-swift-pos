@@ -37,6 +37,8 @@ export function extractCustomersFromOrders(orders: Order[]): DemoCustomer[] {
       items: itemNames || "訂單",
       total: order.finalPrice,
       status: order.paymentStatus === "unpaid" ? "unpaid" : "paid",
+      deliveryAddress: order.deliveryAddress || "",
+      recipientName: order.recipientName || "",
     });
 
     phoneMap.set(phone, existing);

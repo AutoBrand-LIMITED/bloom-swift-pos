@@ -247,6 +247,11 @@ const Index = () => {
           <CustomerHistoryPanel
             customer={selectedCustomer}
             onClose={() => setSelectedCustomer(null)}
+            onUseAddress={(address, recipientName) => {
+              setDeliveryDetail(address);
+              if (recipientName) setRecipientName(recipientName);
+              toast.success("已套用過往送貨地址");
+            }}
           />
         )}
 
