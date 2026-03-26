@@ -3,16 +3,18 @@ import { Button } from "@/components/ui/button";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { parseCsvToOrders } from "@/lib/csv-import";
+import { extractCustomersFromOrders, loadStoredCustomers, mergeCustomers, saveCustomers } from "@/lib/customer-utils";
 import type { Order } from "@/types/order";
 
 interface CsvImportButtonProps {
   existingOrders: Order[];
   onImport: (orders: Order[]) => void;
+  onCustomersUpdated?: () => void;
 }
 
 const STORAGE_KEY = "florist-pos-orders";
 
-const CsvImportButton = ({ existingOrders, onImport }: CsvImportButtonProps) => {
+const CsvImportButton = ({ existingOrders, onImport, onCustomersUpdated }: CsvImportButtonProps) => {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,7 +54,15 @@ const CsvImportButton = ({ existingOrders, onImport }: CsvImportButtonProps) => 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
       onImport(merged);
 
-      toast.success(`成功匯入 ${filtered.length} 張訂單`, {
+      // Sync customers from all orders
+      const newCustomers = extractCustomersFromOrders(merged);
+      const existingCustomers = loadStoredCustomers();
+      const mergedCustomers = mergeCustomers(existingCustomers, newCustomers);
+      saveCustomers(mergedCustomers);
+      onCustomersUpdated?.();
+
+      const customerCount = mergedCustomers.length;
+      toast.success(`成功匯入 ${filtered.length} 張訂單，${customerCount} 位客戶`, {
         description: newOrders.length !== filtered.length
           ? `（${newOrders.length - filtered.length} 張重複訂單已跳過）`
           : undefined,
