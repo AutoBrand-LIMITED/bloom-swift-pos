@@ -29,6 +29,7 @@ function loadOrders(): Order[] {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
   // Customer
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
