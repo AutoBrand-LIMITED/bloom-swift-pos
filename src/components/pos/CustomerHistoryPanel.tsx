@@ -32,24 +32,6 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
   }, [customer]);
 
   if (!customer) return null;
-  const unpaidCount = customer.history.filter((h) => h.status === "unpaid").length;
-  const unpaidTotal = customer.history
-    .filter((h) => h.status === "unpaid")
-    .reduce((s, h) => s + h.total, 0);
-
-  // Extract unique past addresses
-  const pastAddresses = useMemo(() => {
-    const seen = new Set<string>();
-    const addrs: { address: string; recipientName?: string; date: string }[] = [];
-    for (const h of customer.history) {
-      const addr = h.deliveryAddress?.trim();
-      if (addr && !seen.has(addr)) {
-        seen.add(addr);
-        addrs.push({ address: addr, recipientName: h.recipientName, date: h.date });
-      }
-    }
-    return addrs;
-  }, [customer.history]);
 
   return (
     <div className="w-72 shrink-0 border-r border-border bg-card flex flex-col h-[calc(100vh-49px)] sticky top-[49px]">
