@@ -12,9 +12,41 @@ import {
   ShoppingBasket, PartyPopper, Gem, Sprout, CircleDashed,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { Icon } from "@iconify/react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TranslationKey } from "@/lib/i18n";
+
+// Map each species (by name) → best Fluent Emoji icon. Consistent cross-device,
+// chosen per-flower rather than a 1:1 emoji swap. Unicode lacks many species
+// (lily/peony/orchid/hydrangea), so those fall back to the nearest bloom.
+const NAME_ICON: Record<string, string> = {
+  // Roses
+  "紅玫瑰": "rose", "粉玫瑰": "rose", "白玫瑰": "white-flower", "香檳玫瑰": "rose",
+  "玫瑰": "rose", "永生玫瑰": "rose",
+  // Named blooms
+  "鬱金香": "tulip", "向日葵": "sunflower", "太陽花": "sunflower", "牡丹": "hibiscus",
+  "百合": "white-flower", "蘭花": "hyacinth", "蘭花（蝴蝶蘭）": "hyacinth",
+  "康乃馨": "cherry-blossom", "菊花": "blossom", "非洲菊": "blossom", "桔梗": "blossom",
+  "劍蘭": "tulip", "繡球花": "cherry-blossom", "繡球花盆栽": "cherry-blossom",
+  "永生繡球": "cherry-blossom", "永生康乃馨": "cherry-blossom",
+  // Fillers / dried
+  "滿天星": "sparkles", "乾燥滿天星": "sparkles", "情人草": "blossom", "臘梅": "blossom",
+  "小雛菊": "blossom", "勿忘我": "blossom", "薰衣草": "blossom", "乾燥薰衣草": "blossom",
+  "洋甘菊": "blossom", "乾燥情人草": "blossom", "乾燥小雛菊": "blossom",
+  "乾燥棉花": "cloud", "乾燥兔尾草": "sheaf-of-rice",
+  // Potted / foliage
+  "多肉植物": "cactus", "發財樹": "potted-plant", "虎尾蘭": "potted-plant", "琴葉榕": "potted-plant",
+  "尤加利葉": "herb", "乾燥尤加利": "herb", "銀葉": "herb", "腎蕨": "herb", "文竹": "herb",
+  "春蘭葉": "herb", "龜背竹": "leaf-fluttering-in-wind", "散尾葵": "palm-tree",
+  // Fruits
+  "蘋果": "red-apple", "橙": "tangerine", "提子": "grapes", "芒果": "mango",
+  "士多啤梨": "strawberry", "藍莓": "blueberries", "奇異果": "kiwi-fruit", "車厘子": "cherries",
+};
+
+const FlowerIcon = ({ name, className }: { name: string; className?: string }) => (
+  <Icon icon={`fluent-emoji:${NAME_ICON[name] ?? "blossom"}`} className={className} />
+);
 
 // ─── Product Types ───────────────────────────────────────────
 type ProductType = "bouquet" | "basket" | "stand" | "fruit_basket" | "preserved" | "potted" | "wreath";
@@ -310,7 +342,7 @@ function FlowerPicker({ flowers, selected, onToggle, onQtyChange, highlighted }:
             }`}
             onClick={() => !sel && onToggle(f)}
           >
-            <span className="text-lg">{f.emoji}</span>
+            <FlowerIcon name={f.name} className="w-5 h-5 shrink-0" />
             <span className="text-xs font-medium flex-1 flex items-center gap-1">
               {isRecommended && !sel && <Star className="w-2.5 h-2.5 shrink-0 text-amber-400" />}{f.name}
             </span>
