@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Truck, CheckCircle2, Clock, Camera, Package } from "lucide-react";
+import { ArrowLeft, Truck, CheckCircle2, Clock, Camera, Package, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { DRIVERS } from "@/types/order";
 import type { Order } from "@/types/order";
@@ -107,13 +107,15 @@ const DriverApp = () => {
 
   if (!selectedDriver) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center gap-3">
+      <div className="min-h-screen bg-gradient-to-br from-primary/[0.06] via-background to-background flex flex-col">
+        <header className="sticky top-0 z-40 bg-card/70 backdrop-blur-md border-b border-border px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-1.5 text-xs">
             <ArrowLeft className="w-3.5 h-3.5" /> {t("nav_back")}
           </Button>
-          <div className="flex items-center gap-2">
-            <Truck className="w-5 h-5 text-primary" />
+          <div className="flex items-center gap-2.5">
+            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary shrink-0">
+              <Truck className="w-4 h-4" />
+            </span>
             <h1 className="text-sm font-bold">{t("title_driver_login")}</h1>
           </div>
         </header>
@@ -126,11 +128,11 @@ const DriverApp = () => {
                 <button
                   key={d.id}
                   onClick={() => setSelectedDriver(d.name)}
-                  className={`rounded-2xl border border-border bg-card hover:bg-primary/5 hover:border-primary/30 transition-all p-8 text-center font-bold text-lg active:scale-95 ${
+                  className={`group rounded-2xl border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ease-out p-8 text-center font-bold text-lg active:scale-95 ${
                     i === DRIVERS.length - 1 && DRIVERS.length % 2 !== 0 ? "col-span-2" : ""
                   }`}
                 >
-                  <span className="w-10 h-10 rounded-full bg-primary/10 text-primary text-base font-bold flex items-center justify-center mx-auto mb-3">
+                  <span className="w-12 h-12 rounded-full bg-primary/10 text-primary text-lg font-bold flex items-center justify-center mx-auto mb-3 transition-transform duration-200 ease-out group-hover:scale-110">
                     {d.name[0]}
                   </span>
                   {d.name}
@@ -144,11 +146,12 @@ const DriverApp = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-40 bg-gradient-to-br from-primary/[0.06] via-card/80 to-card/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
           <Button variant="ghost" size="sm" onClick={() => setSelectedDriver(null)} className="gap-1.5 text-xs">
             <ArrowLeft className="w-3.5 h-3.5" /> {t("btn_switch_driver")}
           </Button>
+          <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">{selectedDriver?.[0]}</span>
           <span className="font-bold text-sm">{selectedDriver}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -173,9 +176,11 @@ const DriverApp = () => {
 
       <div className="max-w-2xl mx-auto p-4 space-y-3">
         {sortedOrders.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            <Truck className="w-10 h-10 mx-auto mb-3 opacity-20" />
-            <p className="text-sm">{t("msg_no_deliveries")}</p>
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+            <span className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/[0.06] text-primary/40">
+              <Truck className="w-8 h-8" />
+            </span>
+            <p className="text-sm text-muted-foreground">{t("msg_no_deliveries")}</p>
           </div>
         )}
 
@@ -235,8 +240,8 @@ const DriverApp = () => {
                   </div>
 
                   {order.deliveryNotes && (
-                    <div className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
-                      📋 {order.deliveryNotes}
+                    <div className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground flex items-start gap-1.5">
+                      <ClipboardList className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {order.deliveryNotes}
                     </div>
                   )}
 

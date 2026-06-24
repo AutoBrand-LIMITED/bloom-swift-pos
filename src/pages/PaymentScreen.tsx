@@ -10,27 +10,35 @@ const PaymentScreen = () => {
   const ref = params.get("ref") || "—";
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 select-none">
-      <div className="w-full max-w-xs space-y-6 text-center">
+    <div className="relative min-h-screen flex flex-col items-center justify-center p-8 select-none overflow-hidden bg-background">
+      {/* Atmosphere — soft radial blooms */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-primary/[0.08] blur-3xl" />
+        <div className="absolute -bottom-32 -right-24 w-[28rem] h-[28rem] rounded-full bg-primary/[0.06] blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-xs space-y-6 text-center">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
-          <Flower2 className="w-9 h-9 text-primary" />
+          <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 text-primary shrink-0">
+            <Flower2 className="w-6 h-6" />
+          </span>
           <span className="text-2xl font-bold tracking-tight">Anglo Chinese Florist</span>
         </div>
 
         {/* Amount */}
-        <div className="rounded-2xl border border-border bg-card px-8 py-10 space-y-3 shadow-sm">
-          <p className="text-[11px] text-muted-foreground/70 uppercase tracking-widest">{t("label_amount_due")}</p>
-          <p className="text-7xl font-bold font-mono tracking-tight text-primary">
+        <div className="relative rounded-3xl border border-border/70 bg-card/90 backdrop-blur-sm px-8 py-12 space-y-3 shadow-xl shadow-primary/5">
+          <p className="text-[11px] text-muted-foreground/70 uppercase tracking-[0.2em]">{t("label_amount_due")}</p>
+          <p className="text-7xl font-bold font-mono tracking-tight text-primary [text-shadow:0_2px_24px_hsl(152_45%_38%/0.25)]">
             ${amount.toLocaleString()}
           </p>
-          <p className="text-[11px] text-muted-foreground/60 tracking-widest font-medium">HKD</p>
+          <p className="text-[11px] text-muted-foreground/60 tracking-[0.3em] font-medium">HKD</p>
         </div>
 
         {/* Reference */}
         <div className="space-y-1 pt-2">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-widest">{t("label_reference")}</p>
-          <p className="text-xl font-mono font-semibold tracking-widest text-foreground">{ref}</p>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-[0.2em]">{t("label_reference")}</p>
+          <p className="text-xl font-mono font-semibold tracking-[0.2em] text-foreground">{ref}</p>
         </div>
 
         {/* Footer note */}

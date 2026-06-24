@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Lock, BarChart3, Users, Package, ArrowLeft, ShoppingBag, DollarSign, CheckCircle2, AlertCircle } from "lucide-react";
+import { Lock, BarChart3, Users, Package, ArrowLeft, ShoppingBag, DollarSign, CheckCircle2, AlertCircle, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { Order } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
@@ -35,10 +35,12 @@ const SalesReport = () => {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
+      <div className="min-h-screen bg-gradient-to-br from-primary/[0.07] via-background to-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm shadow-lg border-border/60">
           <CardHeader className="text-center">
-            <Lock className="w-10 h-10 mx-auto text-primary mb-2" />
+            <span className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 text-primary mx-auto mb-3">
+              <Lock className="w-7 h-7" />
+            </span>
             <CardTitle className="text-lg">{t("title_analytics")}</CardTitle>
             <p className="text-sm text-muted-foreground">{t("msg_enter_password")}</p>
           </CardHeader>
@@ -148,12 +150,14 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
+      <header className="sticky top-0 z-40 bg-gradient-to-br from-primary/[0.06] via-card/80 to-card/80 backdrop-blur-md border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs">
             <ArrowLeft className="w-3.5 h-3.5" /> {t("btn_back_pos")}
           </Button>
-          <BarChart3 className="w-5 h-5 text-primary" />
+          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary shrink-0">
+            <BarChart3 className="w-4 h-4" />
+          </span>
           <h1 className="text-lg font-bold">{t("title_report")}</h1>
         </div>
       </header>
@@ -301,7 +305,7 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
                 }
                 return (
                   <div key={staff}>
-                    <p className="text-sm font-bold text-foreground mb-2">👤 {staff}</p>
+                    <p className="text-sm font-bold text-foreground mb-2 flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-primary" /> {staff}</p>
                     {Object.entries(custMap).map(([cust, products]) => (
                       <div key={cust} className="ml-3 mb-2">
                         <p className="text-xs font-semibold text-muted-foreground">{cust === UNKNOWN ? t("text_not_specified") : cust}</p>
@@ -342,7 +346,7 @@ const StatCard = ({
 }) => {
   const colors = accent ? accentMap[accent] : null;
   return (
-    <Card>
+    <Card className="transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
       <CardContent className="p-4">
         {icon && (
           <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg mb-2 ${colors ? `${colors.bg} ${colors.icon}` : "bg-muted text-muted-foreground"}`}>

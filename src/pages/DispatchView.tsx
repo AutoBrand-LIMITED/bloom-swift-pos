@@ -84,29 +84,31 @@ const DispatchView = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
+      <header className="sticky top-0 z-40 bg-gradient-to-br from-primary/[0.06] via-card/80 to-card/80 backdrop-blur-md border-b border-border">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-1.5 text-xs">
               <ArrowLeft className="w-3.5 h-3.5" /> {t("nav_back")}
             </Button>
-            <Truck className="w-5 h-5 text-primary" />
+            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary shrink-0">
+              <Truck className="w-4 h-4" />
+            </span>
             <h1 className="text-sm font-bold">{t("title_dispatch")}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-500" />
-                <span className="font-bold font-mono text-sm text-foreground">{totalPending}</span>
-                <span className="text-muted-foreground">{t("dispatch_pending")}</span>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="flex items-center gap-1.5 rounded-full bg-amber-500/10 text-amber-600 px-2.5 py-1">
+                <Clock className="w-3.5 h-3.5" />
+                <span className="font-bold font-mono text-sm">{totalPending}</span>
+                <span className="hidden sm:inline">{t("dispatch_pending")}</span>
               </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                <span className="font-bold font-mono text-sm text-foreground">{totalDelivered}</span>
-                <span className="text-muted-foreground">{t("dispatch_delivered")}</span>
+              <span className="flex items-center gap-1.5 rounded-full bg-green-500/10 text-green-600 px-2.5 py-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span className="font-bold font-mono text-sm">{totalDelivered}</span>
+                <span className="hidden sm:inline">{t("dispatch_delivered")}</span>
               </span>
               {blocked > 0 && (
-                <span className="flex items-center gap-1.5 text-red-500 font-medium"><AlertTriangle className="w-3.5 h-3.5" />{blocked} {t("text_unpaid_warning")}</span>
+                <span className="flex items-center gap-1.5 rounded-full bg-red-500/10 text-red-600 font-medium px-2.5 py-1"><AlertTriangle className="w-3.5 h-3.5" />{blocked}<span className="hidden sm:inline">{t("text_unpaid_warning")}</span></span>
               )}
             </div>
             <div className="flex rounded-lg border border-border overflow-hidden">
@@ -128,9 +130,11 @@ const DispatchView = () => {
 
       <div className="max-w-5xl mx-auto p-4 space-y-6">
         {filteredOrders.length === 0 && (
-          <div className="text-center py-20 text-muted-foreground">
-            <Truck className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p className="text-sm">{t("msg_no_dispatch")}</p>
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+            <span className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/[0.06] text-primary/40">
+              <Truck className="w-8 h-8" />
+            </span>
+            <p className="text-sm text-muted-foreground">{t("msg_no_dispatch")}</p>
           </div>
         )}
 
@@ -139,10 +143,15 @@ const DispatchView = () => {
           const driverDone = driverOrders.filter((o) => o.deliveryStatus === "delivered").length;
 
           return (
-            <div key={driver} className="rounded-xl border border-border overflow-hidden bg-card">
+            <div key={driver} className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
               {/* Driver header */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/40 border-b border-border">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 ${
+                    driver === "未分配" ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"
+                  }`}>
+                    {driver === "未分配" ? "?" : driver[0]}
+                  </span>
                   <span className="text-sm font-bold">{driver === "未分配" ? t("text_unassigned") : driver}</span>
                   <span className="text-xs text-muted-foreground">{driverOrders.length} {t("dispatch_unit_order")}</span>
                 </div>
