@@ -13,21 +13,29 @@ import {
   MousePointerClick, FileText, Star,
 } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
+import { useLanguage } from "@/contexts/LanguageContext";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Product Types ───────────────────────────────────────────
 type ProductType = "bouquet" | "basket" | "stand" | "fruit_basket" | "preserved" | "potted" | "wreath";
 
-const PRODUCT_TYPES: { id: ProductType; label: string; emoji: string }[] = [
-  { id: "bouquet", label: "花束", emoji: "💐" },
-  { id: "basket", label: "花籃", emoji: "🧺" },
-  { id: "stand", label: "花牌 / 花架", emoji: "🎋" },
-  { id: "fruit_basket", label: "果籃", emoji: "🍎" },
-  { id: "preserved", label: "保鮮花 / 永生花", emoji: "🌹" },
-  { id: "potted", label: "盆栽 / 盆花", emoji: "🪴" },
-  { id: "wreath", label: "花環 / 花圈", emoji: "⭕" },
-];
+const PRODUCT_TYPE_EMOJIS: Record<ProductType, string> = {
+  bouquet: "💐", basket: "🧺", stand: "🎋", fruit_basket: "🍎",
+  preserved: "🌹", potted: "🪴", wreath: "⭕",
+};
+const PRODUCT_TYPE_KEYS: Record<ProductType, TranslationKey> = {
+  bouquet: "pt_bouquet", basket: "pt_basket", stand: "pt_stand",
+  fruit_basket: "pt_fruit_basket", preserved: "pt_preserved",
+  potted: "pt_potted", wreath: "pt_wreath",
+};
 
 const OCCASIONS = ["生日", "婚禮", "開張", "慰問", "情人節", "母親節", "畢業", "週年紀念", "喬遷", "探病", "道歉", "白事", "日常"];
+const OCCASION_KEYS: Record<string, TranslationKey> = {
+  "生日": "occasion_birthday", "婚禮": "occ_wedding", "開張": "occ_opening",
+  "慰問": "occ_condolence", "情人節": "occasion_valentines", "母親節": "occasion_mothers_day",
+  "畢業": "occasion_graduation", "週年紀念": "occasion_anniversary", "喬遷": "occ_moving",
+  "探病": "occ_hospital", "道歉": "occ_apology", "白事": "occ_funeral", "日常": "occ_everyday",
+};
 
 // ─── Category-based Options ──────────────────────────────────
 const FLOWERS_BY_TYPE: Record<ProductType, { name: string; emoji: string }[]> = {
@@ -239,22 +247,24 @@ const defaultState: CustomOrderState = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────
-function ChipSelect({ options, value, onChange, highlighted }: {
-  options: string[];
+function ChipSelect({ options, items, value, onChange, highlighted }: {
+  options?: string[];
+  items?: { id: string; label: string }[];
   value: string;
   onChange: (v: string) => void;
   highlighted?: string[];
 }) {
+  const display = items ?? (options ?? []).map((o) => ({ id: o, label: o }));
   return (
     <div className="flex flex-wrap gap-1.5">
-      {options.map((opt) => {
-        const selected = value === opt;
-        const isRecommended = highlighted?.includes(opt);
+      {display.map(({ id, label }) => {
+        const selected = value === id;
+        const isRecommended = highlighted?.includes(id);
         return (
           <button
-            key={opt}
+            key={id}
             type="button"
-            onClick={() => onChange(opt)}
+            onClick={() => onChange(id)}
             className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               selected
                 ? "bg-primary text-primary-foreground border-primary"
@@ -263,7 +273,7 @@ function ChipSelect({ options, value, onChange, highlighted }: {
                   : "border-border bg-secondary/60 hover:bg-secondary"
             }`}
           >
-            {isRecommended && !selected && <Star className="w-2.5 h-2.5 shrink-0 text-amber-400" />}{opt}
+            {isRecommended && !selected && <Star className="w-2.5 h-2.5 shrink-0 text-amber-400" />}{label}
           </button>
         );
       })}
@@ -350,6 +360,7 @@ interface CustomOrderDialogProps {
 }
 
 const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps) => {
+  const { t } = useLanguage();
   const [state, setState] = useState<CustomOrderState>(defaultState);
 
   const update = <K extends keyof CustomOrderState>(key: K, value: CustomOrderState[K]) =>
@@ -357,6 +368,19 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
   const pt = state.productType as ProductType;
   const rec = state.occasion ? OCCASION_RECOMMENDATIONS[state.occasion] : null;
+
+  const productTypes = useMemo(() => (
+    (Object.keys(PRODUCT_TYPE_KEYS) as ProductType[]).map((id) => ({
+      id,
+      label: t(PRODUCT_TYPE_KEYS[id]),
+      emoji: PRODUCT_TYPE_EMOJIS[id],
+    }))
+  ), [t]);
+
+  const occasionItems = useMemo(() => OCCASIONS.map((occ) => ({
+    id: occ,
+    label: OCCASION_KEYS[occ] ? t(OCCASION_KEYS[occ]) : occ,
+  })), [t]);
 
   const availableFlowers = pt ? FLOWERS_BY_TYPE[pt] : [];
   const availableFillers = pt ? FILLERS_BY_TYPE[pt] : [];
@@ -397,7 +421,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
   const buildSummary = (): string => {
     const lines: string[] = [];
-    const ptLabel = PRODUCT_TYPES.find((p) => p.id === state.productType)?.label || "客制訂單";
+    const ptLabel = productTypes.find((p) => p.id === state.productType)?.label || t("custom_order_title");
     lines.push(`【${ptLabel} — 客制詳情】`);
     if (state.occasion) lines.push(`場合：${state.occasion}`);
 
@@ -444,9 +468,9 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
         <DialogHeader className="px-6 pt-6 pb-3">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Sparkles className="w-5 h-5 text-primary" />
-            快速客制訂單
+            {t("custom_order_title")}
             {totalFlowers > 0 && (
-              <Badge variant="secondary" className="ml-2 font-mono">{totalFlowers} 支花材</Badge>
+              <Badge variant="secondary" className="ml-2 font-mono">{totalFlowers} {t("unit_flowers")}</Badge>
             )}
           </DialogTitle>
         </DialogHeader>
@@ -454,9 +478,9 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
         <ScrollArea className="px-6 pb-4 max-h-[calc(90vh-160px)]">
           <div className="space-y-5 pr-2">
             {/* Step 1: Product Type */}
-            <Section icon={Tag} title="產品類型">
+            <Section icon={Tag} title={t("cd_section_product_type")}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {PRODUCT_TYPES.map((p) => (
+                {productTypes.map((p) => (
                   <button
                     key={p.id}
                     type="button"
@@ -475,11 +499,11 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
             </Section>
 
             {/* Step 2: Occasion */}
-            <Section icon={Heart} title="場合">
-              <ChipSelect options={OCCASIONS} value={state.occasion} onChange={(v) => update("occasion", v)} />
+            <Section icon={Heart} title={t("label_occasion")}>
+              <ChipSelect items={occasionItems} value={state.occasion} onChange={(v) => update("occasion", v)} />
               {rec && (
                 <p className="text-xs text-primary/80 mt-1 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 shrink-0" /> 系統已根據「{state.occasion}」推薦適合嘅花材同色調
+                  <Sparkles className="w-3 h-3 shrink-0" /> {t("cd_rec_prefix")}{occasionItems.find(o => o.id === state.occasion)?.label ?? state.occasion}{t("cd_rec_suffix")}
                 </p>
               )}
             </Section>
@@ -489,7 +513,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
               <>
                 {/* Flowers */}
                 {availableFlowers.length > 0 && (
-                  <Section icon={Flower2} title="主花選擇">
+                  <Section icon={Flower2} title={t("cd_section_main_flowers")}>
                     <FlowerPicker
                       flowers={availableFlowers}
                       selected={state.mainFlowers}
@@ -499,7 +523,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                     />
                     <div className="flex gap-2 mt-2">
                       <Input
-                        placeholder="自訂花材名稱..."
+                        placeholder={t("cd_placeholder_custom_flower")}
                         value={state.customFlower}
                         onChange={(e) => update("customFlower", e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && addCustomFlower()}
@@ -507,7 +531,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                       />
                       <VoiceInputButton onResult={(text) => update("customFlower", text)} />
                       <Button variant="outline" size="sm" onClick={addCustomFlower} className="gap-1">
-                        <Plus className="w-3.5 h-3.5" /> 加入
+                        <Plus className="w-3.5 h-3.5" /> {t("cd_btn_add_flower")}
                       </Button>
                     </div>
                   </Section>
@@ -515,7 +539,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Fillers */}
                 {availableFillers.length > 0 && (
-                  <Section icon={Flower2} title="配花 / 襯花">
+                  <Section icon={Flower2} title={t("cd_section_filler_flowers")}>
                     <FlowerPicker
                       flowers={availableFillers}
                       selected={state.fillerFlowers}
@@ -527,7 +551,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Greens */}
                 {availableGreens.length > 0 && (
-                  <Section icon={Leaf} title="綠葉 / 葉材">
+                  <Section icon={Leaf} title={t("cd_section_greens")}>
                     <FlowerPicker
                       flowers={availableGreens}
                       selected={state.greens}
@@ -539,7 +563,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Fruits (only for fruit basket) */}
                 {pt === "fruit_basket" && (
-                  <Section icon={Package} title="生果選擇">
+                  <Section icon={Package} title={t("cd_section_fruits")}>
                     <FlowerPicker
                       flowers={FRUITS}
                       selected={state.fruits}
@@ -550,28 +574,28 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 )}
 
                 {/* Shape / Wrapping */}
-                <Section icon={Package} title="形狀 & 包裝">
+                <Section icon={Package} title={t("cd_section_wrapping")}>
                   <div className="space-y-3">
                     {availableShapes.length > 0 && (
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-muted-foreground">形狀</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_shape")}</Label>
                         <ChipSelect options={availableShapes} value={state.bouquetShape} onChange={(v) => update("bouquetShape", v)} />
                       </div>
                     )}
                     {availableWraps.length > 0 && (
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-muted-foreground">包裝</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_wrapping")}</Label>
                         <ChipSelect options={availableWraps} value={state.wrapMaterial} onChange={(v) => update("wrapMaterial", v)} />
                       </div>
                     )}
                     {(pt === "bouquet") && (
                       <>
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-medium text-muted-foreground">包裝顏色</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_wrap_color")}</Label>
                           <ChipSelect options={WRAP_COLORS} value={state.wrapColor} onChange={(v) => update("wrapColor", v)} />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-medium text-muted-foreground">絲帶顏色</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_ribbon_color")}</Label>
                           <ChipSelect options={RIBBON_COLORS} value={state.ribbonColor} onChange={(v) => update("ribbonColor", v)} />
                         </div>
                       </>
@@ -581,15 +605,15 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Vase (bouquet/basket only) */}
                 {(pt === "bouquet" || pt === "basket") && (
-                  <Section icon={Package} title="花器 / 底盤">
+                  <Section icon={Package} title={t("cd_section_vase")}>
                     <div className="space-y-3">
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-muted-foreground">花器類型</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_vase_type")}</Label>
                         <ChipSelect options={VASE_TYPES} value={state.vaseType} onChange={(v) => update("vaseType", v)} />
                       </div>
                       {state.vaseType && state.vaseType !== "無花器" && (
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-medium text-muted-foreground">花器尺寸</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_vase_size")}</Label>
                           <ChipSelect options={VASE_SIZES} value={state.vaseSize} onChange={(v) => update("vaseSize", v)} />
                         </div>
                       )}
@@ -598,35 +622,35 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 )}
 
                 {/* Style */}
-                <Section icon={Palette} title="整體風格">
+                <Section icon={Palette} title={t("cd_section_style")}>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-muted-foreground">風格主題</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_style_theme")}</Label>
                       <ChipSelect options={STYLE_THEMES} value={state.styleTheme} onChange={(v) => update("styleTheme", v)} highlighted={rec?.suggestedThemes} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-muted-foreground">色調</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_color_tone")}</Label>
                       <ChipSelect options={COLOR_TONES} value={state.colorTone} onChange={(v) => update("colorTone", v)} highlighted={rec?.suggestedColors} />
                     </div>
                   </div>
                 </Section>
 
                 {/* Size */}
-                <Section icon={Ruler} title="尺寸規格">
+                <Section icon={Ruler} title={t("cd_section_size")}>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-muted-foreground">大小</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_size")}</Label>
                       <ChipSelect options={availableSizes} value={state.bouquetSize} onChange={(v) => update("bouquetSize", v)} />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-xs font-medium text-muted-foreground">預計直徑 (cm)</Label>
-                        <Input type="number" placeholder="例：25" value={state.estimatedDiameter}
+                        <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_diameter")}</Label>
+                        <Input type="number" placeholder={t("cd_placeholder_diameter")} value={state.estimatedDiameter}
                           onChange={(e) => update("estimatedDiameter", e.target.value)} className="text-sm font-mono" />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs font-medium text-muted-foreground">預計高度 (cm)</Label>
-                        <Input type="number" placeholder="例：40" value={state.estimatedHeight}
+                        <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_height")}</Label>
+                        <Input type="number" placeholder={t("cd_placeholder_height")} value={state.estimatedHeight}
                           onChange={(e) => update("estimatedHeight", e.target.value)} className="text-sm font-mono" />
                       </div>
                     </div>
@@ -635,14 +659,14 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Fragrance (not for preserved/potted) */}
                 {pt !== "preserved" && pt !== "potted" && (
-                  <Section icon={Wind} title="香味 & 保鮮">
+                  <Section icon={Wind} title={t("cd_section_fragrance")}>
                     <div className="space-y-3">
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-muted-foreground">香味偏好</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_fragrance")}</Label>
                         <ChipSelect options={FRAGRANCE_PREFS} value={state.fragrance} onChange={(v) => update("fragrance", v)} />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-muted-foreground">保鮮處理</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_preservation")}</Label>
                         <ChipSelect options={PRESERVATION} value={state.preservationMethod} onChange={(v) => update("preservationMethod", v)} />
                       </div>
                     </div>
@@ -650,15 +674,15 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 )}
 
                 {/* Allergy */}
-                <Section icon={AlertTriangle} title="過敏提醒">
+                <Section icon={AlertTriangle} title={t("cd_section_allergy")}>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Switch checked={state.hasAllergy} onCheckedChange={(v) => update("hasAllergy", v)} />
-                      <Label className="text-xs">客人有花粉過敏或其他過敏</Label>
+                      <Label className="text-xs">{t("cd_label_allergy_switch")}</Label>
                     </div>
                     {state.hasAllergy && (
                       <div className="flex gap-2">
-                        <Textarea placeholder="請列明需要避開嘅花材或過敏原..." value={state.allergyNotes}
+                        <Textarea placeholder={t("cd_placeholder_allergy_notes")} value={state.allergyNotes}
                           onChange={(e) => update("allergyNotes", e.target.value)} className="text-sm min-h-[60px]" />
                         <VoiceInputButton onResult={(text) => update("allergyNotes", state.allergyNotes ? `${state.allergyNotes} ${text}` : text)} className="self-start" />
                       </div>
@@ -668,9 +692,9 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Special notes */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> 特殊備註</Label>
+                  <Label className="text-xs font-medium flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> {t("cd_special_notes")}</Label>
                   <div className="flex gap-2">
-                    <Textarea placeholder="例如：花頭要開、去刺、花腳要長..." value={state.specialNotes}
+                    <Textarea placeholder={t("cd_placeholder_special_notes")} value={state.specialNotes}
                       onChange={(e) => update("specialNotes", e.target.value)} className="text-sm min-h-[60px]" />
                     <VoiceInputButton onResult={(text) => update("specialNotes", state.specialNotes ? `${state.specialNotes} ${text}` : text)} className="self-start" />
                   </div>
@@ -681,7 +705,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
             {!pt && (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
                 <MousePointerClick className="w-8 h-8 opacity-30" />
-                <p className="text-sm">請先選擇產品類型</p>
+                <p className="text-sm">{t("cd_prompt_select_type")}</p>
               </div>
             )}
           </div>
@@ -689,10 +713,10 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
         <DialogFooter className="px-6 py-4 border-t border-border bg-secondary/30">
           <div className="flex w-full items-center justify-between">
-            <Button variant="ghost" onClick={onClose}>取消</Button>
+            <Button variant="ghost" onClick={onClose}>{t("btn_cancel_edit")}</Button>
             <Button onClick={handleConfirm} disabled={!pt} className="gap-1.5 px-6">
               <Sparkles className="w-4 h-4" />
-              確認客制 ({totalFlowers} 支花材)
+              {t("cd_btn_confirm")} ({totalFlowers} {t("unit_flowers")})
             </Button>
           </div>
         </DialogFooter>

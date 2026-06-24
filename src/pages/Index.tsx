@@ -656,7 +656,7 @@ const Index = () => {
               </div>
               {upcomingBirthdays.map(({ name, birthday, daysUntil }) => (
                 <p key={`${name}-${birthday}`}>
-                  {name} · {birthday} · {daysUntil === 0 ? lang === "zh" ? "今日！" : "Today!" : lang === "zh" ? `${daysUntil}日後` : `in ${daysUntil} days`}
+                  {name} · {birthday} · {daysUntil === 0 ? t("birthday_today") : lang === "zh" ? `${daysUntil}${t("birthday_days_until_suffix")}` : `in ${daysUntil}${t("birthday_days_until_suffix")}`}
                 </p>
               ))}
             </div>

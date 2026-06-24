@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface VoiceInputButtonProps {
   onResult: (text: string) => void;
@@ -9,14 +10,16 @@ interface VoiceInputButtonProps {
   className?: string;
 }
 
-const VoiceInputButton = ({ onResult, lang = "zh-HK", className }: VoiceInputButtonProps) => {
+const VoiceInputButton = ({ onResult, lang, className }: VoiceInputButtonProps) => {
+  const { t, lang: appLang } = useLanguage();
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const recognitionLang = lang ?? (appLang === "zh" ? "zh-HK" : "en-US");
 
   const toggle = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      toast.error("你嘅瀏覽器唔支援語音輸入，請用 Chrome");
+      toast.error(t("voice_not_supported"));
       return;
     }
 
@@ -27,7 +30,7 @@ const VoiceInputButton = ({ onResult, lang = "zh-HK", className }: VoiceInputBut
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = lang;
+    recognition.lang = recognitionLang;
     recognition.continuous = false;
     recognition.interimResults = false;
 
@@ -40,7 +43,7 @@ const VoiceInputButton = ({ onResult, lang = "zh-HK", className }: VoiceInputBut
     recognition.onerror = (event: any) => {
       console.error("Speech recognition error:", event.error);
       if (event.error === "not-allowed") {
-        toast.error("請允許使用麥克風");
+        toast.error(t("voice_mic_denied"));
       }
       setIsListening(false);
     };
@@ -50,7 +53,7 @@ const VoiceInputButton = ({ onResult, lang = "zh-HK", className }: VoiceInputBut
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
-  }, [isListening, lang, onResult]);
+  }, [isListening, recognitionLang, onResult, t]);
 
   return (
     <Button
@@ -59,7 +62,7 @@ const VoiceInputButton = ({ onResult, lang = "zh-HK", className }: VoiceInputBut
       size="icon"
       onClick={toggle}
       className={className}
-      title={isListening ? "停止錄音" : "語音輸入"}
+      title={isListening ? t("voice_stop") : t("voice_start")}
     >
       {isListening ? <MicOff className="w-4 h-4 animate-pulse" /> : <Mic className="w-4 h-4" />}
     </Button>
