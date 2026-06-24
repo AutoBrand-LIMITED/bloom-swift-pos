@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User, Phone, ChevronDown, Building2, Crown, AlertTriangle, Tag } from "lucide-react";
 import { DEMO_CUSTOMERS, type DemoCustomer, type CustomerFlag } from "@/data/demo-customers";
 import { loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
@@ -24,6 +25,7 @@ interface CustomerSectionProps {
   phoneError: boolean;
   selectedCustomer: DemoCustomer | null;
   refreshKey?: number;
+  isComplete?: boolean;
 }
 
 const FLAG_CONFIG: Record<CustomerFlag, { label: string; color: string; icon: React.ReactNode }> = {
@@ -80,7 +82,7 @@ const CustomerSection = ({
   phone, phonePrefix, customerName, customerType, companyName, contactPerson,
   onPhoneChange, onPhonePrefixChange, onNameChange, onCustomerTypeChange,
   onCompanyNameChange, onContactPersonChange,
-  onCustomerSelect, phoneError, selectedCustomer, refreshKey,
+  onCustomerSelect, phoneError, selectedCustomer, refreshKey, isComplete,
 }: CustomerSectionProps) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -126,9 +128,12 @@ const CustomerSection = ({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className={`rounded-xl bg-card p-4 space-y-3 transition-colors ${
+      isComplete ? "border-t border-r border-b border-l-4 border-t-primary/30 border-r-primary/30 border-b-primary/30 border-l-primary" : "border border-border"
+    }`}>
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+          <span className="text-primary font-bold text-base">②</span>
           <User className="w-4 h-4" />
           客戶資料
           {selectedCustomer?.flags?.length ? (
@@ -181,15 +186,18 @@ const CustomerSection = ({
             電話號碼 <span className="text-destructive">*</span>
           </Label>
           <div className="flex gap-1.5">
-            <select
-              value={phonePrefix}
-              onChange={(e) => onPhonePrefixChange(e.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-2 text-xs font-mono text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
-            >
-              {PHONE_PREFIXES.map((p) => (
-                <option key={p.code} value={p.code}>{p.label}</option>
-              ))}
-            </select>
+            <Select value={phonePrefix} onValueChange={onPhonePrefixChange}>
+              <SelectTrigger className="w-[100px] shrink-0 font-mono text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PHONE_PREFIXES.map((p) => (
+                  <SelectItem key={p.code} value={p.code} className="font-mono text-xs">
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="relative flex-1">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input

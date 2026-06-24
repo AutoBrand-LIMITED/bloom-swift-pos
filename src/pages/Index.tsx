@@ -14,6 +14,7 @@ import AddOnsSection from "@/components/pos/AddOnsSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
+import { SALES_STAFF } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
@@ -247,9 +248,18 @@ const Index = () => {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
         <div className="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Flower2 className="w-6 h-6 text-primary" />
-            <h1 className="text-lg font-bold tracking-tight">花店 POS</h1>
+            <div>
+              <h1 className="text-sm font-bold tracking-tight leading-none">Anglo Chinese Florist</h1>
+              <p className="text-[11px] text-muted-foreground leading-none mt-0.5">
+                {new Date().toLocaleDateString("zh-HK", { weekday: "short", month: "long", day: "numeric" })}
+                {salesId && (() => {
+                  const staff = (SALES_STAFF ?? []).find(s => s.id === salesId);
+                  return staff ? ` · ${staff.name}` : "";
+                })()}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
@@ -295,7 +305,7 @@ const Index = () => {
         <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
 
           {/* STEP 1: Staff — required gate */}
-          <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} />
+          <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} isComplete={!!salesId} />
 
           {/* No-staff warning */}
           {!salesId && (
@@ -339,6 +349,7 @@ const Index = () => {
             phoneError={phoneError}
             selectedCustomer={selectedCustomer}
             refreshKey={customerRefreshKey}
+            isComplete={!!phone.trim() && !!customerName.trim()}
           />
 
           <OrderItemsSection
@@ -357,6 +368,7 @@ const Index = () => {
             budget={budget}
             onBudgetChange={setBudget}
             subtotal={subtotal}
+            isComplete={items.length > 0}
           />
 
           <DeliverySection
@@ -380,6 +392,7 @@ const Index = () => {
             onDeliveryPersonChange={setDeliveryPerson}
             failedDeliveryAction={failedDeliveryAction}
             onFailedDeliveryActionChange={setFailedDeliveryAction}
+            isComplete={!!deliveryDate && !!deliveryTime && !!recipientName && deliveryTime !== "指定時間"}
           />
 
           <GiftCardSection
@@ -387,6 +400,7 @@ const Index = () => {
             message={giftCardMessage}
             onEnabledChange={setGiftCardEnabled}
             onMessageChange={setGiftCardMessage}
+            isComplete={!giftCardEnabled || !!giftCardMessage.trim()}
           />
 
           <PaymentSection
@@ -407,6 +421,7 @@ const Index = () => {
             onReminderOptionChange={setReminderOption}
             priceWarning={finalPrice === 0 && items.length > 0}
             orderId={currentOrderId}
+            isComplete={paymentStatus !== "unpaid" || finalPrice === 0}
           />
 
           <AddOnsSection

@@ -45,3 +45,11 @@ export const SALES_STAFF = [
   { id: "S004", name: "王曉華" },
   { id: "S005", name: "林志強" },
 ];
+
+export const DRIVERS = [
+  { id: "D001", name: "阿明" },
+  { id: "D002", name: "阿強" },
+  { id: "D003", name: "阿偉" },
+  { id: "D004", name: "阿華" },
+  { id: "D005", name: "臨時司機" },
+];

@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle } from "lucide-react";
+import { DRIVERS } from "@/types/order";
 
 const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
   "香港島": {
@@ -32,6 +33,12 @@ const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
   },
 };
 
+const DELIVERY_SLOTS = [
+  { value: "上午 (9–1pm)", label: "上午", sublabel: "9am – 1pm" },
+  { value: "下午 (1–6pm)", label: "下午", sublabel: "1pm – 6pm" },
+  { value: "指定時間", label: "指定時間", sublabel: "+ 附加費" },
+];
+
 interface DeliverySectionProps {
   deliveryDate: string;
   deliveryTime: string;
@@ -53,6 +60,7 @@ interface DeliverySectionProps {
   onRecipientPhoneChange: (v: string) => void;
   onDeliveryPersonChange: (v: string) => void;
   onFailedDeliveryActionChange: (v: string) => void;
+  isComplete?: boolean;
 }
 
 const DeliverySection = ({
@@ -62,7 +70,7 @@ const DeliverySection = ({
   onDateChange, onTimeChange,
   onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
   onRecipientNameChange, onRecipientPhoneChange, onDeliveryPersonChange,
-  onFailedDeliveryActionChange,
+  onFailedDeliveryActionChange, isComplete,
 }: DeliverySectionProps) => {
   const districts = deliveryRegion ? Object.keys(HK_DISTRICTS[deliveryRegion] || {}) : [];
   const areas = deliveryRegion && deliveryDistrict
@@ -80,19 +88,37 @@ const DeliverySection = ({
     onAreaChange("");
   };
 
-  // Build full address string for display
+  const isSpecified = deliveryTime === "指定時間" || deliveryTime.startsWith("指定");
+  const specifiedTime = isSpecified ? deliveryTime.replace("指定時間 ", "").replace("指定時間", "") : "";
+
+  const handleSlotSelect = (slotValue: string) => {
+    if (slotValue === "指定時間") {
+      onTimeChange("指定時間");
+    } else {
+      onTimeChange(slotValue);
+    }
+  };
+
+  const handleSpecifiedTime = (t: string) => {
+    onTimeChange(t ? `指定時間 ${t}` : "指定時間");
+  };
+
   const fullAddress = [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail]
     .filter(Boolean)
     .join(" ");
-
   const mapQuery = encodeURIComponent(fullAddress + " 香港");
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className={`rounded-xl bg-card p-4 space-y-3 transition-colors ${
+      isComplete ? "border-t border-r border-b border-l-4 border-t-primary/30 border-r-primary/30 border-b-primary/30 border-l-primary" : "border border-border"
+    }`}>
       <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+        <span className="text-primary font-bold text-base">④</span>
         <MapPin className="w-4 h-4" />
         送貨資料
       </h2>
+
+      {/* Date + Time slot */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
@@ -109,16 +135,38 @@ const DeliverySection = ({
           <Label className="text-xs flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" /> 送貨時間
           </Label>
-          <Input
-            type="time"
-            value={deliveryTime}
-            onChange={(e) => onTimeChange(e.target.value)}
-            className="text-sm"
-          />
+          <div className="flex gap-1.5">
+            {DELIVERY_SLOTS.map((slot) => {
+              const active = deliveryTime === slot.value || (slot.value === "指定時間" && isSpecified);
+              return (
+                <button
+                  key={slot.value}
+                  onClick={() => handleSlotSelect(slot.value)}
+                  className={`flex-1 rounded-lg py-1.5 px-1 text-center text-xs font-medium border transition-all ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-secondary text-secondary-foreground border-transparent hover:border-border"
+                  }`}
+                >
+                  <div>{slot.label}</div>
+                  <div className={`text-[9px] ${active ? "opacity-80" : "text-muted-foreground"}`}>{slot.sublabel}</div>
+                </button>
+              );
+            })}
+          </div>
+          {isSpecified && (
+            <Input
+              type="time"
+              value={specifiedTime}
+              onChange={(e) => handleSpecifiedTime(e.target.value)}
+              className="text-sm mt-1"
+              placeholder="指定時間"
+            />
+          )}
         </div>
       </div>
 
-      {/* Address: Region → District → Area */}
+      {/* Address */}
       <div className="space-y-2">
         <Label className="text-xs">送貨地址</Label>
         <div className="grid grid-cols-3 gap-2">
@@ -163,9 +211,7 @@ const DeliverySection = ({
           maxLength={200}
         />
         {fullAddress && (
-          <p className="text-xs text-muted-foreground">
-            📍 {fullAddress}
-          </p>
+          <p className="text-xs text-muted-foreground">📍 {fullAddress}</p>
         )}
         {fullAddress.length > 2 && (
           <div className="rounded-lg overflow-hidden border border-border mt-2">
@@ -182,7 +228,7 @@ const DeliverySection = ({
         )}
       </div>
 
-      {/* Recipient info */}
+      {/* Recipient */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
@@ -208,19 +254,22 @@ const DeliverySection = ({
         </div>
       </div>
 
-      {/* Delivery person */}
+      {/* Driver dropdown + failed delivery */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
-            <UserCheck className="w-3.5 h-3.5" /> 送貨人
+            <UserCheck className="w-3.5 h-3.5" /> 送貨司機
           </Label>
-          <Input
-            placeholder="負責送貨嘅同事名"
-            value={deliveryPerson}
-            onChange={(e) => onDeliveryPersonChange(e.target.value)}
-            className="text-sm"
-            maxLength={100}
-          />
+          <Select value={deliveryPerson} onValueChange={onDeliveryPersonChange}>
+            <SelectTrigger className="text-sm">
+              <SelectValue placeholder="選擇司機" />
+            </SelectTrigger>
+            <SelectContent>
+              {DRIVERS.map((d) => (
+                <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">

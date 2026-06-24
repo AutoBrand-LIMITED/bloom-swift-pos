@@ -27,6 +27,7 @@ interface PaymentSectionProps {
   onReminderOptionChange: (v: string) => void;
   priceWarning: boolean;
   orderId?: string;
+  isComplete?: boolean;
 }
 
 const statusConfig: Record<PaymentStatus, { label: string; className: string }> = {
@@ -52,7 +53,7 @@ const PaymentSection = ({
   depositAmount, onDepositAmountChange,
   followUpDate, onFollowUpDateChange,
   reminderOption, onReminderOptionChange,
-  priceWarning, orderId,
+  priceWarning, orderId, isComplete,
 }: PaymentSectionProps) => {
   const openPaymentScreen = () => {
     const ref = orderId ? orderId.slice(-8).toUpperCase() : "—";
@@ -61,8 +62,11 @@ const PaymentSection = ({
   };
 
   return (
-  <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+  <div className={`rounded-xl bg-card p-4 space-y-4 transition-colors ${
+    isComplete ? "border-t border-r border-b border-l-4 border-t-primary/30 border-r-primary/30 border-b-primary/30 border-l-primary" : "border border-border"
+  }`}>
     <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+      <span className="text-primary font-bold text-base">⑥</span>
       <CreditCard className="w-4 h-4" />
       付款
     </h2>
