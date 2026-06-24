@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Trash2, Package, Truck, Zap, Wallet, Sparkles } from "lucide-react";
+import { Plus, Trash2, Package, Truck, Zap, Wallet, Sparkles, MessageSquare, MapPin, Lock } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
@@ -16,8 +16,12 @@ interface OrderItemsSectionProps {
   urgentFee: number;
   onDeliveryFeeChange: (v: number) => void;
   onUrgentFeeChange: (v: number) => void;
-  notes: string;
-  onNotesChange: (v: string) => void;
+  senderNotes: string;
+  deliveryNotes: string;
+  internalNotes: string;
+  onSenderNotesChange: (v: string) => void;
+  onDeliveryNotesChange: (v: string) => void;
+  onInternalNotesChange: (v: string) => void;
   budget: number;
   onBudgetChange: (v: number) => void;
   subtotal: number;
@@ -27,7 +31,8 @@ const OrderItemsSection = ({
   items, onItemsChange,
   deliveryFee, urgentFee,
   onDeliveryFeeChange, onUrgentFeeChange,
-  notes, onNotesChange,
+  senderNotes, deliveryNotes, internalNotes,
+  onSenderNotesChange, onDeliveryNotesChange, onInternalNotesChange,
   budget, onBudgetChange, subtotal,
 }: OrderItemsSectionProps) => {
   const [newName, setNewName] = useState("");
@@ -93,7 +98,7 @@ const OrderItemsSection = ({
         open={customOrderOpen}
         onClose={() => setCustomOrderOpen(false)}
         onConfirm={(summary) => {
-          onNotesChange(notes ? `${notes}\n\n${summary}` : summary);
+          onSenderNotesChange(senderNotes ? `${senderNotes}\n\n${summary}` : summary);
           setCustomOrderOpen(false);
         }}
       />
@@ -249,22 +254,73 @@ const OrderItemsSection = ({
         </div>
       </div>
 
-      {/* Notes */}
-      <div className="space-y-1 pt-2 border-t border-border">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs">備註</Label>
-          <VoiceInputButton
-            onResult={(text) => onNotesChange(notes ? `${notes} ${text}` : text)}
-            className="h-7 w-7"
+      {/* 3 note types */}
+      <div className="space-y-3 pt-2 border-t border-border">
+        {/* Sender notes */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
+              <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
+              客戶備註
+              <span className="text-[10px] text-muted-foreground font-normal">（客人特別要求）</span>
+            </Label>
+            <VoiceInputButton
+              onResult={(text) => onSenderNotesChange(senderNotes ? `${senderNotes} ${text}` : text)}
+              className="h-7 w-7"
+            />
+          </div>
+          <Textarea
+            placeholder="例如：紅白配、不要滿天星、花束要大一點..."
+            value={senderNotes}
+            onChange={(e) => onSenderNotesChange(e.target.value)}
+            className="text-sm min-h-[56px]"
+            maxLength={500}
           />
         </div>
-        <Textarea
-          placeholder="例如：紅白配、不要滿天星、附卡片寫..."
-          value={notes}
-          onChange={(e) => onNotesChange(e.target.value)}
-          className="text-sm min-h-[60px]"
-          maxLength={500}
-        />
+
+        {/* Delivery notes */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
+              <MapPin className="w-3.5 h-3.5 text-green-500" />
+              送貨備註
+              <span className="text-[10px] text-muted-foreground font-normal">（送貨特別指示）</span>
+            </Label>
+            <VoiceInputButton
+              onResult={(text) => onDeliveryNotesChange(deliveryNotes ? `${deliveryNotes} ${text}` : text)}
+              className="h-7 w-7"
+            />
+          </div>
+          <Textarea
+            placeholder="例如：需要簽收、客戶自備花瓶、送到前台..."
+            value={deliveryNotes}
+            onChange={(e) => onDeliveryNotesChange(e.target.value)}
+            className="text-sm min-h-[56px]"
+            maxLength={500}
+          />
+        </div>
+
+        {/* Internal notes */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
+              <Lock className="w-3.5 h-3.5 text-purple-500" />
+              內部備註
+              <span className="text-[10px] text-muted-foreground font-normal">（員工專用，不對外顯示）</span>
+            </Label>
+            <VoiceInputButton
+              onResult={(text) => onInternalNotesChange(internalNotes ? `${internalNotes} ${text}` : text)}
+              className="h-7 w-7"
+            />
+          </div>
+          <Textarea
+            placeholder="例如：此客常遲付款、注意特殊要求..."
+            value={internalNotes}
+            onChange={(e) => onInternalNotesChange(e.target.value)}
+            className="text-sm min-h-[56px] border-purple-200"
+            maxLength={500}
+          />
+        </div>
       </div>
     </div>
   );

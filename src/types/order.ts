@@ -12,6 +12,7 @@ export interface Order {
   salesId: string;
   customerName: string;
   phone: string;
+  contactPerson: string;
   items: OrderItem[];
   deliveryFee: number;
   urgentFee: number;
@@ -31,6 +32,9 @@ export interface Order {
   giftCardEnabled: boolean;
   giftCardMessage: string;
   notes: string;
+  senderNotes: string;
+  deliveryNotes: string;
+  internalNotes: string;
   createdAt: string;
 }
 

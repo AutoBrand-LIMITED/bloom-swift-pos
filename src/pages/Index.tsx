@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3 } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
@@ -14,7 +14,6 @@ import AddOnsSection from "@/components/pos/AddOnsSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
 import type { Order, OrderItem, PaymentStatus } from "@/types/order";
-import { SALES_STAFF } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
@@ -30,21 +29,30 @@ function loadOrders(): Order[] {
 
 const Index = () => {
   const navigate = useNavigate();
+
+  // Staff (gate — must be first)
+  const [salesId, setSalesId] = useState("");
+
   // Customer
   const [phone, setPhone] = useState("");
+  const [phonePrefix, setPhonePrefix] = useState("+852");
   const [customerName, setCustomerName] = useState("");
   const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
   const [companyName, setCompanyName] = useState("");
+  const [contactPerson, setContactPerson] = useState("");
   const [phoneError, setPhoneError] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
+  const [persistentNoteDismissed, setPersistentNoteDismissed] = useState(false);
 
   // Items
   const [budget, setBudget] = useState(0);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [urgentFee, setUrgentFee] = useState(0);
-  const [notes, setNotes] = useState("");
+  const [senderNotes, setSenderNotes] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
 
   // Delivery
   const [deliveryDate, setDeliveryDate] = useState("");
@@ -61,12 +69,12 @@ const Index = () => {
   // Gift card
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
   const [giftCardMessage, setGiftCardMessage] = useState("");
+
   // Payment
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [depositAmount, setDepositAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
-  const [salesId, setSalesId] = useState("");
   const [reminderOption, setReminderOption] = useState("none");
   const [priceOverridden, setPriceOverridden] = useState(false);
   const [manualPrice, setManualPrice] = useState<number | null>(null);
@@ -95,17 +103,23 @@ const Index = () => {
   const unpaidCount = useMemo(() => orders.filter((o) => o.paymentStatus === "unpaid").length, [orders]);
 
   const resetForm = useCallback(() => {
+    setSalesId("");
     setPhone("");
+    setPhonePrefix("+852");
     setCustomerName("");
     setCustomerType("personal");
     setCompanyName("");
+    setContactPerson("");
     setPhoneError(false);
     setSelectedCustomer(null);
+    setPersistentNoteDismissed(false);
     setItems([]);
     setBudget(0);
     setDeliveryFee(0);
     setUrgentFee(0);
-    setNotes("");
+    setSenderNotes("");
+    setDeliveryNotes("");
+    setInternalNotes("");
     setDeliveryDate("");
     setDeliveryTime("");
     setDeliveryRegion("");
@@ -125,11 +139,23 @@ const Index = () => {
     setReminderOption("none");
     setPriceOverridden(false);
     setManualPrice(null);
-    setSalesId("");
   }, []);
 
+  const handleCustomerSelect = (c: DemoCustomer) => {
+    setSelectedCustomer(c);
+    setCustomerName(c.name);
+    setPhone(c.phone);
+    setPhoneError(false);
+    setContactPerson(c.contactPerson ?? "");
+    setPersistentNoteDismissed(false);
+  };
+
   const handleSubmit = () => {
-    // Validation
+    if (!salesId) {
+      toast.error("請先選擇負責員工");
+      return;
+    }
+
     if (!phone.trim()) {
       setPhoneError(true);
       toast.error("請輸入客戶電話號碼");
@@ -150,7 +176,8 @@ const Index = () => {
       id: crypto.randomUUID(),
       salesId,
       customerName: customerName.trim(),
-      phone: phone.trim(),
+      phone: `${phonePrefix} ${phone.trim()}`,
+      contactPerson: contactPerson.trim(),
       items,
       deliveryFee,
       urgentFee,
@@ -169,7 +196,10 @@ const Index = () => {
       deliveryPerson: deliveryPerson.trim(),
       giftCardEnabled,
       giftCardMessage: giftCardEnabled ? giftCardMessage.trim() : "",
-      notes: notes.trim(),
+      notes: senderNotes.trim(),
+      senderNotes: senderNotes.trim(),
+      deliveryNotes: deliveryNotes.trim(),
+      internalNotes: internalNotes.trim(),
       createdAt: new Date().toISOString(),
     };
 
@@ -185,7 +215,6 @@ const Index = () => {
       toast.success("訂單已建立 ✓");
     }
 
-    // Show print dialog
     toast("列印單據", {
       duration: 15000,
       description: "選擇要列印嘅單據：",
@@ -205,6 +234,9 @@ const Index = () => {
 
     resetForm();
   };
+
+  const showPersistentNote =
+    selectedCustomer?.persistentNotes && !persistentNoteDismissed;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -257,97 +289,128 @@ const Index = () => {
 
         {/* Main form */}
         <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
-        <CustomerSection
-          phone={phone}
-          customerName={customerName}
-          customerType={customerType}
-          companyName={companyName}
-          onPhoneChange={(v) => { setPhone(v); if (v.trim()) setPhoneError(false); }}
-          onNameChange={setCustomerName}
-          onCustomerTypeChange={setCustomerType}
-          onCompanyNameChange={setCompanyName}
-          onCustomerSelect={(c) => {
-            setSelectedCustomer(c);
-            setCustomerName(c.name);
-            setPhone(c.phone);
-            setPhoneError(false);
-          }}
-           phoneError={phoneError}
-           selectedCustomer={selectedCustomer}
-           refreshKey={customerRefreshKey}
-        />
 
-        <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} />
+          {/* STEP 1: Staff — required gate */}
+          <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} />
 
-        <OrderItemsSection
-          items={items}
-          onItemsChange={setItems}
-          deliveryFee={deliveryFee}
-          urgentFee={urgentFee}
-          onDeliveryFeeChange={setDeliveryFee}
-          onUrgentFeeChange={setUrgentFee}
-          notes={notes}
-          onNotesChange={setNotes}
-          budget={budget}
-          onBudgetChange={setBudget}
-          subtotal={subtotal}
-        />
+          {/* No-staff warning */}
+          {!salesId && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              請先選擇負責員工，再開始輸入訂單
+            </div>
+          )}
 
-        <DeliverySection
-          deliveryDate={deliveryDate}
-          deliveryTime={deliveryTime}
-          deliveryRegion={deliveryRegion}
-          deliveryDistrict={deliveryDistrict}
-          deliveryArea={deliveryArea}
-          deliveryDetail={deliveryDetail}
-          recipientName={recipientName}
-          recipientPhone={recipientPhone}
-          deliveryPerson={deliveryPerson}
-          onDateChange={setDeliveryDate}
-          onTimeChange={setDeliveryTime}
-          onRegionChange={setDeliveryRegion}
-          onDistrictChange={setDeliveryDistrict}
-          onAreaChange={setDeliveryArea}
-          onDetailChange={setDeliveryDetail}
-          onRecipientNameChange={setRecipientName}
-          onRecipientPhoneChange={setRecipientPhone}
-          onDeliveryPersonChange={setDeliveryPerson}
-          failedDeliveryAction={failedDeliveryAction}
-          onFailedDeliveryActionChange={setFailedDeliveryAction}
-        />
+          {/* Persistent notes alert */}
+          {showPersistentNote && (
+            <div className="relative flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-xs uppercase tracking-wide mb-1">客戶持續備註</p>
+                <p className="text-xs leading-relaxed">{selectedCustomer!.persistentNotes}</p>
+              </div>
+              <button
+                onClick={() => setPersistentNoteDismissed(true)}
+                className="shrink-0 text-red-400 hover:text-red-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
-        <GiftCardSection
-          enabled={giftCardEnabled}
-          message={giftCardMessage}
-          onEnabledChange={setGiftCardEnabled}
-          onMessageChange={setGiftCardMessage}
-        />
+          <CustomerSection
+            phone={phone}
+            phonePrefix={phonePrefix}
+            customerName={customerName}
+            customerType={customerType}
+            companyName={companyName}
+            contactPerson={contactPerson}
+            onPhoneChange={(v) => { setPhone(v); if (v.trim()) setPhoneError(false); }}
+            onPhonePrefixChange={setPhonePrefix}
+            onNameChange={setCustomerName}
+            onCustomerTypeChange={setCustomerType}
+            onCompanyNameChange={setCompanyName}
+            onContactPersonChange={setContactPerson}
+            onCustomerSelect={handleCustomerSelect}
+            phoneError={phoneError}
+            selectedCustomer={selectedCustomer}
+            refreshKey={customerRefreshKey}
+          />
 
-        <PaymentSection
-          subtotal={subtotal}
-          finalPrice={finalPrice}
-          priceOverridden={priceOverridden}
-          onFinalPriceChange={handleFinalPriceChange}
-          onResetPrice={resetPrice}
-          paymentStatus={paymentStatus}
-          onPaymentStatusChange={setPaymentStatus}
-          paymentMethod={paymentMethod}
-          onPaymentMethodChange={setPaymentMethod}
-          depositAmount={depositAmount}
-          onDepositAmountChange={setDepositAmount}
-          followUpDate={followUpDate}
-          onFollowUpDateChange={setFollowUpDate}
-          reminderOption={reminderOption}
-          onReminderOptionChange={setReminderOption}
-          priceWarning={finalPrice === 0 && items.length > 0}
-        />
+          <OrderItemsSection
+            items={items}
+            onItemsChange={setItems}
+            deliveryFee={deliveryFee}
+            urgentFee={urgentFee}
+            onDeliveryFeeChange={setDeliveryFee}
+            onUrgentFeeChange={setUrgentFee}
+            senderNotes={senderNotes}
+            deliveryNotes={deliveryNotes}
+            internalNotes={internalNotes}
+            onSenderNotesChange={setSenderNotes}
+            onDeliveryNotesChange={setDeliveryNotes}
+            onInternalNotesChange={setInternalNotes}
+            budget={budget}
+            onBudgetChange={setBudget}
+            subtotal={subtotal}
+          />
 
-        <AddOnsSection
-          items={items}
-          onItemsChange={setItems}
-        />
-      </main>
+          <DeliverySection
+            deliveryDate={deliveryDate}
+            deliveryTime={deliveryTime}
+            deliveryRegion={deliveryRegion}
+            deliveryDistrict={deliveryDistrict}
+            deliveryArea={deliveryArea}
+            deliveryDetail={deliveryDetail}
+            recipientName={recipientName}
+            recipientPhone={recipientPhone}
+            deliveryPerson={deliveryPerson}
+            onDateChange={setDeliveryDate}
+            onTimeChange={setDeliveryTime}
+            onRegionChange={setDeliveryRegion}
+            onDistrictChange={setDeliveryDistrict}
+            onAreaChange={setDeliveryArea}
+            onDetailChange={setDeliveryDetail}
+            onRecipientNameChange={setRecipientName}
+            onRecipientPhoneChange={setRecipientPhone}
+            onDeliveryPersonChange={setDeliveryPerson}
+            failedDeliveryAction={failedDeliveryAction}
+            onFailedDeliveryActionChange={setFailedDeliveryAction}
+          />
+
+          <GiftCardSection
+            enabled={giftCardEnabled}
+            message={giftCardMessage}
+            onEnabledChange={setGiftCardEnabled}
+            onMessageChange={setGiftCardMessage}
+          />
+
+          <PaymentSection
+            subtotal={subtotal}
+            finalPrice={finalPrice}
+            priceOverridden={priceOverridden}
+            onFinalPriceChange={handleFinalPriceChange}
+            onResetPrice={resetPrice}
+            paymentStatus={paymentStatus}
+            onPaymentStatusChange={setPaymentStatus}
+            paymentMethod={paymentMethod}
+            onPaymentMethodChange={setPaymentMethod}
+            depositAmount={depositAmount}
+            onDepositAmountChange={setDepositAmount}
+            followUpDate={followUpDate}
+            onFollowUpDateChange={setFollowUpDate}
+            reminderOption={reminderOption}
+            onReminderOptionChange={setReminderOption}
+            priceWarning={finalPrice === 0 && items.length > 0}
+          />
+
+          <AddOnsSection
+            items={items}
+            onItemsChange={setItems}
+          />
+        </main>
       </div>
+
       {/* Sticky submit */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">

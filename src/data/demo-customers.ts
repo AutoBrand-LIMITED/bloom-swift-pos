@@ -1,7 +1,12 @@
+export type CustomerFlag = 'vip' | 'warning' | 'internal';
+
 export interface DemoCustomer {
   id: string;
   name: string;
   phone: string;
+  contactPerson?: string;
+  flags?: CustomerFlag[];
+  persistentNotes?: string;
   history: PurchaseRecord[];
 }
 
@@ -29,6 +34,8 @@ export const DEMO_CUSTOMERS: DemoCustomer[] = [
     id: "c2",
     name: "李先生",
     phone: "6234 5678",
+    flags: ['warning'],
+    persistentNotes: "慣常遲付款，需跟進。勿先安排送貨。",
     history: [
       { date: "2026-03-18", items: "花藝佈置（婚禮）", total: 8800, status: "unpaid" },
       { date: "2026-02-28", items: "向日葵花束 × 3", total: 1440, status: "paid" },
@@ -58,6 +65,9 @@ export const DEMO_CUSTOMERS: DemoCustomer[] = [
     id: "c5",
     name: "黃太",
     phone: "6567 8901",
+    flags: ['vip'],
+    persistentNotes: "VIP客戶，優先安排。喜愛粉紅色系，不喜歡白花。",
+    contactPerson: "陳小姐（秘書）",
     history: [
       { date: "2026-03-12", items: "套票（100支花）", total: 8800, status: "paid" },
     ],
