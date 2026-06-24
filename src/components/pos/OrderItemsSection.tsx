@@ -40,18 +40,46 @@ const OrderItemsSection = ({
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [customOrderOpen, setCustomOrderOpen] = useState(false);
-  const PRESETS = [
-    { name: "玫瑰花束", price: 680 },
-    { name: "向日葵花束", price: 480 },
-    { name: "百合花束", price: 580 },
-    { name: "繡球花束", price: 780 },
-    { name: "鮮花籃", price: 880 },
-    { name: "蘭花盆栽", price: 1200 },
-    { name: "多肉植物", price: 280 },
-    { name: "花藝佈置", price: 0 },
-    { name: "園藝保養", price: 0 },
-    { name: "套票（100支花）", price: 8800 },
+  const [selectedCategory, setSelectedCategory] = useState("all");
+
+  const CATEGORIES = [
+    { id: "all", label: "全部" },
+    { id: "bouquet", label: "花束" },
+    { id: "basket", label: "花籃" },
+    { id: "plant", label: "盆栽" },
+    { id: "wreath", label: "花圈" },
+    { id: "other", label: "其他" },
   ];
+
+  const PRESETS = [
+    { name: "玫瑰花束", price: 680, category: "bouquet" },
+    { name: "向日葵花束", price: 480, category: "bouquet" },
+    { name: "百合花束", price: 580, category: "bouquet" },
+    { name: "繡球花束", price: 780, category: "bouquet" },
+    { name: "混合野花束", price: 520, category: "bouquet" },
+    { name: "牡丹花束", price: 980, category: "bouquet" },
+    { name: "鬱金香花束", price: 620, category: "bouquet" },
+    { name: "鮮花籃", price: 880, category: "basket" },
+    { name: "果籃連鮮花", price: 1200, category: "basket" },
+    { name: "蘭花籃", price: 1400, category: "basket" },
+    { name: "祝賀花籃", price: 980, category: "basket" },
+    { name: "蘭花盆栽", price: 1200, category: "plant" },
+    { name: "多肉植物", price: 280, category: "plant" },
+    { name: "幸福樹", price: 680, category: "plant" },
+    { name: "觀葉植物", price: 480, category: "plant" },
+    { name: "蝴蝶蘭（雙株）", price: 1800, category: "plant" },
+    { name: "喪禮花圈（白）", price: 1200, category: "wreath" },
+    { name: "喪禮花圈（混色）", price: 1400, category: "wreath" },
+    { name: "靈前擺設", price: 2200, category: "wreath" },
+    { name: "花藝佈置", price: 0, category: "other" },
+    { name: "園藝保養", price: 0, category: "other" },
+    { name: "套票（100支花）", price: 8800, category: "other" },
+    { name: "禮品套裝", price: 680, category: "other" },
+  ];
+
+  const visiblePresets = selectedCategory === "all"
+    ? PRESETS
+    : PRESETS.filter((p) => p.category === selectedCategory);
 
   const addPreset = (preset: { name: string; price: number }) => {
     onItemsChange([
@@ -146,9 +174,26 @@ const OrderItemsSection = ({
         )}
       </div>
 
+      {/* Category filter */}
+      <div className="flex flex-wrap gap-1.5">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setSelectedCategory(cat.id)}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+              selectedCategory === cat.id
+                ? "bg-primary text-primary-foreground"
+                : "border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
       {/* Quick presets */}
       <div className="flex flex-wrap gap-1.5">
-        {PRESETS.map((p) => (
+        {visiblePresets.map((p) => (
           <button
             key={p.name}
             onClick={() => addPreset(p)}
