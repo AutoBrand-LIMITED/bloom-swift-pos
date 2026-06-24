@@ -7,18 +7,19 @@ Point-of-sale system for **Anglo Chinese Florist Limited**, built by AutoBrand L
 | Layer | Tech |
 |-------|------|
 | Framework | React 18 + TypeScript |
-| Build | Vite |
+| Build | Vite 5 |
 | Styling | Tailwind CSS v3 |
 | Components | shadcn/ui |
-| Routing | React Router |
+| Routing | React Router v6 |
 | State | useState / useMemo (local) |
 | Storage | localStorage (Supabase migration planned) |
 | Icons | Lucide React |
-| Testing | Vitest + Playwright |
+| i18n | Custom hook — `useLanguage()` with `zh`/`en` dicts |
 
 ## Getting Started
 
 ```bash
+cp .env.local.example .env.local   # then set VITE_ADMIN_PASSWORD
 npm install
 npm run dev
 ```
@@ -29,21 +30,45 @@ Production build:
 npm run build
 ```
 
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_ADMIN_PASSWORD` | Password for the Sales Report screen |
+
+Copy `.env.local.example` → `.env.local` and fill in.
+
+## Screens
+
+| Route | Description |
+|-------|-------------|
+| `/` | Main POS order entry |
+| `/dispatch` | Back-office dispatch view (driver groups, date filter) |
+| `/driver` | Driver-facing screen (name select → orders → photo upload) |
+| `/report` | Sales analytics (password-protected) |
+| `/payment` | Customer-facing payment screen (`?amount=X&ref=Y`) |
+
 ## Project Structure
 
 ```
 src/
 ├── pages/
-│   ├── Index.tsx          # Main POS screen
-│   └── SalesReport.tsx    # Sales analytics (password: bloom2024)
-├── components/pos/        # POS feature components
+│   ├── Index.tsx          # Main POS screen (6-step order flow)
+│   ├── DispatchView.tsx   # Back-office dispatch (orders by driver)
+│   ├── DriverApp.tsx      # Driver interface (photo upload, delivery status)
+│   ├── SalesReport.tsx    # Sales analytics (VITE_ADMIN_PASSWORD required)
+│   └── PaymentScreen.tsx  # Customer-facing payment display
+├── components/pos/        # POS section components (SalesId, Customer, etc.)
 ├── components/ui/         # shadcn/ui component library
+├── contexts/
+│   └── LanguageContext.tsx # useLanguage() hook — lang, setLang, t()
 ├── data/
-│   └── demo-customers.ts  # Customer seed data + types
+│   └── demo-customers.ts  # Customer seed data
 ├── types/
-│   └── order.ts           # Order, OrderItem, PaymentStatus types
+│   └── order.ts           # Order, Delivery, OrderItem, PaymentStatus, SALES_STAFF, DRIVERS
 └── lib/
-    ├── print-utils.ts     # Receipt, delivery note, picking list generators
+    ├── print-utils.ts     # HTML generators — receipt, delivery note, picking slip, message card
+    ├── orders.ts          # loadOrders / saveOrder / compressImage
     ├── customer-utils.ts  # localStorage customer helpers
     └── utils.ts           # shadcn cn() helper
 ```
