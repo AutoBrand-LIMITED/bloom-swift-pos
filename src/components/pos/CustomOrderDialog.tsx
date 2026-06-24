@@ -48,6 +48,66 @@ const FlowerIcon = ({ name, className }: { name: string; className?: string }) =
   <Icon icon={`fluent-emoji:${NAME_ICON[name] ?? "blossom"}`} className={className} />
 );
 
+// Cantonese → English for all domain option terms. Canonical (Cantonese) stays
+// in state/summary; this drives display only. Unmapped terms render as-is.
+const TERM_EN: Record<string, string> = {
+  // Flowers
+  "紅玫瑰": "Red Rose", "粉玫瑰": "Pink Rose", "白玫瑰": "White Rose", "香檳玫瑰": "Champagne Rose",
+  "玫瑰": "Rose", "百合": "Lily", "繡球花": "Hydrangea", "向日葵": "Sunflower", "牡丹": "Peony",
+  "鬱金香": "Tulip", "蘭花": "Orchid", "康乃馨": "Carnation", "桔梗": "Balloon Flower",
+  "太陽花": "Gerbera", "非洲菊": "African Daisy", "菊花": "Chrysanthemum", "白菊花": "White Chrysanthemum",
+  "劍蘭": "Gladiolus", "永生玫瑰": "Preserved Rose", "永生繡球": "Preserved Hydrangea",
+  "永生康乃馨": "Preserved Carnation", "乾燥滿天星": "Dried Baby's Breath", "乾燥薰衣草": "Dried Lavender",
+  "乾燥棉花": "Dried Cotton", "乾燥兔尾草": "Dried Bunny Tail", "蘭花（蝴蝶蘭）": "Orchid (Phalaenopsis)",
+  "多肉植物": "Succulent", "繡球花盆栽": "Potted Hydrangea", "發財樹": "Money Tree", "虎尾蘭": "Snake Plant",
+  "琴葉榕": "Fiddle-leaf Fig", "滿天星": "Baby's Breath", "情人草": "Statice", "臘梅": "Wintersweet",
+  "小雛菊": "Daisy", "勿忘我": "Forget-me-not", "薰衣草": "Lavender", "洋甘菊": "Chamomile",
+  "乾燥情人草": "Dried Statice", "乾燥小雛菊": "Dried Daisy", "尤加利葉": "Eucalyptus",
+  "乾燥尤加利": "Dried Eucalyptus", "銀葉": "Silver Leaf", "腎蕨": "Fern", "文竹": "Asparagus Fern",
+  "春蘭葉": "Orchid Leaf", "龜背竹": "Monstera", "散尾葵": "Areca Palm",
+  // Fruits
+  "蘋果": "Apple", "橙": "Orange", "提子": "Grapes", "芒果": "Mango", "士多啤梨": "Strawberry",
+  "藍莓": "Blueberry", "奇異果": "Kiwi", "車厘子": "Cherry",
+  // Shapes
+  "圓形花束": "Round Bouquet", "長形花束": "Long Bouquet", "瀑布形花束": "Cascade Bouquet",
+  "韓式單面花束": "Korean One-sided", "螺旋花束": "Spiral Bouquet", "自然風花束": "Natural Style",
+  "圓形花籃": "Round Basket", "橢圓形花籃": "Oval Basket", "提籃": "Handle Basket", "開放式花籃": "Open Basket",
+  "三腳架": "Tripod Stand", "雙層花牌": "Double-tier Stand", "單層花牌": "Single-tier Stand",
+  "羅馬柱花架": "Roman Column Stand", "圓形果籃": "Round Fruit Basket", "禮盒式": "Gift Box Style",
+  "玻璃罩": "Glass Dome", "禮盒": "Gift Box", "花束式": "Bouquet Style", "相框式": "Frame Style",
+  "陶瓷盆": "Ceramic Pot", "水泥盆": "Cement Pot", "藤編盆": "Rattan Pot", "自帶花盆": "Own Pot",
+  "圓形花環": "Round Wreath", "心形花環": "Heart Wreath", "半月形": "Half-moon", "十字架形": "Cross Shape",
+  // Wraps
+  "牛皮紙": "Kraft Paper", "霧面紙": "Matte Paper", "緞帶紙": "Ribbon Paper", "紗網": "Mesh", "絨布": "Velvet",
+  "透明玻璃紙": "Cellophane", "無包裝": "No Wrap", "玻璃紙外層": "Cellophane Outer", "緞帶裝飾": "Ribbon Trim",
+  "緞帶": "Ribbon", "玻璃紙": "Cellophane", "禮盒包裝": "Gift Box Wrap", "麻布袋": "Burlap Bag",
+  // Sizes
+  "迷你（10-15cm）": "Mini (10-15cm)", "標準（20-25cm）": "Standard (20-25cm)", "大型（30-40cm）": "Large (30-40cm)",
+  "巨型（50cm+）": "Giant (50cm+)", "小型花籃": "Small Basket", "標準花籃": "Standard Basket",
+  "大型花籃": "Large Basket", "巨型花籃": "Giant Basket", "標準花牌（5尺）": "Standard Stand (5ft)",
+  "大型花牌（6尺）": "Large Stand (6ft)", "小型": "Small", "標準": "Standard", "豪華": "Deluxe",
+  "迷你": "Mini", "大型": "Large", "S (小)": "S", "M (中)": "M", "L (大)": "L", "XL (特大)": "XL",
+  "小型（30cm）": "Small (30cm)", "標準（45cm）": "Standard (45cm)", "大型（60cm+）": "Large (60cm+)",
+  // Colours
+  "白色": "White", "粉紅色": "Pink", "米色": "Beige", "黑色": "Black", "酒紅色": "Burgundy", "灰色": "Grey",
+  "莫蘭迪綠": "Morandi Green", "奶茶色": "Milk Tea", "金色": "Gold", "緞面米色": "Satin Beige", "無絲帶": "No Ribbon",
+  // Vases
+  "無花器": "No Vase", "玻璃花樽": "Glass Vase", "陶瓷花盆": "Ceramic Pot", "木盒": "Wood Box",
+  "鐵桶": "Metal Bucket", "藤籃": "Rattan Basket", "壓克力盒": "Acrylic Box",
+  // Style themes
+  "自然": "Natural", "浪漫": "Romantic", "簡約": "Minimalist", "奢華": "Luxury", "日式": "Japanese",
+  "歐式": "European", "復古": "Vintage", "現代": "Modern",
+  // Colour tones
+  "暖色系": "Warm Tones", "冷色系": "Cool Tones", "大地色": "Earth Tones", "粉嫩系": "Pastel",
+  "紅白配": "Red & White", "全白": "All White", "混色": "Mixed", "漸變色": "Gradient",
+  // Fragrance
+  "有香味": "Scented", "無香味": "Unscented", "淡香": "Light Scent", "濃香": "Strong Scent", "無所謂": "No Preference",
+  // Preservation
+  "標準處理": "Standard", "加保鮮劑": "Add Preservative", "附水袋": "Water Pack", "冰袋保鮮": "Ice Pack",
+};
+
+const tr = (term: string, lang: string): string => (lang === "en" ? TERM_EN[term] ?? term : term);
+
 // ─── Product Types ───────────────────────────────────────────
 type ProductType = "bouquet" | "basket" | "stand" | "fruit_basket" | "preserved" | "potted" | "wreath";
 
@@ -291,7 +351,8 @@ function ChipSelect({ options, items, value, onChange, highlighted }: {
   onChange: (v: string) => void;
   highlighted?: string[];
 }) {
-  const display = items ?? (options ?? []).map((o) => ({ id: o, label: o }));
+  const { lang } = useLanguage();
+  const display = items ?? (options ?? []).map((o) => ({ id: o, label: tr(o, lang) }));
   return (
     <div className="flex flex-wrap gap-1.5">
       {display.map(({ id, label }) => {
@@ -325,6 +386,7 @@ function FlowerPicker({ flowers, selected, onToggle, onQtyChange, highlighted }:
   onQtyChange: (name: string, qty: number) => void;
   highlighted?: string[];
 }) {
+  const { lang } = useLanguage();
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
       {flowers.map((f) => {
@@ -344,7 +406,7 @@ function FlowerPicker({ flowers, selected, onToggle, onQtyChange, highlighted }:
           >
             <FlowerIcon name={f.name} className="w-5 h-5 shrink-0" />
             <span className="text-xs font-medium flex-1 flex items-center gap-1">
-              {isRecommended && !sel && <Star className="w-2.5 h-2.5 shrink-0 text-amber-400" />}{f.name}
+              {isRecommended && !sel && <Star className="w-2.5 h-2.5 shrink-0 text-amber-400" />}{tr(f.name, lang)}
             </span>
             {sel ? (
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
