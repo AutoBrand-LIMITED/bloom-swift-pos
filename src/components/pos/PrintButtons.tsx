@@ -55,33 +55,29 @@ const PrintButtons = ({ order, size = "sm", compact = false }: PrintButtonsProps
     return (
       <div className="flex items-center gap-1 border-t border-border/60 pt-2">
         <button
-          title={t("btn_picking_slip")}
           onClick={(e) => { e.stopPropagation(); printDocument(generatePickingList(order)); }}
-          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="h-7 flex items-center gap-1 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
         >
-          <ClipboardCheck className="w-3.5 h-3.5" />
+          <ClipboardCheck className="w-3 h-3 shrink-0" /> {t("btn_picking_slip")}
         </button>
         <button
-          title={t("btn_delivery_note")}
           onClick={(e) => { e.stopPropagation(); printDocument(generateDeliveryNote(order)); }}
-          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="h-7 flex items-center gap-1 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
         >
-          <Truck className="w-3.5 h-3.5" />
+          <Truck className="w-3 h-3 shrink-0" /> {t("btn_delivery_note")}
         </button>
         <button
-          title={t("btn_receipt")}
           onClick={(e) => { e.stopPropagation(); printDocument(generateReceipt(order)); }}
-          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="h-7 flex items-center gap-1 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
         >
-          <Receipt className="w-3.5 h-3.5" />
+          <Receipt className="w-3 h-3 shrink-0" /> {t("btn_receipt")}
         </button>
         {hasCard && (
           <button
-            title={t("btn_card")}
             onClick={(e) => { e.stopPropagation(); printDocument(generateMessageCard(order)); }}
-            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="h-7 flex items-center gap-1 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
           >
-            <MessageSquare className="w-3.5 h-3.5" />
+            <MessageSquare className="w-3 h-3 shrink-0" /> {t("btn_card")}
           </button>
         )}
         <DropdownMenu>
@@ -89,10 +85,10 @@ const PrintButtons = ({ order, size = "sm", compact = false }: PrintButtonsProps
             <Button
               variant="outline"
               size="sm"
-              className="ml-auto h-7 gap-1 text-xs px-2.5"
+              className="ml-auto h-7 gap-1 text-xs px-2"
               onClick={(e) => e.stopPropagation()}
             >
-              <Printer className="w-3 h-3" /> {t("btn_print_all")} <ChevronDown className="w-3 h-3 opacity-60" />
+              <Printer className="w-3 h-3" /> <ChevronDown className="w-3 h-3 opacity-60" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
