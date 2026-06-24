@@ -8,6 +8,7 @@ import PrintButtons from "@/components/pos/PrintButtons";
 import type { Order, PaymentStatus } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { productLabel } from "@/lib/product-i18n";
 
 function isDispatchBlocked(order: Order): boolean {
   if (order.paymentStatus !== "unpaid") return false;
@@ -291,7 +292,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                             <div className="rounded-lg bg-muted/40 px-2.5 py-2 space-y-0.5">
                               {order.items.map((item) => (
                                 <div key={item.id} className="flex justify-between items-baseline">
-                                  <span className="text-xs text-foreground/80">{item.name} × {item.quantity}</span>
+                                  <span className="text-xs text-foreground/80">{productLabel(item.name, lang)} × {item.quantity}</span>
                                   <span className="text-xs font-mono text-foreground/70 tabular-nums">${(item.price * item.quantity).toLocaleString()}</span>
                                 </div>
                               ))}

@@ -10,20 +10,7 @@ import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
-
-// Preset product names: Cantonese canonical (stored in cart) → English display.
-const PRESET_EN: Record<string, string> = {
-  "玫瑰花束": "Rose Bouquet", "向日葵花束": "Sunflower Bouquet", "百合花束": "Lily Bouquet",
-  "繡球花束": "Hydrangea Bouquet", "混合野花束": "Mixed Wildflower Bouquet", "牡丹花束": "Peony Bouquet",
-  "鬱金香花束": "Tulip Bouquet", "鮮花籃": "Fresh Flower Basket", "果籃連鮮花": "Fruit & Flower Basket",
-  "蘭花籃": "Orchid Basket", "祝賀花籃": "Congratulatory Basket", "蘭花盆栽": "Potted Orchid",
-  "多肉植物": "Succulent", "幸福樹": "Happiness Tree", "觀葉植物": "Foliage Plant",
-  "蝴蝶蘭（雙株）": "Phalaenopsis (Double)", "喪禮花圈（白）": "Funeral Wreath (White)",
-  "喪禮花圈（混色）": "Funeral Wreath (Mixed)", "靈前擺設": "Memorial Arrangement",
-  "花藝佈置": "Floral Decoration", "園藝保養": "Garden Maintenance",
-  "套票（100支花）": "Package (100 stems)", "禮品套裝": "Gift Set",
-};
-const presetLabel = (name: string, lang: string): string => (lang === "en" ? PRESET_EN[name] ?? name : name);
+import { productLabel } from "@/lib/product-i18n";
 
 interface OrderItemsSectionProps {
   items: OrderItem[];
@@ -223,7 +210,7 @@ const OrderItemsSection = ({
             onClick={() => addPreset(p)}
             className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-left text-xs transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
           >
-            <span className="font-medium leading-snug">{presetLabel(p.name, lang)}</span>
+            <span className="font-medium leading-snug">{productLabel(p.name, lang)}</span>
             {p.price > 0 && (
               <span className="shrink-0 font-mono tabular-nums text-muted-foreground group-hover:text-primary-foreground/70">
                 ${p.price}
