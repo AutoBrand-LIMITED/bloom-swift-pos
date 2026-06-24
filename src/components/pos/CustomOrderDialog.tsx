@@ -9,7 +9,9 @@ import { Switch } from "@/components/ui/switch";
 import {
   Sparkles, Plus, Minus, X, MousePointerClick, Star, Check,
   Tag, Heart, Flower2, Flower, Leaf, Apple, Package, Container, Palette, Ruler, Wind, AlertTriangle, FileText,
+  ShoppingBasket, PartyPopper, Gem, Sprout, CircleDashed,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TranslationKey } from "@/lib/i18n";
@@ -17,9 +19,14 @@ import type { TranslationKey } from "@/lib/i18n";
 // ─── Product Types ───────────────────────────────────────────
 type ProductType = "bouquet" | "basket" | "stand" | "fruit_basket" | "preserved" | "potted" | "wreath";
 
-const PRODUCT_TYPE_EMOJIS: Record<ProductType, string> = {
-  bouquet: "💐", basket: "🧺", stand: "🎋", fruit_basket: "🍎",
-  preserved: "🌹", potted: "🪴", wreath: "⭕",
+const PRODUCT_TYPE_META: Record<ProductType, { icon: LucideIcon; color: string }> = {
+  bouquet: { icon: Flower2, color: "text-pink-500" },
+  basket: { icon: ShoppingBasket, color: "text-amber-600" },
+  stand: { icon: PartyPopper, color: "text-rose-400" },
+  fruit_basket: { icon: Apple, color: "text-red-500" },
+  preserved: { icon: Gem, color: "text-violet-500" },
+  potted: { icon: Sprout, color: "text-emerald-500" },
+  wreath: { icon: CircleDashed, color: "text-orange-500" },
 };
 const PRODUCT_TYPE_KEYS: Record<ProductType, TranslationKey> = {
   bouquet: "pt_bouquet", basket: "pt_basket", stand: "pt_stand",
@@ -372,7 +379,8 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
     (Object.keys(PRODUCT_TYPE_KEYS) as ProductType[]).map((id) => ({
       id,
       label: t(PRODUCT_TYPE_KEYS[id]),
-      emoji: PRODUCT_TYPE_EMOJIS[id],
+      icon: PRODUCT_TYPE_META[id].icon,
+      color: PRODUCT_TYPE_META[id].color,
     }))
   ), [t]);
 
@@ -486,6 +494,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {productTypes.map((p) => {
                   const active = state.productType === p.id;
+                  const Icon = p.icon;
                   return (
                     <button
                       key={p.id}
@@ -502,7 +511,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                           <Check className="w-2.5 h-2.5" strokeWidth={3} />
                         </span>
                       )}
-                      <span className={`text-2xl leading-none transition-transform duration-200 ease-out group-hover:scale-110 ${active ? "scale-110" : ""}`}>{p.emoji}</span>
+                      <Icon className={`w-6 h-6 transition-transform duration-200 ease-out group-hover:scale-110 ${active ? "scale-110 text-primary" : p.color}`} />
                       <span className="text-xs font-semibold leading-tight">{p.label}</span>
                     </button>
                   );

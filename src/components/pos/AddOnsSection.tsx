@@ -1,4 +1,5 @@
-import { Gift, Check } from "lucide-react";
+import { Gift, Check, Truck, PawPrint, Container, Flower2, Sprout, ShoppingBasket, Droplets, Package, PenLine, Lightbulb } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { OrderItem } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -7,17 +8,17 @@ interface AddOnsSectionProps {
   onItemsChange: (items: OrderItem[]) => void;
 }
 
-const ADDONS = [
-  { name: "樓梯送貨（每層）", price: 50 },
-  { name: "Soft Teddy", price: 180 },
-  { name: "玻璃花樽 (6\"x16\"H或以下)", price: 250 },
-  { name: "精美陶瓷花盆", price: 180 },
-  { name: "日式花盆", price: 220 },
-  { name: "竹編花籃", price: 150 },
-  { name: "保鮮花處理", price: 80 },
-  { name: "花束包裝升級", price: 60 },
-  { name: "手寫賀卡", price: 30 },
-  { name: "LED 燈串裝飾", price: 50 },
+const ADDONS: { name: string; price: number; icon: LucideIcon; color: string }[] = [
+  { name: "樓梯送貨（每層）", price: 50, icon: Truck, color: "text-sky-500" },
+  { name: "Soft Teddy", price: 180, icon: PawPrint, color: "text-rose-400" },
+  { name: "玻璃花樽 (6\"x16\"H或以下)", price: 250, icon: Container, color: "text-cyan-500" },
+  { name: "精美陶瓷花盆", price: 180, icon: Flower2, color: "text-pink-500" },
+  { name: "日式花盆", price: 220, icon: Sprout, color: "text-emerald-500" },
+  { name: "竹編花籃", price: 150, icon: ShoppingBasket, color: "text-amber-600" },
+  { name: "保鮮花處理", price: 80, icon: Droplets, color: "text-blue-500" },
+  { name: "花束包裝升級", price: 60, icon: Package, color: "text-orange-500" },
+  { name: "手寫賀卡", price: 30, icon: PenLine, color: "text-violet-500" },
+  { name: "LED 燈串裝飾", price: 50, icon: Lightbulb, color: "text-yellow-500" },
 ];
 
 const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
@@ -44,6 +45,7 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
         {ADDONS.map((addon) => {
           const isAdded = addedNames.has(addon.name);
+          const Icon = addon.icon;
           return (
             <button
               key={addon.name}
@@ -56,6 +58,7 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
                   : "border-border hover:border-primary/40 hover:bg-accent/30"
               }`}
             >
+              <Icon className={`w-4 h-4 shrink-0 ${addon.color}`} />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium leading-tight">{addon.name}</p>
                 <p className="text-xs font-mono text-muted-foreground tabular-nums">${addon.price}</p>
