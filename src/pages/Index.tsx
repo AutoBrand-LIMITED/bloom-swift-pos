@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck, Crown, Gift, Tag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
@@ -21,6 +21,15 @@ import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
 import { loadOrders, saveOrders } from "@/lib/orders";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { updateCustomerPersistentNotes, updateCustomerFlags } from "@/lib/customer-utils";
+import type { CustomerFlag } from "@/data/demo-customers";
+import type { TranslationKey } from "@/lib/i18n";
+
+const OCCASION_KEYS: TranslationKey[] = [
+  "occasion_birthday", "occasion_mothers_day", "occasion_fathers_day",
+  "occasion_valentines", "occasion_christmas", "occasion_anniversary",
+  "occasion_graduation", "occasion_new_year", "occasion_other",
+];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -59,6 +68,11 @@ const Index = () => {
   // Occasion
   const [occasionTag, setOccasionTag] = useState("");
 
+  // Pin notes to customer
+  const [senderNotesPinned, setSenderNotesPinned] = useState(false);
+  const [deliveryNotesPinned, setDeliveryNotesPinned] = useState(false);
+  const [internalNotesPinned, setInternalNotesPinned] = useState(false);
+
   // Gift card
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
   const [giftCardMessage, setGiftCardMessage] = useState("");
@@ -94,6 +108,50 @@ const Index = () => {
   };
 
   const unpaidCount = useMemo(() => orders.filter((o) => o.paymentStatus === "unpaid").length, [orders]);
+
+  const VIP_THRESHOLD = 5000;
+
+  const vipSuggestion = useMemo(() => {
+    if (!selectedCustomer || selectedCustomer.flags?.includes("vip")) return false;
+    const normalizedPhone = selectedCustomer.phone.replace(/\s/g, "");
+    const totalSpend = orders
+      .filter(o => o.phone.replace(/\s/g, "") === normalizedPhone)
+      .reduce((sum, o) => sum + o.finalPrice, 0);
+    return totalSpend >= VIP_THRESHOLD;
+  }, [selectedCustomer, orders]);
+
+  const upcomingBirthdays = useMemo(() => {
+    if (!selectedCustomer) return [] as { name: string; birthday: string; daysUntil: number }[];
+    const normalizedPhone = selectedCustomer.phone.replace(/\s/g, "");
+    const today = new Date();
+    const seen = new Set<string>();
+    const results: { name: string; birthday: string; daysUntil: number }[] = [];
+
+    for (const order of orders) {
+      if (order.phone.replace(/\s/g, "") !== normalizedPhone) continue;
+      for (const d of (order.deliveries ?? [])) {
+        if (!d.recipientBirthday || !d.recipientName) continue;
+        const key = `${d.recipientName}-${d.recipientBirthday}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const parts = d.recipientBirthday.split("-");
+        const month = parseInt(parts[0], 10);
+        const day = parseInt(parts[1], 10);
+        if (isNaN(month) || isNaN(day)) continue;
+
+        const nextBirthday = new Date(today.getFullYear(), month - 1, day);
+        if (nextBirthday < today) nextBirthday.setFullYear(today.getFullYear() + 1);
+        const daysUntil = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysUntil <= 30) {
+          results.push({ name: d.recipientName, birthday: d.recipientBirthday, daysUntil });
+        }
+      }
+    }
+
+    return results.sort((a, b) => a.daysUntil - b.daysUntil);
+  }, [selectedCustomer, orders]);
 
   const totalSteps = giftCardEnabled ? 6 : 5;
   const stepsDone = useMemo(() => [
@@ -138,6 +196,10 @@ const Index = () => {
     setReminderOption("none");
     setPriceOverridden(false);
     setManualPrice(null);
+    setOccasionTag("");
+    setSenderNotesPinned(false);
+    setDeliveryNotesPinned(false);
+    setInternalNotesPinned(false);
     setCurrentOrderId(crypto.randomUUID());
   }, []);
 
@@ -148,6 +210,15 @@ const Index = () => {
     setPhoneError(false);
     setContactPerson(c.contactPerson ?? "");
     setPersistentNoteDismissed(false);
+  };
+
+  const handleMarkVip = () => {
+    if (!selectedCustomer) return;
+    const newFlags: CustomerFlag[] = [...(selectedCustomer.flags ?? []).filter(f => f !== "vip"), "vip"];
+    updateCustomerFlags(selectedCustomer.phone, newFlags);
+    setSelectedCustomer({ ...selectedCustomer, flags: newFlags });
+    setCustomerRefreshKey(k => k + 1);
+    toast.success(t("btn_mark_vip"));
   };
 
   const handleSubmit = () => {
@@ -201,12 +272,26 @@ const Index = () => {
       senderNotes: senderNotes.trim(),
       deliveryNotes: deliveryNotes.trim(),
       internalNotes: internalNotes.trim(),
+      occasionTag: occasionTag || undefined,
       createdAt: new Date().toISOString(),
     };
 
     const updated = [...orders, order];
     setOrders(updated);
     saveOrders(updated);
+
+    // Save pinned notes to customer persistent record (append to existing)
+    const newPinned = [
+      senderNotesPinned && senderNotes.trim() ? senderNotes.trim() : null,
+      deliveryNotesPinned && deliveryNotes.trim() ? deliveryNotes.trim() : null,
+      internalNotesPinned && internalNotes.trim() ? internalNotes.trim() : null,
+    ].filter(Boolean).join("\n");
+    if (newPinned && phone.trim()) {
+      const existing = selectedCustomer?.persistentNotes;
+      const combined = existing ? `${existing}\n${newPinned}` : newPinned;
+      updateCustomerPersistentNotes(`${phonePrefix} ${phone.trim()}`, combined);
+      setCustomerRefreshKey(k => k + 1);
+    }
 
     if (paymentStatus === "unpaid") {
       toast.warning(t("toast_order_unpaid"), { duration: 5000 });
@@ -367,7 +452,36 @@ const Index = () => {
             selectedCustomer={selectedCustomer}
             refreshKey={customerRefreshKey}
             isComplete={!!phone.trim() && !!customerName.trim()}
+            orders={orders}
           />
+
+          {/* VIP threshold suggestion */}
+          {vipSuggestion && (
+            <div className="flex items-center justify-between rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-2.5 text-xs text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-300">
+              <div className="flex items-center gap-2">
+                <Crown className="w-4 h-4 text-yellow-600 shrink-0" />
+                <span>{t("alert_vip_threshold")}</span>
+              </div>
+              <Button size="sm" variant="outline" className="h-6 text-xs border-yellow-300 text-yellow-800 hover:bg-yellow-100" onClick={handleMarkVip}>
+                {t("btn_mark_vip")}
+              </Button>
+            </div>
+          )}
+
+          {/* Birthday reminders */}
+          {upcomingBirthdays.length > 0 && (
+            <div className="rounded-lg border border-pink-200 bg-pink-50 px-4 py-2.5 text-xs text-pink-800 space-y-1 dark:border-pink-800 dark:bg-pink-950/30 dark:text-pink-300">
+              <div className="flex items-center gap-2 font-semibold">
+                <Gift className="w-3.5 h-3.5 shrink-0" />
+                {t("alert_birthday_upcoming")}
+              </div>
+              {upcomingBirthdays.map(({ name, birthday, daysUntil }) => (
+                <p key={`${name}-${birthday}`}>
+                  {name} · {birthday} · {daysUntil === 0 ? lang === "zh" ? "今日！" : "Today!" : lang === "zh" ? `${daysUntil}日後` : `in ${daysUntil} days`}
+                </p>
+              ))}
+            </div>
+          )}
 
           <OrderItemsSection
             items={items}
@@ -386,6 +500,12 @@ const Index = () => {
             onBudgetChange={setBudget}
             subtotal={subtotal}
             isComplete={items.length > 0}
+            senderNotesPinned={senderNotesPinned}
+            deliveryNotesPinned={deliveryNotesPinned}
+            internalNotesPinned={internalNotesPinned}
+            onSenderNotesPinnedChange={setSenderNotesPinned}
+            onDeliveryNotesPinnedChange={setDeliveryNotesPinned}
+            onInternalNotesPinnedChange={setInternalNotesPinned}
           />
 
           <DeliverySection
@@ -401,6 +521,30 @@ const Index = () => {
             onMessageChange={setGiftCardMessage}
             isComplete={!giftCardEnabled || !!giftCardMessage.trim()}
           />
+
+          {/* Occasion tag */}
+          <div className={`rounded-xl p-4 space-y-3 border transition-colors ${occasionTag ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
+            <h2 className="text-[13px] font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
+              <Tag className="w-4 h-4" />
+              {t("label_occasion")}
+              {occasionTag && <span className="text-[11px] font-normal normal-case tracking-normal text-primary">{t(occasionTag as TranslationKey)}</span>}
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {OCCASION_KEYS.map(key => (
+                <button
+                  key={key}
+                  onClick={() => setOccasionTag(occasionTag === key ? "" : key)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    occasionTag === key
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground hover:bg-primary/10 hover:text-primary"
+                  }`}
+                >
+                  {t(key)}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <PaymentSection
             subtotal={subtotal}

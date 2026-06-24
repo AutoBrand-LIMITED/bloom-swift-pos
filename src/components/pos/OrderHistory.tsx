@@ -1,20 +1,28 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ClipboardList, X, ShieldAlert, Truck } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClipboardList, X, ShieldAlert, Truck, Search } from "lucide-react";
 import PrintButtons from "@/components/pos/PrintButtons";
 import type { Order, PaymentStatus } from "@/types/order";
+import { SALES_STAFF } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 function isDispatchBlocked(order: Order): boolean {
   if (order.paymentStatus !== "unpaid") return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  // Check all deliveries (multi-recipient); fall back to legacy flat field
   const dates = (order.deliveries?.map(d => d.deliveryDate).filter(Boolean) ?? []);
   if (dates.length === 0 && order.deliveryDate) dates.push(order.deliveryDate);
   return dates.some(date => new Date(date) <= today);
+}
+
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
 }
 
 interface OrderHistoryProps {
@@ -31,9 +39,46 @@ const STATUS_VARIANTS: Record<PaymentStatus, "destructive" | "default" | "second
 
 const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
   const { t } = useLanguage();
-  // All hooks must run before any conditional return
+  const [searchText, setSearchText] = useState("");
+  const [staffFilter, setStaffFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all");
+
+  const filteredOrders = useMemo(() => {
+    let result = orders;
+
+    if (staffFilter !== "all") {
+      result = result.filter(o => o.salesId === staffFilter);
+    }
+
+    if (periodFilter !== "all") {
+      const cutoff = periodFilter === "today"
+        ? new Date().toISOString().slice(0, 10)
+        : periodFilter === "last7"
+        ? daysAgo(7)
+        : daysAgo(30);
+      result = result.filter(o => {
+        const date = (o.createdAt || "").slice(0, 10);
+        return periodFilter === "today" ? date === cutoff : date >= cutoff;
+      });
+    }
+
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      result = result.filter(o =>
+        o.customerName?.toLowerCase().includes(q) ||
+        o.phone?.includes(q) ||
+        o.recipientName?.toLowerCase().includes(q) ||
+        o.deliveries?.some(d =>
+          d.recipientName?.toLowerCase().includes(q) || d.recipientPhone?.includes(q)
+        )
+      );
+    }
+
+    return result;
+  }, [orders, staffFilter, periodFilter, searchText]);
+
   const driverGroups = useMemo(() => {
-    const sorted = [...orders].sort((a, b) => {
+    const sorted = [...filteredOrders].sort((a, b) => {
       const da = a.deliveryDate || "";
       const db = b.deliveryDate || "";
       if (da !== db) return da.localeCompare(db);
@@ -47,35 +92,89 @@ const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
       groups[driver].push(order);
     }
 
-    // Sort groups: named drivers first (alphabetical), unassigned last
     return Object.entries(groups).sort(([a], [b]) => {
       if (a === "未分配") return 1;
       if (b === "未分配") return -1;
       return a.localeCompare(b);
     });
-  }, [orders]);
+  }, [filteredOrders]);
+
+  const hasFilters = staffFilter !== "all" || periodFilter !== "all" || searchText.trim() !== "";
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-foreground/40 flex justify-end" onClick={onClose}>
       <div
-        className="w-full max-w-md bg-card border-l border-border h-full animate-in slide-in-from-right duration-300"
+        className="w-full max-w-md bg-card border-l border-border h-full animate-in slide-in-from-right duration-300 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <h2 className="font-semibold flex items-center gap-2">
             <ClipboardList className="w-5 h-5" />
-            {t("panel_order_history")} ({orders.length})
+            {t("panel_order_history")} ({filteredOrders.length}/{orders.length})
           </h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-5 h-5" />
           </Button>
         </div>
 
-        {/* Dispatch block alert */}
+        {/* Filters */}
+        <div className="px-4 pt-3 pb-2 space-y-2 shrink-0 border-b border-border">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              placeholder={t("placeholder_search_history")}
+              className="pl-8 h-8 text-xs"
+            />
+            {searchText && (
+              <button onClick={() => setSearchText("")} className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Select value={staffFilter} onValueChange={setStaffFilter}>
+              <SelectTrigger className="h-7 text-xs flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("label_all_staff")}</SelectItem>
+                {SALES_STAFF.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger className="h-7 text-xs flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("filter_all")}</SelectItem>
+                <SelectItem value="today">{t("filter_today")}</SelectItem>
+                <SelectItem value="last7">{t("filter_last7")}</SelectItem>
+                <SelectItem value="last30">{t("filter_last30")}</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs px-2 text-muted-foreground"
+                onClick={() => { setSearchText(""); setStaffFilter("all"); setPeriodFilter("all"); }}
+              >
+                {t("btn_clear_filters")}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Dispatch block alert — always based on full order list, not filtered view */}
         {orders.some(isDispatchBlocked) && (
-          <div className="mx-4 mt-3 rounded-lg bg-destructive/10 border border-destructive/30 p-3 flex items-start gap-2">
+          <div className="mx-4 mt-3 rounded-lg bg-destructive/10 border border-destructive/30 p-3 flex items-start gap-2 shrink-0">
             <ShieldAlert className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
             <div>
               <p className="text-xs font-semibold text-destructive">{t("alert_dispatch_warning")}</p>
@@ -85,14 +184,14 @@ const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
             </div>
           </div>
         )}
-        <ScrollArea className="h-[calc(100vh-65px)]">
-          {orders.length === 0 ? (
+
+        <ScrollArea className="flex-1">
+          {filteredOrders.length === 0 ? (
             <p className="text-center text-muted-foreground p-8">{t("msg_no_orders")}</p>
           ) : (
             <div className="p-4 space-y-5">
               {driverGroups.map(([driver, driverOrders]) => (
                 <div key={driver}>
-                  {/* Driver group header */}
                   <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-dashed border-border">
                     <Truck className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wide">
@@ -134,7 +233,6 @@ const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
                             <Badge variant={badgeVariant}>{badgeLabel}</Badge>
                           </div>
 
-                          {/* Delivery info */}
                           {order.deliveryDate && (
                             <p className="text-xs text-muted-foreground">
                               📅 {order.deliveryDate}

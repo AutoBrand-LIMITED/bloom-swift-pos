@@ -7,6 +7,7 @@ import { User, Phone, ChevronDown, Building2, Crown, AlertTriangle, Tag } from "
 import { DEMO_CUSTOMERS, type DemoCustomer, type CustomerFlag } from "@/data/demo-customers";
 import { loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { Order } from "@/types/order";
 
 export type CustomerType = "personal" | "company";
 
@@ -28,6 +29,7 @@ interface CustomerSectionProps {
   selectedCustomer: DemoCustomer | null;
   refreshKey?: number;
   isComplete?: boolean;
+  orders?: Order[];
 }
 
 const FLAG_COLORS: Record<CustomerFlag, string> = {
@@ -74,7 +76,7 @@ const CustomerSection = ({
   phone, phonePrefix, customerName, customerType, companyName, contactPerson,
   onPhoneChange, onPhonePrefixChange, onNameChange, onCustomerTypeChange,
   onCompanyNameChange, onContactPersonChange,
-  onCustomerSelect, phoneError, selectedCustomer, refreshKey, isComplete,
+  onCustomerSelect, phoneError, selectedCustomer, refreshKey, isComplete, orders,
 }: CustomerSectionProps) => {
   const { t } = useLanguage();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -98,9 +100,31 @@ const CustomerSection = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  const filtered = allCustomers.filter(
-    (c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search)
-  );
+  const filtered = useMemo(() => {
+    if (!search.trim()) return [];
+    const q = search.toLowerCase();
+    const byName = allCustomers.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.phone.includes(search)
+    );
+    // Also surface senders from orders where search matches a recipient phone
+    if (orders?.length) {
+      const matchedSenderPhones = new Set<string>();
+      for (const order of orders) {
+        for (const d of (order.deliveries ?? [])) {
+          if (d.recipientPhone && d.recipientPhone.replace(/\s/g, "").includes(search.replace(/\s/g, ""))) {
+            matchedSenderPhones.add(order.phone.replace(/\s/g, ""));
+          }
+        }
+      }
+      if (matchedSenderPhones.size > 0) {
+        const extra = allCustomers.filter(
+          (c) => matchedSenderPhones.has(c.phone.replace(/\s/g, "")) && !byName.some((b) => b.id === c.id)
+        );
+        return [...byName, ...extra];
+      }
+    }
+    return byName;
+  }, [search, allCustomers, orders]);
 
   const handleSelect = (c: DemoCustomer) => {
     onCustomerSelect(c);

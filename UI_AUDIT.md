@@ -89,7 +89,7 @@ Built by: AutoBrand Limited
 - [x] Internal notes: staff-only, not visible to customers (e.g. 'this customer always pays late')
 
 **Persistent notes:**
-- [ ] Staff can designate notes as persistent (carry across all future orders for that customer) _(hardcoded in customer data; no UI to set)_
+- [x] Staff can designate notes as persistent — Bookmark toggle on each note type; saved to customer on order submit ✅
 - [x] Persistent notes surface automatically when a new order is opened for that customer
 - [x] No manual searching required — new and part-time staff are always informed
 - [ ] Notes can be added retrospectively after an order is placed
@@ -129,7 +129,7 @@ Built by: AutoBrand Limited
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Sales staff selection | ✅ Exists | First field; gates all other input |
-| Phone search + customer lookup | ✅ Exists | 852/853 auto-detect ✅; no recipient search yet |
+| Phone search + customer lookup | ✅ Exists | 852/853 auto-detect ✅; recipient phone search ✅ |
 | Personal / company toggle | ✅ Exists | — |
 | Order items + presets + voice input | ✅ Exists | Category filter: 全部/花束/花籃/盆栽/花圈/其他 ✅; no item code search |
 | Budget tracker with progress bar | ✅ Exists | — |
@@ -146,7 +146,7 @@ Built by: AutoBrand Limited
 | CSV import | ✅ Exists | — |
 | Customer flags (VIP dot / warning) | ✅ Exists | VIP / warning / internal tag with colour badges |
 | 3 note types | ✅ Exists | Sender / delivery / internal, all with voice input |
-| Persistent notes | ✅ Exists | Auto-surfaces on customer load; dismissible per order |
+| Persistent notes | ✅ Exists | Auto-surfaces on customer load; dismissible per order; pin toggle on notes ✅ |
 | Contact person (secretary) field | ✅ Exists | — |
 | Split-delivery (multiple recipients) | ✅ Exists | Multi-recipient cards; add/remove; shown in history |
 | Delivery time preset slots | ✅ Exists | 上午 9–1pm / 下午 1–6pm / 指定時間 + surcharge flag |
@@ -162,12 +162,12 @@ Built by: AutoBrand Limited
 | English / Cantonese language toggle | ✅ Exists | 廣/EN pill in header; persisted in localStorage; full app coverage |
 | Relationship field on recipient | ✅ Exists | Per-recipient dropdown in DeliverySection |
 | Birthday field on recipient | ✅ Exists | MM-DD field per recipient in DeliverySection |
-| Occasion / holiday tag on order | ⚠️ Partial | Type + i18n done; UI picker not yet wired in form |
-| VIP classification + purchase threshold | ❌ Missing | Flag exists; auto-threshold logic not built |
-| Birthday tracking + sender reminder | ❌ Missing | Field exists; reminder alert not built |
+| Occasion / holiday tag on order | ✅ Exists | Pill picker UI ✅; saved to order ✅ |
+| VIP classification + purchase threshold | ✅ Exists | Auto-suggest banner at ≥ HKD 5000 spend; one-tap mark VIP ✅ |
+| Birthday tracking + sender reminder | ✅ Exists | Alert shows upcoming recipient birthdays (within 30 days) on customer select ✅ |
 | WhatsApp reminders | ❌ Missing | Needs backend |
-| Phone search across sender + recipient | ❌ Missing | Currently sender-only |
-| Order history filters (date/staff/occasion) | ❌ Missing | — |
+| Phone search across sender + recipient | ✅ Exists | CustomerSection searches recipient phones across orders ✅ |
+| Order history filters (date/staff/occasion) | ✅ Exists | Search text + staff filter + period (today/7/30/all) ✅ |
 | Supabase (shared DB) | ❌ Missing | All localStorage |
 
 ---
@@ -215,17 +215,18 @@ Built by: AutoBrand Limited
 - [x] Dispatch view: back-office orders grouped by driver, date filter, status + payment badges, blocked unpaid orders highlighted (`/dispatch`)
 - [ ] Auto WhatsApp notification if delivery not updated after set period
 
-### P6 — VIP & Seasonal
+### P6 — VIP & Seasonal ✅ DONE (2026-06-24)
 
 - [x] Relationship field on recipient record (dropdown per recipient card)
 - [x] Birthday field on recipient (MM-DD per recipient card)
-- [ ] Occasion / holiday tag on order — type + i18n done; UI picker not wired yet
-- [ ] VIP flag: manual or purchase threshold trigger (auto-suggest when ≥ threshold)
-- [ ] Birthday reminder: alert sender when recipient birthday upcoming
+- [x] Occasion / holiday tag on order — pill picker UI wired; saved to order ✅
+- [x] VIP flag: auto-suggest banner when total spend ≥ HKD 5000; one-tap mark VIP ✅
+- [x] Birthday reminder: alert shows upcoming recipient birthdays within 30 days on customer select ✅
+- [x] Mark note as persistent: Bookmark toggle per note type → saves to customer on submit ✅
 - [ ] WhatsApp reminder scheduling — needs backend; skip until P7
 - [x] Order history sorted by delivery date ✅ already done in P3
-- [ ] History filters: date range, staff member, occasion tag
-- [ ] Phone search across sender + recipient simultaneously
+- [x] History filters: text search + staff member + date period (today/last7/last30/all) ✅
+- [x] Phone search across sender + recipient simultaneously ✅
 
 ### P7 — Infrastructure
 

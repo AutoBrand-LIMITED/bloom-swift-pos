@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Trash2, Package, Truck, Zap, Wallet, Sparkles, MessageSquare, MapPin, Lock } from "lucide-react";
+import { Plus, Trash2, Package, Truck, Zap, Wallet, Sparkles, MessageSquare, MapPin, Lock, Bookmark } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
@@ -28,6 +28,12 @@ interface OrderItemsSectionProps {
   onBudgetChange: (v: number) => void;
   subtotal: number;
   isComplete?: boolean;
+  senderNotesPinned?: boolean;
+  deliveryNotesPinned?: boolean;
+  internalNotesPinned?: boolean;
+  onSenderNotesPinnedChange?: (v: boolean) => void;
+  onDeliveryNotesPinnedChange?: (v: boolean) => void;
+  onInternalNotesPinnedChange?: (v: boolean) => void;
 }
 
 const OrderItemsSection = ({
@@ -37,6 +43,8 @@ const OrderItemsSection = ({
   senderNotes, deliveryNotes, internalNotes,
   onSenderNotesChange, onDeliveryNotesChange, onInternalNotesChange,
   budget, onBudgetChange, subtotal, isComplete,
+  senderNotesPinned, deliveryNotesPinned, internalNotesPinned,
+  onSenderNotesPinnedChange, onDeliveryNotesPinnedChange, onInternalNotesPinnedChange,
 }: OrderItemsSectionProps) => {
   const { t } = useLanguage();
   const [newName, setNewName] = useState("");
@@ -319,10 +327,21 @@ const OrderItemsSection = ({
               {t("label_sender_notes")}
               <span className="text-[10px] text-muted-foreground font-normal">({t("hint_sender_notes")})</span>
             </Label>
-            <VoiceInputButton
-              onResult={(text) => onSenderNotesChange(senderNotes ? `${senderNotes} ${text}` : text)}
-              className="h-7 w-7"
-            />
+            <div className="flex items-center gap-1">
+              {onSenderNotesPinnedChange && (
+                <button
+                  onClick={() => onSenderNotesPinnedChange(!senderNotesPinned)}
+                  title={t("label_pin_note")}
+                  className={`p-1 rounded transition-colors ${senderNotesPinned ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Bookmark className="w-3.5 h-3.5" fill={senderNotesPinned ? "currentColor" : "none"} />
+                </button>
+              )}
+              <VoiceInputButton
+                onResult={(text) => onSenderNotesChange(senderNotes ? `${senderNotes} ${text}` : text)}
+                className="h-7 w-7"
+              />
+            </div>
           </div>
           <Textarea
             placeholder={t("placeholder_sender_notes")}
@@ -341,10 +360,21 @@ const OrderItemsSection = ({
               {t("label_delivery_notes")}
               <span className="text-[10px] text-muted-foreground font-normal">({t("hint_delivery_notes")})</span>
             </Label>
-            <VoiceInputButton
-              onResult={(text) => onDeliveryNotesChange(deliveryNotes ? `${deliveryNotes} ${text}` : text)}
-              className="h-7 w-7"
-            />
+            <div className="flex items-center gap-1">
+              {onDeliveryNotesPinnedChange && (
+                <button
+                  onClick={() => onDeliveryNotesPinnedChange(!deliveryNotesPinned)}
+                  title={t("label_pin_note")}
+                  className={`p-1 rounded transition-colors ${deliveryNotesPinned ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Bookmark className="w-3.5 h-3.5" fill={deliveryNotesPinned ? "currentColor" : "none"} />
+                </button>
+              )}
+              <VoiceInputButton
+                onResult={(text) => onDeliveryNotesChange(deliveryNotes ? `${deliveryNotes} ${text}` : text)}
+                className="h-7 w-7"
+              />
+            </div>
           </div>
           <Textarea
             placeholder={t("placeholder_delivery_notes")}
@@ -363,10 +393,21 @@ const OrderItemsSection = ({
               {t("label_internal_notes")}
               <span className="text-[10px] text-muted-foreground font-normal">({t("hint_internal_notes")})</span>
             </Label>
-            <VoiceInputButton
-              onResult={(text) => onInternalNotesChange(internalNotes ? `${internalNotes} ${text}` : text)}
-              className="h-7 w-7"
-            />
+            <div className="flex items-center gap-1">
+              {onInternalNotesPinnedChange && (
+                <button
+                  onClick={() => onInternalNotesPinnedChange(!internalNotesPinned)}
+                  title={t("label_pin_note")}
+                  className={`p-1 rounded transition-colors ${internalNotesPinned ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Bookmark className="w-3.5 h-3.5" fill={internalNotesPinned ? "currentColor" : "none"} />
+                </button>
+              )}
+              <VoiceInputButton
+                onResult={(text) => onInternalNotesChange(internalNotes ? `${internalNotes} ${text}` : text)}
+                className="h-7 w-7"
+              />
+            </div>
           </div>
           <Textarea
             placeholder={t("placeholder_internal_notes")}

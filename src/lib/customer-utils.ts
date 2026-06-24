@@ -1,4 +1,5 @@
-import type { DemoCustomer, PurchaseRecord } from "@/data/demo-customers";
+import { DEMO_CUSTOMERS } from "@/data/demo-customers";
+import type { DemoCustomer, PurchaseRecord, CustomerFlag } from "@/data/demo-customers";
 import type { Order } from "@/types/order";
 
 const CUSTOMERS_STORAGE_KEY = "florist-pos-customers";
@@ -86,4 +87,28 @@ export function mergeCustomers(
   }
 
   return Array.from(phoneMap.values());
+}
+
+export function updateCustomerPersistentNotes(phone: string, note: string): void {
+  const normalizedPhone = phone.replace(/\s/g, "");
+  const stored = loadStoredCustomers();
+  const idx = stored.findIndex(c => c.phone.replace(/\s/g, "") === normalizedPhone);
+  if (idx >= 0) {
+    saveCustomers(stored.map((c, i) => i === idx ? { ...c, persistentNotes: note || undefined } : c));
+  } else {
+    const demo = DEMO_CUSTOMERS.find(c => c.phone.replace(/\s/g, "") === normalizedPhone);
+    if (demo) saveCustomers([...stored, { ...demo, persistentNotes: note || undefined }]);
+  }
+}
+
+export function updateCustomerFlags(phone: string, flags: CustomerFlag[]): void {
+  const normalizedPhone = phone.replace(/\s/g, "");
+  const stored = loadStoredCustomers();
+  const idx = stored.findIndex(c => c.phone.replace(/\s/g, "") === normalizedPhone);
+  if (idx >= 0) {
+    saveCustomers(stored.map((c, i) => i === idx ? { ...c, flags } : c));
+  } else {
+    const demo = DEMO_CUSTOMERS.find(c => c.phone.replace(/\s/g, "") === normalizedPhone);
+    if (demo) saveCustomers([...stored, { ...demo, flags }]);
+  }
 }

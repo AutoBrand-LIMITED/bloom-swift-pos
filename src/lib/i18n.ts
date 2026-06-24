@@ -313,6 +313,15 @@ export const zh = {
   btn_mark_vip: "標記為VIP",
   alert_birthday_upcoming: "生日提醒",
   msg_birthday_upcoming: "即將生日",
+
+  // Pin note
+  label_pin_note: "設為永久備註",
+  label_note_pinned: "已設為永久",
+  hint_pin_note: "下次開單自動顯示",
+
+  // History filter periods
+  filter_last7: "近7日",
+  filter_last30: "近30日",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
@@ -630,6 +639,15 @@ export const en: Record<TranslationKey, string> = {
   btn_mark_vip: "Mark as VIP",
   alert_birthday_upcoming: "Birthday Reminder",
   msg_birthday_upcoming: "Birthday coming up",
+
+  // Pin note
+  label_pin_note: "Pin as Persistent Note",
+  label_note_pinned: "Pinned",
+  hint_pin_note: "Shows on future orders",
+
+  // History filter periods
+  filter_last7: "Last 7 days",
+  filter_last30: "Last 30 days",
 };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { zh, en };
