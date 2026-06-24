@@ -13,7 +13,7 @@ import { loadStoredCustomers } from "@/lib/customer-utils";
 import { loadOrders } from "@/lib/orders";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const ADMIN_PASSWORD = "bloom2024";
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD as string;
 const UNSPECIFIED = "未指定";
 const UNKNOWN = "未知";
 

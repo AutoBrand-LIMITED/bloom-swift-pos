@@ -239,8 +239,8 @@ export function generateDeliveryNote(order: Order): string {
 
   const itemRows = order.items.map((item) => `
     <tr>
-      <td>${item.name}</td>
-      <td class="num">${item.quantity}</td>
+      <td>${esc(item.name)}</td>
+      <td class="num">${Number(item.quantity)}</td>
     </tr>`).join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送貨單 ${ref}</title>

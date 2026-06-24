@@ -75,6 +75,8 @@ const DriverApp = () => {
   const deliveredCount = driverOrders.filter((o) => o.deliveryStatus === "delivered").length;
 
   const handlePhotoUpload = async (orderId: string, photoKey: keyof OrderPhotos, file: File) => {
+    if (!file.type.startsWith("image/")) { toast.error(t("toast_photo_failed")); return; }
+    if (file.size > 20 * 1024 * 1024) { toast.error(t("toast_photo_failed")); return; }
     setUploading(`${orderId}-${photoKey}`);
     try {
       const dataUrl = await compressImage(file);
