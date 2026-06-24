@@ -52,6 +52,8 @@ export interface Order {
   deliveryNotes: string;
   internalNotes: string;
   createdAt: string;
+  deliveryStatus?: "pending" | "delivered";
+  deliveredAt?: string;
 }
 
 export const SALES_STAFF = [

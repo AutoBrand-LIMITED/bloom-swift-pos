@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
@@ -19,15 +19,7 @@ import SalesIdSection from "@/components/pos/SalesIdSection";
 import { newDelivery } from "@/components/pos/DeliverySection";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
-const STORAGE_KEY = "florist-pos-orders";
-
-function loadOrders(): Order[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
+import { loadOrders, saveOrders } from "@/lib/orders";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -208,7 +200,7 @@ const Index = () => {
 
     const updated = [...orders, order];
     setOrders(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    saveOrders(updated);
 
     if (paymentStatus === "unpaid") {
       toast.warning("訂單已建立 — 未付款，請跟進！", { duration: 5000 });
@@ -261,6 +253,9 @@ const Index = () => {
           </div>
           <div className="flex items-center gap-2">
             <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
+            <Button variant="ghost" size="sm" onClick={() => navigate("/dispatch")} className="gap-1.5 text-xs">
+              <Truck className="w-3.5 h-3.5" /> 調度
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
               <BarChart3 className="w-3.5 h-3.5" /> 報告
             </Button>

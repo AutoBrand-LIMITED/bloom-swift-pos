@@ -10,16 +10,9 @@ import type { Order } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
 import { loadStoredCustomers } from "@/lib/customer-utils";
 
-const ADMIN_PASSWORD = "bloom2024";
-const STORAGE_KEY = "florist-pos-orders";
+import { loadOrders } from "@/lib/orders";
 
-function loadOrders(): Order[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
+const ADMIN_PASSWORD = "bloom2024";
 
 const SalesReport = () => {
   const [authenticated, setAuthenticated] = useState(false);
