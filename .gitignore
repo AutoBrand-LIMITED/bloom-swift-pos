@@ -24,5 +24,4 @@ dist-ssr
 *.sw?
 
 # Local planning docs
-UI_AUDIT.md
 CONTEXT.md
