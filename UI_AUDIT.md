@@ -43,13 +43,13 @@ Built by: AutoBrand Limited
 
 - [ ] Driver dispatch: orders assigned by district
 - [ ] Each driver sees only their own order list (identified by address, not order number)
-- [ ] Driver interface: minimal — name select → assigned orders → tap address → upload photos
-- [ ] No data entry required from driver
-- [ ] Delivery tracking: 2 photos required per order (product photo + signed receipt photo)
+- [x] Driver interface: minimal — name select → assigned orders → tap address → upload photos
+- [x] No data entry required from driver
+- [x] Delivery tracking: 2 photos required per order (product photo + signed receipt photo)
 - [ ] Supports 6–7 concurrent drivers during peak season including casual/hired drivers
 - [ ] Automated status updates: auto-advance at fixed time milestones
 - [ ] Auto WhatsApp message to colleagues if no update after set period
-- [x] Back-office dispatch view: orders by driver + district grouping _(basic — OrderHistory grouped by driver; full dispatch screen P5)_
+- [x] Back-office dispatch view: orders by driver + district grouping ✅ full `/dispatch` screen
 - [ ] Management can see how many vehicles to deploy from dispatch view
 - [ ] Driver WhatsApp integration option: photo upload via WhatsApp → auto-sync to system
 
@@ -151,8 +151,8 @@ Built by: AutoBrand Limited
 | Split-delivery (multiple recipients) | ✅ Exists | Multi-recipient cards; add/remove; shown in history |
 | Delivery time preset slots | ✅ Exists | 上午 9–1pm / 下午 1–6pm / 指定時間 + surcharge flag |
 | Driver list (not free text) | ✅ Exists | DRIVERS dropdown (阿明/阿強/阿偉/阿華/臨時司機) |
-| Driver interface screen | ❌ Missing | — |
-| Dispatch view (back-office) | ❌ Missing | OrderHistory grouped by driver (basic); full dispatch P5 |
+| Driver interface screen | ✅ Exists | `/driver` — name select → orders → 2-photo upload → mark delivered |
+| Dispatch view (back-office) | ✅ Exists | `/dispatch` — driver groups, date filter, status + payment badges |
 | Standalone payment screen | ✅ Exists | /payment?amount=X&ref=Y — customer-facing, amount only |
 | Stripe / Apple Pay / Google Pay / WhatsApp link | ⚠️ UI only | Methods selectable; no real payment integration yet |
 | Picking slip per SOP (hide sender, tear-off) | ✅ Exists | Hides sender; shows price + items; tear-off stub with order ref |
@@ -206,8 +206,8 @@ Built by: AutoBrand Limited
 
 ### P5 — New Screens
 
-- [ ] Driver app screen: name select → assigned orders by address → photo upload (2 photos per order)
-- [ ] Dispatch view: back-office orders grouped by driver + district
+- [x] Driver app screen: name select → assigned orders (today/tomorrow/all) → 2-photo upload → mark delivered (`/driver`)
+- [x] Dispatch view: back-office orders grouped by driver, date filter, status + payment badges, blocked unpaid orders highlighted (`/dispatch`)
 - [ ] Auto WhatsApp notification if delivery not updated after set period
 
 ### P6 — VIP & Seasonal
