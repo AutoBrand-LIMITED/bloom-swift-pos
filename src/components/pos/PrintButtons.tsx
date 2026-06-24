@@ -17,6 +17,7 @@ import {
   printBatch,
 } from "@/lib/print-utils";
 import type { Order } from "@/types/order";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PrintButtonsProps {
   order: Order;
@@ -24,6 +25,7 @@ interface PrintButtonsProps {
 }
 
 const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
+  const { t } = useLanguage();
   const hasCard = order.giftCardEnabled && !!order.giftCardMessage;
   const [selected, setSelected] = useState({
     pickingSlip: true,
@@ -56,7 +58,7 @@ const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
         className="gap-1.5 text-xs"
         onClick={(e) => { e.stopPropagation(); printDocument(generatePickingList(order)); }}
       >
-        <ClipboardCheck className="w-3.5 h-3.5" /> 執貨單
+        <ClipboardCheck className="w-3.5 h-3.5" /> {t("btn_picking_slip")}
       </Button>
       <Button
         variant="outline"
@@ -64,7 +66,7 @@ const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
         className="gap-1.5 text-xs"
         onClick={(e) => { e.stopPropagation(); printDocument(generateDeliveryNote(order)); }}
       >
-        <Truck className="w-3.5 h-3.5" /> 送貨單
+        <Truck className="w-3.5 h-3.5" /> {t("btn_delivery_note")}
       </Button>
       <Button
         variant="outline"
@@ -72,7 +74,7 @@ const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
         className="gap-1.5 text-xs"
         onClick={(e) => { e.stopPropagation(); printDocument(generateReceipt(order)); }}
       >
-        <Receipt className="w-3.5 h-3.5" /> 收據
+        <Receipt className="w-3.5 h-3.5" /> {t("btn_receipt")}
       </Button>
       {hasCard && (
         <Button
@@ -81,7 +83,7 @@ const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
           className="gap-1.5 text-xs"
           onClick={(e) => { e.stopPropagation(); printDocument(generateMessageCard(order)); }}
         >
-          <MessageSquare className="w-3.5 h-3.5" /> 卡片
+          <MessageSquare className="w-3.5 h-3.5" /> {t("btn_card")}
         </Button>
       )}
       <DropdownMenu>
@@ -92,7 +94,7 @@ const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
             className="gap-1.5 text-xs"
             onClick={(e) => e.stopPropagation()}
           >
-            <Printer className="w-3.5 h-3.5" /> 全部列印 <ChevronDown className="w-3 h-3" />
+            <Printer className="w-3.5 h-3.5" /> {t("btn_print_all")} <ChevronDown className="w-3 h-3" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
@@ -100,32 +102,32 @@ const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
             checked={selected.pickingSlip}
             onCheckedChange={() => toggle("pickingSlip")}
           >
-            執貨單
+            {t("btn_picking_slip")}
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
             checked={selected.deliveryNote}
             onCheckedChange={() => toggle("deliveryNote")}
           >
-            送貨單
+            {t("btn_delivery_note")}
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
             checked={selected.receipt}
             onCheckedChange={() => toggle("receipt")}
           >
-            收據
+            {t("btn_receipt")}
           </DropdownMenuCheckboxItem>
           {hasCard && (
             <DropdownMenuCheckboxItem
               checked={selected.messageCard}
               onCheckedChange={() => toggle("messageCard")}
             >
-              卡片
+              {t("btn_card")}
             </DropdownMenuCheckboxItem>
           )}
           <DropdownMenuSeparator />
           <div className="px-2 py-1.5">
             <Button size="sm" className="w-full text-xs" onClick={handleBatchPrint}>
-              列印所選
+              {t("btn_print_selected")}
             </Button>
           </div>
         </DropdownMenuContent>

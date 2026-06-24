@@ -1,5 +1,6 @@
-import { Gift, Plus, Check } from "lucide-react";
+import { Gift, Check } from "lucide-react";
 import type { OrderItem } from "@/types/order";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface AddOnsSectionProps {
   items: OrderItem[];
@@ -20,6 +21,7 @@ const ADDONS = [
 ];
 
 const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
+  const { t } = useLanguage();
   const addedNames = new Set(items.map((i) => i.name));
 
   const toggleAddon = (addon: { name: string; price: number }) => {
@@ -37,7 +39,7 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
         <Gift className="w-4 h-4" />
-        加購推薦
+        {t("section_addons")}
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {ADDONS.map((addon) => {

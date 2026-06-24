@@ -9,6 +9,7 @@ import { Plus, Trash2, Package, Truck, Zap, Wallet, Sparkles, MessageSquare, Map
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface OrderItemsSectionProps {
   items: OrderItem[];
@@ -37,18 +38,19 @@ const OrderItemsSection = ({
   onSenderNotesChange, onDeliveryNotesChange, onInternalNotesChange,
   budget, onBudgetChange, subtotal, isComplete,
 }: OrderItemsSectionProps) => {
+  const { t } = useLanguage();
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [customOrderOpen, setCustomOrderOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
 
   const CATEGORIES = [
-    { id: "all", label: "全部" },
-    { id: "bouquet", label: "花束" },
-    { id: "basket", label: "花籃" },
-    { id: "plant", label: "盆栽" },
-    { id: "wreath", label: "花圈" },
-    { id: "other", label: "其他" },
+    { id: "all", label: t("cat_all") },
+    { id: "bouquet", label: t("cat_bouquet") },
+    { id: "basket", label: t("cat_basket") },
+    { id: "plant", label: t("cat_plant") },
+    { id: "wreath", label: t("cat_wreath") },
+    { id: "other", label: t("cat_other") },
   ];
 
   const PRESETS = [
@@ -113,10 +115,10 @@ const OrderItemsSection = ({
         <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
           <StepBadge n={3} done={!!isComplete} />
           <Package className="w-4 h-4" />
-          訂單內容
+          {t("section_order_items")}
           {items.length > 0 && (
             <span className="ml-1 text-[11px] font-normal normal-case text-muted-foreground">
-              {items.length} 項 · ${subtotal.toLocaleString()}
+              {items.length} {t("unit_items")} · ${subtotal.toLocaleString()}
             </span>
           )}
         </h2>
@@ -126,7 +128,7 @@ const OrderItemsSection = ({
           className="gap-1.5 text-xs"
           onClick={() => setCustomOrderOpen(true)}
         >
-          <Sparkles className="w-3.5 h-3.5" /> 客制訂單
+          <Sparkles className="w-3.5 h-3.5" /> {t("btn_custom_order")}
         </Button>
       </div>
 
@@ -143,14 +145,14 @@ const OrderItemsSection = ({
       <div className="space-y-2 rounded-lg bg-secondary/50 p-3">
         <div className="flex items-center gap-2">
           <Wallet className="w-4 h-4 text-primary" />
-          <Label className="text-xs font-medium">客人預算</Label>
+          <Label className="text-xs font-medium">{t("label_budget")}</Label>
           <div className="flex items-center gap-1 ml-auto">
             <span className="text-xs text-muted-foreground">$</span>
             <Input
               type="number"
               value={budget || ""}
               onChange={(e) => onBudgetChange(parseFloat(e.target.value) || 0)}
-              placeholder="輸入預算"
+              placeholder={t("placeholder_budget")}
               className="w-28 h-8 text-sm font-mono text-right bg-card"
               min={0}
             />
@@ -159,11 +161,11 @@ const OrderItemsSection = ({
         {budget > 0 && (
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">已用 ${subtotal.toLocaleString()}</span>
+              <span className="text-muted-foreground">{t("label_used")} ${subtotal.toLocaleString()}</span>
               <span className={`font-mono font-medium ${budget - subtotal < 0 ? "text-destructive" : "text-primary"}`}>
                 {budget - subtotal >= 0
-                  ? `剩餘 $${(budget - subtotal).toLocaleString()}`
-                  : `超出 $${(subtotal - budget).toLocaleString()}`}
+                  ? `${t("label_remaining")} $${(budget - subtotal).toLocaleString()}`
+                  : `${t("label_exceeded")} $${(subtotal - budget).toLocaleString()}`}
               </span>
             </div>
             <Progress
@@ -214,7 +216,7 @@ const OrderItemsSection = ({
                 value={item.name}
                 onChange={(e) => updateItem(item.id, "name", e.target.value)}
                 className="flex-1 text-sm h-9 bg-card"
-                placeholder="項目名稱"
+                placeholder={t("placeholder_item_name")}
                 maxLength={100}
               />
               <div className="flex items-center gap-1">
@@ -224,7 +226,7 @@ const OrderItemsSection = ({
                   value={item.price || ""}
                   onChange={(e) => updateItem(item.id, "price", parseFloat(e.target.value) || 0)}
                   className="w-24 text-sm h-9 font-mono bg-card text-right"
-                  placeholder="價格"
+                  placeholder={t("placeholder_price")}
                   min={0}
                 />
               </div>
@@ -247,10 +249,10 @@ const OrderItemsSection = ({
       {/* Add new item */}
       <div className="flex items-end gap-2">
         <div className="flex-1 space-y-1">
-          <Label className="text-xs">新增項目</Label>
+          <Label className="text-xs">{t("label_add_item")}</Label>
           <div className="flex gap-1.5">
             <Input
-              placeholder="例如：玫瑰花束、植物盆栽"
+              placeholder={t("placeholder_add_item")}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addItem()}
@@ -261,7 +263,7 @@ const OrderItemsSection = ({
           </div>
         </div>
         <div className="w-28 space-y-1">
-          <Label className="text-xs">價格 ($)</Label>
+          <Label className="text-xs">{t("placeholder_price")} ($)</Label>
           <Input
             type="number"
             placeholder="0"
@@ -273,7 +275,7 @@ const OrderItemsSection = ({
           />
         </div>
         <Button onClick={addItem} size="default" variant="outline" className="gap-1.5">
-          <Plus className="w-4 h-4" /> 加入
+          <Plus className="w-4 h-4" /> {t("btn_add")}
         </Button>
       </div>
 
@@ -281,7 +283,7 @@ const OrderItemsSection = ({
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
-            <Truck className="w-3.5 h-3.5" /> 送貨費
+            <Truck className="w-3.5 h-3.5" /> {t("label_delivery_fee")}
           </Label>
           <Input
             type="number"
@@ -294,7 +296,7 @@ const OrderItemsSection = ({
         </div>
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
-            <Zap className="w-3.5 h-3.5" /> 急單費
+            <Zap className="w-3.5 h-3.5" /> {t("label_urgent_fee")}
           </Label>
           <Input
             type="number"
@@ -314,8 +316,8 @@ const OrderItemsSection = ({
           <div className="flex items-center justify-between">
             <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
               <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
-              客戶備註
-              <span className="text-[10px] text-muted-foreground font-normal">（客人特別要求）</span>
+              {t("label_sender_notes")}
+              <span className="text-[10px] text-muted-foreground font-normal">({t("hint_sender_notes")})</span>
             </Label>
             <VoiceInputButton
               onResult={(text) => onSenderNotesChange(senderNotes ? `${senderNotes} ${text}` : text)}
@@ -323,7 +325,7 @@ const OrderItemsSection = ({
             />
           </div>
           <Textarea
-            placeholder="例如：紅白配、不要滿天星、花束要大一點..."
+            placeholder={t("placeholder_sender_notes")}
             value={senderNotes}
             onChange={(e) => onSenderNotesChange(e.target.value)}
             className="text-sm min-h-[56px]"
@@ -336,8 +338,8 @@ const OrderItemsSection = ({
           <div className="flex items-center justify-between">
             <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
               <MapPin className="w-3.5 h-3.5 text-green-500" />
-              送貨備註
-              <span className="text-[10px] text-muted-foreground font-normal">（送貨特別指示）</span>
+              {t("label_delivery_notes")}
+              <span className="text-[10px] text-muted-foreground font-normal">({t("hint_delivery_notes")})</span>
             </Label>
             <VoiceInputButton
               onResult={(text) => onDeliveryNotesChange(deliveryNotes ? `${deliveryNotes} ${text}` : text)}
@@ -345,7 +347,7 @@ const OrderItemsSection = ({
             />
           </div>
           <Textarea
-            placeholder="例如：需要簽收、客戶自備花瓶、送到前台..."
+            placeholder={t("placeholder_delivery_notes")}
             value={deliveryNotes}
             onChange={(e) => onDeliveryNotesChange(e.target.value)}
             className="text-sm min-h-[56px]"
@@ -358,8 +360,8 @@ const OrderItemsSection = ({
           <div className="flex items-center justify-between">
             <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
               <Lock className="w-3.5 h-3.5 text-purple-500" />
-              內部備註
-              <span className="text-[10px] text-muted-foreground font-normal">（員工專用，不對外顯示）</span>
+              {t("label_internal_notes")}
+              <span className="text-[10px] text-muted-foreground font-normal">({t("hint_internal_notes")})</span>
             </Label>
             <VoiceInputButton
               onResult={(text) => onInternalNotesChange(internalNotes ? `${internalNotes} ${text}` : text)}
@@ -367,7 +369,7 @@ const OrderItemsSection = ({
             />
           </div>
           <Textarea
-            placeholder="例如：此客常遲付款、注意特殊要求..."
+            placeholder={t("placeholder_internal_notes")}
             value={internalNotes}
             onChange={(e) => onInternalNotesChange(e.target.value)}
             className="text-sm min-h-[56px] border-purple-200"

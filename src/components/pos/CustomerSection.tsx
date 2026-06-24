@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { User, Phone, ChevronDown, Building2, Crown, AlertTriangle, Tag } from "lucide-react";
 import { DEMO_CUSTOMERS, type DemoCustomer, type CustomerFlag } from "@/data/demo-customers";
 import { loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export type CustomerType = "personal" | "company";
 
@@ -29,40 +30,30 @@ interface CustomerSectionProps {
   isComplete?: boolean;
 }
 
-const FLAG_CONFIG: Record<CustomerFlag, { label: string; color: string; icon: React.ReactNode }> = {
-  vip: {
-    label: "VIP",
-    color: "bg-yellow-400 text-yellow-900",
-    icon: <Crown className="w-3 h-3" />,
-  },
-  warning: {
-    label: "警告",
-    color: "bg-red-500 text-white",
-    icon: <AlertTriangle className="w-3 h-3" />,
-  },
-  internal: {
-    label: "備注",
-    color: "bg-purple-500 text-white",
-    icon: <Tag className="w-3 h-3" />,
-  },
+const FLAG_COLORS: Record<CustomerFlag, string> = {
+  vip: "bg-yellow-400 text-yellow-900",
+  warning: "bg-red-500 text-white",
+  internal: "bg-purple-500 text-white",
+};
+const FLAG_ICONS: Record<CustomerFlag, React.ReactNode> = {
+  vip: <Crown className="w-3 h-3" />,
+  warning: <AlertTriangle className="w-3 h-3" />,
+  internal: <Tag className="w-3 h-3" />,
 };
 
-function CustomerFlags({ flags }: { flags?: CustomerFlag[] }) {
+function CustomerFlags({ flags, getLabel }: { flags?: CustomerFlag[]; getLabel: (f: CustomerFlag) => string }) {
   if (!flags?.length) return null;
   return (
     <div className="flex items-center gap-1">
-      {flags.map((f) => {
-        const cfg = FLAG_CONFIG[f];
-        return (
-          <span
-            key={f}
-            className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${cfg.color}`}
-          >
-            {cfg.icon}
-            {cfg.label}
-          </span>
-        );
-      })}
+      {flags.map((f) => (
+        <span
+          key={f}
+          className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${FLAG_COLORS[f]}`}
+        >
+          {FLAG_ICONS[f]}
+          {getLabel(f)}
+        </span>
+      ))}
     </div>
   );
 }
@@ -85,9 +76,11 @@ const CustomerSection = ({
   onCompanyNameChange, onContactPersonChange,
   onCustomerSelect, phoneError, selectedCustomer, refreshKey, isComplete,
 }: CustomerSectionProps) => {
+  const { t } = useLanguage();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [search, setSearch] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const getFlagLabel = (f: CustomerFlag) => f === "vip" ? "VIP" : f === "warning" ? t("flag_warning") : t("flag_internal");
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -134,9 +127,9 @@ const CustomerSection = ({
         <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
           <StepBadge n={2} done={!!isComplete} />
           <User className="w-4 h-4" />
-          客戶資料
+          {t("section_customer")}
           {selectedCustomer?.flags?.length ? (
-            <CustomerFlags flags={selectedCustomer.flags} />
+            <CustomerFlags flags={selectedCustomer.flags} getLabel={getFlagLabel} />
           ) : null}
         </h2>
         <div className="flex rounded-lg overflow-hidden border border-border">
@@ -148,7 +141,7 @@ const CustomerSection = ({
                 : "bg-secondary text-secondary-foreground hover:bg-accent"
             }`}
           >
-            個人
+            {t("btn_personal")}
           </button>
           <button
             onClick={() => onCustomerTypeChange("company")}
@@ -158,7 +151,7 @@ const CustomerSection = ({
                 : "bg-secondary text-secondary-foreground hover:bg-accent"
             }`}
           >
-            <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> 公司</span>
+            <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> {t("btn_company")}</span>
           </button>
         </div>
       </div>
@@ -166,10 +159,10 @@ const CustomerSection = ({
       {customerType === "company" && (
         <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
           <Label className="text-xs font-medium flex items-center gap-1">
-            <Building2 className="w-3.5 h-3.5" /> 公司名稱
+            <Building2 className="w-3.5 h-3.5" /> {t("label_company_name")}
           </Label>
           <Input
-            placeholder="輸入公司名稱"
+            placeholder={t("placeholder_company_name")}
             value={companyName}
             onChange={(e) => onCompanyNameChange(e.target.value)}
             className="text-base"
@@ -182,7 +175,7 @@ const CustomerSection = ({
         {/* Phone with prefix */}
         <div className="space-y-1.5">
           <Label htmlFor="phone" className="text-xs font-medium">
-            電話號碼 <span className="text-destructive">*</span>
+            {t("label_phone")} <span className="text-destructive">*</span>
           </Label>
           <div className="flex gap-1.5">
             <Select value={phonePrefix} onValueChange={onPhonePrefixChange}>
@@ -209,18 +202,18 @@ const CustomerSection = ({
               />
             </div>
           </div>
-          {phoneError && <p className="text-xs text-destructive">請輸入電話號碼</p>}
+          {phoneError && <p className="text-xs text-destructive">{t("error_phone_required")}</p>}
         </div>
 
         {/* Customer name dropdown */}
         <div className="space-y-1.5 relative" ref={dropdownRef}>
-          <Label className="text-xs font-medium">客戶名稱</Label>
+          <Label className="text-xs font-medium">{t("label_customer_name")}</Label>
           <div
             className="flex items-center border border-input rounded-md bg-background cursor-pointer hover:border-ring transition-colors"
             onClick={() => setDropdownOpen(!dropdownOpen)}
           >
             <Input
-              placeholder="選擇或輸入客戶名稱"
+              placeholder={t("placeholder_customer_name")}
               value={dropdownOpen ? search : customerName}
               onChange={(e) => {
                 if (dropdownOpen) {
@@ -239,7 +232,7 @@ const CustomerSection = ({
           {dropdownOpen && (
             <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
               {filtered.length === 0 ? (
-                <p className="text-xs text-muted-foreground p-3">未搵到客戶</p>
+                <p className="text-xs text-muted-foreground p-3">{t("msg_no_customer")}</p>
               ) : (
                 <div className="max-h-48 overflow-y-auto">
                   {filtered.map((c) => (
@@ -251,11 +244,11 @@ const CustomerSection = ({
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">{c.name}</span>
-                          <CustomerFlags flags={c.flags} />
+                          <CustomerFlags flags={c.flags} getLabel={getFlagLabel} />
                         </div>
                         <span className="text-xs text-muted-foreground font-mono">{c.phone}</span>
                       </div>
-                      <span className="text-[10px] text-muted-foreground">{c.history.length} 筆</span>
+                      <span className="text-[10px] text-muted-foreground">{c.history.length} {t("unit_orders")}</span>
                     </button>
                   ))}
                 </div>
@@ -267,9 +260,9 @@ const CustomerSection = ({
 
       {/* Contact person (secretary) */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-muted-foreground">聯絡人（如秘書代訂）</Label>
+        <Label className="text-xs font-medium text-muted-foreground">{t("label_contact_person")}</Label>
         <Input
-          placeholder="例如：陳小姐（秘書）"
+          placeholder={t("placeholder_contact_person")}
           value={contactPerson}
           onChange={(e) => onContactPersonChange(e.target.value)}
           className="text-sm"

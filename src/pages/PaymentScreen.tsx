@@ -1,8 +1,10 @@
 import { useSearchParams } from "react-router-dom";
 import { Flower2 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const PaymentScreen = () => {
   const [params] = useSearchParams();
+  const { t } = useLanguage();
   const raw = parseInt(params.get("amount") || "0", 10);
   const amount = Number.isNaN(raw) ? 0 : raw;
   const ref = params.get("ref") || "—";
@@ -18,7 +20,7 @@ const PaymentScreen = () => {
 
         {/* Amount */}
         <div className="rounded-2xl border border-border bg-card p-8 space-y-4 shadow-sm">
-          <p className="text-sm text-muted-foreground uppercase tracking-widest">應付金額</p>
+          <p className="text-sm text-muted-foreground uppercase tracking-widest">{t("label_amount_due")}</p>
           <p className="text-6xl font-bold font-mono tracking-tight text-foreground">
             ${amount.toLocaleString()}
           </p>
@@ -27,13 +29,13 @@ const PaymentScreen = () => {
 
         {/* Reference */}
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-widest">參考編號</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-widest">{t("label_reference")}</p>
           <p className="text-xl font-mono font-semibold tracking-widest text-foreground">{ref}</p>
         </div>
 
         {/* Footer note */}
         <p className="text-xs text-muted-foreground">
-          如有疑問，請向本店員工查詢
+          {t("hint_contact_staff")}
         </p>
       </div>
     </div>

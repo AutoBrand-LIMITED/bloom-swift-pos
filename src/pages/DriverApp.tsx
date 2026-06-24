@@ -7,6 +7,7 @@ import { DRIVERS } from "@/types/order";
 import type { Order } from "@/types/order";
 import { loadOrders, updateOrder, loadPhotos, savePhoto, deletePhoto, compressImage } from "@/lib/orders";
 import type { OrderPhotos } from "@/lib/orders";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type DateFilter = "today" | "tomorrow" | "all";
 
@@ -45,10 +46,9 @@ function filterByDate(orders: Order[], filter: DateFilter): Order[] {
   return orders.filter((o) => orderPrimaryDate(o) === target);
 }
 
-const DATE_LABELS: Record<DateFilter, string> = { today: "今天", tomorrow: "明天", all: "全部" };
-
 const DriverApp = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [photos, setPhotos] = useState<Record<string, OrderPhotos>>({});
@@ -80,9 +80,9 @@ const DriverApp = () => {
       const dataUrl = await compressImage(file);
       savePhoto(orderId, photoKey, dataUrl);
       setPhotos(loadPhotos());
-      toast.success("相片已儲存");
+      toast.success(t("toast_photo_saved"));
     } catch {
-      toast.error("相片儲存失敗");
+      toast.error(t("toast_photo_failed"));
     } finally {
       setUploading(null);
     }
@@ -91,15 +91,15 @@ const DriverApp = () => {
   const handleMarkDelivered = (order: Order) => {
     const orderPhotos = photos[order.id];
     if (!orderPhotos?.productPhoto || !orderPhotos?.receiptPhoto) {
-      toast.error("請先上傳兩張相片");
+      toast.error(t("toast_error_upload_photos"));
       return;
     }
     try {
       updateOrder(order.id, { deliveryStatus: "delivered", deliveredAt: new Date().toISOString() });
       setOrders(loadOrders());
-      toast.success(`${orderPrimaryRecipient(order)} — 已送達 ✓`);
+      toast.success(`${orderPrimaryRecipient(order)} — ${t("badge_delivered")} ✓`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "儲存失敗");
+      toast.error(e instanceof Error ? e.message : t("toast_photo_failed"));
     }
   };
 
@@ -108,16 +108,16 @@ const DriverApp = () => {
       <div className="min-h-screen bg-background flex flex-col">
         <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-1.5 text-xs">
-            <ArrowLeft className="w-3.5 h-3.5" /> 返回
+            <ArrowLeft className="w-3.5 h-3.5" /> {t("nav_back")}
           </Button>
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-primary" />
-            <h1 className="text-sm font-bold">送貨員登入</h1>
+            <h1 className="text-sm font-bold">{t("title_driver_login")}</h1>
           </div>
         </header>
         <div className="flex flex-col items-center justify-center flex-1 p-8 gap-8">
           <div className="text-center">
-            <p className="text-muted-foreground text-sm">請選擇你的名字</p>
+            <p className="text-muted-foreground text-sm">{t("msg_select_name")}</p>
           </div>
           <div className="grid grid-cols-2 gap-4 w-full max-w-md">
             {DRIVERS.map((d) => (
@@ -140,13 +140,13 @@ const DriverApp = () => {
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setSelectedDriver(null)} className="gap-1.5 text-xs">
-            <ArrowLeft className="w-3.5 h-3.5" /> 換人
+            <ArrowLeft className="w-3.5 h-3.5" /> {t("btn_switch_driver")}
           </Button>
           <span className="font-bold text-sm">{selectedDriver}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            {pendingCount} 待送 · {deliveredCount} 已送
+            {pendingCount} {t("label_pending_count")} · {deliveredCount} {t("label_delivered_count")}
           </span>
           <div className="flex rounded-lg border border-border overflow-hidden">
             {(["today", "tomorrow", "all"] as DateFilter[]).map((f) => (
@@ -157,7 +157,7 @@ const DriverApp = () => {
                   dateFilter === f ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-secondary"
                 }`}
               >
-                {DATE_LABELS[f]}
+                {f === "today" ? t("filter_today") : f === "tomorrow" ? t("filter_tomorrow") : t("filter_all")}
               </button>
             ))}
           </div>
@@ -168,7 +168,7 @@ const DriverApp = () => {
         {sortedOrders.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <Truck className="w-10 h-10 mx-auto mb-3 opacity-20" />
-            <p className="text-sm">沒有送貨訂單</p>
+            <p className="text-sm">{t("msg_no_deliveries")}</p>
           </div>
         )}
 
@@ -193,22 +193,22 @@ const DriverApp = () => {
                       <span className="text-xs font-mono text-muted-foreground">{orderPrimaryTime(order) || orderPrimaryDate(order)}</span>
                       {isDelivered ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-600 bg-green-50 rounded-full px-2 py-0.5">
-                          <CheckCircle2 className="w-3 h-3" /> 已送達
+                          <CheckCircle2 className="w-3 h-3" /> {t("badge_delivered")}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 bg-amber-50 rounded-full px-2 py-0.5">
-                          <Clock className="w-3 h-3" /> 待送
+                          <Clock className="w-3 h-3" /> {t("badge_pending")}
                         </span>
                       )}
                       {order.paymentStatus === "unpaid" && (
-                        <span className="text-[11px] font-medium text-red-600 bg-red-50 rounded-full px-2 py-0.5">未付款</span>
+                        <span className="text-[11px] font-medium text-red-600 bg-red-50 rounded-full px-2 py-0.5">{t("badge_unpaid")}</span>
                       )}
                     </div>
                     <p className="font-bold text-base leading-tight">{orderPrimaryRecipient(order)}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{orderPrimaryAddress(order)}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs text-muted-foreground">{order.items.length} 項</p>
+                    <p className="text-xs text-muted-foreground">{order.items.length} {t("unit_items")}</p>
                     <p className="text-sm font-mono font-semibold">${order.finalPrice.toLocaleString()}</p>
                   </div>
                 </div>
@@ -236,14 +236,14 @@ const DriverApp = () => {
                   {/* Photos */}
                   {!isDelivered && (
                     <div className="space-y-3">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">上傳相片</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("label_upload_photos")}</p>
                       <div className="grid grid-cols-2 gap-3">
                         {/* Product photo */}
                         <div className="space-y-2">
-                          <label className="text-xs font-medium">貨品相片</label>
+                          <label className="text-xs font-medium">{t("label_product_photo")}</label>
                           {orderPhotos.productPhoto ? (
                             <div className="relative">
-                              <img src={orderPhotos.productPhoto} alt="貨品" className="w-full h-28 object-cover rounded-lg border border-border" />
+                              <img src={orderPhotos.productPhoto} alt={t("label_product_photo")} className="w-full h-28 object-cover rounded-lg border border-border" />
                               <button
                                 className="absolute top-1 right-1 bg-black/50 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center"
                                 onClick={() => { deletePhoto(order.id, "productPhoto"); setPhotos(loadPhotos()); }}
@@ -252,7 +252,7 @@ const DriverApp = () => {
                           ) : (
                             <label className={`flex flex-col items-center justify-center h-28 rounded-lg border-2 border-dashed border-border cursor-pointer hover:border-primary transition-colors ${uploading === `${order.id}-productPhoto` ? "opacity-50" : ""}`}>
                               <Camera className="w-6 h-6 text-muted-foreground mb-1" />
-                              <span className="text-xs text-muted-foreground">拍照</span>
+                              <span className="text-xs text-muted-foreground">{t("label_take_photo")}</span>
                               <input
                                 type="file" accept="image/*" capture="environment" className="hidden"
                                 ref={(el) => { productPhotoRef.current[order.id] = el; }}
@@ -268,10 +268,10 @@ const DriverApp = () => {
 
                         {/* Receipt photo */}
                         <div className="space-y-2">
-                          <label className="text-xs font-medium">簽收相片</label>
+                          <label className="text-xs font-medium">{t("label_receipt_photo")}</label>
                           {orderPhotos.receiptPhoto ? (
                             <div className="relative">
-                              <img src={orderPhotos.receiptPhoto} alt="簽收" className="w-full h-28 object-cover rounded-lg border border-border" />
+                              <img src={orderPhotos.receiptPhoto} alt={t("label_receipt_photo")} className="w-full h-28 object-cover rounded-lg border border-border" />
                               <button
                                 className="absolute top-1 right-1 bg-black/50 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center"
                                 onClick={() => { deletePhoto(order.id, "receiptPhoto"); setPhotos(loadPhotos()); }}
@@ -280,7 +280,7 @@ const DriverApp = () => {
                           ) : (
                             <label className={`flex flex-col items-center justify-center h-28 rounded-lg border-2 border-dashed border-border cursor-pointer hover:border-primary transition-colors ${uploading === `${order.id}-receiptPhoto` ? "opacity-50" : ""}`}>
                               <Camera className="w-6 h-6 text-muted-foreground mb-1" />
-                              <span className="text-xs text-muted-foreground">拍照</span>
+                              <span className="text-xs text-muted-foreground">{t("label_take_photo")}</span>
                               <input
                                 type="file" accept="image/*" capture="environment" className="hidden"
                                 ref={(el) => { receiptPhotoRef.current[order.id] = el; }}
@@ -301,17 +301,17 @@ const DriverApp = () => {
                         onClick={() => handleMarkDelivered(order)}
                       >
                         <CheckCircle2 className="w-4 h-4" />
-                        完成送貨
+                        {t("btn_complete_delivery")}
                       </Button>
                       {!hasAllPhotos && (
-                        <p className="text-[11px] text-muted-foreground text-center">需要上傳貨品及簽收相片才能完成</p>
+                        <p className="text-[11px] text-muted-foreground text-center">{t("msg_need_photos")}</p>
                       )}
                     </div>
                   )}
 
                   {isDelivered && order.deliveredAt && (
                     <p className="text-xs text-green-600 text-center">
-                      已送達：{new Date(order.deliveredAt).toLocaleString("zh-HK")}
+                      {t("label_delivered_at")}{new Date(order.deliveredAt).toLocaleString("zh-HK")}
                     </p>
                   )}
                 </div>

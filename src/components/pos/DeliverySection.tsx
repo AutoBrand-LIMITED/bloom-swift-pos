@@ -6,6 +6,7 @@ import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle, Plus, X } from "
 import StepBadge from "@/components/pos/StepBadge";
 import type { Delivery } from "@/types/order";
 import { DRIVERS } from "@/types/order";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
   "香港島": {
@@ -35,12 +36,6 @@ const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
     "離島區": ["東涌", "大嶼山", "長洲", "南丫島", "愉景灣", "機場"],
   },
 };
-
-const DELIVERY_SLOTS = [
-  { value: "上午 (9–1pm)", label: "上午", sublabel: "9am – 1pm" },
-  { value: "下午 (1–6pm)", label: "下午", sublabel: "1pm – 6pm" },
-  { value: "指定時間", label: "指定時間", sublabel: "+ 附加費" },
-];
 
 export function newDelivery(): Delivery {
   return {
@@ -77,6 +72,7 @@ function DeliveryCard({
   onChange: (updated: Delivery) => void;
   onRemove: () => void;
 }) {
+  const { t } = useLanguage();
   const set = <K extends keyof Delivery>(key: K, val: Delivery[K]) =>
     onChange({ ...delivery, [key]: val });
 
@@ -120,7 +116,7 @@ function DeliveryCard({
       {/* Recipient header */}
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-foreground/60 uppercase tracking-wide">
-          收件人 {index + 1}
+          {t("label_recipient")} {index + 1}
           {total > 1 && (
             <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">
               ({String(index + 1).padStart(2, "0")})
@@ -131,7 +127,7 @@ function DeliveryCard({
           <button
             onClick={onRemove}
             className="text-muted-foreground hover:text-destructive transition-colors"
-            aria-label="移除收件人"
+            aria-label={t("aria_remove_recipient")}
           >
             <X className="w-4 h-4" />
           </button>
@@ -142,7 +138,7 @@ function DeliveryCard({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5" /> 送貨日期
+            <Calendar className="w-3.5 h-3.5" /> {t("label_delivery_date")}
           </Label>
           <Input
             type="date"
@@ -153,10 +149,14 @@ function DeliveryCard({
         </div>
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" /> 送貨時間
+            <Clock className="w-3.5 h-3.5" /> {t("label_delivery_time")}
           </Label>
           <div className="flex gap-1.5">
-            {DELIVERY_SLOTS.map((slot) => {
+            {[
+              { value: "上午 (9–1pm)", label: t("slot_morning_label"), sublabel: "9am – 1pm" },
+              { value: "下午 (1–6pm)", label: t("slot_afternoon_label"), sublabel: "1pm – 6pm" },
+              { value: "指定時間", label: t("slot_specified_label"), sublabel: t("slot_specified_sub") },
+            ].map((slot) => {
               const active =
                 delivery.deliveryTime === slot.value ||
                 (slot.value === "指定時間" && isSpecified);
@@ -191,11 +191,11 @@ function DeliveryCard({
 
       {/* Address */}
       <div className="space-y-2">
-        <Label className="text-xs">送貨地址</Label>
+        <Label className="text-xs">{t("label_delivery_address")}</Label>
         <div className="grid grid-cols-3 gap-2">
           <Select value={delivery.deliveryRegion} onValueChange={handleRegionChange}>
             <SelectTrigger className="text-sm">
-              <SelectValue placeholder="地區" />
+              <SelectValue placeholder={t("placeholder_region")} />
             </SelectTrigger>
             <SelectContent>
               {Object.keys(HK_DISTRICTS).map((r) => (
@@ -209,7 +209,7 @@ function DeliveryCard({
             disabled={!delivery.deliveryRegion}
           >
             <SelectTrigger className="text-sm">
-              <SelectValue placeholder="分區" />
+              <SelectValue placeholder={t("placeholder_district")} />
             </SelectTrigger>
             <SelectContent>
               {districts.map((d) => (
@@ -223,7 +223,7 @@ function DeliveryCard({
             disabled={!delivery.deliveryDistrict}
           >
             <SelectTrigger className="text-sm">
-              <SelectValue placeholder="地點" />
+              <SelectValue placeholder={t("placeholder_area")} />
             </SelectTrigger>
             <SelectContent>
               {areas.map((a) => (
@@ -233,7 +233,7 @@ function DeliveryCard({
           </Select>
         </div>
         <Input
-          placeholder="詳細地址（大廈名 / 樓層 / 室）"
+          placeholder={t("placeholder_detail")}
           value={delivery.deliveryDetail}
           onChange={(e) => set("deliveryDetail", e.target.value)}
           className="text-sm"
@@ -261,10 +261,10 @@ function DeliveryCard({
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
-            <User className="w-3.5 h-3.5" /> 收貨人姓名
+            <User className="w-3.5 h-3.5" /> {t("label_recipient_name")}
           </Label>
           <Input
-            placeholder="收貨人姓名"
+            placeholder={t("placeholder_recipient_name")}
             value={delivery.recipientName}
             onChange={(e) => set("recipientName", e.target.value)}
             className="text-sm"
@@ -272,9 +272,9 @@ function DeliveryCard({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">收貨人電話</Label>
+          <Label className="text-xs">{t("label_recipient_phone")}</Label>
           <Input
-            placeholder="收貨人電話"
+            placeholder={t("placeholder_recipient_phone")}
             value={delivery.recipientPhone}
             onChange={(e) => set("recipientPhone", e.target.value)}
             className="text-sm font-mono"
@@ -286,11 +286,11 @@ function DeliveryCard({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
-            <UserCheck className="w-3.5 h-3.5" /> 送貨司機
+            <UserCheck className="w-3.5 h-3.5" /> {t("label_driver")}
           </Label>
           <Select value={delivery.deliveryPerson} onValueChange={(v) => set("deliveryPerson", v)}>
             <SelectTrigger className="text-sm">
-              <SelectValue placeholder="選擇司機" />
+              <SelectValue placeholder={t("placeholder_select_driver")} />
             </SelectTrigger>
             <SelectContent>
               {DRIVERS.map((d) => (
@@ -301,23 +301,23 @@ function DeliveryCard({
         </div>
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
-            <AlertCircle className="w-3.5 h-3.5" /> 無法聯繫收件人
+            <AlertCircle className="w-3.5 h-3.5" /> {t("label_failed_delivery")}
           </Label>
           <Select
             value={delivery.failedDeliveryAction}
             onValueChange={(v) => set("failedDeliveryAction", v)}
           >
             <SelectTrigger className="text-sm">
-              <SelectValue placeholder="選擇處理方式" />
+              <SelectValue placeholder={t("placeholder_select_action")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">不適用</SelectItem>
-              <SelectItem value="leave_door">放門口</SelectItem>
-              <SelectItem value="leave_security">交管理處 / 保安</SelectItem>
-              <SelectItem value="leave_neighbor">交鄰居</SelectItem>
-              <SelectItem value="return">帶回公司</SelectItem>
-              <SelectItem value="reschedule">改期再送</SelectItem>
-              <SelectItem value="call_sender">聯繫寄件人</SelectItem>
+              <SelectItem value="none">{t("action_none")}</SelectItem>
+              <SelectItem value="leave_door">{t("action_leave_door")}</SelectItem>
+              <SelectItem value="leave_security">{t("action_leave_security")}</SelectItem>
+              <SelectItem value="leave_neighbor">{t("action_leave_neighbor")}</SelectItem>
+              <SelectItem value="return">{t("action_return")}</SelectItem>
+              <SelectItem value="reschedule">{t("action_reschedule")}</SelectItem>
+              <SelectItem value="call_sender">{t("action_call_sender")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -327,6 +327,7 @@ function DeliveryCard({
 }
 
 const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: DeliverySectionProps) => {
+  const { t } = useLanguage();
   const update = (index: number, updated: Delivery) => {
     const next = deliveries.map((d, i) => (i === index ? updated : d));
     onDeliveriesChange(next);
@@ -343,10 +344,10 @@ const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: Deliver
         <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
           <StepBadge n={4} done={!!isComplete} />
           <MapPin className="w-4 h-4" />
-          送貨資料
+          {t("section_delivery")}
           {deliveries.length > 1 && (
             <span className="ml-1 text-[11px] font-normal normal-case text-muted-foreground">
-              {deliveries.length} 個收件人
+              {deliveries.length} {t("text_recipients")}
             </span>
           )}
         </h2>
@@ -372,7 +373,7 @@ const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: Deliver
         onClick={addRecipient}
       >
         <Plus className="w-3.5 h-3.5" />
-        新增收件人（分單送貨）
+        {t("btn_add_recipient")}
       </Button>
     </div>
   );

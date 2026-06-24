@@ -20,9 +20,11 @@ import { newDelivery } from "@/components/pos/DeliverySection";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
 import { loadOrders, saveOrders } from "@/lib/orders";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { lang, setLang, t } = useLanguage();
 
   // Pre-generated order ID so it can be shown on the payment screen before submission
   const [currentOrderId, setCurrentOrderId] = useState(() => crypto.randomUUID());
@@ -99,10 +101,10 @@ const Index = () => {
     paymentStatus !== "unpaid" || finalPrice === 0,
   ].filter(Boolean).length, [salesId, phone, customerName, items, deliveries, giftCardEnabled, giftCardMessage, paymentStatus, finalPrice]);
 
-  const blockingReason = !salesId ? "請先選擇員工" :
-    !phone.trim() ? "請輸入客戶電話" :
-    !customerName.trim() ? "請輸入客戶姓名" :
-    items.length === 0 ? "請加入訂單項目" : null;
+  const blockingReason = !salesId ? t("blocking_no_staff") :
+    !phone.trim() ? t("blocking_no_phone") :
+    !customerName.trim() ? t("blocking_no_name") :
+    items.length === 0 ? t("blocking_no_items") : null;
 
   const resetForm = useCallback(() => {
     setSalesId("");
@@ -146,24 +148,24 @@ const Index = () => {
 
   const handleSubmit = () => {
     if (!salesId) {
-      toast.error("請先選擇負責員工");
+      toast.error(t("toast_error_no_staff"));
       return;
     }
 
     if (!phone.trim()) {
       setPhoneError(true);
-      toast.error("請輸入客戶電話號碼");
+      toast.error(t("toast_error_no_phone"));
       return;
     }
     setPhoneError(false);
 
     if (items.length === 0) {
-      toast.error("請至少加入一個項目");
+      toast.error(t("toast_error_no_items"));
       return;
     }
 
     if (finalPrice === 0) {
-      toast.warning("價格為 $0，訂單仍會建立");
+      toast.warning(t("toast_warn_zero_price"));
     }
 
     const order: Order = {
@@ -203,22 +205,22 @@ const Index = () => {
     saveOrders(updated);
 
     if (paymentStatus === "unpaid") {
-      toast.warning("訂單已建立 — 未付款，請跟進！", { duration: 5000 });
+      toast.warning(t("toast_order_unpaid"), { duration: 5000 });
     } else if (paymentStatus === "deposit") {
-      toast.info(`訂單已建立 — 已收訂金 $${depositAmount}，尚欠 $${finalPrice - depositAmount}`);
+      toast.info(`${t("toast_order_deposit")} $${depositAmount} · ${t("label_remaining_due")} $${finalPrice - depositAmount}`);
     } else {
-      toast.success("訂單已建立 ✓");
+      toast.success(t("toast_order_success"));
     }
 
-    toast("列印單據", {
+    toast(t("toast_print_prompt"), {
       duration: 15000,
-      description: "選擇要列印嘅單據：",
+      description: t("toast_print_desc"),
       action: {
-        label: "收據",
+        label: t("btn_receipt"),
         onClick: () => printDocument(generateReceipt(order)),
       },
       cancel: {
-        label: "全部列印",
+        label: t("btn_print_all"),
         onClick: () => {
           printDocument(generateReceipt(order));
           setTimeout(() => printDocument(generateDeliveryNote(order)), 500);
@@ -254,13 +256,28 @@ const Index = () => {
           <div className="flex items-center gap-2">
             <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
             <Button variant="ghost" size="sm" onClick={() => navigate("/dispatch")} className="gap-1.5 text-xs">
-              <Truck className="w-3.5 h-3.5" /> 調度
+              <Truck className="w-3.5 h-3.5" /> {t("nav_dispatch")}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
-              <BarChart3 className="w-3.5 h-3.5" /> 報告
+              <BarChart3 className="w-3.5 h-3.5" /> {t("nav_report")}
             </Button>
+            {/* Language toggle */}
+            <div className="flex rounded-lg overflow-hidden border border-border">
+              <button
+                onClick={() => setLang("zh")}
+                className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+              >
+                廣
+              </button>
+              <button
+                onClick={() => setLang("en")}
+                className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+              >
+                EN
+              </button>
+            </div>
             <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
-              <RotateCcw className="w-3.5 h-3.5" /> 清空
+              <RotateCcw className="w-3.5 h-3.5" /> {t("nav_clear")}
             </Button>
             <Button
               variant="outline"
@@ -268,7 +285,7 @@ const Index = () => {
               onClick={() => setHistoryOpen(true)}
               className="gap-1.5 text-xs relative"
             >
-              <ClipboardList className="w-3.5 h-3.5" /> 訂單記錄
+              <ClipboardList className="w-3.5 h-3.5" /> {t("nav_order_history")}
               {unpaidCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {unpaidCount}
@@ -292,7 +309,7 @@ const Index = () => {
                 next[0] = { ...next[0], deliveryDetail: address, ...(recipientNameVal ? { recipientName: recipientNameVal } : {}) };
                 return next;
               });
-              toast.success("已套用過往送貨地址");
+              toast.success(t("toast_address_applied"));
             }}
           />
         )}
@@ -307,7 +324,7 @@ const Index = () => {
           {!salesId && (
             <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              請先選擇負責員工，再開始輸入訂單
+              {t("warning_no_staff")}
             </div>
           )}
 
@@ -316,7 +333,7 @@ const Index = () => {
             <div className="relative flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <div className="flex-1">
-                <p className="font-semibold text-xs uppercase tracking-wide mb-1">客戶持續備註</p>
+                <p className="font-semibold text-xs uppercase tracking-wide mb-1">{t("label_persistent_notes")}</p>
                 <p className="text-xs leading-relaxed">{selectedCustomer!.persistentNotes}</p>
               </div>
               <button
@@ -414,7 +431,7 @@ const Index = () => {
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div>
-              <p className="text-xs text-muted-foreground">總計</p>
+              <p className="text-xs text-muted-foreground">{t("nav_total")}</p>
               <p className="text-2xl font-bold font-mono tracking-tight">${finalPrice.toLocaleString()}</p>
             </div>
             <div className="flex items-center gap-1">
@@ -439,7 +456,7 @@ const Index = () => {
               className="px-8 text-base font-semibold shadow-lg"
               disabled={!!blockingReason}
             >
-              確認訂單
+              {t("nav_confirm_order")}
             </Button>
           </div>
         </div>

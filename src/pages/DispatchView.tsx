@@ -5,6 +5,7 @@ import { ArrowLeft, Truck, CheckCircle2, Clock, AlertTriangle, Package } from "l
 import { DRIVERS } from "@/types/order";
 import type { Order } from "@/types/order";
 import { loadOrders } from "@/lib/orders";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type DateFilter = "today" | "tomorrow" | "all";
 
@@ -41,11 +42,11 @@ function isDispatchBlocked(order: Order): boolean {
   return dates.some((date) => date <= today);
 }
 
-const DATE_LABELS: Record<DateFilter, string> = { today: "今天", tomorrow: "明天", all: "全部" };
 const DRIVER_NAMES = new Set(DRIVERS.map((d) => d.name));
 
 const DispatchView = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
 
@@ -87,17 +88,17 @@ const DispatchView = () => {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-1.5 text-xs">
-              <ArrowLeft className="w-3.5 h-3.5" /> 返回
+              <ArrowLeft className="w-3.5 h-3.5" /> {t("nav_back")}
             </Button>
             <Truck className="w-5 h-5 text-primary" />
-            <h1 className="text-sm font-bold">送貨調度</h1>
+            <h1 className="text-sm font-bold">{t("title_dispatch")}</h1>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-500" />{totalPending} 待送</span>
-              <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" />{totalDelivered} 已送</span>
+              <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-500" />{totalPending} {t("dispatch_pending")}</span>
+              <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" />{totalDelivered} {t("dispatch_delivered")}</span>
               {blocked > 0 && (
-                <span className="flex items-center gap-1 text-red-500 font-medium"><AlertTriangle className="w-3.5 h-3.5" />{blocked} 未付款警告</span>
+                <span className="flex items-center gap-1 text-red-500 font-medium"><AlertTriangle className="w-3.5 h-3.5" />{blocked} {t("text_unpaid_warning")}</span>
               )}
             </div>
             <div className="flex rounded-lg border border-border overflow-hidden">
@@ -109,7 +110,7 @@ const DispatchView = () => {
                     dateFilter === f ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-secondary"
                   }`}
                 >
-                  {DATE_LABELS[f]}
+                  {f === "today" ? t("filter_today") : f === "tomorrow" ? t("filter_tomorrow") : t("filter_all")}
                 </button>
               ))}
             </div>
@@ -121,7 +122,7 @@ const DispatchView = () => {
         {filteredOrders.length === 0 && (
           <div className="text-center py-20 text-muted-foreground">
             <Truck className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p className="text-sm">沒有送貨記錄</p>
+            <p className="text-sm">{t("msg_no_dispatch")}</p>
           </div>
         )}
 
@@ -134,12 +135,12 @@ const DispatchView = () => {
               {/* Driver header */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/40 border-b border-border">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold">{driver}</span>
-                  <span className="text-xs text-muted-foreground">{driverOrders.length} 單</span>
+                  <span className="text-sm font-bold">{driver === "未分配" ? t("text_unassigned") : driver}</span>
+                  <span className="text-xs text-muted-foreground">{driverOrders.length} {t("dispatch_unit_order")}</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  {driverPending > 0 && <span className="text-amber-600 font-medium">{driverPending} 待送</span>}
-                  {driverDone > 0 && <span className="text-green-600 font-medium">{driverDone} 已送</span>}
+                  {driverPending > 0 && <span className="text-amber-600 font-medium">{driverPending} {t("dispatch_pending")}</span>}
+                  {driverDone > 0 && <span className="text-green-600 font-medium">{driverDone} {t("dispatch_delivered")}</span>}
                 </div>
               </div>
 
@@ -196,11 +197,11 @@ const DispatchView = () => {
                       {/* Payment */}
                       <div className="shrink-0">
                         {order.paymentStatus === "unpaid" ? (
-                          <span className="text-[11px] font-medium text-red-600 bg-red-100 rounded-full px-2 py-0.5">未付</span>
+                          <span className="text-[11px] font-medium text-red-600 bg-red-100 rounded-full px-2 py-0.5">{t("status_unpaid_short")}</span>
                         ) : order.paymentStatus === "deposit" ? (
-                          <span className="text-[11px] font-medium text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">訂金</span>
+                          <span className="text-[11px] font-medium text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">{t("status_deposit_short")}</span>
                         ) : (
-                          <span className="text-[11px] font-medium text-green-600 bg-green-100 rounded-full px-2 py-0.5">已付</span>
+                          <span className="text-[11px] font-medium text-green-600 bg-green-100 rounded-full px-2 py-0.5">{t("status_paid_short")}</span>
                         )}
                       </div>
 

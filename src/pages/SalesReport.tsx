@@ -11,14 +11,18 @@ import { SALES_STAFF } from "@/types/order";
 import { loadStoredCustomers } from "@/lib/customer-utils";
 
 import { loadOrders } from "@/lib/orders";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const ADMIN_PASSWORD = "bloom2024";
+const UNSPECIFIED = "未指定";
+const UNKNOWN = "未知";
 
 const SalesReport = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleLogin = () => {
     if (password === ADMIN_PASSWORD) {
@@ -35,23 +39,23 @@ const SalesReport = () => {
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
             <Lock className="w-10 h-10 mx-auto text-primary mb-2" />
-            <CardTitle className="text-lg">分析報告系統</CardTitle>
-            <p className="text-sm text-muted-foreground">請輸入管理員密碼</p>
+            <CardTitle className="text-lg">{t("title_analytics")}</CardTitle>
+            <p className="text-sm text-muted-foreground">{t("msg_enter_password")}</p>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">密碼</Label>
+              <Label className="text-xs">{t("label_password")}</Label>
               <Input
                 type="password"
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setError(false); }}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                placeholder="輸入密碼"
+                placeholder={t("placeholder_password")}
                 className={error ? "border-destructive" : ""}
               />
-              {error && <p className="text-xs text-destructive">密碼錯誤，請重試</p>}
+              {error && <p className="text-xs text-destructive">{t("error_wrong_password")}</p>}
             </div>
-            <Button onClick={handleLogin} className="w-full">登入</Button>
+            <Button onClick={handleLogin} className="w-full">{t("btn_login")}</Button>
           </CardContent>
         </Card>
       </div>
@@ -62,6 +66,7 @@ const SalesReport = () => {
 };
 
 const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
+  const { t } = useLanguage();
   const orders = useMemo(() => loadOrders(), []);
   const customers = useMemo(() => loadStoredCustomers(), []);
 
@@ -74,9 +79,10 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
   const salesByStaff = useMemo(() => {
     const map: Record<string, { count: number; revenue: number; name: string }> = {};
     for (const o of orders) {
-      const sid = o.salesId || "未指定";
+      const sid = o.salesId || UNSPECIFIED;
       const staff = SALES_STAFF.find((s) => s.id === sid);
-      if (!map[sid]) map[sid] = { count: 0, revenue: 0, name: staff?.name || sid };
+      const displayName = staff?.name || (sid === UNSPECIFIED ? t("text_not_specified") : sid);
+      if (!map[sid]) map[sid] = { count: 0, revenue: 0, name: displayName };
       map[sid].count++;
       map[sid].revenue += o.finalPrice;
     }
@@ -100,8 +106,8 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
   const customerSummary = useMemo(() => {
     const map: Record<string, { name: string; count: number; revenue: number }> = {};
     for (const o of orders) {
-      const key = o.phone || o.customerName || "未知";
-      if (!map[key]) map[key] = { name: o.customerName || key, count: 0, revenue: 0 };
+      const key = o.phone || o.customerName || UNKNOWN;
+      if (!map[key]) map[key] = { name: o.customerName || (key === UNKNOWN ? t("text_not_specified") : key), count: 0, revenue: 0 };
       map[key].count++;
       map[key].revenue += o.finalPrice;
     }
@@ -112,9 +118,9 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
   const salesProductSummary = useMemo(() => {
     const map: Record<string, Record<string, { qty: number; revenue: number }>> = {};
     for (const o of orders) {
-      const sid = o.salesId || "未指定";
+      const sid = o.salesId || UNSPECIFIED;
       const staff = SALES_STAFF.find((s) => s.id === sid);
-      const sName = staff?.name || sid;
+      const sName = staff?.name || (sid === UNSPECIFIED ? t("text_not_specified") : sid);
       if (!map[sName]) map[sName] = {};
       for (const item of o.items) {
         if (!map[sName][item.name]) map[sName][item.name] = { qty: 0, revenue: 0 };
@@ -129,7 +135,7 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
   const customerProductSummary = useMemo(() => {
     const map: Record<string, Record<string, { qty: number; revenue: number }>> = {};
     for (const o of orders) {
-      const cKey = o.customerName || o.phone || "未知";
+      const cKey = o.customerName || o.phone || UNKNOWN;
       if (!map[cKey]) map[cKey] = {};
       for (const item of o.items) {
         if (!map[cKey][item.name]) map[cKey][item.name] = { qty: 0, revenue: 0 };
@@ -146,10 +152,10 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
-            <h1 className="text-lg font-bold">分析報告</h1>
+            <h1 className="text-lg font-bold">{t("title_report")}</h1>
           </div>
           <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs">
-            <ArrowLeft className="w-3.5 h-3.5" /> 返回 POS
+            <ArrowLeft className="w-3.5 h-3.5" /> {t("btn_back_pos")}
           </Button>
         </div>
       </header>
@@ -157,20 +163,20 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Overview cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="總訂單" value={orders.length.toString()} />
-          <StatCard label="總收入" value={`$${totalRevenue.toLocaleString()}`} />
-          <StatCard label="已付款" value={paidOrders.length.toString()} />
-          <StatCard label="未付款" value={unpaidOrders.length.toString()} highlight />
+          <StatCard label={t("stat_total_orders")} value={orders.length.toString()} />
+          <StatCard label={t("stat_total_revenue")} value={`$${totalRevenue.toLocaleString()}`} />
+          <StatCard label={t("stat_paid")} value={paidOrders.length.toString()} />
+          <StatCard label={t("stat_unpaid")} value={unpaidOrders.length.toString()} highlight />
         </div>
 
         {/* Report sections */}
         <Accordion type="multiple" className="space-y-2">
           {/* Sales Summary */}
           <AccordionItem value="sales" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">Sales Summary</AccordionTrigger>
+            <AccordionTrigger className="text-sm font-semibold">{t("section_sales_summary")}</AccordionTrigger>
             <AccordionContent>
               <table className="w-full text-sm">
-                <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">員工</th><th className="text-right">訂單數</th><th className="text-right">收入</th></tr></thead>
+                <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">{t("col_staff")}</th><th className="text-right">{t("col_order_count")}</th><th className="text-right">{t("col_revenue")}</th></tr></thead>
                 <tbody>
                   {salesByStaff.map(([id, d]) => (
                     <tr key={id} className="border-b border-border/50">
@@ -186,10 +192,10 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
           {/* Customer Summary */}
           <AccordionItem value="customer" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">Customer Summary</AccordionTrigger>
+            <AccordionTrigger className="text-sm font-semibold">{t("section_customer_summary")}</AccordionTrigger>
             <AccordionContent>
               <table className="w-full text-sm">
-                <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">客戶</th><th className="text-right">訂單數</th><th className="text-right">消費</th></tr></thead>
+                <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">{t("col_customer")}</th><th className="text-right">{t("col_order_count")}</th><th className="text-right">{t("col_spending")}</th></tr></thead>
                 <tbody>
                   {customerSummary.slice(0, 20).map(([key, d]) => (
                     <tr key={key} className="border-b border-border/50">
@@ -205,10 +211,10 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
           {/* Product Summary */}
           <AccordionItem value="product" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">Product Summary</AccordionTrigger>
+            <AccordionTrigger className="text-sm font-semibold">{t("section_product_summary")}</AccordionTrigger>
             <AccordionContent>
               <table className="w-full text-sm">
-                <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">產品</th><th className="text-right">數量</th><th className="text-right">收入</th></tr></thead>
+                <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">{t("col_product")}</th><th className="text-right">{t("col_quantity")}</th><th className="text-right">{t("col_revenue")}</th></tr></thead>
                 <tbody>
                   {productSummary.slice(0, 20).map(([name, d]) => (
                     <tr key={name} className="border-b border-border/50">
@@ -224,7 +230,7 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
           {/* Sales/Product Summary */}
           <AccordionItem value="sales-product" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">Sales/Product Summary</AccordionTrigger>
+            <AccordionTrigger className="text-sm font-semibold">{t("section_sales_product")}</AccordionTrigger>
             <AccordionContent className="space-y-3">
               {Object.entries(salesProductSummary).map(([staff, products]) => (
                 <div key={staff}>
@@ -247,7 +253,7 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
           {/* Customer/Product Summary */}
           <AccordionItem value="customer-product" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">Customer/Product Summary</AccordionTrigger>
+            <AccordionTrigger className="text-sm font-semibold">{t("section_customer_product")}</AccordionTrigger>
             <AccordionContent className="space-y-3">
               {Object.entries(customerProductSummary).slice(0, 15).map(([cust, products]) => (
                 <div key={cust}>
@@ -270,18 +276,18 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
           {/* S/C/Product Summary */}
           <AccordionItem value="scp" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">S/C/Product Summary</AccordionTrigger>
+            <AccordionTrigger className="text-sm font-semibold">{t("section_scp_summary")}</AccordionTrigger>
             <AccordionContent className="space-y-4">
               {Object.entries(salesProductSummary).map(([staff, _]) => {
                 // For each staff, show their customers and products
                 const staffOrders = orders.filter((o) => {
-                  const sid = o.salesId || "未指定";
+                  const sid = o.salesId || UNSPECIFIED;
                   const s = SALES_STAFF.find((st) => st.id === sid);
                   return (s?.name || sid) === staff;
                 });
                 const custMap: Record<string, Record<string, { qty: number; revenue: number }>> = {};
                 for (const o of staffOrders) {
-                  const cKey = o.customerName || o.phone || "未知";
+                  const cKey = o.customerName || o.phone || UNKNOWN;
                   if (!custMap[cKey]) custMap[cKey] = {};
                   for (const item of o.items) {
                     if (!custMap[cKey][item.name]) custMap[cKey][item.name] = { qty: 0, revenue: 0 };
@@ -294,7 +300,7 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
                     <p className="text-sm font-bold text-foreground mb-2">👤 {staff}</p>
                     {Object.entries(custMap).map(([cust, products]) => (
                       <div key={cust} className="ml-3 mb-2">
-                        <p className="text-xs font-semibold text-muted-foreground">{cust}</p>
+                        <p className="text-xs font-semibold text-muted-foreground">{cust === UNKNOWN ? t("text_not_specified") : cust}</p>
                         <table className="w-full text-sm">
                           <tbody>
                             {Object.entries(products).map(([pName, d]) => (
