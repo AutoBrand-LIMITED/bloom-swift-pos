@@ -122,11 +122,13 @@ const DriverApp = () => {
             <p className="text-muted-foreground text-sm">{t("msg_select_name")}</p>
           </div>
           <div className="grid grid-cols-2 gap-4 w-full max-w-md">
-            {DRIVERS.map((d) => (
+            {DRIVERS.map((d, i) => (
                 <button
                   key={d.id}
                   onClick={() => setSelectedDriver(d.name)}
-                  className="rounded-2xl border border-border bg-card hover:bg-primary/5 hover:border-primary/30 transition-all p-8 text-center font-bold text-lg active:scale-95"
+                  className={`rounded-2xl border border-border bg-card hover:bg-primary/5 hover:border-primary/30 transition-all p-8 text-center font-bold text-lg active:scale-95 ${
+                    i === DRIVERS.length - 1 && DRIVERS.length % 2 !== 0 ? "col-span-2" : ""
+                  }`}
                 >
                   <span className="w-10 h-10 rounded-full bg-primary/10 text-primary text-base font-bold flex items-center justify-center mx-auto mb-3">
                     {d.name[0]}

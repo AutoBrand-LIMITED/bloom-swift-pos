@@ -94,11 +94,19 @@ const DispatchView = () => {
             <h1 className="text-sm font-bold">{t("title_dispatch")}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-500" />{totalPending} {t("dispatch_pending")}</span>
-              <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" />{totalDelivered} {t("dispatch_delivered")}</span>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                <span className="font-bold font-mono text-sm text-foreground">{totalPending}</span>
+                <span className="text-muted-foreground">{t("dispatch_pending")}</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                <span className="font-bold font-mono text-sm text-foreground">{totalDelivered}</span>
+                <span className="text-muted-foreground">{t("dispatch_delivered")}</span>
+              </span>
               {blocked > 0 && (
-                <span className="flex items-center gap-1 text-red-500 font-medium"><AlertTriangle className="w-3.5 h-3.5" />{blocked} {t("text_unpaid_warning")}</span>
+                <span className="flex items-center gap-1.5 text-red-500 font-medium"><AlertTriangle className="w-3.5 h-3.5" />{blocked} {t("text_unpaid_warning")}</span>
               )}
             </div>
             <div className="flex rounded-lg border border-border overflow-hidden">
@@ -106,7 +114,7 @@ const DispatchView = () => {
                 <button
                   key={f}
                   onClick={() => setDateFilter(f)}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
                     dateFilter === f ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-secondary"
                   }`}
                 >
