@@ -1,4 +1,4 @@
-import { History, X, MapPin } from "lucide-react";
+import { History, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMemo } from "react";
@@ -81,7 +81,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
       {pastAddresses.length > 0 && (
         <div className="p-3 border-b border-border space-y-1.5">
           <p className="text-xs sm:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-            <MapPin className="w-3 h-3" /> {t("label_past_addresses")}
+            {t("label_past_addresses")}
           </p>
           {pastAddresses.map((a, i) => (
             <button
@@ -124,7 +124,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
               <p className="text-xs">{h.items}</p>
               {h.deliveryAddress && (
                 <p className="text-xs sm:text-[10px] text-muted-foreground flex items-center gap-0.5">
-                  <MapPin className="w-2.5 h-2.5 inline" /> {h.deliveryAddress}
+                  {h.deliveryAddress}
                 </p>
               )}
               <p className="text-xs font-mono font-semibold text-right">${h.total.toLocaleString()}</p>

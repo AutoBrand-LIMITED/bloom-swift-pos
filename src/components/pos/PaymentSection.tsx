@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, AlertTriangle, CalendarIcon, Bell, Monitor, MessageCircle, Apple, Smartphone, ExternalLink } from "lucide-react";
+import { CreditCard, AlertTriangle, CalendarIcon, Monitor, MessageCircle, Apple, Smartphone, ExternalLink } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -189,7 +189,6 @@ const PaymentSection = ({
     {(paymentStatus === "unpaid" || paymentStatus === "deposit") && (
       <div className="space-y-3 pt-2 border-t border-border animate-in fade-in slide-in-from-top-2 duration-200">
         <div className="flex items-center gap-2 text-sm font-medium">
-          <Bell className="w-4 h-4 text-warning" />
           {t("label_followup")}
         </div>
         <div className="grid grid-cols-2 gap-3">

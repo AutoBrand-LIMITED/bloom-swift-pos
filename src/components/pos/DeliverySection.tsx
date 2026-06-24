@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart, Cake } from "lucide-react";
+import { Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
 import type { Delivery } from "@/types/order";
 import { DRIVERS } from "@/types/order";
@@ -191,7 +191,7 @@ function DeliveryCard({
 
       {/* Address */}
       <div className="space-y-2">
-        <Label className="text-xs font-medium flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {t("label_delivery_address")}</Label>
+        <Label className="text-xs font-medium">{t("label_delivery_address")}</Label>
         <div className="grid grid-cols-3 gap-2">
           <Select value={delivery.deliveryRegion} onValueChange={handleRegionChange}>
             <SelectTrigger className="text-sm">
@@ -299,7 +299,7 @@ function DeliveryCard({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium flex items-center gap-1"><Cake className="w-3.5 h-3.5" /> {t("label_birthday")}</Label>
+          <Label className="text-xs font-medium">{t("label_birthday")}</Label>
           <Input
             placeholder={t("placeholder_birthday")}
             value={delivery.recipientBirthday || ""}
@@ -370,7 +370,6 @@ const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: Deliver
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
           <StepBadge n={4} done={!!isComplete} />
-          <MapPin className="w-4 h-4" />
           {t("section_delivery")}
           {deliveries.length > 1 && (
             <span className="ml-1 text-xs sm:text-[11px] font-normal normal-case text-muted-foreground">
