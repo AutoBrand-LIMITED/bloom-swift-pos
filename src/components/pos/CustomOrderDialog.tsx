@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import {
   Sparkles, Plus, Minus, X, MousePointerClick, Star, Check,
+  Tag, Heart, Flower2, Flower, Leaf, Apple, Package, Container, Palette, Ruler, Wind, AlertTriangle, FileText,
 } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -332,13 +333,18 @@ function FlowerPicker({ flowers, selected, onToggle, onQtyChange, highlighted }:
   );
 }
 
-function Section({ title, children }: {
+function Section({ icon: Icon, title, children, flush }: {
+  icon: React.ElementType;
   title: string;
   children: React.ReactNode;
+  flush?: boolean;
 }) {
   return (
-    <section className="space-y-3 pt-5 first:pt-0 border-t border-border/50 first:border-0">
-      <h3 className="text-xs font-semibold tracking-wide uppercase text-foreground/70">
+    <section className={`space-y-3 pt-5 first:pt-0 ${flush ? "" : "border-t border-border first:border-0"}`}>
+      <h3 className="flex items-center gap-2.5 text-xs font-semibold tracking-wide uppercase text-foreground/70">
+        <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 text-primary shrink-0">
+          <Icon className="w-4 h-4" />
+        </span>
         {title}
       </h3>
       {children}
@@ -477,7 +483,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
         <ScrollArea className="px-6 pb-4 max-h-[calc(90vh-160px)]">
           <div className="space-y-0 pr-2">
             {/* Step 1: Product Type */}
-            <Section title={t("cd_section_product_type")}>
+            <Section icon={Tag} title={t("cd_section_product_type")}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {productTypes.map((p) => {
                   const active = state.productType === p.id;
@@ -506,7 +512,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
             </Section>
 
             {/* Step 2: Occasion */}
-            <Section title={t("label_occasion")}>
+            <Section icon={Heart} title={t("label_occasion")}>
               <ChipSelect items={occasionItems} value={state.occasion} onChange={(v) => update("occasion", v)} />
               {rec && (
                 <p className="text-xs text-primary/90 mt-2 flex items-center gap-1.5 rounded-lg bg-primary/[0.06] px-3 py-2 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -520,7 +526,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
               <>
                 {/* Flowers */}
                 {availableFlowers.length > 0 && (
-                  <Section title={t("cd_section_main_flowers")}>
+                  <Section icon={Flower2} title={t("cd_section_main_flowers")}>
                     <FlowerPicker
                       flowers={availableFlowers}
                       selected={state.mainFlowers}
@@ -546,7 +552,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Fillers */}
                 {availableFillers.length > 0 && (
-                  <Section title={t("cd_section_filler_flowers")}>
+                  <Section icon={Flower} title={t("cd_section_filler_flowers")}>
                     <FlowerPicker
                       flowers={availableFillers}
                       selected={state.fillerFlowers}
@@ -558,7 +564,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Greens */}
                 {availableGreens.length > 0 && (
-                  <Section title={t("cd_section_greens")}>
+                  <Section icon={Leaf} title={t("cd_section_greens")}>
                     <FlowerPicker
                       flowers={availableGreens}
                       selected={state.greens}
@@ -570,7 +576,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Fruits (only for fruit basket) */}
                 {pt === "fruit_basket" && (
-                  <Section title={t("cd_section_fruits")}>
+                  <Section icon={Apple} title={t("cd_section_fruits")}>
                     <FlowerPicker
                       flowers={FRUITS}
                       selected={state.fruits}
@@ -581,7 +587,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 )}
 
                 {/* Shape / Wrapping */}
-                <Section title={t("cd_section_wrapping")}>
+                <Section icon={Package} title={t("cd_section_wrapping")}>
                   <div className="space-y-3">
                     {availableShapes.length > 0 && (
                       <div className="space-y-1.5">
@@ -612,7 +618,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Vase (bouquet/basket only) */}
                 {(pt === "bouquet" || pt === "basket") && (
-                  <Section title={t("cd_section_vase")}>
+                  <Section icon={Container} title={t("cd_section_vase")}>
                     <div className="space-y-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_vase_type")}</Label>
@@ -629,7 +635,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 )}
 
                 {/* Style */}
-                <Section title={t("cd_section_style")}>
+                <Section icon={Palette} title={t("cd_section_style")}>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_style_theme")}</Label>
@@ -643,7 +649,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 </Section>
 
                 {/* Size */}
-                <Section title={t("cd_section_size")}>
+                <Section icon={Ruler} title={t("cd_section_size")}>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_size")}</Label>
@@ -666,7 +672,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Fragrance (not for preserved/potted) */}
                 {pt !== "preserved" && pt !== "potted" && (
-                  <Section title={t("cd_section_fragrance")}>
+                  <Section icon={Wind} title={t("cd_section_fragrance")}>
                     <div className="space-y-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_fragrance")}</Label>
@@ -681,7 +687,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 )}
 
                 {/* Allergy */}
-                <Section title={t("cd_section_allergy")}>
+                <Section icon={AlertTriangle} title={t("cd_section_allergy")}>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Switch checked={state.hasAllergy} onCheckedChange={(v) => update("hasAllergy", v)} />
@@ -698,7 +704,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 </Section>
 
                 {/* Special notes */}
-                <Section title={t("cd_special_notes")}>
+                <Section icon={FileText} title={t("cd_special_notes")} flush>
                   <div className="flex gap-2">
                     <Textarea placeholder={t("cd_placeholder_special_notes")} value={state.specialNotes}
                       onChange={(e) => update("specialNotes", e.target.value)} className="text-sm min-h-[60px]" />
