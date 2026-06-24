@@ -36,7 +36,10 @@ export interface Order {
   finalPrice: number;
   priceOverridden: boolean;
   paymentStatus: PaymentStatus;
+  paymentMethod?: string;
   depositAmount: number;
+  customerType?: "personal" | "company";
+  companyName?: string;
   followUpDate: string;
   reminderOption: string;
   deliveries?: Delivery[];

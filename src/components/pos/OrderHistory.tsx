@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardList, X, ShieldAlert, Truck, Search } from "lucide-react";
+import { ClipboardList, X, ShieldAlert, Truck, Search, Pencil, RefreshCw } from "lucide-react";
 import PrintButtons from "@/components/pos/PrintButtons";
 import type { Order, PaymentStatus } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
@@ -29,6 +29,8 @@ interface OrderHistoryProps {
   orders: Order[];
   open: boolean;
   onClose: () => void;
+  onEdit?: (order: Order) => void;
+  onReorder?: (order: Order) => void;
 }
 
 const STATUS_VARIANTS: Record<PaymentStatus, "destructive" | "default" | "secondary"> = {
@@ -37,7 +39,7 @@ const STATUS_VARIANTS: Record<PaymentStatus, "destructive" | "default" | "second
   deposit: "secondary",
 };
 
-const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
+const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistoryProps) => {
   const { t } = useLanguage();
   const [searchText, setSearchText] = useState("");
   const [staffFilter, setStaffFilter] = useState("all");
@@ -263,6 +265,28 @@ const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
                             <span className="font-mono font-bold text-sm">${order.finalPrice.toLocaleString()}</span>
                           </div>
                           <PrintButtons order={order} />
+                          <div className="flex gap-1.5 pt-1">
+                            {onEdit && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 text-xs gap-1 flex-1"
+                                onClick={() => { onEdit(order); onClose(); }}
+                              >
+                                <Pencil className="w-3 h-3" /> {t("btn_edit_order")}
+                              </Button>
+                            )}
+                            {onReorder && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 text-xs gap-1 flex-1"
+                                onClick={() => { onReorder(order); onClose(); }}
+                              >
+                                <RefreshCw className="w-3 h-3" /> {t("btn_reorder")}
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}

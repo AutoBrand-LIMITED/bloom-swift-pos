@@ -322,6 +322,19 @@ export const zh = {
   // History filter periods
   filter_last7: "近7日",
   filter_last30: "近30日",
+
+  // Edit / reorder
+  btn_edit_order: "修改訂單",
+  btn_reorder: "重新下單",
+  btn_cancel_edit: "取消修改",
+  btn_save_changes: "儲存更改",
+  label_editing_order: "正在修改訂單",
+  toast_order_updated: "訂單已更新",
+
+  // Duplicate order alert
+  alert_duplicate_title: "可能重複訂單",
+  alert_duplicate_body: "此客戶同日已有相同收貨人訂單，確認繼續？",
+  btn_submit_anyway: "確認提交",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
@@ -648,6 +661,19 @@ export const en: Record<TranslationKey, string> = {
   // History filter periods
   filter_last7: "Last 7 days",
   filter_last30: "Last 30 days",
+
+  // Edit / reorder
+  btn_edit_order: "Edit Order",
+  btn_reorder: "Reorder",
+  btn_cancel_edit: "Cancel Edit",
+  btn_save_changes: "Save Changes",
+  label_editing_order: "Editing Order",
+  toast_order_updated: "Order updated",
+
+  // Duplicate order alert
+  alert_duplicate_title: "Possible Duplicate",
+  alert_duplicate_body: "An order with the same customer, date and recipient already exists. Continue?",
+  btn_submit_anyway: "Submit Anyway",
 };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { zh, en };

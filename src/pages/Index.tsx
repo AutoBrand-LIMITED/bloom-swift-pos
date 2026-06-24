@@ -1,7 +1,12 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck, Crown, Gift, Tag } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck, Crown, Gift, Tag, Pencil } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
@@ -89,6 +94,12 @@ const Index = () => {
   // History
   const [orders, setOrders] = useState<Order[]>(loadOrders);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Edit mode
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+
+  // Duplicate order dialog
+  const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
 
   const subtotal = useMemo(() => {
     const itemsTotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
@@ -200,6 +211,8 @@ const Index = () => {
     setSenderNotesPinned(false);
     setDeliveryNotesPinned(false);
     setInternalNotesPinned(false);
+    setEditingOrderId(null);
+    setPendingOrder(null);
     setCurrentOrderId(crypto.randomUUID());
   }, []);
 
@@ -219,6 +232,101 @@ const Index = () => {
     setSelectedCustomer({ ...selectedCustomer, flags: newFlags });
     setCustomerRefreshKey(k => k + 1);
     toast.success(t("btn_mark_vip"));
+  };
+
+  const handleEditOrder = (order: Order) => {
+    setSalesId(order.salesId);
+    const parts = order.phone.split(" ");
+    setPhonePrefix(parts[0] ?? "+852");
+    setPhone(parts.slice(1).join(" "));
+    setCustomerName(order.customerName);
+    setCustomerType(order.customerType ?? "personal");
+    setCompanyName(order.companyName ?? "");
+    setContactPerson(order.contactPerson ?? "");
+    setItems(order.items);
+    setDeliveryFee(order.deliveryFee);
+    setUrgentFee(order.urgentFee);
+    setSenderNotes(order.senderNotes ?? "");
+    setDeliveryNotes(order.deliveryNotes ?? "");
+    setInternalNotes(order.internalNotes ?? "");
+    setDeliveries(order.deliveries?.length ? order.deliveries : [newDelivery()]);
+    setGiftCardEnabled(order.giftCardEnabled);
+    setGiftCardMessage(order.giftCardMessage ?? "");
+    setPaymentStatus(order.paymentStatus);
+    setDepositAmount(order.depositAmount ?? 0);
+    setPaymentMethod(order.paymentMethod ?? "");
+    setFollowUpDate(order.followUpDate ? new Date(order.followUpDate) : undefined);
+    setReminderOption(order.reminderOption ?? "none");
+    setPriceOverridden(order.priceOverridden);
+    setManualPrice(order.priceOverridden ? order.finalPrice : null);
+    setOccasionTag(order.occasionTag ?? "");
+    setSenderNotesPinned(false);
+    setDeliveryNotesPinned(false);
+    setInternalNotesPinned(false);
+    setPhoneError(false);
+    setCurrentOrderId(order.id);
+    setEditingOrderId(order.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleReorder = (order: Order) => {
+    setSalesId(order.salesId);
+    const parts = order.phone.split(" ");
+    setPhonePrefix(parts[0] ?? "+852");
+    setPhone(parts.slice(1).join(" "));
+    setCustomerName(order.customerName);
+    setCustomerType(order.customerType ?? "personal");
+    setCompanyName(order.companyName ?? "");
+    setContactPerson(order.contactPerson ?? "");
+    setItems(order.items);
+    setDeliveryFee(order.deliveryFee);
+    setUrgentFee(order.urgentFee);
+    setSenderNotes(order.senderNotes ?? "");
+    setDeliveryNotes(order.deliveryNotes ?? "");
+    setInternalNotes(order.internalNotes ?? "");
+    setDeliveries([newDelivery()]);
+    setGiftCardEnabled(order.giftCardEnabled);
+    setGiftCardMessage(order.giftCardMessage ?? "");
+    setPaymentStatus("unpaid");
+    setDepositAmount(0);
+    setPaymentMethod("");
+    setFollowUpDate(undefined);
+    setReminderOption("none");
+    setPriceOverridden(order.priceOverridden);
+    setManualPrice(order.priceOverridden ? order.finalPrice : null);
+    setOccasionTag(order.occasionTag ?? "");
+    setSenderNotesPinned(false);
+    setDeliveryNotesPinned(false);
+    setInternalNotesPinned(false);
+    setPhoneError(false);
+    setEditingOrderId(null);
+    setCurrentOrderId(crypto.randomUUID());
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast.info(t("btn_reorder"));
+  };
+
+  const isDuplicateOrder = (order: Order): boolean => {
+    const normalizedPhone = order.phone.replace(/\s/g, "");
+    const dates = (order.deliveries ?? []).map(d => d.deliveryDate).filter(Boolean);
+    const recipients = (order.deliveries ?? []).map(d => d.recipientName.trim().toLowerCase()).filter(Boolean);
+    return orders.some(o => {
+      if (o.id === editingOrderId) return false;
+      if (o.phone.replace(/\s/g, "") !== normalizedPhone) return false;
+      const oDates = (o.deliveries ?? []).map(d => d.deliveryDate).filter(Boolean);
+      const oRecipients = (o.deliveries ?? []).map(d => d.recipientName.trim().toLowerCase()).filter(Boolean);
+      return dates.some(d => oDates.includes(d)) && recipients.some(r => oRecipients.includes(r));
+    });
+  };
+
+  const saveOrder = (order: Order) => {
+    let updated: Order[];
+    if (editingOrderId) {
+      updated = orders.map(o => o.id === editingOrderId ? order : o);
+    } else {
+      updated = [...orders, order];
+    }
+    setOrders(updated);
+    saveOrders(updated);
   };
 
   const handleSubmit = () => {
@@ -256,7 +364,10 @@ const Index = () => {
       finalPrice,
       priceOverridden,
       paymentStatus,
+      paymentMethod,
       depositAmount: paymentStatus === "deposit" ? depositAmount : 0,
+      customerType,
+      companyName: customerType === "company" ? companyName.trim() : undefined,
       followUpDate: followUpDate ? followUpDate.toISOString() : "",
       reminderOption,
       deliveries,
@@ -273,12 +384,22 @@ const Index = () => {
       deliveryNotes: deliveryNotes.trim(),
       internalNotes: internalNotes.trim(),
       occasionTag: occasionTag || undefined,
-      createdAt: new Date().toISOString(),
+      createdAt: editingOrderId
+        ? (orders.find(o => o.id === editingOrderId)?.createdAt ?? new Date().toISOString())
+        : new Date().toISOString(),
     };
 
-    const updated = [...orders, order];
-    setOrders(updated);
-    saveOrders(updated);
+    // Duplicate check — skip when editing the same order
+    if (!editingOrderId && isDuplicateOrder(order)) {
+      setPendingOrder(order);
+      return;
+    }
+
+    commitOrder(order);
+  };
+
+  const commitOrder = (order: Order) => {
+    saveOrder(order);
 
     // Save pinned notes to customer persistent record (append to existing)
     const newPinned = [
@@ -293,10 +414,12 @@ const Index = () => {
       setCustomerRefreshKey(k => k + 1);
     }
 
-    if (paymentStatus === "unpaid") {
+    if (editingOrderId) {
+      toast.success(t("toast_order_updated"));
+    } else if (paymentStatus === "unpaid") {
       toast.warning(t("toast_order_unpaid"), { duration: 5000 });
     } else if (paymentStatus === "deposit") {
-      toast.info(`${t("toast_order_deposit")} $${depositAmount} · ${t("label_remaining_due")} $${finalPrice - depositAmount}`);
+      toast.info(`${t("toast_order_deposit")} $${depositAmount} · ${t("label_remaining_due")} $${order.finalPrice - depositAmount}`);
     } else {
       toast.success(t("toast_order_success"));
     }
@@ -318,6 +441,7 @@ const Index = () => {
       },
     });
 
+    setPendingOrder(null);
     resetForm();
   };
 
@@ -405,6 +529,19 @@ const Index = () => {
 
         {/* Main form */}
         <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-5 pb-28">
+
+          {/* Edit mode banner */}
+          {editingOrderId && (
+            <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+              <div className="flex items-center gap-2 font-semibold">
+                <Pencil className="w-3.5 h-3.5 shrink-0" />
+                {t("label_editing_order")} · {editingOrderId.slice(0, 8).toUpperCase()}
+              </div>
+              <Button size="sm" variant="ghost" className="h-6 text-xs text-amber-800 hover:bg-amber-100" onClick={resetForm}>
+                {t("btn_cancel_edit")}
+              </Button>
+            </div>
+          )}
 
           {/* STEP 1: Staff — required gate */}
           <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} isComplete={!!salesId} />
@@ -607,14 +744,36 @@ const Index = () => {
               className={`px-8 text-base font-semibold shadow-lg transition-all duration-200 ${stepsDone === totalSteps ? "shadow-primary/25 shadow-lg" : ""}`}
               disabled={!!blockingReason}
             >
-              {t("nav_confirm_order")}
+              {editingOrderId ? t("btn_save_changes") : t("nav_confirm_order")}
             </Button>
           </div>
         </div>
       </div>
 
       {/* Order history drawer */}
-      <OrderHistory orders={orders} open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <OrderHistory
+        orders={orders}
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onEdit={handleEditOrder}
+        onReorder={handleReorder}
+      />
+
+      {/* Duplicate order confirmation dialog */}
+      <AlertDialog open={!!pendingOrder} onOpenChange={(open) => { if (!open) setPendingOrder(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("alert_duplicate_title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("alert_duplicate_body")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingOrder(null)}>{t("btn_cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (pendingOrder) commitOrder(pendingOrder); }}>
+              {t("btn_submit_anyway")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
