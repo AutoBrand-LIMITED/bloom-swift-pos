@@ -56,6 +56,9 @@ const Index = () => {
   // Delivery
   const [deliveries, setDeliveries] = useState<Delivery[]>([newDelivery()]);
 
+  // Occasion
+  const [occasionTag, setOccasionTag] = useState("");
+
   // Gift card
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
   const [giftCardMessage, setGiftCardMessage] = useState("");

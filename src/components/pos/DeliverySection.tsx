@@ -283,6 +283,33 @@ function DeliveryCard({
         </div>
       </div>
 
+      {/* Relationship + Birthday */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">{t("label_relationship")}</Label>
+          <Select value={delivery.recipientRelationship || ""} onValueChange={(v) => set("recipientRelationship", v)}>
+            <SelectTrigger className="text-sm">
+              <SelectValue placeholder={t("placeholder_relationship")} />
+            </SelectTrigger>
+            <SelectContent>
+              {(["rel_mother","rel_father","rel_wife","rel_husband","rel_girlfriend","rel_boyfriend","rel_friend","rel_colleague","rel_boss","rel_other"] as const).map((k) => (
+                <SelectItem key={k} value={k}>{t(k)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">{t("label_birthday")}</Label>
+          <Input
+            placeholder={t("placeholder_birthday")}
+            value={delivery.recipientBirthday || ""}
+            onChange={(e) => set("recipientBirthday", e.target.value)}
+            className="text-sm font-mono"
+            maxLength={5}
+          />
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">

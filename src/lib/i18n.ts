@@ -267,6 +267,52 @@ export const zh = {
   label_amount_due: "應付金額",
   label_reference: "參考編號",
   hint_contact_staff: "如有疑問，請向本店員工查詢",
+
+  // P6 — Occasion & Recipient
+  label_occasion: "場合標籤",
+  placeholder_occasion: "選擇場合",
+  occasion_none: "無",
+  occasion_birthday: "生日",
+  occasion_mothers_day: "母親節",
+  occasion_fathers_day: "父親節",
+  occasion_valentines: "情人節",
+  occasion_christmas: "聖誕節",
+  occasion_anniversary: "週年紀念",
+  occasion_graduation: "畢業",
+  occasion_new_year: "新年",
+  occasion_other: "其他",
+
+  label_relationship: "關係",
+  placeholder_relationship: "選擇關係",
+  rel_mother: "媽媽",
+  rel_father: "爸爸",
+  rel_wife: "太太",
+  rel_husband: "先生",
+  rel_girlfriend: "女朋友",
+  rel_boyfriend: "男朋友",
+  rel_friend: "朋友",
+  rel_colleague: "同事",
+  rel_boss: "上司",
+  rel_other: "其他",
+
+  label_birthday: "生日（月/日）",
+  placeholder_birthday: "例如 06-24",
+
+  // History filters
+  label_filter_date_from: "由",
+  label_filter_date_to: "至",
+  label_filter_staff: "員工",
+  label_filter_occasion: "場合",
+  placeholder_search_history: "搜尋客戶、收貨人、電話",
+  btn_clear_filters: "清除篩選",
+  label_all_staff: "全部員工",
+  label_all_occasions: "全部場合",
+
+  // VIP threshold
+  alert_vip_threshold: "此客戶已達VIP門檻",
+  btn_mark_vip: "標記為VIP",
+  alert_birthday_upcoming: "生日提醒",
+  msg_birthday_upcoming: "即將生日",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
@@ -538,6 +584,52 @@ export const en: Record<TranslationKey, string> = {
   label_amount_due: "Amount Due",
   label_reference: "Reference No.",
   hint_contact_staff: "Please ask our staff if you have any questions",
+
+  // P6 — Occasion & Recipient
+  label_occasion: "Occasion",
+  placeholder_occasion: "Select occasion",
+  occasion_none: "None",
+  occasion_birthday: "Birthday",
+  occasion_mothers_day: "Mother's Day",
+  occasion_fathers_day: "Father's Day",
+  occasion_valentines: "Valentine's Day",
+  occasion_christmas: "Christmas",
+  occasion_anniversary: "Anniversary",
+  occasion_graduation: "Graduation",
+  occasion_new_year: "New Year",
+  occasion_other: "Other",
+
+  label_relationship: "Relationship",
+  placeholder_relationship: "Select relationship",
+  rel_mother: "Mother",
+  rel_father: "Father",
+  rel_wife: "Wife",
+  rel_husband: "Husband",
+  rel_girlfriend: "Girlfriend",
+  rel_boyfriend: "Boyfriend",
+  rel_friend: "Friend",
+  rel_colleague: "Colleague",
+  rel_boss: "Boss",
+  rel_other: "Other",
+
+  label_birthday: "Birthday (MM-DD)",
+  placeholder_birthday: "e.g. 06-24",
+
+  // History filters
+  label_filter_date_from: "From",
+  label_filter_date_to: "To",
+  label_filter_staff: "Staff",
+  label_filter_occasion: "Occasion",
+  placeholder_search_history: "Search customer, recipient, phone",
+  btn_clear_filters: "Clear Filters",
+  label_all_staff: "All Staff",
+  label_all_occasions: "All Occasions",
+
+  // VIP threshold
+  alert_vip_threshold: "Customer has reached VIP threshold",
+  btn_mark_vip: "Mark as VIP",
+  alert_birthday_upcoming: "Birthday Reminder",
+  msg_birthday_upcoming: "Birthday coming up",
 };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { zh, en };

@@ -15,6 +15,8 @@ export interface Delivery {
   deliveryDetail: string;
   recipientName: string;
   recipientPhone: string;
+  recipientRelationship?: string;
+  recipientBirthday?: string; // MM-DD
   deliveryPerson: string;
   failedDeliveryAction: string;
 }
@@ -51,6 +53,7 @@ export interface Order {
   senderNotes: string;
   deliveryNotes: string;
   internalNotes: string;
+  occasionTag?: string;
   createdAt: string;
   deliveryStatus?: "pending" | "delivered";
   deliveredAt?: string;
