@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Gift } from "lucide-react";
@@ -38,40 +37,46 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
       </div>
 
       {enabled && (
-        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-          {/* Quick templates */}
-          <div className="flex flex-wrap gap-1.5">
-            {TEMPLATES.map((t) => (
+        <div className="space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+          {/* Quick templates — horizontal scroll, no wrap */}
+          <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5">
+            {TEMPLATES.map((tmpl) => (
               <button
-                key={t}
-                onClick={() => onMessageChange(message ? message + "\n\n" + t : t)}
-                className="rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs transition-colors hover:bg-primary hover:text-primary-foreground"
+                key={tmpl}
+                onClick={() => onMessageChange(message ? message + "\n\n" + tmpl : tmpl)}
+                className="shrink-0 rounded-lg border border-border/70 bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground/80 transition-all hover:bg-primary hover:text-primary-foreground hover:border-primary whitespace-nowrap"
               >
-                {t}
+                {tmpl}
               </button>
             ))}
           </div>
 
-          {/* Markdown editor */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-medium">{t("label_card_content")}</Label>
-              <div className="flex items-center gap-2">
+          {/* Card composer */}
+          <div className="rounded-lg border border-border overflow-hidden">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border">
+              <span className="text-xs font-medium text-foreground/70">{t("label_card_content")}</span>
+              <div className="flex items-center gap-1">
                 <VoiceInputButton
                   onResult={(text) => onMessageChange(message ? `${message} ${text}` : text)}
                   className="h-7 w-7"
                 />
                 <button
                   onClick={() => setPreview(!preview)}
-                  className="text-xs text-primary hover:underline"
+                  className={`h-7 px-2.5 rounded-md text-xs font-medium transition-colors ${
+                    preview
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  }`}
                 >
                   {preview ? t("btn_edit") : t("btn_preview")}
                 </button>
               </div>
             </div>
 
+            {/* Body */}
             {preview ? (
-              <div className="rounded-lg border border-border bg-accent/30 p-4 min-h-[100px] prose prose-sm max-w-none">
+              <div className="p-4 min-h-[120px] prose prose-sm max-w-none bg-card text-sm">
                 <MarkdownPreview content={message} noContentLabel={t("msg_no_content")} />
               </div>
             ) : (
@@ -79,13 +84,16 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
                 placeholder={t("placeholder_card")}
                 value={message}
                 onChange={(e) => onMessageChange(e.target.value)}
-                className="text-sm min-h-[100px] font-mono"
+                className="min-h-[120px] font-mono text-sm border-0 rounded-none focus-visible:ring-0 bg-card resize-none"
                 maxLength={1000}
               />
             )}
-            <p className="text-xs sm:text-[10px] text-muted-foreground">
-              {t("hint_markdown")}
-            </p>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-3 py-1.5 bg-muted/20 border-t border-border">
+              <p className="text-[10px] text-muted-foreground">{t("hint_markdown")}</p>
+              <span className="text-[10px] text-muted-foreground tabular-nums font-mono">{message.length}/1000</span>
+            </div>
           </div>
         </div>
       )}
