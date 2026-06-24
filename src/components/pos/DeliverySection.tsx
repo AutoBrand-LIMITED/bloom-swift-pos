@@ -1,8 +1,10 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle, Plus, X } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
+import type { Delivery } from "@/types/order";
 import { DRIVERS } from "@/types/order";
 
 const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
@@ -40,82 +42,101 @@ const DELIVERY_SLOTS = [
   { value: "指定時間", label: "指定時間", sublabel: "+ 附加費" },
 ];
 
+export function newDelivery(): Delivery {
+  return {
+    id: crypto.randomUUID(),
+    deliveryDate: "",
+    deliveryTime: "",
+    deliveryRegion: "",
+    deliveryDistrict: "",
+    deliveryArea: "",
+    deliveryDetail: "",
+    recipientName: "",
+    recipientPhone: "",
+    deliveryPerson: "",
+    failedDeliveryAction: "none",
+  };
+}
+
 interface DeliverySectionProps {
-  deliveryDate: string;
-  deliveryTime: string;
-  deliveryRegion: string;
-  deliveryDistrict: string;
-  deliveryArea: string;
-  deliveryDetail: string;
-  recipientName: string;
-  recipientPhone: string;
-  deliveryPerson: string;
-  failedDeliveryAction: string;
-  onDateChange: (v: string) => void;
-  onTimeChange: (v: string) => void;
-  onRegionChange: (v: string) => void;
-  onDistrictChange: (v: string) => void;
-  onAreaChange: (v: string) => void;
-  onDetailChange: (v: string) => void;
-  onRecipientNameChange: (v: string) => void;
-  onRecipientPhoneChange: (v: string) => void;
-  onDeliveryPersonChange: (v: string) => void;
-  onFailedDeliveryActionChange: (v: string) => void;
+  deliveries: Delivery[];
+  onDeliveriesChange: (d: Delivery[]) => void;
   isComplete?: boolean;
 }
 
-const DeliverySection = ({
-  deliveryDate, deliveryTime,
-  deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
-  recipientName, recipientPhone, deliveryPerson, failedDeliveryAction,
-  onDateChange, onTimeChange,
-  onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
-  onRecipientNameChange, onRecipientPhoneChange, onDeliveryPersonChange,
-  onFailedDeliveryActionChange, isComplete,
-}: DeliverySectionProps) => {
-  const districts = deliveryRegion ? Object.keys(HK_DISTRICTS[deliveryRegion] || {}) : [];
-  const areas = deliveryRegion && deliveryDistrict
-    ? HK_DISTRICTS[deliveryRegion]?.[deliveryDistrict] || []
+function DeliveryCard({
+  delivery,
+  index,
+  total,
+  onChange,
+  onRemove,
+}: {
+  delivery: Delivery;
+  index: number;
+  total: number;
+  onChange: (updated: Delivery) => void;
+  onRemove: () => void;
+}) {
+  const set = <K extends keyof Delivery>(key: K, val: Delivery[K]) =>
+    onChange({ ...delivery, [key]: val });
+
+  const districts = delivery.deliveryRegion
+    ? Object.keys(HK_DISTRICTS[delivery.deliveryRegion] || {})
     : [];
+  const areas =
+    delivery.deliveryRegion && delivery.deliveryDistrict
+      ? HK_DISTRICTS[delivery.deliveryRegion]?.[delivery.deliveryDistrict] || []
+      : [];
 
-  const handleRegionChange = (v: string) => {
-    onRegionChange(v);
-    onDistrictChange("");
-    onAreaChange("");
-  };
+  const handleRegionChange = (v: string) =>
+    onChange({ ...delivery, deliveryRegion: v, deliveryDistrict: "", deliveryArea: "" });
 
-  const handleDistrictChange = (v: string) => {
-    onDistrictChange(v);
-    onAreaChange("");
-  };
+  const handleDistrictChange = (v: string) =>
+    onChange({ ...delivery, deliveryDistrict: v, deliveryArea: "" });
 
-  const isSpecified = deliveryTime === "指定時間" || deliveryTime.startsWith("指定");
-  const specifiedTime = isSpecified ? deliveryTime.replace("指定時間 ", "").replace("指定時間", "") : "";
+  const isSpecified =
+    delivery.deliveryTime === "指定時間" || delivery.deliveryTime.startsWith("指定");
+  const specifiedTime = isSpecified
+    ? delivery.deliveryTime.replace("指定時間 ", "").replace("指定時間", "")
+    : "";
 
-  const handleSlotSelect = (slotValue: string) => {
-    if (slotValue === "指定時間") {
-      onTimeChange("指定時間");
-    } else {
-      onTimeChange(slotValue);
-    }
-  };
+  const handleSlotSelect = (slotValue: string) => set("deliveryTime", slotValue);
 
-  const handleSpecifiedTime = (t: string) => {
-    onTimeChange(t ? `指定時間 ${t}` : "指定時間");
-  };
+  const handleSpecifiedTime = (t: string) =>
+    set("deliveryTime", t ? `指定時間 ${t}` : "指定時間");
 
-  const fullAddress = [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail]
+  const fullAddress = [
+    delivery.deliveryRegion,
+    delivery.deliveryDistrict,
+    delivery.deliveryArea,
+    delivery.deliveryDetail,
+  ]
     .filter(Boolean)
     .join(" ");
   const mapQuery = encodeURIComponent(fullAddress + " 香港");
 
   return (
-    <div className="rounded-xl bg-card p-4 space-y-3 border border-border">
-      <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
-        <StepBadge n={4} done={!!isComplete} />
-        <MapPin className="w-4 h-4" />
-        送貨資料
-      </h2>
+    <div className="space-y-3">
+      {/* Recipient header */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-foreground/60 uppercase tracking-wide">
+          收件人 {index + 1}
+          {total > 1 && (
+            <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">
+              ({String(index + 1).padStart(2, "0")})
+            </span>
+          )}
+        </p>
+        {total > 1 && (
+          <button
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-destructive transition-colors"
+            aria-label="移除收件人"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
       {/* Date + Time slot */}
       <div className="grid grid-cols-2 gap-3">
@@ -125,8 +146,8 @@ const DeliverySection = ({
           </Label>
           <Input
             type="date"
-            value={deliveryDate}
-            onChange={(e) => onDateChange(e.target.value)}
+            value={delivery.deliveryDate}
+            onChange={(e) => set("deliveryDate", e.target.value)}
             className="text-sm"
           />
         </div>
@@ -136,7 +157,9 @@ const DeliverySection = ({
           </Label>
           <div className="flex gap-1.5">
             {DELIVERY_SLOTS.map((slot) => {
-              const active = deliveryTime === slot.value || (slot.value === "指定時間" && isSpecified);
+              const active =
+                delivery.deliveryTime === slot.value ||
+                (slot.value === "指定時間" && isSpecified);
               return (
                 <button
                   key={slot.value}
@@ -148,7 +171,9 @@ const DeliverySection = ({
                   }`}
                 >
                   <div>{slot.label}</div>
-                  <div className={`text-[9px] ${active ? "opacity-80" : "text-muted-foreground"}`}>{slot.sublabel}</div>
+                  <div className={`text-[9px] ${active ? "opacity-80" : "text-muted-foreground"}`}>
+                    {slot.sublabel}
+                  </div>
                 </button>
               );
             })}
@@ -159,7 +184,6 @@ const DeliverySection = ({
               value={specifiedTime}
               onChange={(e) => handleSpecifiedTime(e.target.value)}
               className="text-sm mt-1"
-              placeholder="指定時間"
             />
           )}
         </div>
@@ -169,7 +193,7 @@ const DeliverySection = ({
       <div className="space-y-2">
         <Label className="text-xs">送貨地址</Label>
         <div className="grid grid-cols-3 gap-2">
-          <Select value={deliveryRegion} onValueChange={handleRegionChange}>
+          <Select value={delivery.deliveryRegion} onValueChange={handleRegionChange}>
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="地區" />
             </SelectTrigger>
@@ -179,8 +203,11 @@ const DeliverySection = ({
               ))}
             </SelectContent>
           </Select>
-
-          <Select value={deliveryDistrict} onValueChange={handleDistrictChange} disabled={!deliveryRegion}>
+          <Select
+            value={delivery.deliveryDistrict}
+            onValueChange={handleDistrictChange}
+            disabled={!delivery.deliveryRegion}
+          >
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="分區" />
             </SelectTrigger>
@@ -190,8 +217,11 @@ const DeliverySection = ({
               ))}
             </SelectContent>
           </Select>
-
-          <Select value={deliveryArea} onValueChange={onAreaChange} disabled={!deliveryDistrict}>
+          <Select
+            value={delivery.deliveryArea}
+            onValueChange={(v) => set("deliveryArea", v)}
+            disabled={!delivery.deliveryDistrict}
+          >
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="地點" />
             </SelectTrigger>
@@ -204,8 +234,8 @@ const DeliverySection = ({
         </div>
         <Input
           placeholder="詳細地址（大廈名 / 樓層 / 室）"
-          value={deliveryDetail}
-          onChange={(e) => onDetailChange(e.target.value)}
+          value={delivery.deliveryDetail}
+          onChange={(e) => set("deliveryDetail", e.target.value)}
           className="text-sm"
           maxLength={200}
         />
@@ -215,9 +245,9 @@ const DeliverySection = ({
         {fullAddress.length > 2 && (
           <div className="rounded-lg overflow-hidden border border-border mt-2">
             <iframe
-              title="Google Map"
+              title={`Google Map ${index + 1}`}
               width="100%"
-              height="200"
+              height="160"
               style={{ border: 0 }}
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
@@ -227,7 +257,7 @@ const DeliverySection = ({
         )}
       </div>
 
-      {/* Recipient */}
+      {/* Recipient + Driver */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
@@ -235,8 +265,8 @@ const DeliverySection = ({
           </Label>
           <Input
             placeholder="收貨人姓名"
-            value={recipientName}
-            onChange={(e) => onRecipientNameChange(e.target.value)}
+            value={delivery.recipientName}
+            onChange={(e) => set("recipientName", e.target.value)}
             className="text-sm"
             maxLength={100}
           />
@@ -245,21 +275,20 @@ const DeliverySection = ({
           <Label className="text-xs">收貨人電話</Label>
           <Input
             placeholder="收貨人電話"
-            value={recipientPhone}
-            onChange={(e) => onRecipientPhoneChange(e.target.value)}
+            value={delivery.recipientPhone}
+            onChange={(e) => set("recipientPhone", e.target.value)}
             className="text-sm font-mono"
             maxLength={20}
           />
         </div>
       </div>
 
-      {/* Driver dropdown + failed delivery */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
             <UserCheck className="w-3.5 h-3.5" /> 送貨司機
           </Label>
-          <Select value={deliveryPerson} onValueChange={onDeliveryPersonChange}>
+          <Select value={delivery.deliveryPerson} onValueChange={(v) => set("deliveryPerson", v)}>
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="選擇司機" />
             </SelectTrigger>
@@ -274,7 +303,10 @@ const DeliverySection = ({
           <Label className="text-xs flex items-center gap-1">
             <AlertCircle className="w-3.5 h-3.5" /> 無法聯繫收件人
           </Label>
-          <Select value={failedDeliveryAction} onValueChange={onFailedDeliveryActionChange}>
+          <Select
+            value={delivery.failedDeliveryAction}
+            onValueChange={(v) => set("failedDeliveryAction", v)}
+          >
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="選擇處理方式" />
             </SelectTrigger>
@@ -290,6 +322,58 @@ const DeliverySection = ({
           </Select>
         </div>
       </div>
+    </div>
+  );
+}
+
+const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: DeliverySectionProps) => {
+  const update = (index: number, updated: Delivery) => {
+    const next = deliveries.map((d, i) => (i === index ? updated : d));
+    onDeliveriesChange(next);
+  };
+
+  const addRecipient = () => onDeliveriesChange([...deliveries, newDelivery()]);
+
+  const removeRecipient = (index: number) =>
+    onDeliveriesChange(deliveries.filter((_, i) => i !== index));
+
+  return (
+    <div className="rounded-xl bg-card p-4 space-y-4 border border-border">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
+          <StepBadge n={4} done={!!isComplete} />
+          <MapPin className="w-4 h-4" />
+          送貨資料
+          {deliveries.length > 1 && (
+            <span className="ml-1 text-[11px] font-normal normal-case text-muted-foreground">
+              {deliveries.length} 個收件人
+            </span>
+          )}
+        </h2>
+      </div>
+
+      {deliveries.map((d, i) => (
+        <div key={d.id}>
+          {i > 0 && <div className="border-t border-dashed border-border pt-4" />}
+          <DeliveryCard
+            delivery={d}
+            index={i}
+            total={deliveries.length}
+            onChange={(updated) => update(i, updated)}
+            onRemove={() => removeRecipient(i)}
+          />
+        </div>
+      ))}
+
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full gap-2 text-xs border-dashed"
+        onClick={addRecipient}
+      >
+        <Plus className="w-3.5 h-3.5" />
+        新增收件人（分單送貨）
+      </Button>
     </div>
   );
 };

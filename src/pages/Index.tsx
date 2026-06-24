@@ -13,9 +13,10 @@ import PaymentSection from "@/components/pos/PaymentSection";
 import AddOnsSection from "@/components/pos/AddOnsSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
-import type { Order, OrderItem, PaymentStatus } from "@/types/order";
+import type { Order, OrderItem, PaymentStatus, Delivery } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
+import { newDelivery } from "@/components/pos/DeliverySection";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
 const STORAGE_KEY = "florist-pos-orders";
@@ -59,16 +60,7 @@ const Index = () => {
   const [internalNotes, setInternalNotes] = useState("");
 
   // Delivery
-  const [deliveryDate, setDeliveryDate] = useState("");
-  const [deliveryTime, setDeliveryTime] = useState("");
-  const [deliveryRegion, setDeliveryRegion] = useState("");
-  const [deliveryDistrict, setDeliveryDistrict] = useState("");
-  const [deliveryArea, setDeliveryArea] = useState("");
-  const [deliveryDetail, setDeliveryDetail] = useState("");
-  const [recipientName, setRecipientName] = useState("");
-  const [recipientPhone, setRecipientPhone] = useState("");
-  const [deliveryPerson, setDeliveryPerson] = useState("");
-  const [failedDeliveryAction, setFailedDeliveryAction] = useState("none");
+  const [deliveries, setDeliveries] = useState<Delivery[]>([newDelivery()]);
 
   // Gift card
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
@@ -110,10 +102,10 @@ const Index = () => {
     !!salesId,
     !!phone.trim() && !!customerName.trim(),
     items.length > 0,
-    !!deliveryDate && !!deliveryTime && !!recipientName && deliveryTime !== "指定時間",
+    deliveries.every(d => d.deliveryDate && d.deliveryTime && d.recipientName && d.deliveryTime !== "指定時間"),
     !giftCardEnabled || !!giftCardMessage.trim(),
     paymentStatus !== "unpaid" || finalPrice === 0,
-  ].filter(Boolean).length, [salesId, phone, customerName, items, deliveryDate, deliveryTime, recipientName, giftCardEnabled, giftCardMessage, paymentStatus, subtotal, priceOverridden, manualPrice]);
+  ].filter(Boolean).length, [salesId, phone, customerName, items, deliveries, giftCardEnabled, giftCardMessage, paymentStatus, finalPrice]);
 
   const blockingReason = !salesId ? "請先選擇員工" :
     !phone.trim() ? "請輸入客戶電話" :
@@ -138,16 +130,7 @@ const Index = () => {
     setSenderNotes("");
     setDeliveryNotes("");
     setInternalNotes("");
-    setDeliveryDate("");
-    setDeliveryTime("");
-    setDeliveryRegion("");
-    setDeliveryDistrict("");
-    setDeliveryArea("");
-    setDeliveryDetail("");
-    setRecipientName("");
-    setRecipientPhone("");
-    setDeliveryPerson("");
-    setFailedDeliveryAction("none");
+    setDeliveries([newDelivery()]);
     setGiftCardEnabled(false);
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
@@ -207,12 +190,13 @@ const Index = () => {
       depositAmount: paymentStatus === "deposit" ? depositAmount : 0,
       followUpDate: followUpDate ? followUpDate.toISOString() : "",
       reminderOption,
-      deliveryDate,
-      deliveryTime,
-      deliveryAddress: [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail.trim()].filter(Boolean).join(" "),
-      recipientName: recipientName.trim(),
-      recipientPhone: recipientPhone.trim(),
-      deliveryPerson: deliveryPerson.trim(),
+      deliveries,
+      deliveryDate: deliveries[0]?.deliveryDate ?? "",
+      deliveryTime: deliveries[0]?.deliveryTime ?? "",
+      deliveryAddress: [deliveries[0]?.deliveryRegion, deliveries[0]?.deliveryDistrict, deliveries[0]?.deliveryArea, deliveries[0]?.deliveryDetail?.trim()].filter(Boolean).join(" "),
+      recipientName: deliveries[0]?.recipientName?.trim() ?? "",
+      recipientPhone: deliveries[0]?.recipientPhone?.trim() ?? "",
+      deliveryPerson: deliveries[0]?.deliveryPerson ?? "",
       giftCardEnabled,
       giftCardMessage: giftCardEnabled ? giftCardMessage.trim() : "",
       notes: senderNotes.trim(),
@@ -307,9 +291,12 @@ const Index = () => {
           <CustomerHistoryPanel
             customer={selectedCustomer}
             onClose={() => setSelectedCustomer(null)}
-            onUseAddress={(address, recipientName) => {
-              setDeliveryDetail(address);
-              if (recipientName) setRecipientName(recipientName);
+            onUseAddress={(address, recipientNameVal) => {
+              setDeliveries(prev => {
+                const next = [...prev];
+                next[0] = { ...next[0], deliveryDetail: address, ...(recipientNameVal ? { recipientName: recipientNameVal } : {}) };
+                return next;
+              });
               toast.success("已套用過往送貨地址");
             }}
           />
@@ -386,27 +373,9 @@ const Index = () => {
           />
 
           <DeliverySection
-            deliveryDate={deliveryDate}
-            deliveryTime={deliveryTime}
-            deliveryRegion={deliveryRegion}
-            deliveryDistrict={deliveryDistrict}
-            deliveryArea={deliveryArea}
-            deliveryDetail={deliveryDetail}
-            recipientName={recipientName}
-            recipientPhone={recipientPhone}
-            deliveryPerson={deliveryPerson}
-            onDateChange={setDeliveryDate}
-            onTimeChange={setDeliveryTime}
-            onRegionChange={setDeliveryRegion}
-            onDistrictChange={setDeliveryDistrict}
-            onAreaChange={setDeliveryArea}
-            onDetailChange={setDeliveryDetail}
-            onRecipientNameChange={setRecipientName}
-            onRecipientPhoneChange={setRecipientPhone}
-            onDeliveryPersonChange={setDeliveryPerson}
-            failedDeliveryAction={failedDeliveryAction}
-            onFailedDeliveryActionChange={setFailedDeliveryAction}
-            isComplete={!!deliveryDate && !!deliveryTime && !!recipientName && deliveryTime !== "指定時間"}
+            deliveries={deliveries}
+            onDeliveriesChange={setDeliveries}
+            isComplete={deliveries.every(d => d.deliveryDate && d.deliveryTime && d.recipientName && d.deliveryTime !== "指定時間")}
           />
 
           <GiftCardSection

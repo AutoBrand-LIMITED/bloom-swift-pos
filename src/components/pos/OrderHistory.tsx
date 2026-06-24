@@ -1,17 +1,19 @@
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ClipboardList, X, ShieldAlert } from "lucide-react";
+import { ClipboardList, X, ShieldAlert, Truck } from "lucide-react";
 import PrintButtons from "@/components/pos/PrintButtons";
 import type { Order, PaymentStatus } from "@/types/order";
 
 function isDispatchBlocked(order: Order): boolean {
   if (order.paymentStatus !== "unpaid") return false;
-  if (!order.deliveryDate) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const delivery = new Date(order.deliveryDate);
-  return delivery <= today;
+  // Check all deliveries (multi-recipient); fall back to legacy flat field
+  const dates = (order.deliveries?.map(d => d.deliveryDate).filter(Boolean) ?? []);
+  if (dates.length === 0 && order.deliveryDate) dates.push(order.deliveryDate);
+  return dates.some(date => new Date(date) <= today);
 }
 
 interface OrderHistoryProps {
@@ -27,6 +29,30 @@ const statusBadge: Record<PaymentStatus, { label: string; variant: "destructive"
 };
 
 const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
+  // All hooks must run before any conditional return
+  const driverGroups = useMemo(() => {
+    const sorted = [...orders].sort((a, b) => {
+      const da = a.deliveryDate || "";
+      const db = b.deliveryDate || "";
+      if (da !== db) return da.localeCompare(db);
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    const groups: Record<string, Order[]> = {};
+    for (const order of sorted) {
+      const driver = order.deliveryPerson?.trim() || "未分配";
+      if (!groups[driver]) groups[driver] = [];
+      groups[driver].push(order);
+    }
+
+    // Sort groups: named drivers first (alphabetical), unassigned last
+    return Object.entries(groups).sort(([a], [b]) => {
+      if (a === "未分配") return 1;
+      if (b === "未分配") return -1;
+      return a.localeCompare(b);
+    });
+  }, [orders]);
+
   if (!open) return null;
 
   return (
@@ -61,51 +87,87 @@ const OrderHistory = ({ orders, open, onClose }: OrderHistoryProps) => {
           {orders.length === 0 ? (
             <p className="text-center text-muted-foreground p-8">暫無訂單</p>
           ) : (
-            <div className="p-4 space-y-3">
-              {[...orders].reverse().map((order) => {
-                const badge = statusBadge[order.paymentStatus];
-                const blocked = isDispatchBlocked(order);
-                return (
-                  <div
-                    key={order.id}
-                    className={`rounded-lg border p-3 space-y-2 ${
-                      blocked
-                        ? "border-destructive bg-destructive/10"
-                        : order.paymentStatus === "unpaid"
-                        ? "border-destructive/40 bg-destructive/5"
-                        : "border-border"
-                    }`}
-                  >
-                    {blocked && (
-                      <div className="flex items-center gap-1.5 text-destructive text-xs font-semibold">
-                        <ShieldAlert className="w-3.5 h-3.5" />
-                        派送前必須收款
-                      </div>
-                    )}
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium text-sm">{order.customerName || order.phone}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{order.phone}</p>
-                      </div>
-                      <Badge variant={badge.variant}>{badge.label}</Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      {order.items.map((item) => (
-                        <p key={item.id}>
-                          {item.name} × {item.quantity} = ${(item.price * item.quantity).toLocaleString()}
-                        </p>
-                      ))}
-                    </div>
-                    <div className="flex justify-between items-center pt-1 border-t border-border">
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(order.createdAt).toLocaleString("zh-HK")}
-                      </span>
-                      <span className="font-mono font-bold text-sm">${order.finalPrice.toLocaleString()}</span>
-                    </div>
-                    <PrintButtons order={order} />
+            <div className="p-4 space-y-5">
+              {driverGroups.map(([driver, driverOrders]) => (
+                <div key={driver}>
+                  {/* Driver group header */}
+                  <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-dashed border-border">
+                    <Truck className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wide">
+                      {driver}
+                    </span>
+                    <span className="ml-auto text-[10px] text-muted-foreground font-mono">
+                      {driverOrders.length} 單
+                    </span>
                   </div>
-                );
-              })}
+
+                  <div className="space-y-2.5">
+                    {driverOrders.map((order) => {
+                      const badge = statusBadge[order.paymentStatus];
+                      const blocked = isDispatchBlocked(order);
+                      const extraDeliveries = (order.deliveries?.length ?? 0) > 1 ? order.deliveries!.slice(1) : [];
+                      return (
+                        <div
+                          key={order.id}
+                          className={`rounded-lg border p-3 space-y-2 ${
+                            blocked
+                              ? "border-destructive bg-destructive/10"
+                              : order.paymentStatus === "unpaid"
+                              ? "border-destructive/40 bg-destructive/5"
+                              : "border-border"
+                          }`}
+                        >
+                          {blocked && (
+                            <div className="flex items-center gap-1.5 text-destructive text-xs font-semibold">
+                              <ShieldAlert className="w-3.5 h-3.5" />
+                              派送前必須收款
+                            </div>
+                          )}
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium text-sm">{order.customerName || order.phone}</p>
+                              <p className="text-xs text-muted-foreground font-mono">{order.phone}</p>
+                            </div>
+                            <Badge variant={badge.variant}>{badge.label}</Badge>
+                          </div>
+
+                          {/* Delivery info */}
+                          {order.deliveryDate && (
+                            <p className="text-xs text-muted-foreground">
+                              📅 {order.deliveryDate}
+                              {order.deliveryTime && ` · ${order.deliveryTime}`}
+                              {order.recipientName && ` → ${order.recipientName}`}
+                            </p>
+                          )}
+                          {extraDeliveries.map((d, i) => (
+                            <p key={d.id} className="text-xs text-muted-foreground">
+                              📅 [{i + 2}] {d.deliveryDate}
+                              {d.deliveryTime && ` · ${d.deliveryTime}`}
+                              {d.recipientName && ` → ${d.recipientName}`}
+                              {d.deliveryPerson && ` (${d.deliveryPerson})`}
+                            </p>
+                          ))}
+
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            {order.items.map((item) => (
+                              <p key={item.id}>
+                                {item.name} × {item.quantity} = ${(item.price * item.quantity).toLocaleString()}
+                              </p>
+                            ))}
+                          </div>
+                          <div className="flex justify-between items-center pt-1 border-t border-border">
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(order.createdAt).toLocaleString("zh-HK")}
+                            </span>
+                            <span className="font-mono font-bold text-sm">${order.finalPrice.toLocaleString()}</span>
+                          </div>
+                          <PrintButtons order={order} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </ScrollArea>

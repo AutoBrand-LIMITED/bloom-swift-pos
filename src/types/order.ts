@@ -5,6 +5,20 @@ export interface OrderItem {
   quantity: number;
 }
 
+export interface Delivery {
+  id: string;
+  deliveryDate: string;
+  deliveryTime: string;
+  deliveryRegion: string;
+  deliveryDistrict: string;
+  deliveryArea: string;
+  deliveryDetail: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryPerson: string;
+  failedDeliveryAction: string;
+}
+
 export type PaymentStatus = "unpaid" | "paid" | "deposit";
 
 export interface Order {
@@ -23,6 +37,8 @@ export interface Order {
   depositAmount: number;
   followUpDate: string;
   reminderOption: string;
+  deliveries?: Delivery[];
+  // legacy flat fields kept for backward compat (derived from deliveries[0])
   deliveryDate: string;
   deliveryTime: string;
   deliveryAddress: string;
