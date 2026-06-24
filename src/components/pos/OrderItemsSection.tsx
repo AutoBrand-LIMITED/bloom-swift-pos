@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Trash2, Package, Wallet, Sparkles, Bookmark } from "lucide-react";
+import { Plus, Trash2, Package, Wallet, Wand2, Bookmark } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
@@ -136,7 +136,7 @@ const OrderItemsSection = ({
           className="gap-1.5 text-xs"
           onClick={() => setCustomOrderOpen(true)}
         >
-          <Sparkles className="w-3.5 h-3.5" /> {t("btn_custom_order")}
+          <Wand2 className="w-3.5 h-3.5" /> {t("btn_custom_order")}
         </Button>
       </div>
 
