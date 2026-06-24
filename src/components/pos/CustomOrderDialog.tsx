@@ -333,14 +333,13 @@ function FlowerPicker({ flowers, selected, onToggle, onQtyChange, highlighted }:
   );
 }
 
-function Section({ icon: Icon, title, children, flush }: {
+function Section({ icon: Icon, title, children }: {
   icon: React.ElementType;
   title: string;
   children: React.ReactNode;
-  flush?: boolean;
 }) {
   return (
-    <section className={`space-y-3 pt-5 first:pt-0 ${flush ? "" : "border-t border-border first:border-0"}`}>
+    <section className="space-y-3 pt-5 first:pt-0">
       <h3 className="flex items-center gap-2.5 text-xs font-semibold tracking-wide uppercase text-foreground/70">
         <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 text-primary shrink-0">
           <Icon className="w-4 h-4" />
@@ -704,7 +703,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 </Section>
 
                 {/* Special notes */}
-                <Section icon={FileText} title={t("cd_special_notes")} flush>
+                <Section icon={FileText} title={t("cd_special_notes")}>
                   <div className="flex gap-2">
                     <Textarea placeholder={t("cd_placeholder_special_notes")} value={state.specialNotes}
                       onChange={(e) => update("specialNotes", e.target.value)} className="text-sm min-h-[60px]" />
