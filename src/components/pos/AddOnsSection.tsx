@@ -2,23 +2,25 @@ import { Gift, Check, Truck, PawPrint, Container, Flower2, Sprout, ShoppingBaske
 import type { LucideIcon } from "lucide-react";
 import type { OrderItem } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface AddOnsSectionProps {
   items: OrderItem[];
   onItemsChange: (items: OrderItem[]) => void;
 }
 
-const ADDONS: { name: string; price: number; icon: LucideIcon; color: string }[] = [
-  { name: "樓梯送貨（每層）", price: 50, icon: Truck, color: "text-sky-500" },
-  { name: "Soft Teddy", price: 180, icon: PawPrint, color: "text-rose-400" },
-  { name: "玻璃花樽 (6\"x16\"H或以下)", price: 250, icon: Container, color: "text-cyan-500" },
-  { name: "精美陶瓷花盆", price: 180, icon: Flower2, color: "text-pink-500" },
-  { name: "日式花盆", price: 220, icon: Sprout, color: "text-emerald-500" },
-  { name: "竹編花籃", price: 150, icon: ShoppingBasket, color: "text-amber-600" },
-  { name: "保鮮花處理", price: 80, icon: Droplets, color: "text-blue-500" },
-  { name: "花束包裝升級", price: 60, icon: Package, color: "text-orange-500" },
-  { name: "手寫賀卡", price: 30, icon: PenLine, color: "text-violet-500" },
-  { name: "LED 燈串裝飾", price: 50, icon: Lightbulb, color: "text-yellow-500" },
+// `name` is canonical (stored in cart); `key` drives bilingual display.
+const ADDONS: { name: string; key: TranslationKey; price: number; icon: LucideIcon; color: string }[] = [
+  { name: "樓梯送貨（每層）", key: "addon_stairs", price: 50, icon: Truck, color: "text-sky-500" },
+  { name: "毛公仔", key: "addon_teddy", price: 180, icon: PawPrint, color: "text-rose-400" },
+  { name: "玻璃花樽 (6\"x16\"H或以下)", key: "addon_glass_vase", price: 250, icon: Container, color: "text-cyan-500" },
+  { name: "精美陶瓷花盆", key: "addon_ceramic_pot", price: 180, icon: Flower2, color: "text-pink-500" },
+  { name: "日式花盆", key: "addon_jp_pot", price: 220, icon: Sprout, color: "text-emerald-500" },
+  { name: "竹編花籃", key: "addon_bamboo_basket", price: 150, icon: ShoppingBasket, color: "text-amber-600" },
+  { name: "保鮮花處理", key: "addon_preservation", price: 80, icon: Droplets, color: "text-blue-500" },
+  { name: "花束包裝升級", key: "addon_wrap_upgrade", price: 60, icon: Package, color: "text-orange-500" },
+  { name: "手寫賀卡", key: "addon_card", price: 30, icon: PenLine, color: "text-violet-500" },
+  { name: "LED 燈串裝飾", key: "addon_led", price: 50, icon: Lightbulb, color: "text-yellow-500" },
 ];
 
 const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
@@ -51,7 +53,7 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
               key={addon.name}
               onClick={() => toggleAddon(addon)}
               aria-pressed={isAdded}
-              aria-label={`${addon.name} $${addon.price}${isAdded ? " — 已加購" : ""}`}
+              aria-label={`${t(addon.key)} $${addon.price}${isAdded ? ` — ${t("addon_added_suffix")}` : ""}`}
               className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
                 isAdded
                   ? "border-primary bg-primary/5 shadow-sm"
@@ -60,7 +62,7 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
             >
               <Icon className={`w-4 h-4 shrink-0 ${addon.color}`} />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium leading-tight">{addon.name}</p>
+                <p className="text-xs font-medium leading-tight">{t(addon.key)}</p>
                 <p className="text-xs font-mono text-muted-foreground tabular-nums">${addon.price}</p>
               </div>
               <div className={`w-4 h-4 rounded-full shrink-0 flex items-center justify-center transition-all ${

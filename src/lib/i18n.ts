@@ -406,6 +406,21 @@ export const zh = {
   // Birthday display
   birthday_today: "今日！",
   birthday_days_until_suffix: "日後",
+
+  // Add-ons / 404
+  addon_added_suffix: "已加購",
+  notfound_message: "搵唔到呢一頁",
+  notfound_home: "返回主頁",
+  addon_stairs: "樓梯送貨（每層）",
+  addon_teddy: "毛公仔",
+  addon_glass_vase: "玻璃花樽 (6\"x16\"H或以下)",
+  addon_ceramic_pot: "精美陶瓷花盆",
+  addon_jp_pot: "日式花盆",
+  addon_bamboo_basket: "竹編花籃",
+  addon_preservation: "保鮮花處理",
+  addon_wrap_upgrade: "花束包裝升級",
+  addon_card: "手寫賀卡",
+  addon_led: "LED 燈串裝飾",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
@@ -816,6 +831,21 @@ export const en: Record<TranslationKey, string> = {
   // Birthday display
   birthday_today: "Today!",
   birthday_days_until_suffix: " days",
+
+  // Add-ons / 404
+  addon_added_suffix: "Added",
+  notfound_message: "Oops! Page not found",
+  notfound_home: "Return to Home",
+  addon_stairs: "Stair delivery (per floor)",
+  addon_teddy: "Soft Teddy",
+  addon_glass_vase: "Glass vase (≤6\"x16\"H)",
+  addon_ceramic_pot: "Ceramic pot",
+  addon_jp_pot: "Japanese pot",
+  addon_bamboo_basket: "Bamboo basket",
+  addon_preservation: "Flower preservation",
+  addon_wrap_upgrade: "Wrap upgrade",
+  addon_card: "Handwritten card",
+  addon_led: "LED string lights",
 };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { zh, en };
