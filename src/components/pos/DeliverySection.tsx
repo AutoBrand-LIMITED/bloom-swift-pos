@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle } from "lucide-react";
+import StepBadge from "@/components/pos/StepBadge";
 import { DRIVERS } from "@/types/order";
 
 const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
@@ -109,11 +110,9 @@ const DeliverySection = ({
   const mapQuery = encodeURIComponent(fullAddress + " 香港");
 
   return (
-    <div className={`rounded-xl bg-card p-4 space-y-3 transition-colors ${
-      isComplete ? "border-t border-r border-b border-l-4 border-t-primary/30 border-r-primary/30 border-b-primary/30 border-l-primary" : "border border-border"
-    }`}>
+    <div className="rounded-xl bg-card p-4 space-y-3 border border-border">
       <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
-        <span className="text-primary font-bold text-base">④</span>
+        <StepBadge n={4} done={!!isComplete} />
         <MapPin className="w-4 h-4" />
         送貨資料
       </h2>

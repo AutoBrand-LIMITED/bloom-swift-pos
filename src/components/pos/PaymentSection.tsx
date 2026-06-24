@@ -5,6 +5,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CreditCard, AlertTriangle, CalendarIcon, Bell, Monitor, MessageCircle, Apple, Smartphone, ExternalLink } from "lucide-react";
+import StepBadge from "@/components/pos/StepBadge";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { PaymentStatus } from "@/types/order";
@@ -62,11 +63,9 @@ const PaymentSection = ({
   };
 
   return (
-  <div className={`rounded-xl bg-card p-4 space-y-4 transition-colors ${
-    isComplete ? "border-t border-r border-b border-l-4 border-t-primary/30 border-r-primary/30 border-b-primary/30 border-l-primary" : "border border-border"
-  }`}>
+  <div className="rounded-xl bg-card p-4 space-y-4 border border-border">
     <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
-      <span className="text-primary font-bold text-base">⑥</span>
+      <StepBadge n={6} done={!!isComplete} />
       <CreditCard className="w-4 h-4" />
       付款
     </h2>

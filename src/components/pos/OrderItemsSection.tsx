@@ -1,4 +1,5 @@
 import { useState } from "react";
+import StepBadge from "@/components/pos/StepBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -79,12 +80,10 @@ const OrderItemsSection = ({
   };
 
   return (
-    <div className={`rounded-xl bg-card p-4 space-y-4 transition-colors ${
-      isComplete ? "border-t border-r border-b border-l-4 border-t-primary/30 border-r-primary/30 border-b-primary/30 border-l-primary" : "border border-border"
-    }`}>
+    <div className="rounded-xl bg-card p-4 space-y-4 border border-border">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
-          <span className="text-primary font-bold text-base">③</span>
+          <StepBadge n={3} done={!!isComplete} />
           <Package className="w-4 h-4" />
           訂單內容
         </h2>
