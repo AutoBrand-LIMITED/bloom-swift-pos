@@ -97,9 +97,9 @@ const Index = () => {
     !!phone.trim() && !!customerName.trim(),
     items.length > 0,
     deliveries.every(d => d.deliveryDate && d.deliveryTime && d.recipientName && d.deliveryTime !== "指定時間"),
-    !giftCardEnabled || !!giftCardMessage.trim(),
-    paymentStatus !== "unpaid" || finalPrice === 0,
-  ].filter(Boolean).length, [salesId, phone, customerName, items, deliveries, giftCardEnabled, giftCardMessage, paymentStatus, finalPrice]);
+    giftCardEnabled && !!giftCardMessage.trim(),
+    items.length > 0 && paymentStatus !== "unpaid",
+  ].filter(Boolean).length, [salesId, phone, customerName, items, deliveries, giftCardEnabled, giftCardMessage, paymentStatus]);
 
   const blockingReason = !salesId ? t("blocking_no_staff") :
     !phone.trim() ? t("blocking_no_phone") :
