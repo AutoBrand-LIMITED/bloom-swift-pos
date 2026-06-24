@@ -161,7 +161,7 @@ const OrderItemsSection = ({
               value={budget || ""}
               onChange={(e) => onBudgetChange(parseFloat(e.target.value) || 0)}
               placeholder={t("placeholder_budget")}
-              className="w-28 h-8 text-sm font-mono text-right bg-card"
+              className="w-28 h-8 text-sm font-mono text-center bg-card"
               min={0}
             />
           </div>

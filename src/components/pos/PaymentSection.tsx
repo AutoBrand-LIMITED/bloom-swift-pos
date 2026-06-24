@@ -107,7 +107,7 @@ const PaymentSection = ({
 
     {/* Payment status */}
     <div className="space-y-2">
-      <Label className="text-xs">{t("label_payment_status")}</Label>
+      <Label className="text-xs font-medium">{t("label_payment_status")}</Label>
       <div className="grid grid-cols-3 gap-2">
         {(["unpaid", "paid", "deposit"] as PaymentStatus[]).map((status) => {
           const label = t(status === "unpaid" ? "status_unpaid" : status === "paid" ? "status_paid" : "status_deposit");
@@ -132,7 +132,7 @@ const PaymentSection = ({
     {/* Payment method - show for paid and deposit */}
     {(paymentStatus === "paid" || paymentStatus === "deposit") && (
       <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-        <Label className="text-xs">{t("label_payment_method")}</Label>
+        <Label className="text-xs font-medium">{t("label_payment_method")}</Label>
         <div className="grid grid-cols-3 gap-1.5">
           {PAYMENT_METHODS.map((m) => (
             <button
@@ -168,7 +168,7 @@ const PaymentSection = ({
     {/* Deposit amount */}
     {paymentStatus === "deposit" && (
       <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
-        <Label className="text-xs">{t("label_deposit_amount")}</Label>
+        <Label className="text-xs font-medium">{t("label_deposit_amount")}</Label>
         <Input
           type="number"
           value={depositAmount || ""}
@@ -193,8 +193,8 @@ const PaymentSection = ({
           {t("label_followup")}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">{t("label_followup_date")}</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">{t("label_followup_date")}</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -220,8 +220,8 @@ const PaymentSection = ({
               </PopoverContent>
             </Popover>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">{t("label_reminder")}</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">{t("label_reminder")}</Label>
             <Select value={reminderOption} onValueChange={onReminderOptionChange}>
               <SelectTrigger className="text-sm">
                 <SelectValue placeholder={t("placeholder_select_reminder")} />

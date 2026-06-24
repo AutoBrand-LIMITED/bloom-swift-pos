@@ -233,7 +233,7 @@ const CustomerSection = ({
         <div className="space-y-1.5 relative" ref={dropdownRef}>
           <Label className="text-xs font-medium">{t("label_customer_name")}</Label>
           <div
-            className="flex items-center border border-input rounded-md bg-background cursor-pointer hover:border-ring transition-colors"
+            className="flex items-center h-10 border border-input rounded-md bg-background cursor-pointer hover:border-ring transition-colors"
             onClick={() => setDropdownOpen(!dropdownOpen)}
           >
             <Input

@@ -20,8 +20,8 @@ const SalesIdSection = ({ salesId, onSalesIdChange, isComplete }: SalesIdSection
         <UserCheck className="w-4 h-4" />
         {t("section_staff")}
       </h2>
-      <div className="space-y-1">
-        <Label className="text-xs">{t("label_responsible_staff")}</Label>
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">{t("label_responsible_staff")}</Label>
         <Select value={salesId} onValueChange={onSalesIdChange}>
           <SelectTrigger className="text-sm">
             <SelectValue placeholder={t("placeholder_select_staff")} />

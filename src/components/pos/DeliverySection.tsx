@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle, Plus, X } from "lucide-react";
+import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart, Cake } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
 import type { Delivery } from "@/types/order";
 import { DRIVERS } from "@/types/order";
@@ -136,8 +136,8 @@ function DeliveryCard({
 
       {/* Date + Time slot */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" /> {t("label_delivery_date")}
           </Label>
           <Input
@@ -147,8 +147,8 @@ function DeliveryCard({
             className="text-sm"
           />
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" /> {t("label_delivery_time")}
           </Label>
           <div className="flex gap-1.5">
@@ -191,7 +191,7 @@ function DeliveryCard({
 
       {/* Address */}
       <div className="space-y-2">
-        <Label className="text-xs">{t("label_delivery_address")}</Label>
+        <Label className="text-xs font-medium flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {t("label_delivery_address")}</Label>
         <div className="grid grid-cols-3 gap-2">
           <Select value={delivery.deliveryRegion} onValueChange={handleRegionChange}>
             <SelectTrigger className="text-sm">
@@ -259,8 +259,8 @@ function DeliveryCard({
 
       {/* Recipient + Driver */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
-        <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1">
             <User className="w-3.5 h-3.5" /> {t("label_recipient_name")}
           </Label>
           <Input
@@ -271,8 +271,8 @@ function DeliveryCard({
             maxLength={100}
           />
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">{t("label_recipient_phone")}</Label>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> {t("label_recipient_phone")}</Label>
           <Input
             placeholder={t("placeholder_recipient_phone")}
             value={delivery.recipientPhone}
@@ -285,8 +285,8 @@ function DeliveryCard({
 
       {/* Relationship + Birthday */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">{t("label_relationship")}</Label>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1"><Heart className="w-3.5 h-3.5" /> {t("label_relationship")}</Label>
           <Select value={delivery.recipientRelationship || ""} onValueChange={(v) => set("recipientRelationship", v)}>
             <SelectTrigger className="text-sm">
               <SelectValue placeholder={t("placeholder_relationship")} />
@@ -298,8 +298,8 @@ function DeliveryCard({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">{t("label_birthday")}</Label>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1"><Cake className="w-3.5 h-3.5" /> {t("label_birthday")}</Label>
           <Input
             placeholder={t("placeholder_birthday")}
             value={delivery.recipientBirthday || ""}
@@ -311,8 +311,8 @@ function DeliveryCard({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1">
             <UserCheck className="w-3.5 h-3.5" /> {t("label_driver")}
           </Label>
           <Select value={delivery.deliveryPerson} onValueChange={(v) => set("deliveryPerson", v)}>
@@ -326,8 +326,8 @@ function DeliveryCard({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1">
             <AlertCircle className="w-3.5 h-3.5" /> {t("label_failed_delivery")}
           </Label>
           <Select

@@ -53,9 +53,9 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
           </div>
 
           {/* Markdown editor */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">{t("label_card_content")}</Label>
+              <Label className="text-xs font-medium">{t("label_card_content")}</Label>
               <div className="flex items-center gap-2">
                 <VoiceInputButton
                   onResult={(text) => onMessageChange(message ? `${message} ${text}` : text)}
