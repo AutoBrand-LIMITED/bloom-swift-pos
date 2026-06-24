@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import {
-  Sparkles, Plus, Minus, X, MousePointerClick, FileText, Star, Check,
+  Sparkles, Plus, Minus, X, MousePointerClick, Star, Check,
 } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -698,14 +698,13 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 </Section>
 
                 {/* Special notes */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> {t("cd_special_notes")}</Label>
+                <Section title={t("cd_special_notes")}>
                   <div className="flex gap-2">
                     <Textarea placeholder={t("cd_placeholder_special_notes")} value={state.specialNotes}
                       onChange={(e) => update("specialNotes", e.target.value)} className="text-sm min-h-[60px]" />
                     <VoiceInputButton onResult={(text) => update("specialNotes", state.specialNotes ? `${state.specialNotes} ${text}` : text)} className="self-start" />
                   </div>
-                </div>
+                </Section>
               </>
             )}
 
