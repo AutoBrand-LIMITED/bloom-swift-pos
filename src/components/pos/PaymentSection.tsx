@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, AlertTriangle, CalendarIcon, Monitor, MessageCircle, Apple, Smartphone, ExternalLink } from "lucide-react";
+import { CreditCard, AlertTriangle, CalendarIcon, Store, MessageCircle, Apple, Wallet, Banknote, ExternalLink } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -51,12 +51,12 @@ const PaymentSection = ({
   const { t } = useLanguage();
 
   const PAYMENT_METHODS = [
-    { value: "terminal", label: t("method_terminal"), icon: <Monitor className="w-3.5 h-3.5" /> },
+    { value: "terminal", label: t("method_terminal"), icon: <Store className="w-3.5 h-3.5" /> },
     { value: "whatsapp_link", label: t("method_whatsapp"), icon: <MessageCircle className="w-3.5 h-3.5" /> },
     { value: "apple_pay", label: t("method_apple_pay"), icon: <Apple className="w-3.5 h-3.5" /> },
-    { value: "google_pay", label: t("method_google_pay"), icon: <Smartphone className="w-3.5 h-3.5" /> },
+    { value: "google_pay", label: t("method_google_pay"), icon: <Wallet className="w-3.5 h-3.5" /> },
     { value: "stripe_card", label: t("method_stripe"), icon: <CreditCard className="w-3.5 h-3.5" /> },
-    { value: "cash", label: t("method_cash"), icon: null },
+    { value: "cash", label: t("method_cash"), icon: <Banknote className="w-3.5 h-3.5" /> },
   ];
 
   const openPaymentScreen = () => {
