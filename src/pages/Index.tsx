@@ -95,12 +95,13 @@ const Index = () => {
 
   const unpaidCount = useMemo(() => orders.filter((o) => o.paymentStatus === "unpaid").length, [orders]);
 
+  const totalSteps = giftCardEnabled ? 6 : 5;
   const stepsDone = useMemo(() => [
     !!salesId,
     !!phone.trim() && !!customerName.trim(),
     items.length > 0,
     deliveries.every(d => d.deliveryDate && d.deliveryTime && d.recipientName && d.deliveryTime !== "指定時間"),
-    !giftCardEnabled || !!giftCardMessage.trim(),
+    ...(giftCardEnabled ? [!!giftCardMessage.trim()] : []),
     items.length > 0 && paymentStatus !== "unpaid",
   ].filter(Boolean).length, [salesId, phone, customerName, items, deliveries, giftCardEnabled, giftCardMessage, paymentStatus]);
 
@@ -439,15 +440,15 @@ const Index = () => {
             </div>
             <div className="flex flex-col gap-1.5 min-w-[100px]">
               <div className="flex justify-between items-center">
-                <span className="text-[11px] text-muted-foreground font-medium">{stepsDone}/6</span>
-                {stepsDone === 6 && (
+                <span className="text-[11px] text-muted-foreground font-medium">{stepsDone}/{totalSteps}</span>
+                {stepsDone === totalSteps && (
                   <span className="text-[11px] text-primary font-semibold">✓ Ready</span>
                 )}
               </div>
               <div className="h-1.5 bg-muted rounded-full overflow-hidden w-28">
                 <div
                   className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${(stepsDone / 6) * 100}%` }}
+                  style={{ width: `${(stepsDone / totalSteps) * 100}%` }}
                 />
               </div>
             </div>
@@ -459,7 +460,7 @@ const Index = () => {
             <Button
               onClick={handleSubmit}
               size="lg"
-              className={`px-8 text-base font-semibold shadow-lg transition-all duration-200 ${stepsDone === 6 ? "shadow-primary/25 shadow-lg" : ""}`}
+              className={`px-8 text-base font-semibold shadow-lg transition-all duration-200 ${stepsDone === totalSteps ? "shadow-primary/25 shadow-lg" : ""}`}
               disabled={!!blockingReason}
             >
               {t("nav_confirm_order")}
