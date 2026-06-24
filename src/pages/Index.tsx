@@ -106,6 +106,20 @@ const Index = () => {
 
   const unpaidCount = useMemo(() => orders.filter((o) => o.paymentStatus === "unpaid").length, [orders]);
 
+  const stepsDone = useMemo(() => [
+    !!salesId,
+    !!phone.trim() && !!customerName.trim(),
+    items.length > 0,
+    !!deliveryDate && !!deliveryTime && !!recipientName && deliveryTime !== "指定時間",
+    !giftCardEnabled || !!giftCardMessage.trim(),
+    paymentStatus !== "unpaid" || finalPrice === 0,
+  ].filter(Boolean).length, [salesId, phone, customerName, items, deliveryDate, deliveryTime, recipientName, giftCardEnabled, giftCardMessage, paymentStatus, subtotal, priceOverridden, manualPrice]);
+
+  const blockingReason = !salesId ? "請先選擇員工" :
+    !phone.trim() ? "請輸入客戶電話" :
+    !customerName.trim() ? "請輸入客戶姓名" :
+    items.length === 0 ? "請加入訂單項目" : null;
+
   const resetForm = useCallback(() => {
     setSalesId("");
     setPhone("");
@@ -266,7 +280,7 @@ const Index = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
               <BarChart3 className="w-3.5 h-3.5" /> 報告
             </Button>
-            <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs">
+            <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
               <RotateCcw className="w-3.5 h-3.5" /> 清空
             </Button>
             <Button
@@ -302,7 +316,7 @@ const Index = () => {
         )}
 
         {/* Main form */}
-        <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
+        <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-5 pb-28">
 
           {/* STEP 1: Staff — required gate */}
           <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} isComplete={!!salesId} />
@@ -434,17 +448,36 @@ const Index = () => {
       {/* Sticky submit */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">總計</p>
-            <p className="text-2xl font-bold font-mono tracking-tight">${finalPrice.toLocaleString()}</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">總計</p>
+              <p className="text-2xl font-bold font-mono tracking-tight">${finalPrice.toLocaleString()}</p>
+            </div>
+            <div className="flex items-center gap-1">
+              {[1,2,3,4,5,6].map((n) => (
+                <div
+                  key={n}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    n <= stepsDone ? "bg-primary" : "bg-muted-foreground/25"
+                  }`}
+                />
+              ))}
+              <span className="ml-1.5 text-xs text-muted-foreground">{stepsDone}/6</span>
+            </div>
           </div>
-          <Button
-            onClick={handleSubmit}
-            size="lg"
-            className="px-8 text-base font-semibold shadow-lg"
-          >
-            確認訂單
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            {blockingReason && (
+              <p className="text-[11px] text-destructive font-medium">{blockingReason}</p>
+            )}
+            <Button
+              onClick={handleSubmit}
+              size="lg"
+              className="px-8 text-base font-semibold shadow-lg"
+              disabled={!!blockingReason}
+            >
+              確認訂單
+            </Button>
+          </div>
         </div>
       </div>
 

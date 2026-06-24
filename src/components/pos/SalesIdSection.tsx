@@ -13,7 +13,7 @@ interface SalesIdSectionProps {
 const SalesIdSection = ({ salesId, onSalesIdChange, isComplete }: SalesIdSectionProps) => {
   return (
     <div className="rounded-xl bg-card p-4 space-y-2 border border-border">
-      <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+      <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
         <StepBadge n={1} done={!!isComplete} />
         <UserCheck className="w-4 h-4" />
         銷售員

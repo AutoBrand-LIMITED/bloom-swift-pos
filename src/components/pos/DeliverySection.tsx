@@ -111,7 +111,7 @@ const DeliverySection = ({
 
   return (
     <div className="rounded-xl bg-card p-4 space-y-3 border border-border">
-      <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+      <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
         <StepBadge n={4} done={!!isComplete} />
         <MapPin className="w-4 h-4" />
         送貨資料

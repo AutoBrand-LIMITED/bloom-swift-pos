@@ -82,10 +82,15 @@ const OrderItemsSection = ({
   return (
     <div className="rounded-xl bg-card p-4 space-y-4 border border-border">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+        <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
           <StepBadge n={3} done={!!isComplete} />
           <Package className="w-4 h-4" />
           訂單內容
+          {items.length > 0 && (
+            <span className="ml-1 text-[11px] font-normal normal-case text-muted-foreground">
+              {items.length} 項 · ${subtotal.toLocaleString()}
+            </span>
+          )}
         </h2>
         <Button
           variant="outline"
