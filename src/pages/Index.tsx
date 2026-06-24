@@ -465,7 +465,7 @@ const Index = () => {
             <div className="min-w-0">
               <h1 className="text-sm font-bold tracking-tight leading-none truncate">Anglo Chinese Florist</h1>
               <p className="text-[11px] text-muted-foreground leading-none mt-0.5 tabular-nums">
-                {new Date().toLocaleDateString("zh-HK", { weekday: "short", month: "long", day: "numeric" })}
+                {new Date().toLocaleDateString(lang === "zh" ? "zh-HK" : "en-US", { weekday: "short", month: "long", day: "numeric" })}
                 {salesId && (() => {
                   const staff = (SALES_STAFF ?? []).find(s => s.id === salesId);
                   return staff ? ` · ${staff.name}` : "";

@@ -48,7 +48,7 @@ function filterByDate(orders: Order[], filter: DateFilter): Order[] {
 
 const DriverApp = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [photos, setPhotos] = useState<Record<string, OrderPhotos>>({});
@@ -323,7 +323,7 @@ const DriverApp = () => {
 
                   {isDelivered && order.deliveredAt && (
                     <p className="text-xs text-green-600 text-center">
-                      {t("label_delivered_at")}{new Date(order.deliveredAt).toLocaleString("zh-HK")}
+                      {t("label_delivered_at")}{new Date(order.deliveredAt).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
                     </p>
                   )}
                 </div>

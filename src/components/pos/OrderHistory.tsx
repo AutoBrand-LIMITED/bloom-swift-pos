@@ -39,7 +39,7 @@ const STATUS_STYLES: Record<PaymentStatus, string> = {
 };
 
 const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistoryProps) => {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [searchText, setSearchText] = useState("");
   const [staffFilter, setStaffFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
@@ -300,7 +300,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                             {/* Timestamp + total */}
                             <div className="flex items-center justify-between pt-0.5 border-t border-border/60">
                               <span className="text-xs text-muted-foreground tabular-nums">
-                                {new Date(order.createdAt).toLocaleString("zh-HK")}
+                                {new Date(order.createdAt).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
                               </span>
                               <span className="font-mono font-bold text-sm tabular-nums">${order.finalPrice.toLocaleString()}</span>
                             </div>
