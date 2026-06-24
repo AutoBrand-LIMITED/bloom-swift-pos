@@ -534,7 +534,7 @@ const Index = () => {
       </header>
 
       {/* Body: left panel + main */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1">
         {/* Customer history panel — overlay on mobile, sidebar on desktop */}
         {selectedCustomer && (
           <>
