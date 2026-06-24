@@ -4,13 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
-  Flower2, Leaf, Package, Palette, Ruler, Wind, AlertTriangle, Sparkles, Plus, Minus, X, Tag, Heart,
-  MousePointerClick, FileText, Star,
+  Sparkles, Plus, Minus, X, MousePointerClick, FileText, Star, Check,
 } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -335,20 +332,17 @@ function FlowerPicker({ flowers, selected, onToggle, onQtyChange, highlighted }:
   );
 }
 
-function Section({ icon: Icon, title, children }: {
-  icon: React.ElementType;
+function Section({ title, children }: {
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-        <Icon className="w-4 h-4 text-primary" />
+    <section className="space-y-3 pt-5 first:pt-0 border-t border-border/50 first:border-0">
+      <h3 className="text-xs font-semibold tracking-wide uppercase text-foreground/70">
         {title}
       </h3>
       {children}
-      <Separator />
-    </div>
+    </section>
   );
 }
 
@@ -465,45 +459,58 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-3">
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="w-5 h-5 text-primary" />
-            {t("custom_order_title")}
+        <DialogHeader className="px-6 pt-6 pb-4 bg-gradient-to-br from-primary/[0.07] via-transparent to-transparent border-b border-border/60">
+          <DialogTitle className="flex items-center gap-3 text-lg">
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary/12 text-primary shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </span>
+            <span className="flex-1">{t("custom_order_title")}</span>
             {totalFlowers > 0 && (
-              <Badge variant="secondary" className="ml-2 font-mono">{totalFlowers} {t("unit_flowers")}</Badge>
+              <span className="flex items-baseline gap-1 rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-semibold tabular-nums animate-in fade-in zoom-in-95 duration-200">
+                <span className="font-mono">{totalFlowers}</span>
+                <span className="text-xs font-normal opacity-80">{t("unit_flowers")}</span>
+              </span>
             )}
           </DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="px-6 pb-4 max-h-[calc(90vh-160px)]">
-          <div className="space-y-5 pr-2">
+          <div className="space-y-0 pr-2">
             {/* Step 1: Product Type */}
-            <Section icon={Tag} title={t("cd_section_product_type")}>
+            <Section title={t("cd_section_product_type")}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {productTypes.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleProductTypeChange(p.id)}
-                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border p-4 text-center transition-all min-h-[88px] ${
-                      state.productType === p.id
-                        ? "border-primary bg-primary/10 text-primary shadow-sm"
-                        : "border-border hover:border-primary/30 hover:bg-secondary/40"
-                    }`}
-                  >
-                    <span className="text-2xl leading-none">{p.emoji}</span>
-                    <span className="text-xs font-semibold leading-tight">{p.label}</span>
-                  </button>
-                ))}
+                {productTypes.map((p) => {
+                  const active = state.productType === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleProductTypeChange(p.id)}
+                      className={`group relative flex flex-col items-center justify-center gap-2 rounded-xl border p-4 text-center min-h-[92px] transition-[transform,border-color,background-color,box-shadow] duration-200 ease-out will-change-transform hover:-translate-y-0.5 ${
+                        active
+                          ? "border-primary bg-primary/[0.08] text-primary shadow-[0_4px_16px_-6px_hsl(152_45%_38%/0.4)]"
+                          : "border-border hover:border-primary/40 hover:bg-secondary/40 hover:shadow-sm"
+                      }`}
+                    >
+                      {active && (
+                        <span className="absolute top-1.5 right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground animate-in zoom-in-50 duration-200">
+                          <Check className="w-2.5 h-2.5" strokeWidth={3} />
+                        </span>
+                      )}
+                      <span className={`text-2xl leading-none transition-transform duration-200 ease-out group-hover:scale-110 ${active ? "scale-110" : ""}`}>{p.emoji}</span>
+                      <span className="text-xs font-semibold leading-tight">{p.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </Section>
 
             {/* Step 2: Occasion */}
-            <Section icon={Heart} title={t("label_occasion")}>
+            <Section title={t("label_occasion")}>
               <ChipSelect items={occasionItems} value={state.occasion} onChange={(v) => update("occasion", v)} />
               {rec && (
-                <p className="text-xs text-primary/80 mt-1 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 shrink-0" /> {t("cd_rec_prefix")}{occasionItems.find(o => o.id === state.occasion)?.label ?? state.occasion}{t("cd_rec_suffix")}
+                <p className="text-xs text-primary/90 mt-2 flex items-center gap-1.5 rounded-lg bg-primary/[0.06] px-3 py-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" /> {t("cd_rec_prefix")}{occasionItems.find(o => o.id === state.occasion)?.label ?? state.occasion}{t("cd_rec_suffix")}
                 </p>
               )}
             </Section>
@@ -513,7 +520,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
               <>
                 {/* Flowers */}
                 {availableFlowers.length > 0 && (
-                  <Section icon={Flower2} title={t("cd_section_main_flowers")}>
+                  <Section title={t("cd_section_main_flowers")}>
                     <FlowerPicker
                       flowers={availableFlowers}
                       selected={state.mainFlowers}
@@ -539,7 +546,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Fillers */}
                 {availableFillers.length > 0 && (
-                  <Section icon={Flower2} title={t("cd_section_filler_flowers")}>
+                  <Section title={t("cd_section_filler_flowers")}>
                     <FlowerPicker
                       flowers={availableFillers}
                       selected={state.fillerFlowers}
@@ -551,7 +558,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Greens */}
                 {availableGreens.length > 0 && (
-                  <Section icon={Leaf} title={t("cd_section_greens")}>
+                  <Section title={t("cd_section_greens")}>
                     <FlowerPicker
                       flowers={availableGreens}
                       selected={state.greens}
@@ -563,7 +570,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Fruits (only for fruit basket) */}
                 {pt === "fruit_basket" && (
-                  <Section icon={Package} title={t("cd_section_fruits")}>
+                  <Section title={t("cd_section_fruits")}>
                     <FlowerPicker
                       flowers={FRUITS}
                       selected={state.fruits}
@@ -574,7 +581,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 )}
 
                 {/* Shape / Wrapping */}
-                <Section icon={Package} title={t("cd_section_wrapping")}>
+                <Section title={t("cd_section_wrapping")}>
                   <div className="space-y-3">
                     {availableShapes.length > 0 && (
                       <div className="space-y-1.5">
@@ -605,7 +612,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Vase (bouquet/basket only) */}
                 {(pt === "bouquet" || pt === "basket") && (
-                  <Section icon={Package} title={t("cd_section_vase")}>
+                  <Section title={t("cd_section_vase")}>
                     <div className="space-y-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_vase_type")}</Label>
@@ -622,7 +629,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 )}
 
                 {/* Style */}
-                <Section icon={Palette} title={t("cd_section_style")}>
+                <Section title={t("cd_section_style")}>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_style_theme")}</Label>
@@ -636,7 +643,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 </Section>
 
                 {/* Size */}
-                <Section icon={Ruler} title={t("cd_section_size")}>
+                <Section title={t("cd_section_size")}>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_size")}</Label>
@@ -659,7 +666,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Fragrance (not for preserved/potted) */}
                 {pt !== "preserved" && pt !== "potted" && (
-                  <Section icon={Wind} title={t("cd_section_fragrance")}>
+                  <Section title={t("cd_section_fragrance")}>
                     <div className="space-y-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs font-medium text-muted-foreground">{t("cd_label_fragrance")}</Label>
@@ -674,7 +681,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 )}
 
                 {/* Allergy */}
-                <Section icon={AlertTriangle} title={t("cd_section_allergy")}>
+                <Section title={t("cd_section_allergy")}>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Switch checked={state.hasAllergy} onCheckedChange={(v) => update("hasAllergy", v)} />
@@ -703,20 +710,27 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
             )}
 
             {!pt && (
-              <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
-                <MousePointerClick className="w-8 h-8 opacity-30" />
-                <p className="text-sm">{t("cd_prompt_select_type")}</p>
+              <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+                <span className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/[0.06] text-primary/50">
+                  <MousePointerClick className="w-7 h-7" />
+                </span>
+                <p className="text-sm text-muted-foreground max-w-[220px]">{t("cd_prompt_select_type")}</p>
               </div>
             )}
           </div>
         </ScrollArea>
 
-        <DialogFooter className="px-6 py-4 border-t border-border bg-secondary/30">
+        <DialogFooter className="px-6 py-4 border-t border-border bg-gradient-to-t from-secondary/40 to-transparent">
           <div className="flex w-full items-center justify-between">
-            <Button variant="ghost" onClick={onClose}>{t("btn_cancel_edit")}</Button>
-            <Button onClick={handleConfirm} disabled={!pt} className="gap-1.5 px-6">
+            <Button variant="ghost" onClick={onClose} className="text-muted-foreground">{t("btn_cancel_edit")}</Button>
+            <Button
+              onClick={handleConfirm}
+              disabled={!pt}
+              className="gap-1.5 px-6 shadow-[0_4px_14px_-4px_hsl(152_45%_38%/0.5)] transition-transform duration-200 ease-out hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0"
+            >
               <Sparkles className="w-4 h-4" />
-              {t("cd_btn_confirm")} ({totalFlowers} {t("unit_flowers")})
+              {t("cd_btn_confirm")}
+              {totalFlowers > 0 && <span className="font-mono opacity-90">· {totalFlowers}</span>}
             </Button>
           </div>
         </DialogFooter>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Trash2, Package, Truck, Zap, Wallet, Sparkles, Lock, Bookmark } from "lucide-react";
+import { Plus, Trash2, Package, Wallet, Sparkles, Bookmark } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
@@ -294,9 +294,7 @@ const OrderItemsSection = ({
       {/* Quick add fees */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
-            <Truck className="w-3.5 h-3.5" /> {t("label_delivery_fee")}
-          </Label>
+          <Label className="text-xs">{t("label_delivery_fee")}</Label>
           <Input
             type="number"
             value={deliveryFee || ""}
@@ -391,7 +389,6 @@ const OrderItemsSection = ({
         <div className="space-y-1">
           <div className="flex items-center justify-between">
             <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
-              <Lock className="w-3.5 h-3.5 text-purple-500" />
               {t("label_internal_notes")}
               <span className="text-xs sm:text-[10px] text-muted-foreground font-normal">{t("hint_internal_notes")}</span>
             </Label>
