@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Lock, BarChart3, Users, Package, ArrowLeft } from "lucide-react";
+import { Lock, BarChart3, Users, Package, ArrowLeft, ShoppingBag, DollarSign, CheckCircle2, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { Order } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
@@ -149,31 +149,31 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            <h1 className="text-lg font-bold">{t("title_report")}</h1>
-          </div>
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs">
             <ArrowLeft className="w-3.5 h-3.5" /> {t("btn_back_pos")}
           </Button>
+          <BarChart3 className="w-5 h-5 text-primary" />
+          <h1 className="text-lg font-bold">{t("title_report")}</h1>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Overview cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label={t("stat_total_orders")} value={orders.length.toString()} />
-          <StatCard label={t("stat_total_revenue")} value={`$${totalRevenue.toLocaleString()}`} />
-          <StatCard label={t("stat_paid")} value={paidOrders.length.toString()} />
-          <StatCard label={t("stat_unpaid")} value={unpaidOrders.length.toString()} highlight />
+          <StatCard label={t("stat_total_orders")} value={orders.length.toString()} icon={<ShoppingBag className="w-4 h-4" />} />
+          <StatCard label={t("stat_total_revenue")} value={`$${totalRevenue.toLocaleString()}`} icon={<DollarSign className="w-4 h-4" />} accent="primary" />
+          <StatCard label={t("stat_paid")} value={paidOrders.length.toString()} icon={<CheckCircle2 className="w-4 h-4" />} accent="success" />
+          <StatCard label={t("stat_unpaid")} value={unpaidOrders.length.toString()} icon={<AlertCircle className="w-4 h-4" />} accent="danger" />
         </div>
 
         {/* Report sections */}
         <Accordion type="multiple" className="space-y-2">
           {/* Sales Summary */}
           <AccordionItem value="sales" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">{t("section_sales_summary")}</AccordionTrigger>
+            <AccordionTrigger className="text-sm font-semibold">
+              <span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />{t("section_sales_summary")}</span>
+            </AccordionTrigger>
             <AccordionContent>
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">{t("col_staff")}</th><th className="text-right">{t("col_order_count")}</th><th className="text-right">{t("col_revenue")}</th></tr></thead>
@@ -192,7 +192,9 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
           {/* Customer Summary */}
           <AccordionItem value="customer" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">{t("section_customer_summary")}</AccordionTrigger>
+            <AccordionTrigger className="text-sm font-semibold">
+              <span className="flex items-center gap-2"><Users className="w-4 h-4 text-primary" />{t("section_customer_summary")}</span>
+            </AccordionTrigger>
             <AccordionContent>
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">{t("col_customer")}</th><th className="text-right">{t("col_order_count")}</th><th className="text-right">{t("col_spending")}</th></tr></thead>
@@ -211,7 +213,9 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
           {/* Product Summary */}
           <AccordionItem value="product" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">{t("section_product_summary")}</AccordionTrigger>
+            <AccordionTrigger className="text-sm font-semibold">
+              <span className="flex items-center gap-2"><Package className="w-4 h-4 text-primary" />{t("section_product_summary")}</span>
+            </AccordionTrigger>
             <AccordionContent>
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">{t("col_product")}</th><th className="text-right">{t("col_quantity")}</th><th className="text-right">{t("col_revenue")}</th></tr></thead>
@@ -325,13 +329,31 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
-const StatCard = ({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) => (
-  <Card className={highlight ? "border-destructive/50" : ""}>
-    <CardContent className="p-3 text-center">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-xl font-bold font-mono ${highlight ? "text-destructive" : ""}`}>{value}</p>
-    </CardContent>
-  </Card>
-);
+const accentMap = {
+  primary: { icon: "text-primary", bg: "bg-primary/10", value: "text-primary" },
+  success: { icon: "text-emerald-600", bg: "bg-emerald-50", value: "text-emerald-700" },
+  danger: { icon: "text-destructive", bg: "bg-destructive/10", value: "text-destructive" },
+} as const;
+
+const StatCard = ({
+  label, value, icon, accent,
+}: {
+  label: string; value: string; icon?: React.ReactNode; accent?: keyof typeof accentMap;
+}) => {
+  const colors = accent ? accentMap[accent] : null;
+  return (
+    <Card>
+      <CardContent className="p-4">
+        {icon && (
+          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg mb-2 ${colors ? `${colors.bg} ${colors.icon}` : "bg-muted text-muted-foreground"}`}>
+            {icon}
+          </span>
+        )}
+        <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className={`text-2xl font-bold font-mono mt-0.5 ${colors ? colors.value : "text-foreground"}`}>{value}</p>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default SalesReport;

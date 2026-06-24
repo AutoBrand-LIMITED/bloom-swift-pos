@@ -19,12 +19,12 @@ const PaymentScreen = () => {
         </div>
 
         {/* Amount */}
-        <div className="rounded-2xl border border-border bg-card p-8 space-y-4 shadow-sm">
-          <p className="text-sm text-muted-foreground uppercase tracking-widest">{t("label_amount_due")}</p>
-          <p className="text-6xl font-bold font-mono tracking-tight text-foreground">
+        <div className="rounded-2xl border border-border bg-card p-8 space-y-3 shadow-sm">
+          <p className="text-[11px] text-muted-foreground/70 uppercase tracking-widest">{t("label_amount_due")}</p>
+          <p className="text-6xl font-bold font-mono tracking-tight text-primary">
             ${amount.toLocaleString()}
           </p>
-          <p className="text-xs text-muted-foreground">HKD</p>
+          <p className="text-[10px] text-muted-foreground/50 tracking-widest">HKD</p>
         </div>
 
         {/* Reference */}
