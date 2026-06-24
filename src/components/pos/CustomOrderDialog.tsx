@@ -479,7 +479,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="px-6 pb-4 max-h-[calc(90vh-160px)]">
+        <ScrollArea className="px-6 pt-4 pb-4 max-h-[calc(90vh-160px)]">
           <div className="space-y-0 pr-2">
             {/* Step 1: Product Type */}
             <Section icon={Tag} title={t("cd_section_product_type")}>
