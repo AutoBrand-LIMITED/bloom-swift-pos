@@ -294,7 +294,7 @@ export function generateMessageCard(order: Order): string {
     </style></head><body>
     <div class="card">
       <div class="flower">🌸</div>
-      ${d?.recipientName ? `<div class="recipient">致：${d.recipientName}</div>` : ""}
+      ${d?.recipientName ? `<div class="recipient">致：${esc(d.recipientName)}</div>` : ""}
       <div class="message">${formattedMsg || "<em style='color:#ccc'>（無卡片內容）</em>"}</div>
       <hr class="divider" />
       <div class="meta">${ref} · Anglo Chinese Florist</div>
