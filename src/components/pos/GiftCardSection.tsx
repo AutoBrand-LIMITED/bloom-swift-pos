@@ -83,7 +83,7 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
                 maxLength={1000}
               />
             )}
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-xs sm:text-[10px] text-muted-foreground">
               {t("hint_markdown")}
             </p>
           </div>

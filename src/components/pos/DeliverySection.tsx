@@ -118,7 +118,7 @@ function DeliveryCard({
         <p className="text-xs font-semibold text-foreground/60 uppercase tracking-wide">
           {t("label_recipient")} {index + 1}
           {total > 1 && (
-            <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">
+            <span className="ml-1.5 font-mono text-xs sm:text-[10px] text-muted-foreground">
               ({String(index + 1).padStart(2, "0")})
             </span>
           )}
@@ -373,7 +373,7 @@ const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: Deliver
           <MapPin className="w-4 h-4" />
           {t("section_delivery")}
           {deliveries.length > 1 && (
-            <span className="ml-1 text-[11px] font-normal normal-case text-muted-foreground">
+            <span className="ml-1 text-xs sm:text-[11px] font-normal normal-case text-muted-foreground">
               {deliveries.length} {t("text_recipients")}
             </span>
           )}

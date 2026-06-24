@@ -125,7 +125,7 @@ const OrderItemsSection = ({
           <Package className="w-4 h-4" />
           {t("section_order_items")}
           {items.length > 0 && (
-            <span className="ml-1 text-[11px] font-normal normal-case text-muted-foreground">
+            <span className="ml-1 text-xs sm:text-[11px] font-normal normal-case text-muted-foreground">
               {items.length} {t("unit_items")} · ${subtotal.toLocaleString()}
             </span>
           )}
@@ -325,7 +325,7 @@ const OrderItemsSection = ({
             <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
               <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
               {t("label_sender_notes")}
-              <span className="text-[10px] text-muted-foreground font-normal">({t("hint_sender_notes")})</span>
+              <span className="text-xs sm:text-[10px] text-muted-foreground font-normal">({t("hint_sender_notes")})</span>
             </Label>
             <div className="flex items-center gap-1">
               {onSenderNotesPinnedChange && (
@@ -358,7 +358,7 @@ const OrderItemsSection = ({
             <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
               <MapPin className="w-3.5 h-3.5 text-green-500" />
               {t("label_delivery_notes")}
-              <span className="text-[10px] text-muted-foreground font-normal">({t("hint_delivery_notes")})</span>
+              <span className="text-xs sm:text-[10px] text-muted-foreground font-normal">({t("hint_delivery_notes")})</span>
             </Label>
             <div className="flex items-center gap-1">
               {onDeliveryNotesPinnedChange && (
@@ -391,7 +391,7 @@ const OrderItemsSection = ({
             <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
               <Lock className="w-3.5 h-3.5 text-purple-500" />
               {t("label_internal_notes")}
-              <span className="text-[10px] text-muted-foreground font-normal">({t("hint_internal_notes")})</span>
+              <span className="text-xs sm:text-[10px] text-muted-foreground font-normal">({t("hint_internal_notes")})</span>
             </Label>
             <div className="flex items-center gap-1">
               {onInternalNotesPinnedChange && (

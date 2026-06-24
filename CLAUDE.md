@@ -19,7 +19,7 @@ Each section (SalesId, Customer, OrderItems, Delivery, GiftCard, Payment) follow
 <div className={`rounded-xl p-4 space-y-X border transition-colors ${
   isComplete ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"
 }`}>
-  <h2 className="text-[13px] font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
+  <h2 className="text-sm sm:text-[13px] font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
     <StepBadge n={N} done={!!isComplete} />
     <LucideIcon className="w-4 h-4" />
     {t("section_key")}
@@ -87,6 +87,18 @@ npx tsc --noEmit # type check
 - Back buttons: always top-left in sticky header, before icon + title
 - No emoji in section headers — use Lucide icons
 - Driver cards: initial avatar (`bg-primary/10 text-primary`) not color borders
+
+### Responsive Typography
+- Small label text uses `text-xs sm:text-[10px]` — 12px on mobile, 10px on desktop
+- Helper/subtitle text uses `text-xs sm:text-[11px]` — 12px on mobile, 11px on desktop
+- Section headers use `text-sm sm:text-[13px]` — 14px on mobile, 13px on desktop
+- Exception: text inside fixed-size badge/pill containers stays at hardcoded sizes (bounded by the container)
+
+### Responsive Layout
+- Header nav: `hidden sm:flex` (desktop) + `flex sm:hidden` (mobile) with lang toggle + history icon + `⋯` DropdownMenu
+- CustomerHistoryPanel: `fixed top-[49px] bottom-0 left-0 z-50 sm:static` on mobile (overlay), sidebar on desktop
+- Mobile overlay backdrop: `fixed inset-0 z-30 bg-foreground/40 sm:hidden`
+- Footer progress bar: `hidden sm:flex`; compact `x/y` step counter shown on mobile instead
 
 ## Security Notes
 

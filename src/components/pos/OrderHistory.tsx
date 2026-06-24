@@ -199,7 +199,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                     <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wide">
                       {driver === "未分配" ? t("text_unassigned") : driver}
                     </span>
-                    <span className="ml-auto text-[10px] text-muted-foreground font-mono">
+                    <span className="ml-auto text-xs sm:text-[10px] text-muted-foreground font-mono">
                       {driverOrders.length} {t("unit_order")}
                     </span>
                   </div>

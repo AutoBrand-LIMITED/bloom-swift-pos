@@ -36,7 +36,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
   if (!customer) return null;
 
   return (
-    <div className="w-72 shrink-0 border-r border-border bg-card flex flex-col h-[calc(100vh-49px)] sticky top-[49px]">
+    <div className="w-[85vw] max-w-xs sm:w-72 sm:max-w-none shrink-0 border-r border-border bg-card flex flex-col h-full sm:h-[calc(100vh-49px)] sm:sticky sm:top-[49px]">
       {/* Header */}
       <div className="p-3 border-b border-border flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
@@ -61,11 +61,11 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg bg-secondary/50 p-2 text-center">
-            <p className="text-[10px] text-muted-foreground">{t("label_total_spent")}</p>
+            <p className="text-xs sm:text-[10px] text-muted-foreground">{t("label_total_spent")}</p>
             <p className="text-sm font-bold font-mono text-primary">${totalSpent.toLocaleString()}</p>
           </div>
           <div className="rounded-lg bg-secondary/50 p-2 text-center">
-            <p className="text-[10px] text-muted-foreground">{t("label_order_count")}</p>
+            <p className="text-xs sm:text-[10px] text-muted-foreground">{t("label_order_count")}</p>
             <p className="text-sm font-bold font-mono">{customer.history.length}</p>
           </div>
         </div>
@@ -80,7 +80,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
       {/* Past addresses */}
       {pastAddresses.length > 0 && (
         <div className="p-3 border-b border-border space-y-1.5">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+          <p className="text-xs sm:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
             <MapPin className="w-3 h-3" /> {t("label_past_addresses")}
           </p>
           {pastAddresses.map((a, i) => (
@@ -92,9 +92,9 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
             >
               <p className="text-xs leading-relaxed">{a.address}</p>
               {a.recipientName && (
-                <p className="text-[10px] text-muted-foreground mt-0.5">{t("label_recipient_prefix")}{a.recipientName}</p>
+                <p className="text-xs sm:text-[10px] text-muted-foreground mt-0.5">{t("label_recipient_prefix")}{a.recipientName}</p>
               )}
-              <p className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+              <p className="text-xs sm:text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
                 {t("hint_use_address")}
               </p>
             </button>
@@ -105,7 +105,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
       {/* History list */}
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-1.5">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t("label_purchase_history")}</p>
+          <p className="text-xs sm:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t("label_purchase_history")}</p>
           {customer.history.map((h, i) => (
             <div
               key={i}
@@ -114,7 +114,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground font-mono">{h.date}</span>
+                <span className="text-xs sm:text-[10px] text-muted-foreground font-mono">{h.date}</span>
                 {h.status === "unpaid" ? (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">{t("status_unpaid_short")}</span>
                 ) : (
@@ -123,7 +123,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
               </div>
               <p className="text-xs">{h.items}</p>
               {h.deliveryAddress && (
-                <p className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                <p className="text-xs sm:text-[10px] text-muted-foreground flex items-center gap-0.5">
                   <MapPin className="w-2.5 h-2.5 inline" /> {h.deliveryAddress}
                 </p>
               )}

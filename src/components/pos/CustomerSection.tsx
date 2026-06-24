@@ -272,7 +272,7 @@ const CustomerSection = ({
                         </div>
                         <span className="text-xs text-muted-foreground font-mono">{c.phone}</span>
                       </div>
-                      <span className="text-[10px] text-muted-foreground">{c.history.length} {t("unit_orders")}</span>
+                      <span className="text-xs sm:text-[10px] text-muted-foreground">{c.history.length} {t("unit_orders")}</span>
                     </button>
                   ))}
                 </div>

@@ -1,12 +1,16 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck, Crown, Gift, Tag, Pencil } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck, Crown, Gift, Tag, Pencil, MoreHorizontal } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
@@ -457,7 +461,7 @@ const Index = () => {
             <Flower2 className="w-6 h-6 text-primary" />
             <div>
               <h1 className="text-sm font-bold tracking-tight leading-none">Anglo Chinese Florist</h1>
-              <p className="text-[11px] text-muted-foreground leading-none mt-0.5">
+              <p className="text-xs sm:text-[11px] text-muted-foreground leading-none mt-0.5">
                 {new Date().toLocaleDateString("zh-HK", { weekday: "short", month: "long", day: "numeric" })}
                 {salesId && (() => {
                   const staff = (SALES_STAFF ?? []).find(s => s.id === salesId);
@@ -466,7 +470,8 @@ const Index = () => {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          {/* Desktop nav */}
+          <div className="hidden sm:flex items-center gap-2">
             <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
             <Button variant="ghost" size="sm" onClick={() => navigate("/dispatch")} className="gap-1.5 text-xs">
               <Truck className="w-3.5 h-3.5" /> {t("nav_dispatch")}
@@ -474,30 +479,14 @@ const Index = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
               <BarChart3 className="w-3.5 h-3.5" /> {t("nav_report")}
             </Button>
-            {/* Language toggle */}
             <div className="flex rounded-lg overflow-hidden border border-border">
-              <button
-                onClick={() => setLang("zh")}
-                className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
-              >
-                廣
-              </button>
-              <button
-                onClick={() => setLang("en")}
-                className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
-              >
-                EN
-              </button>
+              <button onClick={() => setLang("zh")} className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>廣</button>
+              <button onClick={() => setLang("en")} className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>EN</button>
             </div>
             <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
               <RotateCcw className="w-3.5 h-3.5" /> {t("nav_clear")}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setHistoryOpen(true)}
-              className="gap-1.5 text-xs relative"
-            >
+            <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)} className="gap-1.5 text-xs relative">
               <ClipboardList className="w-3.5 h-3.5" /> {t("nav_order_history")}
               {unpaidCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
@@ -506,29 +495,72 @@ const Index = () => {
               )}
             </Button>
           </div>
+
+          {/* Mobile nav */}
+          <div className="flex sm:hidden items-center gap-1.5">
+            <div className="flex rounded-lg overflow-hidden border border-border">
+              <button onClick={() => setLang("zh")} className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>廣</button>
+              <button onClick={() => setLang("en")} className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>EN</button>
+            </div>
+            <Button variant="outline" size="icon" className="h-8 w-8 relative shrink-0" onClick={() => setHistoryOpen(true)}>
+              <ClipboardList className="w-4 h-4" />
+              {unpaidCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {unpaidCount}
+                </span>
+              )}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => navigate("/dispatch")}>
+                  <Truck className="w-4 h-4 mr-2" /> {t("nav_dispatch")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/report")}>
+                  <BarChart3 className="w-4 h-4 mr-2" /> {t("nav_report")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={resetForm}>
+                  <RotateCcw className="w-4 h-4 mr-2" /> {t("nav_clear")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
       {/* Body: left panel + main */}
-      <div className="flex flex-1">
-        {/* Left: Customer history panel */}
+      <div className="flex flex-1 min-h-0">
+        {/* Customer history panel — overlay on mobile, sidebar on desktop */}
         {selectedCustomer && (
-          <CustomerHistoryPanel
-            customer={selectedCustomer}
-            onClose={() => setSelectedCustomer(null)}
-            onUseAddress={(address, recipientNameVal) => {
-              setDeliveries(prev => {
-                const next = [...prev];
-                next[0] = { ...next[0], deliveryDetail: address, ...(recipientNameVal ? { recipientName: recipientNameVal } : {}) };
-                return next;
-              });
-              toast.success(t("toast_address_applied"));
-            }}
-          />
+          <>
+            <div
+              className="fixed inset-0 z-30 bg-foreground/40 sm:hidden"
+              onClick={() => setSelectedCustomer(null)}
+            />
+            <div className="fixed top-[49px] bottom-0 left-0 z-50 sm:static sm:z-auto sm:top-auto sm:bottom-auto">
+              <CustomerHistoryPanel
+                customer={selectedCustomer}
+                onClose={() => setSelectedCustomer(null)}
+                onUseAddress={(address, recipientNameVal) => {
+                  setDeliveries(prev => {
+                    const next = [...prev];
+                    next[0] = { ...next[0], deliveryDetail: address, ...(recipientNameVal ? { recipientName: recipientNameVal } : {}) };
+                    return next;
+                  });
+                  toast.success(t("toast_address_applied"));
+                }}
+              />
+            </div>
+          </>
         )}
 
         {/* Main form */}
-        <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-5 pb-28">
+        <main className="flex-1 max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-4 sm:space-y-5 pb-28">
 
           {/* Edit mode banner */}
           {editingOrderId && (
@@ -661,10 +693,10 @@ const Index = () => {
 
           {/* Occasion tag */}
           <div className={`rounded-xl p-4 space-y-3 border transition-colors ${occasionTag ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
-            <h2 className="text-[13px] font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
+            <h2 className="text-sm sm:text-[13px] font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
               <Tag className="w-4 h-4" />
               {t("label_occasion")}
-              {occasionTag && <span className="text-[11px] font-normal normal-case tracking-normal text-primary">{t(occasionTag as TranslationKey)}</span>}
+              {occasionTag && <span className="text-xs sm:text-[11px] font-normal normal-case tracking-normal text-primary">{t(occasionTag as TranslationKey)}</span>}
             </h2>
             <div className="flex flex-wrap gap-2">
               {OCCASION_KEYS.map(key => (
@@ -713,35 +745,38 @@ const Index = () => {
 
       {/* Sticky submit */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground">{t("nav_total")}</p>
-              <p className="text-2xl font-bold font-mono tracking-tight">${finalPrice.toLocaleString()}</p>
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          {/* Total + progress */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="shrink-0">
+              <p className="text-xs sm:text-[10px] text-muted-foreground leading-none mb-0.5">{t("nav_total")}</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono tracking-tight leading-none">${finalPrice.toLocaleString()}</p>
             </div>
-            <div className="flex flex-col gap-1.5 min-w-[100px]">
+            {/* Progress — hidden on xs, visible on sm+ */}
+            <div className="hidden sm:flex flex-col gap-1.5 min-w-[100px]">
               <div className="flex justify-between items-center">
-                <span className="text-[11px] text-muted-foreground font-medium">{stepsDone}/{totalSteps}</span>
-                {stepsDone === totalSteps && (
-                  <span className="text-[11px] text-primary font-semibold">✓ Ready</span>
-                )}
+                <span className="text-xs sm:text-[11px] text-muted-foreground font-medium">{stepsDone}/{totalSteps}</span>
+                {stepsDone === totalSteps && <span className="text-xs sm:text-[11px] text-primary font-semibold">✓ Ready</span>}
               </div>
               <div className="h-1.5 bg-muted rounded-full overflow-hidden w-28">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${(stepsDone / totalSteps) * 100}%` }}
-                />
+                <div className="h-full bg-primary rounded-full transition-all duration-500 ease-out" style={{ width: `${(stepsDone / totalSteps) * 100}%` }} />
               </div>
             </div>
+            {/* Mobile compact step indicator */}
+            <span className="sm:hidden text-xs text-muted-foreground font-medium tabular-nums shrink-0">
+              {stepsDone}/{totalSteps}
+            </span>
           </div>
-          <div className="flex flex-col items-end gap-1">
+
+          {/* Submit */}
+          <div className="flex flex-col items-end gap-1 shrink-0">
             {blockingReason && (
-              <p className="text-[11px] text-destructive font-medium">{blockingReason}</p>
+              <p className="text-[10px] sm:text-[11px] text-destructive font-medium text-right max-w-[130px] leading-tight">{blockingReason}</p>
             )}
             <Button
               onClick={handleSubmit}
               size="lg"
-              className={`px-8 text-base font-semibold shadow-lg transition-all duration-200 ${stepsDone === totalSteps ? "shadow-primary/25 shadow-lg" : ""}`}
+              className={`px-5 sm:px-8 text-sm sm:text-base font-semibold shadow-lg transition-all duration-200 ${stepsDone === totalSteps ? "shadow-primary/25" : ""}`}
               disabled={!!blockingReason}
             >
               {editingOrderId ? t("btn_save_changes") : t("nav_confirm_order")}
