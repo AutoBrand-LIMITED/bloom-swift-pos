@@ -305,6 +305,7 @@ export const zh = {
   label_filter_occasion: "場合",
   placeholder_search_history: "搜尋客戶、收貨人、電話",
   btn_clear_filters: "清除篩選",
+  btn_clear_search: "清除搜尋",
   label_all_staff: "全部員工",
   label_all_occasions: "全部場合",
 
@@ -644,6 +645,7 @@ export const en: Record<TranslationKey, string> = {
   label_filter_occasion: "Occasion",
   placeholder_search_history: "Search customer, recipient, phone",
   btn_clear_filters: "Clear Filters",
+  btn_clear_search: "Clear Search",
   label_all_staff: "All Staff",
   label_all_occasions: "All Occasions",
 
