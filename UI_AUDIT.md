@@ -16,7 +16,7 @@ Built by: AutoBrand Limited
 - [x] Auto-detect HK 852 / Macau 853 prefix
 - [x] Auto-load customer history + past delivery addresses
 - [x] One tap to apply a saved address
-- [ ] Product category selection (bouquets, baskets, wreaths, etc.) — category-specific options
+- [x] Product category selection (bouquets, baskets, wreaths, etc.) — category-specific options
 - [ ] Item code quick-search for experienced staff
 - [x] Message card templates (Happy Birthday, preset greetings) + voice input for custom text
 - [x] One-tap batch printing — picking slip, delivery note, message card individually selectable (全部列印 dropdown)
@@ -131,7 +131,7 @@ Built by: AutoBrand Limited
 | Sales staff selection | ✅ Exists | First field; gates all other input |
 | Phone search + customer lookup | ✅ Exists | 852/853 auto-detect ✅; no recipient search yet |
 | Personal / company toggle | ✅ Exists | — |
-| Order items + presets + voice input | ✅ Exists | No category browsing; no item code search |
+| Order items + presets + voice input | ✅ Exists | Category filter: 全部/花束/花籃/盆栽/花圈/其他 ✅; no item code search |
 | Budget tracker with progress bar | ✅ Exists | — |
 | HK cascading address (region→district→area) | ✅ Exists | — |
 | Google Maps embed | ✅ Exists | — |
