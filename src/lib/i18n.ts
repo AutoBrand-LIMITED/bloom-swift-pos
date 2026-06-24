@@ -307,7 +307,7 @@ export const en: Record<TranslationKey, string> = {
   section_order_items: "Order Items",
   btn_custom_order: "Custom Order",
   label_budget: "Customer Budget",
-  placeholder_budget: "Enter budget",
+  placeholder_budget: "Budget",
   label_used: "Used",
   label_remaining: "Remaining",
   label_exceeded: "Exceeded",
