@@ -146,6 +146,8 @@ export function generateReceipt(order: Order): string {
       ${order.paymentStatus === "deposit" ? `<span style="margin-left:8px;font-size:12px">（訂金 $${order.depositAmount.toLocaleString()}，尚欠 $${(order.finalPrice - order.depositAmount).toLocaleString()}）</span>` : ""}
     </div>
     ${d ? `<h2>📦 送貨資料</h2>${deliveryBlock(d)}` : ""}
+    ${order.senderNotes ? `<h2>📝 製作備註</h2><div class="notes">${esc(order.senderNotes)}</div>` : ""}
+    ${order.deliveryNotes ? `<h2>🚚 送貨備註</h2><div class="notes">${esc(order.deliveryNotes)}</div>` : ""}
     ${order.notes ? `<h2>📝 備註</h2><div class="notes">${esc(order.notes)}</div>` : ""}
     ${order.giftCardEnabled && order.giftCardMessage ? `<h2>💌 卡片內容</h2><div class="notes">${esc(order.giftCardMessage).replace(/\n/g, "<br>")}</div>` : ""}
     <div class="footer">此收據由花店 POS 系統產生 · ${new Date().toLocaleDateString("zh-HK")}</div>
