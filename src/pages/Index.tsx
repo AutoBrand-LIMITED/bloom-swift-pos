@@ -560,7 +560,7 @@ const Index = () => {
         )}
 
         {/* Main form */}
-        <main className="flex-1 max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-4 sm:space-y-5 pb-28">
+        <main className="flex-1 max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-4 sm:space-y-5 pb-28 sm:pb-40">
 
           {/* Edit mode banner */}
           {editingOrderId && (

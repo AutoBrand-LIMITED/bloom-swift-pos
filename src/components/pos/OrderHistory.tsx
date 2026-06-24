@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardList, X, ShieldAlert, Truck, Search, Pencil, RefreshCw, Calendar } from "lucide-react";
+import { ClipboardList, X, ShieldAlert, Truck, Search, Pencil, RefreshCw, Calendar, Phone } from "lucide-react";
 import PrintButtons from "@/components/pos/PrintButtons";
 import type { Order, PaymentStatus } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
@@ -254,7 +254,10 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="font-semibold text-sm leading-tight">{order.customerName || order.phone}</p>
-                                <p className="text-xs text-muted-foreground font-mono mt-0.5 tabular-nums">{order.phone}</p>
+                                <p className="text-xs text-muted-foreground font-mono mt-0.5 tabular-nums flex items-center gap-1">
+                                <Phone className="w-3 h-3 shrink-0" />
+                                {order.phone}
+                              </p>
                               </div>
                               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[order.paymentStatus]}`}>
                                 {badgeLabel}
