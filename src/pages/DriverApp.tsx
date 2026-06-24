@@ -120,15 +120,25 @@ const DriverApp = () => {
             <p className="text-muted-foreground text-sm">{t("msg_select_name")}</p>
           </div>
           <div className="grid grid-cols-2 gap-4 w-full max-w-md">
-            {DRIVERS.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setSelectedDriver(d.name)}
-                className="rounded-2xl border-2 border-border bg-card hover:border-primary hover:bg-primary/5 transition-all p-8 text-center font-bold text-lg active:scale-95"
-              >
-                🚚 {d.name}
-              </button>
-            ))}
+            {DRIVERS.map((d, i) => {
+              const accents = [
+                "border-t-emerald-400 hover:bg-emerald-50 hover:border-emerald-300",
+                "border-t-sky-400 hover:bg-sky-50 hover:border-sky-300",
+                "border-t-violet-400 hover:bg-violet-50 hover:border-violet-300",
+                "border-t-amber-400 hover:bg-amber-50 hover:border-amber-300",
+                "border-t-rose-400 hover:bg-rose-50 hover:border-rose-300",
+              ];
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => setSelectedDriver(d.name)}
+                  className={`rounded-2xl border border-border border-t-4 bg-card transition-all p-8 text-center font-bold text-lg active:scale-95 ${accents[i % accents.length]}`}
+                >
+                  <Truck className="w-6 h-6 mx-auto mb-2 opacity-60" />
+                  {d.name}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

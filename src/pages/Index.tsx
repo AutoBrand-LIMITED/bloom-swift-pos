@@ -100,7 +100,7 @@ const Index = () => {
     !!phone.trim() && !!customerName.trim(),
     items.length > 0,
     deliveries.every(d => d.deliveryDate && d.deliveryTime && d.recipientName && d.deliveryTime !== "指定時間"),
-    giftCardEnabled && !!giftCardMessage.trim(),
+    !giftCardEnabled || !!giftCardMessage.trim(),
     items.length > 0 && paymentStatus !== "unpaid",
   ].filter(Boolean).length, [salesId, phone, customerName, items, deliveries, giftCardEnabled, giftCardMessage, paymentStatus]);
 
@@ -430,23 +430,26 @@ const Index = () => {
       </div>
 
       {/* Sticky submit */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div>
               <p className="text-xs text-muted-foreground">{t("nav_total")}</p>
               <p className="text-2xl font-bold font-mono tracking-tight">${finalPrice.toLocaleString()}</p>
             </div>
-            <div className="flex items-center gap-1">
-              {[1,2,3,4,5,6].map((n) => (
+            <div className="flex flex-col gap-1.5 min-w-[100px]">
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] text-muted-foreground font-medium">{stepsDone}/6</span>
+                {stepsDone === 6 && (
+                  <span className="text-[11px] text-primary font-semibold">✓ Ready</span>
+                )}
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden w-28">
                 <div
-                  key={n}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    n <= stepsDone ? "bg-primary" : "bg-muted-foreground/25"
-                  }`}
+                  className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${(stepsDone / 6) * 100}%` }}
                 />
-              ))}
-              <span className="ml-1.5 text-xs text-muted-foreground">{stepsDone}/6</span>
+              </div>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -456,7 +459,7 @@ const Index = () => {
             <Button
               onClick={handleSubmit}
               size="lg"
-              className="px-8 text-base font-semibold shadow-lg"
+              className={`px-8 text-base font-semibold shadow-lg transition-all duration-200 ${stepsDone === 6 ? "shadow-primary/25 shadow-lg" : ""}`}
               disabled={!!blockingReason}
             >
               {t("nav_confirm_order")}

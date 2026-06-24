@@ -98,8 +98,8 @@ function DeliveryCard({
 
   const handleSlotSelect = (slotValue: string) => set("deliveryTime", slotValue);
 
-  const handleSpecifiedTime = (t: string) =>
-    set("deliveryTime", t ? `指定時間 ${t}` : "指定時間");
+  const handleSpecifiedTime = (timeValue: string) =>
+    set("deliveryTime", timeValue ? `指定時間 ${timeValue}` : "指定時間");
 
   const fullAddress = [
     delivery.deliveryRegion,
@@ -366,9 +366,9 @@ const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: Deliver
     onDeliveriesChange(deliveries.filter((_, i) => i !== index));
 
   return (
-    <div className="rounded-xl bg-card p-4 space-y-4 border border-border">
+    <div className={`rounded-xl p-4 space-y-4 border transition-colors ${isComplete ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
+        <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
           <StepBadge n={4} done={!!isComplete} />
           <MapPin className="w-4 h-4" />
           {t("section_delivery")}

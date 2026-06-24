@@ -122,9 +122,9 @@ const CustomerSection = ({
   };
 
   return (
-    <div className="rounded-xl bg-card p-4 space-y-3 border border-border">
+    <div className={`rounded-xl p-4 space-y-3 border transition-colors ${isComplete ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/70 flex items-center gap-2">
+        <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
           <StepBadge n={2} done={!!isComplete} />
           <User className="w-4 h-4" />
           {t("section_customer")}
