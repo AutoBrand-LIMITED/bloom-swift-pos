@@ -390,7 +390,7 @@ export const zh = {
   cd_prompt_select_type: "請先選擇產品類型",
   cd_special_notes: "特殊備註",
   cd_btn_add_flower: "加入",
-  cd_btn_confirm: "確認客制",
+  cd_btn_confirm: "加入訂單",
 
   // Voice input
   voice_not_supported: "你嘅瀏覽器唔支援語音輸入，請用 Chrome",
@@ -799,7 +799,7 @@ export const en: Record<TranslationKey, string> = {
   cd_prompt_select_type: "Please select a product type first",
   cd_special_notes: "Special Notes",
   cd_btn_add_flower: "Add",
-  cd_btn_confirm: "Confirm Custom",
+  cd_btn_confirm: "Add to Order",
 
   // Voice input
   voice_not_supported: "Voice input not supported. Please use Chrome.",

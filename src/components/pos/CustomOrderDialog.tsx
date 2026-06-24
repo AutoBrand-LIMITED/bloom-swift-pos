@@ -733,7 +733,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
               disabled={!pt}
               className="gap-1.5 px-6 shadow-[0_4px_14px_-4px_hsl(152_45%_38%/0.5)] transition-transform duration-200 ease-out hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0"
             >
-              <Sparkles className="w-4 h-4" />
+              <Check className="w-4 h-4" />
               {t("cd_btn_confirm")}
               {totalFlowers > 0 && <span className="font-mono opacity-90">· {totalFlowers}</span>}
             </Button>
