@@ -37,31 +37,35 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+      <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
         <Gift className="w-4 h-4" />
         {t("section_addons")}
       </h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
         {ADDONS.map((addon) => {
           const isAdded = addedNames.has(addon.name);
           return (
             <button
               key={addon.name}
               onClick={() => toggleAddon(addon)}
-              className={`relative rounded-lg border p-3 text-left transition-all ${
+              aria-pressed={isAdded}
+              aria-label={`${addon.name} $${addon.price}${isAdded ? " — 已加購" : ""}`}
+              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
                 isAdded
                   ? "border-primary bg-primary/5 shadow-sm"
                   : "border-border hover:border-primary/40 hover:bg-accent/30"
               }`}
             >
-              {isAdded && (
-                <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                  <Check className="w-3 h-3 text-primary-foreground" />
-                </div>
-              )}
-              <span className="text-lg">{addon.emoji}</span>
-              <p className="text-xs font-medium mt-1 leading-tight">{addon.name}</p>
-              <p className="text-xs font-mono text-muted-foreground mt-0.5">${addon.price}</p>
+              <span className="text-base leading-none shrink-0">{addon.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium leading-tight">{addon.name}</p>
+                <p className="text-xs font-mono text-muted-foreground tabular-nums">${addon.price}</p>
+              </div>
+              <div className={`w-4 h-4 rounded-full shrink-0 flex items-center justify-center transition-all ${
+                isAdded ? "bg-primary" : "border border-border/60"
+              }`}>
+                {isAdded && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+              </div>
             </button>
           );
         })}

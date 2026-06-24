@@ -185,15 +185,15 @@ const OrderItemsSection = ({
       </div>
 
       {/* Category filter */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.id}
             onClick={() => setSelectedCategory(cat.id)}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+            className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
               selectedCategory === cat.id
                 ? "bg-primary text-primary-foreground"
-                : "border border-border bg-secondary/60 text-muted-foreground hover:bg-secondary"
+                : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
             }`}
           >
             {cat.label}
@@ -202,15 +202,19 @@ const OrderItemsSection = ({
       </div>
 
       {/* Quick presets */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
         {visiblePresets.map((p) => (
           <button
             key={p.name}
             onClick={() => addPreset(p)}
-            className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary/60 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground"
+            className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-left text-xs transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
           >
-            <Plus className="w-3 h-3" />
-            {p.name} {p.price > 0 && <span className="font-mono opacity-70">${p.price}</span>}
+            <span className="font-medium leading-snug">{p.name}</span>
+            {p.price > 0 && (
+              <span className="shrink-0 font-mono tabular-nums text-muted-foreground group-hover:text-primary-foreground/70">
+                ${p.price}
+              </span>
+            )}
           </button>
         ))}
       </div>

@@ -57,7 +57,7 @@ const CsvImportButton = ({ onCustomersUpdated }: CsvImportButtonProps) => {
         onClick={() => fileRef.current?.click()}
         className="gap-1.5 text-xs"
       >
-        <Upload className="w-3.5 h-3.5" /> 匯入CSV
+        <Upload className="w-3.5 h-3.5" /> <span className="hidden lg:inline">匯入CSV</span>
       </Button>
     </>
   );

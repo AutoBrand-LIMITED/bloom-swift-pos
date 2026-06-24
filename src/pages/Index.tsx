@@ -474,20 +474,20 @@ const Index = () => {
           <div className="hidden sm:flex items-center gap-2">
             <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
             <Button variant="ghost" size="sm" onClick={() => navigate("/dispatch")} className="gap-1.5 text-xs">
-              <Truck className="w-3.5 h-3.5" /> {t("nav_dispatch")}
+              <Truck className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_dispatch")}</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
-              <BarChart3 className="w-3.5 h-3.5" /> {t("nav_report")}
+              <BarChart3 className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_report")}</span>
             </Button>
             <div className="flex rounded-lg overflow-hidden border border-border">
               <button onClick={() => setLang("zh")} className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>廣</button>
               <button onClick={() => setLang("en")} className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>EN</button>
             </div>
             <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
-              <RotateCcw className="w-3.5 h-3.5" /> {t("nav_clear")}
+              <RotateCcw className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_clear")}</span>
             </Button>
             <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)} className="gap-1.5 text-xs relative">
-              <ClipboardList className="w-3.5 h-3.5" /> {t("nav_order_history")}
+              <ClipboardList className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_order_history")}</span>
               {unpaidCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {unpaidCount}
