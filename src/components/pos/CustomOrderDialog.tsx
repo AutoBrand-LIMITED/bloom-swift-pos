@@ -735,7 +735,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
         <DialogFooter className="px-6 py-4 border-t border-border bg-gradient-to-t from-secondary/40 to-transparent">
           <div className="flex w-full items-center justify-between">
-            <Button variant="ghost" onClick={onClose} className="text-muted-foreground">{t("btn_cancel_edit")}</Button>
+            <Button variant="ghost" onClick={onClose} className="text-muted-foreground">{t("btn_cancel")}</Button>
             <Button
               onClick={handleConfirm}
               disabled={!pt}
