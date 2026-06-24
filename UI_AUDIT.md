@@ -159,12 +159,15 @@ Built by: AutoBrand Limited
 | Delivery note per SOP (recipient only) | ✅ Exists | Recipient + phone only; hides price/sender; multi-recipient |
 | Message card standalone print | ✅ Exists | Styled card layout; card-only content |
 | Batch print with document toggles | ✅ Exists | 全部列印 dropdown; per-doc checkboxes; 列印所選 |
-| VIP classification + purchase threshold | ❌ Missing | — |
-| Birthday tracking by recipient | ❌ Missing | — |
-| Relationship field on recipient | ❌ Missing | — |
-| Occasion / holiday tagging | ❌ Missing | — |
-| WhatsApp reminders | ❌ Missing | — |
-| Phone search across sender + recipient | ❌ Missing | — |
+| English / Cantonese language toggle | ✅ Exists | 廣/EN pill in header; persisted in localStorage; full app coverage |
+| Relationship field on recipient | ✅ Exists | Per-recipient dropdown in DeliverySection |
+| Birthday field on recipient | ✅ Exists | MM-DD field per recipient in DeliverySection |
+| Occasion / holiday tag on order | ⚠️ Partial | Type + i18n done; UI picker not yet wired in form |
+| VIP classification + purchase threshold | ❌ Missing | Flag exists; auto-threshold logic not built |
+| Birthday tracking + sender reminder | ❌ Missing | Field exists; reminder alert not built |
+| WhatsApp reminders | ❌ Missing | Needs backend |
+| Phone search across sender + recipient | ❌ Missing | Currently sender-only |
+| Order history filters (date/staff/occasion) | ❌ Missing | — |
 | Supabase (shared DB) | ❌ Missing | All localStorage |
 
 ---
@@ -199,6 +202,8 @@ Built by: AutoBrand Limited
 
 ### P4 — Print Templates ✅ DONE (2026-06-24)
 
+<!-- Receipt also updated to show senderNotes + deliveryNotes (new note fields). -->
+
 - [x] Picking slip: show price + product detail, hide sender, tear-off design with order number on both halves
 - [x] Delivery note: show recipient name + phone only, hide price + sender
 - [x] Message card: standalone print with card content only
@@ -212,15 +217,15 @@ Built by: AutoBrand Limited
 
 ### P6 — VIP & Seasonal
 
-- [ ] VIP flag: manual or purchase threshold trigger
-- [ ] Birthday tracking by recipient (not sender) + reminder to sender
-- [ ] Relationship field on recipient record
-- [ ] Occasion / holiday tag on order (independent of product)
-- [ ] WhatsApp reminder scheduling per customer / occasion
-- [ ] Order history sorted by delivery date (not order date)
-- [ ] History view: delivery date, recipient name, delivery count, order summary
+- [x] Relationship field on recipient record (dropdown per recipient card)
+- [x] Birthday field on recipient (MM-DD per recipient card)
+- [ ] Occasion / holiday tag on order — type + i18n done; UI picker not wired yet
+- [ ] VIP flag: manual or purchase threshold trigger (auto-suggest when ≥ threshold)
+- [ ] Birthday reminder: alert sender when recipient birthday upcoming
+- [ ] WhatsApp reminder scheduling — needs backend; skip until P7
+- [x] Order history sorted by delivery date ✅ already done in P3
+- [ ] History filters: date range, staff member, occasion tag
 - [ ] Phone search across sender + recipient simultaneously
-- [ ] Filters: date range, staff member, upcoming delivery date, occasion tag
 
 ### P7 — Infrastructure
 
