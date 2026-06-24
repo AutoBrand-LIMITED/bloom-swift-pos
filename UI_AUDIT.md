@@ -11,32 +11,32 @@ Built by: AutoBrand Limited
 ### §2.1 Core POS & Sales
 
 - [ ] Tablet-optimised interface with full touch support; mobile simplified layout
-- [ ] **Staff member is the FIRST field** — required before any other input
-- [ ] Phone number search (with or without spaces)
-- [ ] Auto-detect HK 852 / Macau 853 prefix
-- [ ] Auto-load customer history + past delivery addresses
-- [ ] One tap to apply a saved address
+- [x] **Staff member is the FIRST field** — required before any other input
+- [x] Phone number search (with or without spaces)
+- [x] Auto-detect HK 852 / Macau 853 prefix
+- [x] Auto-load customer history + past delivery addresses
+- [x] One tap to apply a saved address
 - [ ] Product category selection (bouquets, baskets, wreaths, etc.) — category-specific options
 - [ ] Item code quick-search for experienced staff
-- [ ] Message card templates (Happy Birthday, preset greetings) + voice input for custom text
+- [x] Message card templates (Happy Birthday, preset greetings) + voice input for custom text
 - [ ] One-tap batch printing — picking slip, delivery note, message card individually selectable
 - [ ] Option to skip message card printing entirely
 - [ ] Stripe payment integration: Apple Pay, Google Pay, WhatsApp Payment Link
 
 ### §2.2 Customer & Order Management
 
-- [ ] Full customer profiles: VIP flags, company name + address (required for listed companies)
-- [ ] Contact person field (e.g. secretary placing order on behalf of boss)
+- [x] Full customer profiles: VIP flags, company name + address (required for listed companies)
+- [x] Contact person field (e.g. secretary placing order on behalf of boss)
 - [ ] Multiple delivery addresses per customer
-- [ ] Phone search: spaced and unspaced formats simultaneously
-- [ ] Area code auto-detection: HK 852 and Macau 853 without manual selection
-- [ ] Contact person stored separately from customer name — both visible on order record
-- [ ] Split-delivery orders: single invoice, multiple recipients, auto-numbered (INV-001-1, INV-001-2)
-- [ ] Delivery time slots: 9am–1pm, 1pm–6pm, specified time (before 10am, before 12pm, office hours)
+- [x] Phone search: spaced and unspaced formats simultaneously
+- [x] Area code auto-detection: HK 852 and Macau 853 without manual selection
+- [x] Contact person stored separately from customer name — both visible on order record
+- [x] Split-delivery orders: single invoice, multiple recipients, auto-numbered (INV-001-1, INV-001-2)
+- [x] Delivery time slots: 9am–1pm, 1pm–6pm, specified time (before 10am, before 12pm, office hours)
 - [ ] Peak season slots configurable in back-end settings
-- [ ] Specified time delivery flagged separately + additional charge flag
-- [ ] Google Maps integration for delivery address display and route planning
-- [ ] Optimised order entry flow: phone + staff first → customer enters recipient/delivery → staff adds items
+- [x] Specified time delivery flagged separately + additional charge flag
+- [x] Google Maps integration for delivery address display and route planning
+- [x] Optimised order entry flow: phone + staff first → customer enters recipient/delivery → staff adds items
 - [ ] Bulk import + format conversion of legacy Excel customer data (including pre-2010 formats)
 
 ### §2.3 Delivery Management
@@ -49,19 +49,19 @@ Built by: AutoBrand Limited
 - [ ] Supports 6–7 concurrent drivers during peak season including casual/hired drivers
 - [ ] Automated status updates: auto-advance at fixed time milestones
 - [ ] Auto WhatsApp message to colleagues if no update after set period
-- [ ] Back-office dispatch view: orders by driver + district grouping
+- [x] Back-office dispatch view: orders by driver + district grouping _(basic — OrderHistory grouped by driver; full dispatch screen P5)_
 - [ ] Management can see how many vehicles to deploy from dispatch view
 - [ ] Driver WhatsApp integration option: photo upload via WhatsApp → auto-sync to system
 
 ### §2.4 Payment & Invoice System
 
-- [ ] Two primary payment methods: in-store (physical terminal) and WhatsApp Payment Link
-- [ ] Payment screen is standalone — shows amount + reference ONLY (no order details, no sender info)
+- [x] Two primary payment methods: in-store (physical terminal) and WhatsApp Payment Link _(UI only — no real integration)_
+- [x] Payment screen is standalone — shows amount + reference ONLY (no order details, no sender info)
 - [ ] Shoppage platform integration for payment link generation
-- [ ] Outstanding payment tracking: pre-delivery alert for unpaid orders
-- [ ] System prompts staff before dispatching an unpaid order
+- [x] Outstanding payment tracking: pre-delivery alert for unpaid orders
+- [x] System prompts staff before dispatching an unpaid order
 - [ ] Automatic Stripe webhook: payment confirmed → system updates in real time
-- [ ] Split payment support: deposit, balance, post-amendment top-up — all with individual timestamps
+- [x] Split payment support: deposit + balance flow _(no post-amendment top-up or timestamps yet)_
 - [ ] Invoice numbers are permanent and non-cancellable
 - [ ] All amendments retain full audit trail
 
@@ -84,20 +84,20 @@ Built by: AutoBrand Limited
 ### §2.6 Notes & Customer Flags
 
 **Three note types:**
-- [ ] Sender notes: customer's specific requests for this order (e.g. 'make it bigger', 'no white flowers')
-- [ ] Delivery notes: specific delivery instructions (e.g. 'signed receipt required', 'customer providing own vase')
-- [ ] Internal notes: staff-only, not visible to customers (e.g. 'this customer always pays late')
+- [x] Sender notes: customer's specific requests for this order (e.g. 'make it bigger', 'no white flowers')
+- [x] Delivery notes: specific delivery instructions (e.g. 'signed receipt required', 'customer providing own vase')
+- [x] Internal notes: staff-only, not visible to customers (e.g. 'this customer always pays late')
 
 **Persistent notes:**
-- [ ] Staff can designate notes as persistent (carry across all future orders for that customer)
-- [ ] Persistent notes surface automatically when a new order is opened for that customer
-- [ ] No manual searching required — new and part-time staff are always informed
+- [ ] Staff can designate notes as persistent (carry across all future orders for that customer) _(hardcoded in customer data; no UI to set)_
+- [x] Persistent notes surface automatically when a new order is opened for that customer
+- [x] No manual searching required — new and part-time staff are always informed
 - [ ] Notes can be added retrospectively after an order is placed
 
 **Customer flags:**
-- [ ] Internal tagging with visual indicators (e.g. red dot, purple dot) — not visible to customers
-- [ ] Flags for: late-paying customers, difficult customers, VIP clients, special handling
-- [ ] Flag appears immediately when customer record is pulled up, before order is opened
+- [x] Internal tagging with visual indicators (e.g. red dot, purple dot) — not visible to customers
+- [x] Flags for: late-paying customers, difficult customers, VIP clients, special handling
+- [x] Flag appears immediately when customer record is pulled up, before order is opened
 
 ### §2.7 VIP & Seasonal Management
 
@@ -117,10 +117,10 @@ Built by: AutoBrand Limited
 
 - [ ] Phone search covers sender AND recipient records simultaneously
 - [ ] Single search returns all orders where that number appears in any role
-- [ ] Order history displayed by **delivery date** (not order date or payment date)
+- [x] Order history displayed by **delivery date** (sorted within driver group)
 - [ ] History view shows: delivery date, recipient name, delivery count for recipient, order summary
 - [ ] Filters: date range (e.g. last 10 days), specific staff member, upcoming delivery date range, occasion/holiday tag
-- [ ] Order list sorted by delivery person — groups all orders for same driver together
+- [x] Order list sorted by delivery person — groups all orders for same driver together
 
 ---
 
@@ -128,17 +128,17 @@ Built by: AutoBrand Limited
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Sales staff selection | ✅ Exists | Wrong position — not first field |
-| Phone search + customer lookup | ✅ Exists | No 852/853 auto-detect; no recipient search |
+| Sales staff selection | ✅ Exists | First field; gates all other input |
+| Phone search + customer lookup | ✅ Exists | 852/853 auto-detect ✅; no recipient search yet |
 | Personal / company toggle | ✅ Exists | — |
 | Order items + presets + voice input | ✅ Exists | No category browsing; no item code search |
 | Budget tracker with progress bar | ✅ Exists | — |
 | HK cascading address (region→district→area) | ✅ Exists | — |
 | Google Maps embed | ✅ Exists | — |
-| Delivery date / time input | ✅ Exists | Free time input — no preset slots |
+| Delivery date / time input | ✅ Exists | Preset slots: 上午/下午/指定時間 |
 | Recipient fields + failed delivery action | ✅ Exists | — |
 | Gift card + templates + markdown + voice | ✅ Exists | — |
-| Payment status (paid/unpaid/deposit) | ✅ Exists | Wrong methods — no Stripe/Apple Pay/WhatsApp |
+| Payment status (paid/unpaid/deposit) | ✅ Exists | Methods UI done (terminal/Apple Pay/Stripe/WhatsApp/cash); no real integration |
 | Follow-up date + reminder option | ✅ Exists | — |
 | Add-ons section | ✅ Exists | — |
 | Order history drawer | ✅ Exists | Grouped by driver; sorted by delivery date within group |
