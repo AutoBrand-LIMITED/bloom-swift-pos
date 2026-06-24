@@ -303,7 +303,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                             </div>
 
                             {/* Print buttons */}
-                            <PrintButtons order={order} />
+                            <PrintButtons order={order} compact />
 
                             {/* Edit / Reorder */}
                             {(onEdit || onReorder) && (

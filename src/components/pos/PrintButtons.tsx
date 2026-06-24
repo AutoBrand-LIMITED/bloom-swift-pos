@@ -22,9 +22,10 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface PrintButtonsProps {
   order: Order;
   size?: "sm" | "default";
+  compact?: boolean;
 }
 
-const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
+const PrintButtons = ({ order, size = "sm", compact = false }: PrintButtonsProps) => {
   const { t } = useLanguage();
   const hasCard = order.giftCardEnabled && !!order.giftCardMessage;
   const [selected, setSelected] = useState({
@@ -49,6 +50,77 @@ const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
     if (selected.messageCard && hasCard) docs.push(generateMessageCard(order));
     if (docs.length > 0) printBatch(docs);
   };
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1 border-t border-border/60 pt-2">
+        <button
+          title={t("btn_picking_slip")}
+          onClick={(e) => { e.stopPropagation(); printDocument(generatePickingList(order)); }}
+          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <ClipboardCheck className="w-3.5 h-3.5" />
+        </button>
+        <button
+          title={t("btn_delivery_note")}
+          onClick={(e) => { e.stopPropagation(); printDocument(generateDeliveryNote(order)); }}
+          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <Truck className="w-3.5 h-3.5" />
+        </button>
+        <button
+          title={t("btn_receipt")}
+          onClick={(e) => { e.stopPropagation(); printDocument(generateReceipt(order)); }}
+          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <Receipt className="w-3.5 h-3.5" />
+        </button>
+        {hasCard && (
+          <button
+            title={t("btn_card")}
+            onClick={(e) => { e.stopPropagation(); printDocument(generateMessageCard(order)); }}
+            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+          </button>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto h-7 gap-1 text-xs px-2.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Printer className="w-3 h-3" /> {t("btn_print_all")} <ChevronDown className="w-3 h-3 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuCheckboxItem checked={selected.pickingSlip} onCheckedChange={() => toggle("pickingSlip")}>
+              {t("btn_picking_slip")}
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={selected.deliveryNote} onCheckedChange={() => toggle("deliveryNote")}>
+              {t("btn_delivery_note")}
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={selected.receipt} onCheckedChange={() => toggle("receipt")}>
+              {t("btn_receipt")}
+            </DropdownMenuCheckboxItem>
+            {hasCard && (
+              <DropdownMenuCheckboxItem checked={selected.messageCard} onCheckedChange={() => toggle("messageCard")}>
+                {t("btn_card")}
+              </DropdownMenuCheckboxItem>
+            )}
+            <DropdownMenuSeparator />
+            <div className="px-2 py-1.5">
+              <Button size="sm" className="w-full text-xs" onClick={handleBatchPrint}>
+                {t("btn_print_selected")}
+              </Button>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-wrap gap-1.5">
