@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
   Flower2, Leaf, Package, Palette, Ruler, Wind, AlertTriangle, Sparkles, Plus, Minus, X, Tag, Heart,
+  MousePointerClick, FileText, Star,
 } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 
@@ -254,7 +255,7 @@ function ChipSelect({ options, value, onChange, highlighted }: {
             key={opt}
             type="button"
             onClick={() => onChange(opt)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               selected
                 ? "bg-primary text-primary-foreground border-primary"
                 : isRecommended
@@ -262,7 +263,7 @@ function ChipSelect({ options, value, onChange, highlighted }: {
                   : "border-border bg-secondary/60 hover:bg-secondary"
             }`}
           >
-            {isRecommended && !selected ? "⭐ " : ""}{opt}
+            {isRecommended && !selected && <Star className="w-2.5 h-2.5 shrink-0 text-amber-400" />}{opt}
           </button>
         );
       })}
@@ -295,8 +296,8 @@ function FlowerPicker({ flowers, selected, onToggle, onQtyChange, highlighted }:
             onClick={() => !sel && onToggle(f)}
           >
             <span className="text-lg">{f.emoji}</span>
-            <span className="text-xs font-medium flex-1">
-              {isRecommended && !sel ? "⭐ " : ""}{f.name}
+            <span className="text-xs font-medium flex-1 flex items-center gap-1">
+              {isRecommended && !sel && <Star className="w-2.5 h-2.5 shrink-0 text-amber-400" />}{f.name}
             </span>
             {sel ? (
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -460,14 +461,14 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                     key={p.id}
                     type="button"
                     onClick={() => handleProductTypeChange(p.id)}
-                    className={`flex items-center gap-2 rounded-lg border p-3 text-sm font-medium transition-colors ${
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border p-4 text-center transition-all min-h-[88px] ${
                       state.productType === p.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border hover:bg-secondary/50"
+                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                        : "border-border hover:border-primary/30 hover:bg-secondary/40"
                     }`}
                   >
-                    <span className="text-lg">{p.emoji}</span>
-                    {p.label}
+                    <span className="text-2xl leading-none">{p.emoji}</span>
+                    <span className="text-xs font-semibold leading-tight">{p.label}</span>
                   </button>
                 ))}
               </div>
@@ -477,8 +478,8 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
             <Section icon={Heart} title="場合">
               <ChipSelect options={OCCASIONS} value={state.occasion} onChange={(v) => update("occasion", v)} />
               {rec && (
-                <p className="text-xs text-primary/80 mt-1">
-                  ⭐ 系統已根據「{state.occasion}」推薦適合嘅花材同色調
+                <p className="text-xs text-primary/80 mt-1 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 shrink-0" /> 系統已根據「{state.occasion}」推薦適合嘅花材同色調
                 </p>
               )}
             </Section>
@@ -553,24 +554,24 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                   <div className="space-y-3">
                     {availableShapes.length > 0 && (
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">形狀</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">形狀</Label>
                         <ChipSelect options={availableShapes} value={state.bouquetShape} onChange={(v) => update("bouquetShape", v)} />
                       </div>
                     )}
                     {availableWraps.length > 0 && (
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">包裝</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">包裝</Label>
                         <ChipSelect options={availableWraps} value={state.wrapMaterial} onChange={(v) => update("wrapMaterial", v)} />
                       </div>
                     )}
                     {(pt === "bouquet") && (
                       <>
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">包裝顏色</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">包裝顏色</Label>
                           <ChipSelect options={WRAP_COLORS} value={state.wrapColor} onChange={(v) => update("wrapColor", v)} />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">絲帶顏色</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">絲帶顏色</Label>
                           <ChipSelect options={RIBBON_COLORS} value={state.ribbonColor} onChange={(v) => update("ribbonColor", v)} />
                         </div>
                       </>
@@ -583,12 +584,12 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                   <Section icon={Package} title="花器 / 底盤">
                     <div className="space-y-3">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">花器類型</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">花器類型</Label>
                         <ChipSelect options={VASE_TYPES} value={state.vaseType} onChange={(v) => update("vaseType", v)} />
                       </div>
                       {state.vaseType && state.vaseType !== "無花器" && (
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">花器尺寸</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">花器尺寸</Label>
                           <ChipSelect options={VASE_SIZES} value={state.vaseSize} onChange={(v) => update("vaseSize", v)} />
                         </div>
                       )}
@@ -600,11 +601,11 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 <Section icon={Palette} title="整體風格">
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">風格主題</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">風格主題</Label>
                       <ChipSelect options={STYLE_THEMES} value={state.styleTheme} onChange={(v) => update("styleTheme", v)} highlighted={rec?.suggestedThemes} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">色調</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">色調</Label>
                       <ChipSelect options={COLOR_TONES} value={state.colorTone} onChange={(v) => update("colorTone", v)} highlighted={rec?.suggestedColors} />
                     </div>
                   </div>
@@ -614,17 +615,17 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 <Section icon={Ruler} title="尺寸規格">
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">大小</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">大小</Label>
                       <ChipSelect options={availableSizes} value={state.bouquetSize} onChange={(v) => update("bouquetSize", v)} />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">預計直徑 (cm)</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">預計直徑 (cm)</Label>
                         <Input type="number" placeholder="例：25" value={state.estimatedDiameter}
                           onChange={(e) => update("estimatedDiameter", e.target.value)} className="text-sm font-mono" />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">預計高度 (cm)</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">預計高度 (cm)</Label>
                         <Input type="number" placeholder="例：40" value={state.estimatedHeight}
                           onChange={(e) => update("estimatedHeight", e.target.value)} className="text-sm font-mono" />
                       </div>
@@ -637,11 +638,11 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                   <Section icon={Wind} title="香味 & 保鮮">
                     <div className="space-y-3">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">香味偏好</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">香味偏好</Label>
                         <ChipSelect options={FRAGRANCE_PREFS} value={state.fragrance} onChange={(v) => update("fragrance", v)} />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">保鮮處理</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">保鮮處理</Label>
                         <ChipSelect options={PRESERVATION} value={state.preservationMethod} onChange={(v) => update("preservationMethod", v)} />
                       </div>
                     </div>
@@ -667,7 +668,7 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
 
                 {/* Special notes */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground flex items-center gap-1">📝 特殊備註</Label>
+                  <Label className="text-xs font-medium flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> 特殊備註</Label>
                   <div className="flex gap-2">
                     <Textarea placeholder="例如：花頭要開、去刺、花腳要長..." value={state.specialNotes}
                       onChange={(e) => update("specialNotes", e.target.value)} className="text-sm min-h-[60px]" />
@@ -678,8 +679,9 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
             )}
 
             {!pt && (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                👆 請先選擇產品類型
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
+                <MousePointerClick className="w-8 h-8 opacity-30" />
+                <p className="text-sm">請先選擇產品類型</p>
               </div>
             )}
           </div>
