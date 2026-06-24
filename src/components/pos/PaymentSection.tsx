@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, AlertTriangle, CalendarIcon, Bell } from "lucide-react";
+import { CreditCard, AlertTriangle, CalendarIcon, Bell, Monitor, MessageCircle, Apple, Smartphone, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import type { PaymentStatus } from "@/types/order";
@@ -26,6 +26,7 @@ interface PaymentSectionProps {
   reminderOption: string;
   onReminderOptionChange: (v: string) => void;
   priceWarning: boolean;
+  orderId?: string;
 }
 
 const statusConfig: Record<PaymentStatus, { label: string; className: string }> = {
@@ -35,14 +36,12 @@ const statusConfig: Record<PaymentStatus, { label: string; className: string }> 
 };
 
 const PAYMENT_METHODS = [
-  { value: "fps", label: "FPS 轉數快" },
-  { value: "credit_card", label: "信用卡" },
-  { value: "alipay", label: "支付寶 Alipay" },
-  { value: "wechat_pay", label: "WeChat Pay" },
-  { value: "payme", label: "PayMe" },
-  { value: "octopus", label: "八達通" },
-  { value: "cash", label: "現金" },
-  { value: "bank_transfer", label: "銀行轉賬" },
+  { value: "terminal", label: "店內終端機", icon: <Monitor className="w-3.5 h-3.5" /> },
+  { value: "whatsapp_link", label: "WhatsApp 付款連結", icon: <MessageCircle className="w-3.5 h-3.5" /> },
+  { value: "apple_pay", label: "Apple Pay", icon: <Apple className="w-3.5 h-3.5" /> },
+  { value: "google_pay", label: "Google Pay", icon: <Smartphone className="w-3.5 h-3.5" /> },
+  { value: "stripe_card", label: "信用卡 (Stripe)", icon: <CreditCard className="w-3.5 h-3.5" /> },
+  { value: "cash", label: "現金", icon: null },
 ];
 
 const PaymentSection = ({
@@ -53,8 +52,15 @@ const PaymentSection = ({
   depositAmount, onDepositAmountChange,
   followUpDate, onFollowUpDateChange,
   reminderOption, onReminderOptionChange,
-  priceWarning,
-}: PaymentSectionProps) => (
+  priceWarning, orderId,
+}: PaymentSectionProps) => {
+  const openPaymentScreen = () => {
+    const ref = orderId ? orderId.slice(-8).toUpperCase() : "—";
+    const url = `/payment?amount=${finalPrice}&ref=${ref}`;
+    window.open(url, "_blank", "width=480,height=680,toolbar=no,menubar=no");
+  };
+
+  return (
   <div className="rounded-xl border border-border bg-card p-4 space-y-4">
     <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
       <CreditCard className="w-4 h-4" />
@@ -121,22 +127,36 @@ const PaymentSection = ({
     {(paymentStatus === "paid" || paymentStatus === "deposit") && (
       <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
         <Label className="text-xs">付款方式</Label>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           {PAYMENT_METHODS.map((m) => (
             <button
               key={m.value}
               onClick={() => onPaymentMethodChange(m.value)}
-              className={`rounded-lg py-2 px-2 text-xs font-medium transition-all border ${
+              className={`rounded-lg py-2 px-2 text-xs font-medium transition-all border flex items-center justify-center gap-1.5 ${
                 paymentMethod === m.value
                   ? "bg-primary text-primary-foreground border-primary shadow-sm"
                   : "bg-secondary text-secondary-foreground border-transparent hover:border-border"
               }`}
             >
+              {m.icon}
               {m.label}
             </button>
           ))}
         </div>
       </div>
+    )}
+
+    {/* Customer-facing payment screen button */}
+    {finalPrice > 0 && (
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full gap-2 text-xs"
+        onClick={openPaymentScreen}
+      >
+        <ExternalLink className="w-3.5 h-3.5" />
+        顯示客戶付款頁面
+      </Button>
     )}
 
     {/* Deposit amount */}
@@ -238,6 +258,7 @@ const PaymentSection = ({
       </div>
     )}
   </div>
-);
+  );
+};
 
 export default PaymentSection;

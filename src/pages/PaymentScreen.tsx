@@ -1,0 +1,43 @@
+import { useSearchParams } from "react-router-dom";
+import { Flower2 } from "lucide-react";
+
+const PaymentScreen = () => {
+  const [params] = useSearchParams();
+  const raw = parseInt(params.get("amount") || "0", 10);
+  const amount = Number.isNaN(raw) ? 0 : raw;
+  const ref = params.get("ref") || "—";
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 select-none">
+      <div className="w-full max-w-sm space-y-8 text-center">
+        {/* Logo */}
+        <div className="flex items-center justify-center gap-2">
+          <Flower2 className="w-7 h-7 text-primary" />
+          <span className="text-lg font-bold tracking-tight">Anglo Chinese Florist</span>
+        </div>
+
+        {/* Amount */}
+        <div className="rounded-2xl border border-border bg-card p-8 space-y-4 shadow-sm">
+          <p className="text-sm text-muted-foreground uppercase tracking-widest">應付金額</p>
+          <p className="text-6xl font-bold font-mono tracking-tight text-foreground">
+            ${amount.toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground">HKD</p>
+        </div>
+
+        {/* Reference */}
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground uppercase tracking-widest">參考編號</p>
+          <p className="text-xl font-mono font-semibold tracking-widest text-foreground">{ref}</p>
+        </div>
+
+        {/* Footer note */}
+        <p className="text-xs text-muted-foreground">
+          如有疑問，請向本店員工查詢
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default PaymentScreen;

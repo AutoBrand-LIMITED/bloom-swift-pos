@@ -30,6 +30,9 @@ function loadOrders(): Order[] {
 const Index = () => {
   const navigate = useNavigate();
 
+  // Pre-generated order ID so it can be shown on the payment screen before submission
+  const [currentOrderId, setCurrentOrderId] = useState(() => crypto.randomUUID());
+
   // Staff (gate — must be first)
   const [salesId, setSalesId] = useState("");
 
@@ -139,6 +142,7 @@ const Index = () => {
     setReminderOption("none");
     setPriceOverridden(false);
     setManualPrice(null);
+    setCurrentOrderId(crypto.randomUUID());
   }, []);
 
   const handleCustomerSelect = (c: DemoCustomer) => {
@@ -173,7 +177,7 @@ const Index = () => {
     }
 
     const order: Order = {
-      id: crypto.randomUUID(),
+      id: currentOrderId,
       salesId,
       customerName: customerName.trim(),
       phone: `${phonePrefix} ${phone.trim()}`,
@@ -402,6 +406,7 @@ const Index = () => {
             reminderOption={reminderOption}
             onReminderOptionChange={setReminderOption}
             priceWarning={finalPrice === 0 && items.length > 0}
+            orderId={currentOrderId}
           />
 
           <AddOnsSection
