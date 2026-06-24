@@ -19,8 +19,8 @@ Built by: AutoBrand Limited
 - [ ] Product category selection (bouquets, baskets, wreaths, etc.) — category-specific options
 - [ ] Item code quick-search for experienced staff
 - [x] Message card templates (Happy Birthday, preset greetings) + voice input for custom text
-- [ ] One-tap batch printing — picking slip, delivery note, message card individually selectable
-- [ ] Option to skip message card printing entirely
+- [x] One-tap batch printing — picking slip, delivery note, message card individually selectable (全部列印 dropdown)
+- [x] Option to skip message card printing entirely (checkbox in dropdown; skipped by default if no card)
 - [ ] Stripe payment integration: Apple Pay, Google Pay, WhatsApp Payment Link
 
 ### §2.2 Customer & Order Management
@@ -68,18 +68,18 @@ Built by: AutoBrand Limited
 ### §2.5 Document Design
 
 **Picking Slip (Internal)**
-- [ ] Shows: recipient details, full product description (colour, stem count, size, vase, special instructions), price
-- [ ] Hides: sender details entirely (strict confidentiality)
-- [ ] Tear-off design: upper + lower portions separated after production
-- [ ] Both halves carry same order number for reconciliation
-- [ ] Product description detailed enough for any staff member (including part-time) to fulfil without verbal clarification
+- [x] Shows: recipient details, full product description, price
+- [x] Hides: sender details entirely (strict confidentiality)
+- [x] Tear-off design: upper portion + stub strip below dashed line, both carry order ref
+- [x] Both halves carry same order number for reconciliation
+- [ ] Product description detailed enough for any staff member — requires real item names from inventory
 
 **Delivery Note (External)**
-- [ ] Shows: recipient name and phone number only
-- [ ] Hides: price, sender name, sender contact details
-- [ ] Same layout as picking slip with all sensitive fields removed
-- [ ] Batch printing: picking slip + delivery note + message card in one action
-- [ ] Individual document selection also supported
+- [x] Shows: recipient name and phone number only
+- [x] Hides: price, sender name, sender contact details
+- [x] Same layout as picking slip with all sensitive fields removed
+- [x] Batch printing: picking slip + delivery note + message card in one action (全部列印 dropdown)
+- [x] Individual document selection also supported (per-document buttons + checkboxes)
 
 ### §2.6 Notes & Customer Flags
 
@@ -155,8 +155,10 @@ Built by: AutoBrand Limited
 | Dispatch view (back-office) | ❌ Missing | OrderHistory grouped by driver (basic); full dispatch P5 |
 | Standalone payment screen | ✅ Exists | /payment?amount=X&ref=Y — customer-facing, amount only |
 | Stripe / Apple Pay / Google Pay / WhatsApp link | ⚠️ UI only | Methods selectable; no real payment integration yet |
-| Picking slip per SOP (hide sender, tear-off) | ❌ Missing | — |
-| Delivery note per SOP (recipient only) | ❌ Missing | — |
+| Picking slip per SOP (hide sender, tear-off) | ✅ Exists | Hides sender; shows price + items; tear-off stub with order ref |
+| Delivery note per SOP (recipient only) | ✅ Exists | Recipient + phone only; hides price/sender; multi-recipient |
+| Message card standalone print | ✅ Exists | Styled card layout; card-only content |
+| Batch print with document toggles | ✅ Exists | 全部列印 dropdown; per-doc checkboxes; 列印所選 |
 | VIP classification + purchase threshold | ❌ Missing | — |
 | Birthday tracking by recipient | ❌ Missing | — |
 | Relationship field on recipient | ❌ Missing | — |
@@ -195,12 +197,12 @@ Built by: AutoBrand Limited
 - [x] Split-delivery UI: add multiple recipients per order; shown in history grouped by driver
 - [x] Order list sorted by delivery person in history/dispatch views
 
-### P4 — Print Templates
+### P4 — Print Templates ✅ DONE (2026-06-24)
 
-- [ ] Picking slip: show price + product detail, hide sender, tear-off design with order number on both halves
-- [ ] Delivery note: show recipient name + phone only, hide price + sender
-- [ ] Message card: standalone print with card content only
-- [ ] Batch print: picking slip + delivery note + message card in one action with individual toggles
+- [x] Picking slip: show price + product detail, hide sender, tear-off design with order number on both halves
+- [x] Delivery note: show recipient name + phone only, hide price + sender
+- [x] Message card: standalone print with card content only
+- [x] Batch print: picking slip + delivery note + message card in one action with individual toggles
 
 ### P5 — New Screens
 
