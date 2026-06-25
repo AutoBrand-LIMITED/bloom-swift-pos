@@ -351,14 +351,259 @@ export function generateDeliveryNote(order: Order): string {
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const yyyy = d.getFullYear();
-    const dow = DAY_ZH[d.getDay()];
-    return `${dd}-${mm}-${yyyy} (週${dow})`;
+    return `${dd}-${mm}-${yyyy} (週${DAY_ZH[d.getDay()]})`;
   }
 
-  const totalQty = order.items.reduce((s, i) => s + Number(i.quantity), 0);
+  const dnStyles = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+      color: #111;
+      background: white;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .dn-page {
+      padding: 28px 32px 24px;
+      max-width: 700px;
+    }
+    /* ── Header ── */
+    .dn-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #111;
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+    }
+    .dn-brand-name {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .dn-brand-sub {
+      font-size: 10px;
+      color: #888;
+      letter-spacing: 0.06em;
+      margin-top: 2px;
+    }
+    .dn-doctype {
+      text-align: right;
+    }
+    .dn-doctype-zh {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      line-height: 1;
+    }
+    .dn-ref {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #555;
+      margin-top: 3px;
+      letter-spacing: 0.04em;
+    }
+    /* ── Two-col info block ── */
+    .dn-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      margin-bottom: 18px;
+      border-bottom: 1px solid #e0e0e0;
+      padding-bottom: 16px;
+    }
+    .dn-info-left {
+      padding-right: 24px;
+      border-right: 1px solid #e0e0e0;
+    }
+    .dn-info-right {
+      padding-left: 24px;
+    }
+    .dn-field-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #999;
+      display: block;
+      margin-bottom: 1px;
+    }
+    .dn-addr-section-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #999;
+      margin-bottom: 6px;
+    }
+    .dn-recipient-name {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 3px;
+      line-height: 1.2;
+    }
+    .dn-recipient-addr {
+      font-size: 11.5px;
+      color: #333;
+      line-height: 1.6;
+      margin-bottom: 3px;
+    }
+    .dn-recipient-phone {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #555;
+    }
+    .dn-map-url {
+      font-size: 8.5px;
+      color: #999;
+      margin-top: 3px;
+      word-break: break-all;
+    }
+    .dn-map-url a { color: #2563eb; }
+    .dn-sender-block {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #efefef;
+    }
+    .dn-meta-row {
+      display: flex;
+      gap: 0;
+      margin-bottom: 5px;
+      align-items: baseline;
+    }
+    .dn-meta-label {
+      font-size: 10px;
+      color: #999;
+      min-width: 54px;
+      flex-shrink: 0;
+    }
+    .dn-meta-value {
+      font-size: 12px;
+      font-weight: 600;
+      color: #111;
+    }
+    .dn-meta-value.mono {
+      font-family: 'Courier New', monospace;
+      font-weight: 400;
+    }
+    .dn-meta-value.card {
+      font-size: 11px;
+      font-weight: 400;
+      color: #555;
+    }
+    /* ── Items table ── */
+    .dn-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 0;
+    }
+    .dn-table th {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      background: #f6f6f6;
+      border-top: 1.5px solid #d0d0d0;
+      border-bottom: 1.5px solid #d0d0d0;
+      padding: 6px 8px;
+      text-align: left;
+    }
+    .dn-table th.r { text-align: right; }
+    .dn-table td {
+      padding: 9px 8px;
+      border-bottom: 1px solid #efefef;
+      font-size: 12px;
+      vertical-align: top;
+    }
+    .dn-table td.code {
+      font-family: 'Courier New', monospace;
+      font-size: 10.5px;
+      color: #888;
+      white-space: nowrap;
+    }
+    .dn-table td.stock {
+      text-align: right;
+      color: #ccc;
+      font-size: 11px;
+    }
+    .dn-table td.qty {
+      text-align: right;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .dn-table tfoot td {
+      border-bottom: none;
+      border-top: 2px solid #111;
+      padding-top: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #555;
+    }
+    .dn-table tfoot td.total-num {
+      text-align: right;
+      font-size: 16px;
+      font-weight: 800;
+      color: #111;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0;
+    }
+    /* ── Notes ── */
+    .dn-notes {
+      margin-top: 14px;
+      padding: 10px 12px;
+      background: #fafaf8;
+      border-left: 3px solid #ccc;
+      font-size: 11.5px;
+      line-height: 1.7;
+    }
+    .dn-notes-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #999;
+      display: block;
+      margin-bottom: 4px;
+    }
+    /* ── Signature ── */
+    .dn-sig {
+      margin-top: 44px;
+    }
+    .dn-sig-label {
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 28px;
+    }
+    .dn-sig-line {
+      border-top: 1.5px solid #bbb;
+      width: 240px;
+      padding-top: 5px;
+      font-size: 9.5px;
+      color: #aaa;
+      letter-spacing: 0.05em;
+    }
+    /* ── Footer ── */
+    .dn-footer {
+      margin-top: 20px;
+      padding-top: 8px;
+      border-top: 1px solid #eee;
+      text-align: center;
+      font-size: 9px;
+      color: #bbb;
+      letter-spacing: 0.05em;
+    }
+    @media print {
+      .dn-page { padding: 16px 20px 16px; }
+    }
+  `;
 
-  const allNotes = [order.senderNotes, order.deliveryNotes, order.notes]
-    .filter(Boolean).map(esc).join("<br>");
+  const totalQty = order.items.reduce((s, i) => s + Number(i.quantity), 0);
+  const allNotes = [order.senderNotes, order.deliveryNotes, order.notes].filter(Boolean).map(esc).join("<br>");
 
   const dnSections = (allDeliveries ?? []).map((d, i) => {
     if (!d) return "";
@@ -370,97 +615,84 @@ export function generateDeliveryNote(order: Order): string {
 
     const itemRows = order.items.map((item) => `
       <tr>
-        <td style="font-size:12px;color:#888;font-family:monospace;white-space:nowrap">${esc(item.id?.slice(0,8).toUpperCase() ?? "")}</td>
+        <td class="code">${esc(item.id?.slice(0, 8).toUpperCase() ?? "")}</td>
         <td>${esc(item.name)}</td>
-        <td class="num" style="color:#aaa">—</td>
-        <td class="num">${Number(item.quantity)}</td>
+        <td class="stock">—</td>
+        <td class="qty">${Number(item.quantity)}</td>
       </tr>`).join("");
 
     return `
-    <div style="${isExtra ? "page-break-before:always;" : ""}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:2px solid #1a1a1a;margin-bottom:14px;">
-        <div style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">
-          Anglo Chinese Florist · 英華花店
+    <div class="dn-page"${isExtra ? ' style="page-break-before:always;"' : ""}>
+      <div class="dn-header">
+        <div>
+          <div class="dn-brand-name">Anglo Chinese Florist</div>
+          <div class="dn-brand-sub">英華花店</div>
         </div>
-        <div style="text-align:right;">
-          <div style="font-size:18px;font-weight:800;letter-spacing:-0.3px;">送貨單</div>
-          <div style="font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;font-weight:700;margin-top:2px;">${esc(dnRef)}</div>
+        <div class="dn-doctype">
+          <div class="dn-doctype-zh">送貨單</div>
+          <div class="dn-ref">${esc(dnRef)}</div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:14px;">
-        <div style="padding-right:20px;border-right:1px solid #e8e8e8;">
-          <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">送貨地址</div>
-          ${d.recipientName ? `<div style="font-size:14px;font-weight:700;margin-bottom:4px;">${esc(d.recipientName)}</div>` : ""}
-          ${addr ? `<div style="font-size:12px;color:#333;line-height:1.55;margin-bottom:4px;">${addr}</div>` : ""}
-          ${d.recipientPhone ? `<div style="font-size:12px;color:#555;font-family:monospace;">${esc(d.recipientPhone)}</div>` : ""}
-          ${mapUrl ? `<div style="margin-top:4px;font-size:9px;"><a href="${mapUrl}" style="color:#2563eb;">${esc(mapUrl)}</a></div>` : ""}
+      <div class="dn-info">
+        <div class="dn-info-left">
+          <div class="dn-addr-section-label">送貨地址</div>
+          ${d.recipientName ? `<div class="dn-recipient-name">${esc(d.recipientName)}</div>` : ""}
+          ${addr ? `<div class="dn-recipient-addr">${addr}</div>` : ""}
+          ${d.recipientPhone ? `<div class="dn-recipient-phone">${esc(d.recipientPhone)}</div>` : ""}
+          ${mapUrl ? `<div class="dn-map-url"><a href="${mapUrl}">${esc(mapUrl)}</a></div>` : ""}
 
-          <div style="margin-top:12px;border-top:1px solid #f0f0f0;padding-top:10px;">
-            <table style="width:100%;border:none;">
-              <tr><td style="font-size:11px;color:#999;padding:2px 0;width:52px;">客戶</td><td style="font-size:12px;font-weight:600;padding:2px 0;">${esc(order.customerName || order.phone)}</td></tr>
-              ${order.contactPerson ? `<tr><td style="font-size:11px;color:#999;padding:2px 0;">聯絡人</td><td style="font-size:12px;padding:2px 0;">${esc(order.contactPerson)}</td></tr>` : ""}
-              <tr><td style="font-size:11px;color:#999;padding:2px 0;">電話</td><td style="font-size:12px;font-family:monospace;padding:2px 0;">${esc(order.phone)}</td></tr>
-            </table>
+          <div class="dn-sender-block">
+            <div class="dn-meta-row"><span class="dn-meta-label">客戶</span><span class="dn-meta-value">${esc(order.customerName || order.phone)}</span></div>
+            ${order.contactPerson ? `<div class="dn-meta-row"><span class="dn-meta-label">聯絡人</span><span class="dn-meta-value">${esc(order.contactPerson)}</span></div>` : ""}
+            <div class="dn-meta-row"><span class="dn-meta-label">電話</span><span class="dn-meta-value mono">${esc(order.phone)}</span></div>
           </div>
         </div>
 
-        <div style="padding-left:20px;">
-          <table style="width:100%;border:none;">
-            <tr>
-              <td style="font-size:11px;color:#999;padding:3px 0;width:60px;">送貨日期</td>
-              <td style="font-size:12px;font-weight:600;padding:3px 0;">${esc(fmtDate(d.deliveryDate || ""))}</td>
-            </tr>
-            <tr>
-              <td style="font-size:11px;color:#999;padding:3px 0;">送貨時間</td>
-              <td style="font-size:12px;font-weight:600;padding:3px 0;">${esc(d.deliveryTime || "")}</td>
-            </tr>
-            <tr>
-              <td style="font-size:11px;color:#999;padding:3px 0;">員工</td>
-              <td style="font-size:12px;font-weight:600;padding:3px 0;">${esc(staffName(order.salesId))}</td>
-            </tr>
-            ${d.deliveryPerson ? `<tr><td style="font-size:11px;color:#999;padding:3px 0;">司機</td><td style="font-size:12px;font-weight:600;padding:3px 0;">${esc(d.deliveryPerson)}</td></tr>` : ""}
-            <tr>
-              <td style="font-size:11px;color:#999;padding:3px 0;">Card</td>
-              <td style="font-size:12px;padding:3px 0;">${order.giftCardEnabled && order.giftCardMessage ? esc(order.giftCardMessage.slice(0, 40)) + (order.giftCardMessage.length > 40 ? "…" : "") : ""}</td>
-            </tr>
-          </table>
+        <div class="dn-info-right">
+          <div class="dn-meta-row"><span class="dn-meta-label">送貨日期</span><span class="dn-meta-value">${esc(fmtDate(d.deliveryDate || ""))}</span></div>
+          <div class="dn-meta-row"><span class="dn-meta-label">送貨時間</span><span class="dn-meta-value">${esc(d.deliveryTime || "")}</span></div>
+          <div class="dn-meta-row"><span class="dn-meta-label">員工</span><span class="dn-meta-value">${esc(staffName(order.salesId))}</span></div>
+          ${d.deliveryPerson ? `<div class="dn-meta-row"><span class="dn-meta-label">司機</span><span class="dn-meta-value">${esc(d.deliveryPerson)}</span></div>` : ""}
+          <div class="dn-meta-row"><span class="dn-meta-label">Card</span><span class="dn-meta-value card">${order.giftCardEnabled && order.giftCardMessage ? esc(order.giftCardMessage.slice(0, 50)) + (order.giftCardMessage.length > 50 ? "…" : "") : ""}</span></div>
         </div>
       </div>
 
-      <table>
+      <table class="dn-table">
         <thead>
           <tr>
-            <th style="width:80px;">產品編號</th>
+            <th style="width:72px;">產品編號</th>
             <th>描述</th>
-            <th class="num" style="width:50px;">庫存</th>
-            <th class="num" style="width:50px;">數量</th>
+            <th class="r" style="width:44px;">庫存</th>
+            <th class="r" style="width:44px;">數量</th>
           </tr>
         </thead>
-        <tbody>
-          ${itemRows}
-        </tbody>
+        <tbody>${itemRows}</tbody>
         <tfoot>
           <tr>
-            <td colspan="3" style="text-align:right;font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;border-top:1.5px solid #ccc;padding-top:10px;">總數</td>
-            <td class="num" style="font-size:15px;font-weight:800;border-top:1.5px solid #ccc;padding-top:10px;">${totalQty}</td>
+            <td colspan="3" style="text-align:right;">總數</td>
+            <td class="total-num">${totalQty}</td>
           </tr>
         </tfoot>
       </table>
 
-      ${allNotes ? `<div style="margin-top:16px;"><span style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;">備註　</span><span style="font-size:12px;line-height:1.65;">${allNotes}</span></div>` : ""}
+      ${allNotes ? `
+      <div class="dn-notes">
+        <span class="dn-notes-label">備註</span>
+        ${allNotes}
+      </div>` : ""}
 
-      <div style="margin-top:40px;">
-        <div style="font-size:11px;font-weight:700;margin-bottom:32px;">簽收</div>
-        <div style="border-top:1.5px solid #ccc;width:220px;padding-top:5px;font-size:10px;color:#aaa;letter-spacing:0.04em;">收貨人簽署</div>
+      <div class="dn-sig">
+        <div class="dn-sig-label">簽收</div>
+        <div class="dn-sig-line">收貨人簽署</div>
       </div>
 
-      <div style="margin-top:24px;text-align:center;font-size:9px;color:#bbb;border-top:1px solid #eee;padding-top:8px;">Anglo Chinese Florist · 英華花店 · ${new Date().toLocaleDateString("zh-HK")}</div>
+      <div class="dn-footer">Anglo Chinese Florist · 英華花店 · ${new Date().toLocaleDateString("zh-HK")}</div>
     </div>`;
   }).join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送貨單 DN-${ref}</title>
-    <style>${commonStyles}</style></head><body>${dnSections}</body></html>`;
+    <style>${dnStyles}</style></head><body>${dnSections}</body></html>`;
 }
 
 /** 卡片 — gift message card only */
