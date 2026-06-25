@@ -260,8 +260,8 @@ export function generateReceipt(order: Order): string {
     order.urgentFee > 0 ? `<tr class="r-fee-row"><td colspan="3">急單費</td><td class="r-item-sub">$${order.urgentFee.toLocaleString()}</td></tr>` : "",
   ].join("");
 
-  function delivRow(label: string, val: string) {
-    return val ? `<div class="r-meta-row"><span class="r-meta-lbl">${label}</span><span class="r-meta-val">${val}</span></div>` : "";
+  function delivRow(label: string, rawVal: string) {
+    return rawVal ? `<div class="r-meta-row"><span class="r-meta-lbl">${label}</span><span class="r-meta-val">${esc(rawVal)}</span></div>` : "";
   }
 
   const allDelivRows = [d, ...extraDeliveries].filter(Boolean).map((del, i) => {
@@ -270,10 +270,10 @@ export function generateReceipt(order: Order): string {
     const prefix = (order.deliveries?.length ?? 0) > 1 ? `[${i + 1}] ` : "";
     return `
       ${i > 0 ? `<div class="r-deliv-divider"></div>` : ""}
-      ${delivRow("送貨日期", `${prefix}${esc(del.deliveryDate || "")}`)}
-      ${delivRow("送貨時間", esc(del.deliveryTime || ""))}
-      ${delivRow("收貨人", esc(del.recipientName || ""))}
-      ${delivRow("收貨電話", esc(del.recipientPhone || ""))}
+      ${delivRow("送貨日期", `${prefix}${del.deliveryDate || ""}`)}
+      ${delivRow("送貨時間", del.deliveryTime || "")}
+      ${delivRow("收貨人", del.recipientName || "")}
+      ${delivRow("收貨電話", del.recipientPhone || "")}
       ${addr ? `<div class="r-meta-row"><span class="r-meta-lbl">地址</span><span class="r-meta-val">${addr}</span></div>` : ""}
     `;
   }).join("");
