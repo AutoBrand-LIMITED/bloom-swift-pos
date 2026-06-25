@@ -237,37 +237,157 @@ function deliveryBlock(d: Delivery | null, label?: string): string {
 
 /** 客人收據 */
 export function generateReceipt(order: Order): string {
-  const badgeClass = `badge badge-${order.paymentStatus}`;
-  const d = primaryDelivery(order);
-  const date = new Date(order.createdAt).toLocaleDateString("zh-HK");
   const ref = orderRef(order);
+  const date = new Date(order.createdAt).toLocaleDateString("zh-HK");
+  const d = primaryDelivery(order);
+  const extraDeliveries = (order.deliveries ?? []).slice(1);
+
+  const payStatus = order.paymentStatus;
+  const payColor = payStatus === "paid" ? "#16a34a" : payStatus === "deposit" ? "#d97706" : "#dc2626";
+  const payBg = payStatus === "paid" ? "#f0fdf4" : payStatus === "deposit" ? "#fffbeb" : "#fef2f2";
+  const payText = payStatus === "paid" ? "已付款" : payStatus === "deposit" ? "已付訂金" : "未付款";
+
+  const itemRows = order.items.map((item) => `
+    <tr>
+      <td class="r-item-name">${esc(item.name)}</td>
+      <td class="r-item-qty">${item.quantity}</td>
+      <td class="r-item-price">$${item.price.toLocaleString()}</td>
+      <td class="r-item-sub">$${(item.price * item.quantity).toLocaleString()}</td>
+    </tr>`).join("");
+
+  const feeRows = [
+    order.deliveryFee > 0 ? `<tr class="r-fee-row"><td colspan="3">送貨費</td><td class="r-item-sub">$${order.deliveryFee.toLocaleString()}</td></tr>` : "",
+    order.urgentFee > 0 ? `<tr class="r-fee-row"><td colspan="3">急單費</td><td class="r-item-sub">$${order.urgentFee.toLocaleString()}</td></tr>` : "",
+  ].join("");
+
+  function delivRow(label: string, val: string) {
+    return val ? `<div class="r-meta-row"><span class="r-meta-lbl">${label}</span><span class="r-meta-val">${val}</span></div>` : "";
+  }
+
+  const allDelivRows = [d, ...extraDeliveries].filter(Boolean).map((del, i) => {
+    if (!del) return "";
+    const addr = [del.deliveryRegion, del.deliveryDistrict, del.deliveryArea, del.deliveryDetail].filter(Boolean).map(esc).join(" ");
+    const prefix = (order.deliveries?.length ?? 0) > 1 ? `[${i + 1}] ` : "";
+    return `
+      ${i > 0 ? `<div class="r-deliv-divider"></div>` : ""}
+      ${delivRow("送貨日期", `${prefix}${esc(del.deliveryDate || "")}`)}
+      ${delivRow("送貨時間", esc(del.deliveryTime || ""))}
+      ${delivRow("收貨人", esc(del.recipientName || ""))}
+      ${delivRow("收貨電話", esc(del.recipientPhone || ""))}
+      ${addr ? `<div class="r-meta-row"><span class="r-meta-lbl">地址</span><span class="r-meta-val">${addr}</span></div>` : ""}
+    `;
+  }).join("");
+
+  const receiptStyles = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+      color: #111;
+      background: white;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 28px 32px 24px;
+      max-width: 640px;
+    }
+    /* Header */
+    .r-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 18px; }
+    .r-brand { }
+    .r-brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
+    .r-brand-sub { font-size: 10px; color: #888; margin-top: 2px; letter-spacing: 0.06em; }
+    .r-doctype { text-align: right; }
+    .r-doctype-zh { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; line-height: 1; }
+    .r-ref { font-family: 'Courier New', monospace; font-size: 11px; color: #666; margin-top: 3px; }
+    .r-date { font-size: 10px; color: #aaa; margin-top: 2px; }
+    /* Customer meta grid */
+    .r-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 16px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e8e8e8; }
+    .r-meta-row { display: flex; gap: 6px; align-items: baseline; }
+    .r-meta-lbl { font-size: 10px; color: #999; min-width: 52px; flex-shrink: 0; }
+    .r-meta-val { font-size: 12px; font-weight: 600; }
+    .r-meta-val.mono { font-family: 'Courier New', monospace; font-weight: 400; }
+    /* Delivery block */
+    .r-deliv { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e8e8e8; }
+    .r-deliv-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #bbb; margin-bottom: 8px; }
+    .r-deliv-divider { height: 1px; background: #f0f0f0; margin: 8px 0; }
+    /* Items table */
+    .r-table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+    .r-table th { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #888; background: #f6f6f6; border-top: 1.5px solid #d0d0d0; border-bottom: 1.5px solid #d0d0d0; padding: 6px 8px; }
+    .r-table th:not(:first-child) { text-align: right; }
+    .r-table td { padding: 9px 8px; border-bottom: 1px solid #f0f0f0; font-size: 12.5px; }
+    .r-item-name { }
+    .r-item-qty { text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #555; }
+    .r-item-price { text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #888; }
+    .r-item-sub { text-align: right; font-family: 'Courier New', monospace; font-size: 12px; font-weight: 600; }
+    .r-fee-row td { font-size: 11.5px; color: #666; padding: 6px 8px; border-bottom: 1px solid #f0f0f0; }
+    .r-total-row { border-top: 2px solid #111; }
+    .r-total-row td { padding: 10px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #555; border: none; }
+    .r-total-row td.r-total-amount { font-size: 22px; font-weight: 800; color: #111; font-family: 'Courier New', monospace; letter-spacing: -0.5px; text-align: right; }
+    /* Payment status */
+    .r-payment { display: flex; align-items: center; gap: 10px; margin: 16px 0; padding: 10px 14px; border-radius: 6px; }
+    .r-payment-badge { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+    .r-payment-detail { font-size: 11px; color: #888; }
+    /* Notes */
+    .r-notes-block { margin-top: 14px; }
+    .r-notes-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #999; margin-bottom: 4px; }
+    .r-notes-body { font-size: 11.5px; line-height: 1.65; padding: 8px 12px; background: #fafaf8; border-left: 3px solid #d0d0d0; }
+    .r-notes-body.highlight { border-left-color: #f59e0b; background: #fffbeb; }
+    /* Footer */
+    .r-footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #eee; text-align: center; font-size: 9px; color: #bbb; letter-spacing: 0.05em; }
+    @media print { body { padding: 14px 18px; } }
+  `;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>收據 ${ref}</title>
-    <style>${commonStyles}</style></head><body>
+    <style>${receiptStyles}</style></head><body>
 
-    ${docHeader("收據", "RECEIPT", ref, date)}
+    <div class="r-header">
+      <div class="r-brand">
+        <div class="r-brand-name">Anglo Chinese Florist</div>
+        <div class="r-brand-sub">英華花店</div>
+      </div>
+      <div class="r-doctype">
+        <div class="r-doctype-zh">收據</div>
+        <div class="r-ref">${esc(ref)}</div>
+        <div class="r-date">${esc(date)}</div>
+      </div>
+    </div>
 
-    <div class="section-heading">客戶資料</div>
-    ${orderMeta(order)}
+    <div class="r-meta">
+      <div class="r-meta-row"><span class="r-meta-lbl">客戶</span><span class="r-meta-val">${esc(order.customerName || "—")}</span></div>
+      <div class="r-meta-row"><span class="r-meta-lbl">電話</span><span class="r-meta-val mono">${esc(order.phone)}</span></div>
+      ${order.contactPerson ? `<div class="r-meta-row"><span class="r-meta-lbl">聯絡人</span><span class="r-meta-val">${esc(order.contactPerson)}</span></div>` : ""}
+      ${order.salesId ? `<div class="r-meta-row"><span class="r-meta-lbl">員工</span><span class="r-meta-val">${esc(staffName(order.salesId))}</span></div>` : ""}
+    </div>
 
-    <div class="section-heading">訂單明細</div>
-    ${itemsTable(order, true)}
+    ${d ? `<div class="r-deliv"><div class="r-deliv-label">送貨資料</div>${allDelivRows}</div>` : ""}
 
-    <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:11px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">付款狀態</span>
-      <span class="${badgeClass}">${paymentLabel[order.paymentStatus]}</span>
+    <table class="r-table">
+      <thead>
+        <tr><th>項目</th><th>數量</th><th>單價</th><th>小計</th></tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+        ${feeRows}
+      </tbody>
+      <tfoot>
+        <tr class="r-total-row">
+          <td colspan="3">總計</td>
+          <td class="r-total-amount">$${order.finalPrice.toLocaleString()}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="r-payment" style="background:${payBg}">
+      <span class="r-payment-badge" style="color:${payColor}">${payText}</span>
       ${order.paymentStatus === "deposit"
-        ? `<span style="font-size:12px;color:#888">訂金 $${order.depositAmount.toLocaleString()} · 尚欠 $${(order.finalPrice - order.depositAmount).toLocaleString()}</span>`
+        ? `<span class="r-payment-detail">訂金 $${order.depositAmount.toLocaleString()} · 尚欠 $${(order.finalPrice - order.depositAmount).toLocaleString()}</span>`
         : ""}
     </div>
 
-    ${d ? `<div class="section-heading">送貨資料</div>${deliveryBlock(d)}` : ""}
-    ${order.senderNotes ? `<div class="section-heading">製作備註</div><div class="notes">${esc(order.senderNotes)}</div>` : ""}
-    ${order.deliveryNotes ? `<div class="section-heading">送貨備註</div><div class="notes">${esc(order.deliveryNotes)}</div>` : ""}
-    ${order.notes ? `<div class="section-heading">備註</div><div class="notes">${esc(order.notes)}</div>` : ""}
-    ${order.giftCardEnabled && order.giftCardMessage ? `<div class="section-heading">卡片內容</div><div class="notes">${esc(order.giftCardMessage).replace(/\n/g, "<br>")}</div>` : ""}
+    ${order.senderNotes ? `<div class="r-notes-block"><div class="r-notes-label">製作備註</div><div class="r-notes-body">${esc(order.senderNotes)}</div></div>` : ""}
+    ${order.deliveryNotes ? `<div class="r-notes-block"><div class="r-notes-label">送貨備註</div><div class="r-notes-body">${esc(order.deliveryNotes)}</div></div>` : ""}
+    ${order.notes ? `<div class="r-notes-block"><div class="r-notes-label">備註</div><div class="r-notes-body">${esc(order.notes)}</div></div>` : ""}
+    ${order.giftCardEnabled && order.giftCardMessage ? `<div class="r-notes-block"><div class="r-notes-label">卡片內容</div><div class="r-notes-body highlight">${esc(order.giftCardMessage).replace(/\n/g, "<br>")}</div></div>` : ""}
 
-    <div class="footer">Anglo Chinese Florist · 英華花店 · ${new Date().toLocaleDateString("zh-HK")}</div>
+    <div class="r-footer">Anglo Chinese Florist · 英華花店 · ${new Date().toLocaleDateString("zh-HK")}</div>
   </body></html>`;
 }
 
@@ -278,61 +398,133 @@ export function generatePickingList(order: Order): string {
   const allDeliveries = order.deliveries?.length
     ? order.deliveries
     : ([primaryDelivery(order)].filter(Boolean) as Delivery[]);
+  const firstD = allDeliveries?.[0];
+  const totalQty = order.items.reduce((s, i) => s + Number(i.quantity), 0);
+
+  const pickStyles = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+      color: #111;
+      background: white;
+      font-size: 13px;
+      line-height: 1.4;
+      padding: 24px 28px 20px;
+      max-width: 680px;
+    }
+    .ps-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #111; padding-bottom: 10px; margin-bottom: 16px; }
+    .ps-brand-name { font-size: 13px; font-weight: 700; }
+    .ps-brand-sub { font-size: 10px; color: #999; margin-top: 1px; letter-spacing: 0.06em; }
+    .ps-doctype { text-align: right; }
+    .ps-doctype-zh { font-size: 22px; font-weight: 900; letter-spacing: -0.4px; line-height: 1; }
+    .ps-confidential { font-size: 9px; font-weight: 700; color: #dc2626; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 3px; }
+    .ps-ref { font-family: 'Courier New', monospace; font-size: 12px; color: #555; margin-top: 2px; }
+    .ps-date { font-size: 10px; color: #bbb; margin-top: 1px; }
+    .ps-deliv-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px 20px; background: #f6f6f4; border-radius: 6px; padding: 10px 14px; margin-bottom: 18px; }
+    .ps-deliv-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #999; display: block; }
+    .ps-deliv-val { font-size: 12.5px; font-weight: 600; color: #111; }
+    .ps-deliv-section-label { font-size: 10px; font-weight: 700; color: #888; letter-spacing: 0.06em; margin: 12px 0 6px; padding-top: 8px; border-top: 1px solid #eee; }
+    .ps-section-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #aaa; margin-bottom: 8px; }
+    .ps-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+    .ps-item:last-child { border-bottom: none; }
+    .ps-cb { width: 20px; height: 20px; border: 2px solid #ccc; border-radius: 3px; flex-shrink: 0; }
+    .ps-qty { font-family: 'Courier New', monospace; font-size: 18px; font-weight: 800; color: #111; min-width: 42px; text-align: right; flex-shrink: 0; }
+    .ps-name { font-size: 15px; font-weight: 500; flex: 1; }
+    .ps-price { font-family: 'Courier New', monospace; font-size: 13px; color: #888; flex-shrink: 0; }
+    .ps-fee-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; color: #777; border-bottom: 1px solid #f0f0f0; }
+    .ps-fee-val { font-family: 'Courier New', monospace; }
+    .ps-total-block { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0 8px; border-top: 2.5px solid #111; margin-top: 2px; }
+    .ps-total-label { font-size: 13px; font-weight: 700; }
+    .ps-total-amount { font-family: 'Courier New', monospace; font-size: 28px; font-weight: 900; letter-spacing: -0.5px; }
+    .ps-notes-block { margin-top: 14px; }
+    .ps-notes-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #aaa; margin-bottom: 5px; }
+    .ps-notes-body { font-size: 13px; line-height: 1.65; padding: 10px 14px; }
+    .ps-notes-body.hi { background: #fffbeb; border-left: 3px solid #f59e0b; font-size: 15px; font-weight: 600; }
+    .ps-notes-body.lo { background: #fafaf8; border-left: 3px solid #d0d0d0; }
+    .ps-sigs { display: flex; gap: 40px; margin-top: 40px; }
+    .ps-sig-line { border-top: 1.5px solid #bbb; width: 200px; padding-top: 5px; font-size: 9.5px; color: #aaa; letter-spacing: 0.05em; }
+    .ps-tear { border-top: 1.5px dashed #bbb; margin: 24px 0 10px; }
+    .ps-tear-label { text-align: center; font-size: 9px; color: #bbb; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+    .ps-stub { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px 20px; background: #f6f6f4; border-radius: 6px; padding: 12px 14px; }
+    .ps-stub-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #999; display: block; }
+    .ps-stub-val { font-size: 12px; font-weight: 600; }
+    .ps-stub-val.big { font-size: 16px; font-family: 'Courier New', monospace; font-weight: 800; }
+    .ps-footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid #eee; text-align: center; font-size: 9px; color: #bbb; letter-spacing: 0.05em; }
+    @media print { body { padding: 12px 16px; } }
+  `;
+
+  const delivBars = (allDeliveries ?? []).map((d, i) => {
+    if (!d) return "";
+    const addr = [d.deliveryRegion, d.deliveryDistrict, d.deliveryArea, d.deliveryDetail].filter(Boolean).map(esc).join(" ");
+    const sectionLabel = (allDeliveries?.length ?? 0) > 1
+      ? `<div class="ps-deliv-section-label">${esc(recipientRef(order, i))}</div>` : "";
+    return `${sectionLabel}
+      <div class="ps-deliv-bar">
+        ${d.deliveryDate ? `<div><span class="ps-deliv-lbl">送貨日期</span><span class="ps-deliv-val">${esc(d.deliveryDate)}</span></div>` : ""}
+        ${d.deliveryTime ? `<div><span class="ps-deliv-lbl">時間</span><span class="ps-deliv-val">${esc(d.deliveryTime)}</span></div>` : ""}
+        ${d.recipientName ? `<div><span class="ps-deliv-lbl">收貨人</span><span class="ps-deliv-val">${esc(d.recipientName)}</span></div>` : ""}
+        ${d.recipientPhone ? `<div><span class="ps-deliv-lbl">電話</span><span class="ps-deliv-val">${esc(d.recipientPhone)}</span></div>` : ""}
+        ${d.deliveryPerson ? `<div><span class="ps-deliv-lbl">司機</span><span class="ps-deliv-val">${esc(d.deliveryPerson)}</span></div>` : ""}
+        ${addr ? `<div style="grid-column:1/-1"><span class="ps-deliv-lbl">地址</span><span class="ps-deliv-val">${addr}</span></div>` : ""}
+      </div>`;
+  }).join("");
 
   const pickItems = order.items.map((item) => `
-    <div class="pick-item">
-      <div class="pick-cb"></div>
-      <div class="pick-qty">×${item.quantity}</div>
-      <div class="pick-name">${esc(item.name)}</div>
-      <div class="pick-price">$${(item.price * item.quantity).toLocaleString()}</div>
+    <div class="ps-item">
+      <div class="ps-cb"></div>
+      <div class="ps-qty">×${Number(item.quantity)}</div>
+      <div class="ps-name">${esc(item.name)}</div>
+      <div class="ps-price">$${(item.price * item.quantity).toLocaleString()}</div>
     </div>`).join("");
 
-  const deliverySections = (allDeliveries ?? []).map((d, i) =>
-    d ? deliveryBlock(d, (allDeliveries?.length ?? 0) > 1 ? `收件人 ${i + 1} · ${recipientRef(order, i)}` : undefined) : ""
-  ).join("");
-
-  const firstD = allDeliveries?.[0];
-  const stub = `
-    <div class="stub">
-      <div><span class="lbl">訂單編號</span><span class="val">${ref}</span></div>
-      <div><span class="lbl">總計</span><span class="val">$${order.finalPrice.toLocaleString()}</span></div>
-      ${firstD?.deliveryDate ? `<div><span class="lbl">送貨日期</span><span class="val">${esc(firstD.deliveryDate)}</span></div>` : ""}
-      ${firstD?.recipientName ? `<div><span class="lbl">收貨人</span><span class="val">${esc(firstD.recipientName)}</span></div>` : ""}
-      ${firstD?.deliveryPerson ? `<div><span class="lbl">司機</span><span class="val">${esc(firstD.deliveryPerson)}</span></div>` : ""}
-      <div><span class="lbl">件數</span><span class="val">${order.items.reduce((s, i) => s + i.quantity, 0)} 件</span></div>
-    </div>`;
-
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>執貨單 ${ref}</title>
-    <style>${commonStyles}</style></head><body>
+    <style>${pickStyles}</style></head><body>
 
-    ${docHeader("執貨單", "PICKING SLIP · CONFIDENTIAL", ref, date)}
+    <div class="ps-header">
+      <div>
+        <div class="ps-brand-name">Anglo Chinese Florist</div>
+        <div class="ps-brand-sub">英華花店</div>
+      </div>
+      <div class="ps-doctype">
+        <div class="ps-doctype-zh">執貨單</div>
+        <div class="ps-confidential">Confidential · Internal Only</div>
+        <div class="ps-ref">${esc(ref)}</div>
+        <div class="ps-date">${esc(date)}</div>
+      </div>
+    </div>
 
-    <div class="section-heading">送貨資料</div>
-    ${deliverySections}
+    ${delivBars}
 
-    <div class="section-heading">執貨清單</div>
+    <div class="ps-section-label">執貨清單</div>
     ${pickItems}
-    ${order.deliveryFee > 0 ? `<div style="padding:8px 0 4px;font-size:12px;color:#777;border-bottom:1px solid #f0f0f0">送貨費 <span style="float:right;font-family:monospace">$${order.deliveryFee.toLocaleString()}</span></div>` : ""}
-    ${order.urgentFee > 0 ? `<div style="padding:8px 0 4px;font-size:12px;color:#777;border-bottom:1px solid #f0f0f0">急單費 <span style="float:right;font-family:monospace">$${order.urgentFee.toLocaleString()}</span></div>` : ""}
-    <div style="margin-top:10px;padding:10px 0;border-top:2.5px solid #1a1a1a;display:flex;justify-content:space-between;align-items:baseline">
-      <span style="font-weight:700;font-size:13px">總計</span>
-      <span style="font-family:'JetBrains Mono','Courier New',monospace;font-weight:800;font-size:20px">$${order.finalPrice.toLocaleString()}</span>
+    ${order.deliveryFee > 0 ? `<div class="ps-fee-row"><span>送貨費</span><span class="ps-fee-val">$${order.deliveryFee.toLocaleString()}</span></div>` : ""}
+    ${order.urgentFee > 0 ? `<div class="ps-fee-row"><span>急單費</span><span class="ps-fee-val">$${order.urgentFee.toLocaleString()}</span></div>` : ""}
+    <div class="ps-total-block">
+      <span class="ps-total-label">總計</span>
+      <span class="ps-total-amount">$${order.finalPrice.toLocaleString()}</span>
     </div>
 
-    ${order.senderNotes ? `<div class="section-heading">製作備註</div><div class="notes highlight" style="font-size:14px;font-weight:500">${esc(order.senderNotes)}</div>` : ""}
-    ${order.deliveryNotes ? `<div class="section-heading">送貨備註</div><div class="notes">${esc(order.deliveryNotes)}</div>` : ""}
-    ${order.notes ? `<div class="section-heading">備註</div><div class="notes">${esc(order.notes)}</div>` : ""}
+    ${order.senderNotes ? `<div class="ps-notes-block"><div class="ps-notes-label">製作備註</div><div class="ps-notes-body hi">${esc(order.senderNotes)}</div></div>` : ""}
+    ${order.deliveryNotes ? `<div class="ps-notes-block"><div class="ps-notes-label">送貨備註</div><div class="ps-notes-body lo">${esc(order.deliveryNotes)}</div></div>` : ""}
+    ${order.notes ? `<div class="ps-notes-block"><div class="ps-notes-label">備註</div><div class="ps-notes-body lo">${esc(order.notes)}</div></div>` : ""}
 
-    <div class="signatures">
-      <div class="sig-line">執貨員簽署</div>
-      <div class="sig-line">覆核員簽署</div>
+    <div class="ps-sigs">
+      <div><div class="ps-sig-line">執貨員簽署</div></div>
+      <div><div class="ps-sig-line">覆核員簽署</div></div>
     </div>
 
-    <hr class="tear-line" />
-    <div style="font-size:10px;color:#bbb;text-align:center;margin-bottom:10px;letter-spacing:0.08em;text-transform:uppercase">隨貨交出 · Tear and attach to order</div>
-    ${stub}
+    <div class="ps-tear"></div>
+    <div class="ps-tear-label">隨貨交出 · Tear and attach to order</div>
+    <div class="ps-stub">
+      <div><span class="ps-stub-lbl">訂單編號</span><span class="ps-stub-val">${esc(ref)}</span></div>
+      <div><span class="ps-stub-lbl">總計</span><span class="ps-stub-val big">$${order.finalPrice.toLocaleString()}</span></div>
+      <div><span class="ps-stub-lbl">件數</span><span class="ps-stub-val big">${totalQty} 件</span></div>
+      ${firstD?.deliveryDate ? `<div><span class="ps-stub-lbl">送貨日期</span><span class="ps-stub-val">${esc(firstD.deliveryDate)}</span></div>` : ""}
+      ${firstD?.recipientName ? `<div><span class="ps-stub-lbl">收貨人</span><span class="ps-stub-val">${esc(firstD.recipientName)}</span></div>` : ""}
+      ${firstD?.deliveryPerson ? `<div><span class="ps-stub-lbl">司機</span><span class="ps-stub-val">${esc(firstD.deliveryPerson)}</span></div>` : ""}
+    </div>
 
-    <div class="footer">Anglo Chinese Florist · 英華花店 · ${new Date().toLocaleDateString("zh-HK")}</div>
+    <div class="ps-footer">Anglo Chinese Florist · 英華花店 · ${new Date().toLocaleDateString("zh-HK")}</div>
   </body></html>`;
 }
 
