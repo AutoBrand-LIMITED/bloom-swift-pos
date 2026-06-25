@@ -321,6 +321,7 @@ export function generatePickingList(order: Order): string {
 
     ${order.senderNotes ? `<div class="section-heading">製作備註</div><div class="notes highlight" style="font-size:14px;font-weight:500">${esc(order.senderNotes)}</div>` : ""}
     ${order.deliveryNotes ? `<div class="section-heading">送貨備註</div><div class="notes">${esc(order.deliveryNotes)}</div>` : ""}
+    ${order.notes ? `<div class="section-heading">備註</div><div class="notes">${esc(order.notes)}</div>` : ""}
 
     <div class="signatures">
       <div class="sig-line">執貨員簽署</div>

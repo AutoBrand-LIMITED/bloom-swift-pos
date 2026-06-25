@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +25,22 @@ function orderDeliveryDates(o: Order): string[] {
   const dates = (o.deliveries?.map(d => d.deliveryDate).filter(Boolean) ?? []);
   if (dates.length === 0 && o.deliveryDate) dates.push(o.deliveryDate);
   return dates;
+}
+
+function highlight(text: string, query: string): React.ReactNode {
+  const trimmed = query.trim();
+  if (!trimmed) return text;
+  const lower = text.toLowerCase();
+  const lowerQ = trimmed.toLowerCase();
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0, idx: number;
+  while ((idx = lower.indexOf(lowerQ, cursor)) !== -1) {
+    if (idx > cursor) nodes.push(text.slice(cursor, idx));
+    nodes.push(<mark key={idx} className="bg-primary/20 text-foreground rounded-sm not-italic">{text.slice(idx, idx + trimmed.length)}</mark>);
+    cursor = idx + trimmed.length;
+  }
+  nodes.push(text.slice(cursor));
+  return <>{nodes}</>;
 }
 
 function daysAgo(n: number): string {
@@ -320,9 +336,14 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
 
         <ScrollArea className="flex-1">
           {filteredOrders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <ClipboardList className="w-8 h-8 mb-3 opacity-30" />
-              <p className="text-sm">{t("msg_no_orders")}</p>
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+              <ClipboardList className="w-8 h-8 opacity-30" />
+              <p className="text-sm">{hasFilters ? t("msg_no_orders_filtered") : t("msg_no_orders")}</p>
+              {hasFilters && (
+                <button onClick={clearAll} className="text-xs text-primary underline underline-offset-2 hover:no-underline mt-1">
+                  {t("btn_clear_filters")}
+                </button>
+              )}
             </div>
           ) : (
             <div className="p-4 space-y-6">
@@ -387,7 +408,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-sm font-semibold truncate leading-tight">
-                                  {order.customerName || order.phone}
+                                  {highlight(order.customerName || order.phone, searchText)}
                                 </span>
                                 <div className="flex items-center gap-2 shrink-0">
                                   {blocked && <AlertTriangle className="w-3 h-3 text-destructive" />}
