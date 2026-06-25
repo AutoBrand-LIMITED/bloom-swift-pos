@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Crown, Gift, Tag, Pencil, MoreHorizontal, SlidersHorizontal, Upload } from "lucide-react";
+import { ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Crown, Gift, Tag, Pencil, MoreHorizontal, SlidersHorizontal, Upload } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -570,9 +570,7 @@ const Index = () => {
         <div className="max-w-full mx-auto px-4 h-[52px] flex items-center justify-between gap-3">
           {/* Brand */}
           <div className="flex items-center gap-3 min-w-0 shrink-0">
-            <div className="flex items-center justify-center w-9 h-9 rounded-full bg-primary text-primary-foreground shrink-0 shadow-sm">
-              <Flower2 className="w-[18px] h-[18px]" />
-            </div>
+            <img src="/logo512.png" alt="Anglo Chinese Florist" className="w-9 h-9 rounded-full object-cover shrink-0 shadow-sm" />
             <div className="min-w-0">
               <div className="flex items-baseline gap-1.5">
                 <h1 className="text-[13px] font-bold tracking-tight leading-none">Anglo Chinese Florist</h1>
