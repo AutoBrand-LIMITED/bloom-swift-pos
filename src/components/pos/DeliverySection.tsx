@@ -200,7 +200,7 @@ function DeliveryCard({
       </div>
 
       {/* Date + Time slot */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-3">
         <div className="space-y-1.5">
           <Label className="text-xs font-medium flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" /> {t("label_delivery_date")}
@@ -209,7 +209,7 @@ function DeliveryCard({
             type="date"
             value={delivery.deliveryDate}
             onChange={(e) => set("deliveryDate", e.target.value)}
-            className="text-sm"
+            className="text-sm max-w-[220px]"
           />
         </div>
         <div className="space-y-1.5">
