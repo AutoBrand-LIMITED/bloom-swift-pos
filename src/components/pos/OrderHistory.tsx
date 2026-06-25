@@ -370,13 +370,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                       return (
                         <div
                           key={order.id}
-                          className={`rounded-lg overflow-hidden border transition-colors ${
-                            blocked
-                              ? "border-border shadow-[inset_3px_0_0_0_hsl(var(--destructive)/0.7)]"
-                              : order.paymentStatus === "unpaid"
-                              ? "border-destructive/20"
-                              : "border-border"
-                          }`}
+                          className={`rounded-lg overflow-hidden border border-border transition-colors`}
                         >
                           {/* Compact row — always visible */}
                           <button
