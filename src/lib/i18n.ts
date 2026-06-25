@@ -4,6 +4,7 @@ export const zh = {
   // Nav
   nav_back: "返回",
   nav_dispatch: "調度",
+  plan_route: "規劃路線",
   nav_report: "報告",
   nav_clear: "清空",
   nav_order_history: "訂單記錄",
@@ -494,6 +495,7 @@ export const en: Record<TranslationKey, string> = {
   // Nav
   nav_back: "Back",
   nav_dispatch: "Dispatch",
+  plan_route: "Plan Route",
   nav_report: "Report",
   nav_clear: "Clear",
   nav_order_history: "Order History",

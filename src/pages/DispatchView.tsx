@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Truck, CheckCircle2, Clock, AlertTriangle, Package, MapPin, Users } from "lucide-react";
+import { ArrowLeft, Truck, CheckCircle2, Clock, AlertTriangle, Package, MapPin, Users, Navigation } from "lucide-react";
 import type { Order } from "@/types/order";
 import { loadOrders } from "@/lib/orders";
 import { loadDrivers } from "@/lib/drivers";
@@ -188,6 +188,14 @@ const DispatchView = () => {
             ? (groupMode === "driver" ? t("text_unassigned") : t("text_not_specified"))
             : key;
 
+          const pendingAddresses = groupOrders
+            .filter((o) => o.deliveryStatus !== "delivered")
+            .map((o) => orderPrimaryAddress(o))
+            .filter((a) => Boolean(a) && a !== "—");
+          const routeUrl = pendingAddresses.length > 1
+            ? `https://www.google.com/maps/dir/${pendingAddresses.map(encodeURIComponent).join("/")}`
+            : null;
+
           return (
             <div key={key} className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
               {/* Group header */}
@@ -204,6 +212,17 @@ const DispatchView = () => {
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   {groupPending > 0 && <span className="text-amber-600 font-medium">{groupPending} {t("dispatch_pending")}</span>}
                   {groupDone > 0 && <span className="text-green-600 font-medium">{groupDone} {t("dispatch_delivered")}</span>}
+                  {routeUrl && (
+                    <a
+                      href={routeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-primary hover:underline font-medium"
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                      {t("plan_route")}
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -212,6 +231,7 @@ const DispatchView = () => {
                 {groupOrders.map((order) => {
                   const isDelivered = order.deliveryStatus === "delivered";
                   const blocked = isDispatchBlocked(order);
+                  const orderAddr = orderPrimaryAddress(order);
 
                   return (
                     <div
@@ -247,8 +267,19 @@ const DispatchView = () => {
                       </div>
 
                       {/* Address */}
-                      <div className="flex-1 min-w-0 hidden md:block">
-                        <p className="text-xs text-muted-foreground truncate">{orderPrimaryAddress(order)}</p>
+                      <div className="flex-1 min-w-0 hidden md:flex items-center gap-1.5">
+                        <p className="text-xs text-muted-foreground truncate">{orderAddr}</p>
+                        {orderAddr && orderAddr !== "—" && (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(orderAddr + " 香港")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-primary shrink-0 transition-colors"
+                            title={orderAddr}
+                          >
+                            <MapPin className="w-3 h-3" />
+                          </a>
+                        )}
                       </div>
 
                       {/* Items */}

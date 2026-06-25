@@ -134,7 +134,9 @@ Built by: AutoBrand Limited
 | Order items + presets + voice input | ✅ Exists | Category filter: 全部/花束/花籃/盆栽/花圈/其他 ✅; item code quick-search ✅ (`/` shortcut) |
 | Budget tracker with progress bar | ✅ Exists | — |
 | HK cascading address (region→district→area) | ✅ Exists | — |
-| Google Maps embed | ✅ Exists | — |
+| Google Maps — per-address pin (Dispatch) | ✅ Exists | Opens individual delivery in Maps |
+| Google Maps — Plan Route (Dispatch) | ✅ Exists | Multi-stop route URL per driver, opens Maps directions |
+| Google Maps — delivery note link (print) | ✅ Exists | URL printed on delivery slip |
 | Delivery date / time input | ✅ Exists | Preset slots: 上午/下午/指定時間 |
 | Recipient fields + failed delivery action | ✅ Exists | — |
 | Gift card + templates + markdown + voice | ✅ Exists | — |

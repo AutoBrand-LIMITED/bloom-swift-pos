@@ -345,7 +345,9 @@ export function generateDeliveryNote(order: Order): string {
 
   const deliverySections = (allDeliveries ?? []).map((d, i) => {
     if (!d) return "";
+    const rawAddr = [d.deliveryRegion, d.deliveryDistrict, d.deliveryArea, d.deliveryDetail].filter(Boolean).join(" ");
     const addr = [d.deliveryRegion, d.deliveryDistrict, d.deliveryArea, d.deliveryDetail].filter(Boolean).map(esc).join(" ");
+    const mapUrl = rawAddr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddr + " 香港")}` : "";
     const isExtra = i > 0;
     return `
       <div style="${isExtra ? "margin-top:20px;padding-top:16px;border-top:1.5px dashed #e0e0e0;" : ""}">
@@ -358,7 +360,8 @@ export function generateDeliveryNote(order: Order): string {
         <div class="recipient-card">
           ${d.recipientName ? `<div class="recipient-name-lg">${esc(d.recipientName)}</div>` : ""}
           ${d.recipientPhone ? `<div class="recipient-phone-lg">${esc(d.recipientPhone)}</div>` : ""}
-          ${addr ? `<div class="recipient-addr">${addr}</div>` : ""}
+          ${rawAddr ? `<div class="recipient-addr">${addr}</div>` : ""}
+          ${mapUrl ? `<div style="margin-top:4px;font-size:10px;color:#888"><a href="${mapUrl}" style="color:#2563eb">${esc(mapUrl)}</a></div>` : ""}
         </div>
         ${d.deliveryPerson ? `<div style="margin-top:8px;font-size:11px;color:#aaa">司機：${esc(d.deliveryPerson)}</div>` : ""}
       </div>`;
