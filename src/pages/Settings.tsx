@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowLeft, SlidersHorizontal, Clock, Plus, Trash2, RotateCcw, Save, Lock } from "lucide-react";
+import { ArrowLeft, Clock, Plus, Trash2, RotateCcw, Save, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { loadSlots, saveSlots, resetSlots, type DeliverySlot } from "@/lib/delivery-slots";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -46,111 +45,120 @@ const Settings = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-gradient-to-br from-primary/[0.06] via-card/80 to-card/80 backdrop-blur-md border-b border-border">
+      <header className="sticky top-0 z-40 bg-card/90 backdrop-blur-md border-b border-border">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary/10 text-primary shrink-0">
-            <SlidersHorizontal className="w-4 h-4" />
-          </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-sm font-bold tracking-tight leading-none">{t("settings_title")}</h1>
             <p className="text-[11px] text-muted-foreground leading-none mt-1">{t("settings_slots_desc")}</p>
           </div>
+          <Button size="sm" className="gap-1.5 shrink-0" onClick={handleSave}>
+            <Save className="w-3.5 h-3.5" /> {t("settings_save")}
+          </Button>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-5 space-y-4 pb-28">
-        {/* Delivery slots */}
-        <section className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
-            <Clock className="w-4 h-4" />
+      <main className="max-w-2xl mx-auto px-4 py-6 pb-10">
+        {/* Section label */}
+        <div className="flex items-center gap-2 mb-4">
+          <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
+          <span className="text-[11px] font-bold tracking-widest uppercase text-primary/70">
             {t("settings_slots_section")}
-          </h2>
-
-          <div className="space-y-2.5">
-            {slots.map((slot) => {
-              const builtIn = !!slot.locked;
-              return (
-                <div
-                  key={slot.id}
-                  className={`rounded-lg border p-3 ${builtIn ? "border-border bg-secondary/30" : "border-primary/20 bg-primary/[0.03]"}`}
-                >
-                  {builtIn ? (
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted text-muted-foreground shrink-0">
-                        <Lock className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">
-                          {slot.labelKey ? t(slot.labelKey) : slot.label}
-                          <span className="ml-1.5 text-xs text-muted-foreground font-normal">
-                            {slot.sublabelKey ? t(slot.sublabelKey) : slot.sublabel}
-                          </span>
-                        </p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {slot.specified ? t("settings_specified_hint") : t("settings_locked_hint")}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-end gap-2">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">{t("settings_slot_label")}</Label>
-                        <Input
-                          value={slot.label}
-                          onChange={(e) => updateSlot(slot.id, "label", e.target.value)}
-                          placeholder={t("placeholder_slot_label")}
-                          className="text-sm h-9"
-                          maxLength={40}
-                        />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">{t("settings_slot_sublabel")}</Label>
-                        <Input
-                          value={slot.sublabel}
-                          onChange={(e) => updateSlot(slot.id, "sublabel", e.target.value)}
-                          placeholder={t("placeholder_slot_sub")}
-                          className="text-sm h-9"
-                          maxLength={40}
-                        />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 text-destructive hover:text-destructive shrink-0"
-                        onClick={() => removeSlot(slot.id)}
-                        aria-label={t("settings_remove_slot")}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <Button variant="outline" size="sm" className="w-full gap-2 text-xs border-dashed" onClick={addSlot}>
-            <Plus className="w-3.5 h-3.5" />
-            {t("settings_add_slot")}
-          </Button>
-        </section>
-
-      </main>
-
-      {/* Sticky actions */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground" onClick={handleReset}>
-            <RotateCcw className="w-3.5 h-3.5" /> {t("settings_reset")}
-          </Button>
-          <Button size="sm" className="gap-1.5" onClick={handleSave}>
-            <Save className="w-4 h-4" /> {t("settings_save")}
-          </Button>
+          </span>
         </div>
-      </div>
+
+        <div className="space-y-2">
+          {slots.map((slot) => {
+            const builtIn = !!slot.locked;
+            const isSpecified = !!slot.specified;
+            return (
+              <div
+                key={slot.id}
+                className={`rounded-xl border transition-colors ${
+                  isSpecified
+                    ? "border-amber-200 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-900/10"
+                    : builtIn
+                    ? "border-border bg-card"
+                    : "border-primary/20 bg-primary/[0.025]"
+                }`}
+              >
+                {builtIn ? (
+                  <div className="flex items-center gap-3 px-4 py-3.5">
+                    {/* Time label — dominant */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[15px] font-semibold leading-tight ${isSpecified ? "text-amber-800 dark:text-amber-300" : "text-foreground"}`}>
+                        {slot.labelKey ? t(slot.labelKey) : slot.label}
+                      </p>
+                      <p className={`text-xs mt-0.5 font-mono ${isSpecified ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                        {slot.sublabelKey ? t(slot.sublabelKey) : slot.sublabel}
+                      </p>
+                    </div>
+                    {/* Lock badge */}
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                      isSpecified
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-800/30 dark:text-amber-400"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      <Lock className="w-2.5 h-2.5" />
+                      {isSpecified ? t("settings_specified_hint") : t("settings_locked_hint")}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-3">
+                    <div className="flex-1 min-w-0">
+                      <Input
+                        value={slot.label}
+                        onChange={(e) => updateSlot(slot.id, "label", e.target.value)}
+                        placeholder={t("placeholder_slot_label")}
+                        className="text-sm h-8 border-0 bg-transparent px-0 focus-visible:ring-0 font-medium placeholder:text-muted-foreground/50"
+                        maxLength={40}
+                      />
+                    </div>
+                    <div className="w-px h-5 bg-border shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Input
+                        value={slot.sublabel}
+                        onChange={(e) => updateSlot(slot.id, "sublabel", e.target.value)}
+                        placeholder={t("placeholder_slot_sub")}
+                        className="text-xs h-8 border-0 bg-transparent px-0 focus-visible:ring-0 text-muted-foreground placeholder:text-muted-foreground/40 font-mono"
+                        maxLength={40}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground/50 hover:text-destructive shrink-0"
+                      onClick={() => removeSlot(slot.id)}
+                      aria-label={t("settings_remove_slot")}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={addSlot}
+          className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/[0.02] transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          {t("settings_add_slot")}
+        </button>
+
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" /> {t("settings_reset")}
+          </button>
+        </div>
+      </main>
     </div>
   );
 };
