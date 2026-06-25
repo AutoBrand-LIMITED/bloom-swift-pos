@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Crown, Gift, Tag, Pencil, MoreHorizontal, SlidersHorizontal, Upload } from "lucide-react";
+import { ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Crown, Gift, Pencil, MoreHorizontal, SlidersHorizontal, Upload } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -33,13 +33,6 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { updateCustomerPersistentNotes, updateCustomerFlags, saveCustomerAddresses, extractCustomersFromOrders, loadStoredCustomers, mergeCustomers, saveCustomers } from "@/lib/customer-utils";
 import { parseCsvToOrders } from "@/lib/csv-import";
 import type { CustomerFlag, SavedAddress } from "@/data/demo-customers";
-import type { TranslationKey } from "@/lib/i18n";
-
-const OCCASION_KEYS: TranslationKey[] = [
-  "occasion_birthday", "occasion_mothers_day", "occasion_fathers_day",
-  "occasion_valentines", "occasion_christmas", "occasion_anniversary",
-  "occasion_graduation", "occasion_new_year", "occasion_other",
-];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -818,12 +811,25 @@ const Index = () => {
             onBudgetChange={setBudget}
             subtotal={subtotal}
             isComplete={items.length > 0}
+            occasionTag={occasionTag}
+            onOccasionTagChange={(key) => {
+              setOccasionTag(key);
+              if (key) {
+                const r = reminderForOccasion(key);
+                if (r !== "none") setReminderOption(r);
+              }
+            }}
             senderNotesPinned={senderNotesPinned}
             deliveryNotesPinned={deliveryNotesPinned}
             internalNotesPinned={internalNotesPinned}
             onSenderNotesPinnedChange={setSenderNotesPinned}
             onDeliveryNotesPinnedChange={setDeliveryNotesPinned}
             onInternalNotesPinnedChange={setInternalNotesPinned}
+          />
+
+          <AddOnsSection
+            items={items}
+            onItemsChange={setItems}
           />
 
           <DeliverySection
@@ -839,38 +845,6 @@ const Index = () => {
             onMessageChange={setGiftCardMessage}
             isComplete={!giftCardEnabled || !!giftCardMessage.trim()}
           />
-
-          {/* Occasion tag */}
-          <div className={`rounded-xl p-4 space-y-3 border transition-colors ${occasionTag ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
-            <h2 className="text-sm sm:text-[13px] font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
-              <Tag className="w-4 h-4" />
-              {t("label_occasion")}
-              {occasionTag && <span className="text-xs sm:text-[11px] font-normal normal-case tracking-normal text-primary">{t(occasionTag as TranslationKey)}</span>}
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {OCCASION_KEYS.map(key => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    const next = occasionTag === key ? "" : key;
-                    setOccasionTag(next);
-                    // Apply the staff-configured reminder timing for this occasion
-                    if (next) {
-                      const r = reminderForOccasion(next);
-                      if (r !== "none") setReminderOption(r);
-                    }
-                  }}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                    occasionTag === key
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground hover:bg-primary/10 hover:text-primary"
-                  }`}
-                >
-                  {t(key)}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <PaymentSection
             subtotal={subtotal}
@@ -894,11 +868,6 @@ const Index = () => {
             payments={editingOrderId ? orders.find(o => o.id === editingOrderId)?.payments : undefined}
             isComplete={items.length > 0 && (paymentStatus !== "unpaid" || finalPrice === 0)}
             step={giftCardEnabled ? 6 : 5}
-          />
-
-          <AddOnsSection
-            items={items}
-            onItemsChange={setItems}
           />
         </main>
       </div>

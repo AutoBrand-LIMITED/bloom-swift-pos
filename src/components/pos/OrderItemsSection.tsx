@@ -5,12 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Trash2, Package, Wallet, Wand2, Bookmark, Search, CornerDownLeft } from "lucide-react";
+import { Plus, Trash2, Package, Wallet, Wand2, Bookmark, Search, CornerDownLeft, Tag } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { productLabel } from "@/lib/product-i18n";
+import type { TranslationKey } from "@/lib/i18n";
+
+const OCCASION_KEYS: TranslationKey[] = [
+  "occasion_birthday", "occasion_mothers_day", "occasion_fathers_day",
+  "occasion_valentines", "occasion_christmas", "occasion_anniversary",
+  "occasion_graduation", "occasion_new_year", "occ_wedding", "occ_opening",
+  "occ_condolence", "occ_moving", "occ_hospital", "occ_funeral", "occasion_other",
+];
 
 interface OrderItemsSectionProps {
   items: OrderItem[];
@@ -29,6 +37,8 @@ interface OrderItemsSectionProps {
   onBudgetChange: (v: number) => void;
   subtotal: number;
   isComplete?: boolean;
+  occasionTag?: string;
+  onOccasionTagChange?: (key: string) => void;
   senderNotesPinned?: boolean;
   deliveryNotesPinned?: boolean;
   internalNotesPinned?: boolean;
@@ -44,6 +54,7 @@ const OrderItemsSection = ({
   senderNotes, deliveryNotes, internalNotes,
   onSenderNotesChange, onDeliveryNotesChange, onInternalNotesChange,
   budget, onBudgetChange, subtotal, isComplete,
+  occasionTag, onOccasionTagChange,
   senderNotesPinned, deliveryNotesPinned, internalNotesPinned,
   onSenderNotesPinnedChange, onDeliveryNotesPinnedChange, onInternalNotesPinnedChange,
 }: OrderItemsSectionProps) => {
@@ -182,6 +193,30 @@ const OrderItemsSection = ({
           setCustomOrderOpen(false);
         }}
       />
+
+      {/* Occasion */}
+      {onOccasionTagChange && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+            <Tag className="w-3 h-3" /> {t("label_occasion")}
+          </span>
+          <div className="flex gap-1.5 flex-wrap">
+            {OCCASION_KEYS.map(key => (
+              <button
+                key={key}
+                onClick={() => onOccasionTagChange(occasionTag === key ? "" : key)}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                  occasionTag === key
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-primary/10 hover:text-primary"
+                }`}
+              >
+                {t(key)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Budget */}
       <div className="space-y-2 rounded-lg bg-secondary/50 p-3">
