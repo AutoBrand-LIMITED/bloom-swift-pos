@@ -40,7 +40,6 @@ const CsvImportButton = ({ onCustomersUpdated }: CsvImportButtonProps) => {
         : `Imported ${mergedCustomers.length} customers, ${totalRecords} records`;
       toast.success(successMsg);
     } catch (err) {
-      console.error("CSV import error:", err);
       toast.error(t("csv_import_failed"));
     }
 

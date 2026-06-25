@@ -68,7 +68,7 @@ const Index = () => {
   const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".csv") && file.type !== "text/csv") {
+    if (!file.name.toLowerCase().endsWith(".csv") || !["text/csv", "text/plain", "application/csv", "application/vnd.ms-excel"].includes(file.type)) {
       toast.error(t("csv_import_failed"));
       if (csvFileRef.current) csvFileRef.current.value = "";
       return;
@@ -88,7 +88,6 @@ const Index = () => {
       const records = parsed.reduce((s, o) => s + o.items.length, 0);
       toast.success(lang === "zh" ? `成功匯入 ${merged.length} 位客戶，共 ${records} 筆歷史記錄` : `Imported ${merged.length} customers, ${records} records`);
     } catch (err) {
-      console.error("CSV import error:", err);
       toast.error(t("csv_import_failed"));
     }
     if (csvFileRef.current) csvFileRef.current.value = "";

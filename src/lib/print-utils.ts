@@ -922,14 +922,28 @@ export function generateMessageCard(order: Order): string {
 
 /** Open a print window with the given HTML */
 export function printDocument(html: string) {
-  const win = window.open("", "_blank", "width=800,height=900");
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
-  setTimeout(() => win.print(), 300);
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank", "width=800,height=900");
+  if (!win) { URL.revokeObjectURL(url); return; }
+  setTimeout(() => {
+    win.print();
+    setTimeout(() => URL.revokeObjectURL(url), 5_000);
+  }, 300);
 }
 
-/** Print multiple documents in sequence */
-export function printBatch(htmlDocs: string[], delayMs = 600) {
-  htmlDocs.forEach((html, i) => setTimeout(() => printDocument(html), i * delayMs));
+/** Print multiple documents in a single window to avoid popup-blocker issues */
+export function printBatch(htmlDocs: string[]) {
+  if (htmlDocs.length === 0) return;
+  if (htmlDocs.length === 1) { printDocument(htmlDocs[0]); return; }
+  const combined = htmlDocs
+    .map((html, i) => {
+      const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      const body = bodyMatch ? bodyMatch[1] : html;
+      return `<div style="page-break-after:${i < htmlDocs.length - 1 ? "always" : "avoid"}">${body}</div>`;
+    })
+    .join("\n");
+  const stylesMatch = htmlDocs[0].match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const styles = stylesMatch ? `<style>${stylesMatch[1]}</style>` : "";
+  printDocument(`<!DOCTYPE html><html><head>${styles}</head><body>${combined}</body></html>`);
 }

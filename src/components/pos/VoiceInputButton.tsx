@@ -41,7 +41,6 @@ const VoiceInputButton = ({ onResult, lang, className }: VoiceInputButtonProps) 
     };
 
     recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
       if (event.error === "not-allowed") {
         toast.error(t("voice_mic_denied"));
       }
