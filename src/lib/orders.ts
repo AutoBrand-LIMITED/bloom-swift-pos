@@ -2,6 +2,33 @@ import type { Order } from "@/types/order";
 
 export const ORDERS_KEY = "florist-pos-orders";
 export const PHOTOS_KEY = "florist-pos-photos";
+export const INVOICE_SEQ_KEY = "florist-pos-invoice-seq";
+
+/**
+ * Permanent, non-cancellable invoice number. A monotonic counter in
+ * localStorage guarantees each call returns a unique INV-XXXX value that is
+ * never reused, even after an order is deleted.
+ *
+ * Note: the counter advances before the order is written. localStorage has no
+ * transactions, so if a subsequent save throws (e.g. quota), a number may be
+ * skipped. Gaps are acceptable — uniqueness/non-reuse is the invariant, not
+ * contiguity. (A backend with a sequence will enforce this properly — P7.)
+ */
+export function nextInvoiceNumber(): string {
+  let seq = 0;
+  try {
+    seq = parseInt(localStorage.getItem(INVOICE_SEQ_KEY) || "0", 10) || 0;
+  } catch {
+    seq = 0;
+  }
+  const next = seq + 1;
+  try {
+    localStorage.setItem(INVOICE_SEQ_KEY, String(next));
+  } catch {
+    throw new Error("儲存失敗：儲存空間已滿");
+  }
+  return `INV-${String(next).padStart(4, "0")}`;
+}
 
 export function loadOrders(): Order[] {
   try {

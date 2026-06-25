@@ -1,13 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Truck, CheckCircle2, Clock, AlertTriangle, Package } from "lucide-react";
-import { DRIVERS } from "@/types/order";
+import { ArrowLeft, Truck, CheckCircle2, Clock, AlertTriangle, Package, MapPin, Users } from "lucide-react";
 import type { Order } from "@/types/order";
 import { loadOrders } from "@/lib/orders";
+import { loadDrivers } from "@/lib/drivers";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 type DateFilter = "today" | "tomorrow" | "all";
+type GroupMode = "driver" | "district";
 
 function toDateStr(d: Date): string { return d.toISOString().slice(0, 10); }
 function todayStr(): string { return toDateStr(new Date()); }
@@ -42,15 +43,17 @@ function isDispatchBlocked(order: Order): boolean {
   return dates.some((date) => date <= today);
 }
 
-const DRIVER_NAMES = new Set(DRIVERS.map((d) => d.name));
-
 const DispatchView = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
+  const [groupMode, setGroupMode] = useState<GroupMode>("driver");
 
   useEffect(() => { setOrders(loadOrders()); }, []);
+
+  const drivers = useMemo(() => loadDrivers(), []);
+  const driverNames = useMemo(() => new Set(drivers.map((d) => d.name)), [drivers]);
 
   const filteredOrders = useMemo(() => {
     if (dateFilter === "all") return orders;
@@ -62,25 +65,45 @@ const DispatchView = () => {
   const totalDelivered = filteredOrders.filter((o) => o.deliveryStatus === "delivered").length;
   const blocked = filteredOrders.filter(isDispatchBlocked).length;
 
-  const driverGroups = useMemo(() => {
-    const groups: Record<string, Order[]> = {};
+  // Vehicles to deploy = distinct assigned drivers with at least one pending order
+  const vehiclesToDeploy = useMemo(() => {
+    const set = new Set<string>();
     for (const o of filteredOrders) {
-      const driver = orderDriver(o) || "未分配";
-      groups[driver] = [...(groups[driver] ?? []), o];
+      if (o.deliveryStatus === "delivered") continue;
+      const d = orderDriver(o);
+      if (d) set.add(d);
     }
-    // Sort orders within each group by date then time
-    for (const key of Object.keys(groups)) {
-      groups[key].sort((a, b) =>
+    return set.size;
+  }, [filteredOrders]);
+
+  const groups = useMemo(() => {
+    const map: Record<string, Order[]> = {};
+    for (const o of filteredOrders) {
+      const key = groupMode === "driver"
+        ? (orderDriver(o) || "未分配")
+        : (orderPrimaryDistrict(o) || "—");
+      map[key] = [...(map[key] ?? []), o];
+    }
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) =>
         (orderPrimaryDate(a) + orderPrimaryTime(a)).localeCompare(orderPrimaryDate(b) + orderPrimaryTime(b))
       );
     }
-    // Return named drivers first (in DRIVERS order), then 未分配 last
-    const sortedKeys = [
-      ...DRIVERS.map((d) => d.name).filter((n) => groups[n]),
-      ...Object.keys(groups).filter((k) => !DRIVER_NAMES.has(k)),
-    ];
-    return sortedKeys.map((key) => ({ driver: key, orders: groups[key] }));
-  }, [filteredOrders]);
+    if (groupMode === "driver") {
+      const sortedKeys = [
+        ...drivers.map((d) => d.name).filter((n) => map[n]),
+        ...Object.keys(map).filter((k) => !driverNames.has(k)),
+      ];
+      return sortedKeys.map((key) => ({ key, orders: map[key] }));
+    }
+    // district mode — alphabetical, unknown last
+    const sortedKeys = Object.keys(map).sort((a, b) => {
+      if (a === "—") return 1;
+      if (b === "—") return -1;
+      return a.localeCompare(b);
+    });
+    return sortedKeys.map((key) => ({ key, orders: map[key] }));
+  }, [filteredOrders, groupMode, drivers, driverNames]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -107,9 +130,28 @@ const DispatchView = () => {
                 <span className="font-bold font-mono text-sm">{totalDelivered}</span>
                 <span className="hidden sm:inline">{t("dispatch_delivered")}</span>
               </span>
+              <span className="flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1" title={t("dispatch_vehicles")}>
+                <Users className="w-3.5 h-3.5" />
+                <span className="font-bold font-mono text-sm">{vehiclesToDeploy}</span>
+                <span className="hidden sm:inline">{t("dispatch_vehicles")}</span>
+              </span>
               {blocked > 0 && (
                 <span className="flex items-center gap-1.5 rounded-full bg-red-500/10 text-red-600 font-medium px-2.5 py-1"><AlertTriangle className="w-3.5 h-3.5" />{blocked}<span className="hidden sm:inline">{t("text_unpaid_warning")}</span></span>
               )}
+            </div>
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              {(["driver", "district"] as GroupMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setGroupMode(m)}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+                    groupMode === m ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {m === "driver" ? <Truck className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline">{m === "driver" ? t("group_by_driver") : t("group_by_district")}</span>
+                </button>
+              ))}
             </div>
             <div className="flex rounded-lg border border-border overflow-hidden">
               {(["today", "tomorrow", "all"] as DateFilter[]).map((f) => (
@@ -138,32 +180,36 @@ const DispatchView = () => {
           </div>
         )}
 
-        {driverGroups.map(({ driver, orders: driverOrders }) => {
-          const driverPending = driverOrders.filter((o) => o.deliveryStatus !== "delivered").length;
-          const driverDone = driverOrders.filter((o) => o.deliveryStatus === "delivered").length;
+        {groups.map(({ key, orders: groupOrders }) => {
+          const groupPending = groupOrders.filter((o) => o.deliveryStatus !== "delivered").length;
+          const groupDone = groupOrders.filter((o) => o.deliveryStatus === "delivered").length;
+          const isUnknown = key === "未分配" || key === "—";
+          const headerLabel = isUnknown
+            ? (groupMode === "driver" ? t("text_unassigned") : t("text_not_specified"))
+            : key;
 
           return (
-            <div key={driver} className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
-              {/* Driver header */}
+            <div key={key} className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+              {/* Group header */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/40 border-b border-border">
                 <div className="flex items-center gap-2.5">
                   <span className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 ${
-                    driver === "未分配" ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"
+                    isUnknown ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"
                   }`}>
-                    {driver === "未分配" ? "?" : driver[0]}
+                    {groupMode === "district" ? <MapPin className="w-3.5 h-3.5" /> : (isUnknown ? "?" : key[0])}
                   </span>
-                  <span className="text-sm font-bold">{driver === "未分配" ? t("text_unassigned") : driver}</span>
-                  <span className="text-xs text-muted-foreground">{driverOrders.length} {t("dispatch_unit_order")}</span>
+                  <span className="text-sm font-bold">{headerLabel}</span>
+                  <span className="text-xs text-muted-foreground">{groupOrders.length} {t("dispatch_unit_order")}</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  {driverPending > 0 && <span className="text-amber-600 font-medium">{driverPending} {t("dispatch_pending")}</span>}
-                  {driverDone > 0 && <span className="text-green-600 font-medium">{driverDone} {t("dispatch_delivered")}</span>}
+                  {groupPending > 0 && <span className="text-amber-600 font-medium">{groupPending} {t("dispatch_pending")}</span>}
+                  {groupDone > 0 && <span className="text-green-600 font-medium">{groupDone} {t("dispatch_delivered")}</span>}
                 </div>
               </div>
 
               {/* Orders table */}
               <div className="divide-y divide-border">
-                {driverOrders.map((order) => {
+                {groupOrders.map((order) => {
                   const isDelivered = order.deliveryStatus === "delivered";
                   const blocked = isDispatchBlocked(order);
 

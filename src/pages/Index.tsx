@@ -22,13 +22,14 @@ import PaymentSection from "@/components/pos/PaymentSection";
 import AddOnsSection from "@/components/pos/AddOnsSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
-import type { Order, OrderItem, PaymentStatus, PaymentRecord, Delivery } from "@/types/order";
+import type { Order, OrderItem, PaymentStatus, PaymentRecord, AuditEntry, Delivery } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
 import { newDelivery } from "@/components/pos/DeliverySection";
 import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
-import { loadOrders, saveOrders } from "@/lib/orders";
+import { loadOrders, saveOrders, nextInvoiceNumber } from "@/lib/orders";
+import { reminderForOccasion } from "@/lib/occasion-reminders";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { updateCustomerPersistentNotes, updateCustomerFlags, saveCustomerAddresses } from "@/lib/customer-utils";
 import type { CustomerFlag, SavedAddress } from "@/data/demo-customers";
@@ -309,6 +310,44 @@ const Index = () => {
     toast.info(t("btn_reorder"));
   };
 
+  const persistOrder = (updated: Order) => {
+    const next = orders.map(o => (o.id === updated.id ? updated : o));
+    setOrders(next);
+    saveOrders(next);
+  };
+
+  const handleSettleBalance = (order: Order) => {
+    const depositPaid = (order.payments ?? []).filter(p => p.type === "deposit").reduce((s, p) => s + p.amount, 0);
+    const balance = order.finalPrice - depositPaid;
+    const now = new Date().toISOString();
+    // unpaid → full payment; deposit → balance owed. Attribute to the active
+    // staff member, falling back to the order's original staff.
+    const isFullPayment = order.paymentStatus === "unpaid";
+    const staffId = salesId || order.salesId;
+    const updated: Order = {
+      ...order,
+      paymentStatus: "paid",
+      payments: [...(order.payments ?? []), { type: isFullPayment ? "full" : "balance", amount: balance, method: order.paymentMethod ?? "", at: now }],
+      auditLog: [...(order.auditLog ?? []), { action: "balance_settled", at: now, staffId, detail: `$${balance.toLocaleString()}` }],
+    };
+    persistOrder(updated);
+    toast.success(`${t("toast_balance_settled")} $${balance.toLocaleString()}`);
+  };
+
+  const handleAddNote = (order: Order, note: string) => {
+    const trimmed = note.trim();
+    if (!trimmed) return;
+    const now = new Date().toISOString();
+    const staffId = salesId || order.salesId;
+    const updated: Order = {
+      ...order,
+      internalNotes: order.internalNotes ? `${order.internalNotes}\n${trimmed}` : trimmed,
+      auditLog: [...(order.auditLog ?? []), { action: "note_added", at: now, staffId, detail: trimmed }],
+    };
+    persistOrder(updated);
+    toast.success(t("toast_note_added"));
+  };
+
   const isDuplicateOrder = (order: Order): boolean => {
     const normalizedPhone = order.phone.replace(/\s/g, "");
     const dates = (order.deliveries ?? []).map(d => d.deliveryDate).filter(Boolean);
@@ -380,6 +419,13 @@ const Index = () => {
 
     const prevOrder = editingOrderId ? orders.find(o => o.id === editingOrderId) : undefined;
     const payments = buildPayments(prevOrder);
+    const now = new Date().toISOString();
+    const invoiceNumber = editingOrderId
+      ? (prevOrder?.invoiceNumber ?? nextInvoiceNumber())
+      : nextInvoiceNumber();
+    const auditLog: AuditEntry[] = editingOrderId
+      ? [...(prevOrder?.auditLog ?? []), { action: "amended", at: now, staffId: salesId }]
+      : [{ action: "created", at: now, staffId: salesId }];
 
     const order: Order = {
       id: currentOrderId,
@@ -415,6 +461,8 @@ const Index = () => {
       internalNotes: internalNotes.trim(),
       occasionTag: occasionTag || undefined,
       payments,
+      invoiceNumber,
+      auditLog,
       createdAt: editingOrderId
         ? (orders.find(o => o.id === editingOrderId)?.createdAt ?? new Date().toISOString())
         : new Date().toISOString(),
@@ -617,7 +665,7 @@ const Index = () => {
         )}
 
         {/* Main form */}
-        <main className="flex-1 max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-4 sm:space-y-5 pb-28 sm:pb-40">
+        <main className="flex-1 max-w-3xl lg:max-w-4xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-5 space-y-4 sm:space-y-5 pb-28 sm:pb-40">
 
           {/* Edit mode banner */}
           {editingOrderId && (
@@ -759,7 +807,15 @@ const Index = () => {
               {OCCASION_KEYS.map(key => (
                 <button
                   key={key}
-                  onClick={() => setOccasionTag(occasionTag === key ? "" : key)}
+                  onClick={() => {
+                    const next = occasionTag === key ? "" : key;
+                    setOccasionTag(next);
+                    // Apply the staff-configured reminder timing for this occasion
+                    if (next) {
+                      const r = reminderForOccasion(next);
+                      if (r !== "none") setReminderOption(r);
+                    }
+                  }}
                   className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                     occasionTag === key
                       ? "bg-primary text-primary-foreground"
@@ -850,6 +906,8 @@ const Index = () => {
         onClose={() => setHistoryOpen(false)}
         onEdit={handleEditOrder}
         onReorder={handleReorder}
+        onSettleBalance={handleSettleBalance}
+        onAddNote={handleAddNote}
       />
 
       {/* Duplicate order confirmation dialog */}

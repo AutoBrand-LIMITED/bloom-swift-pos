@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
 import type { Delivery } from "@/types/order";
-import { DRIVERS } from "@/types/order";
+import { loadDrivers } from "@/lib/drivers";
 import { loadSlots } from "@/lib/delivery-slots";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -76,9 +76,10 @@ function DeliveryCard({
   onRemove: () => void;
 }) {
   const { t } = useLanguage();
-  // Read fresh each render (localStorage is cheap) so slot edits in /settings
-  // take effect without unmounting the form.
+  // Read fresh each render (localStorage is cheap) so slot/driver edits in
+  // /settings take effect without unmounting the form.
   const slots = loadSlots();
+  const drivers = loadDrivers();
   const set = <K extends keyof Delivery>(key: K, val: Delivery[K]) =>
     onChange({ ...delivery, [key]: val });
 
@@ -324,7 +325,7 @@ function DeliveryCard({
               <SelectValue placeholder={t("placeholder_select_driver")} />
             </SelectTrigger>
             <SelectContent>
-              {DRIVERS.map((d) => (
+              {drivers.map((d) => (
                 <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
               ))}
             </SelectContent>

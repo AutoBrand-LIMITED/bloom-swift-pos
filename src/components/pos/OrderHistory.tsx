@@ -1,14 +1,16 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardList, X, ShieldAlert, Truck, Search, Pencil, RefreshCw, Calendar, Phone } from "lucide-react";
+import { ClipboardList, X, ShieldAlert, Truck, Search, Pencil, RefreshCw, Calendar, Phone, Receipt, Wallet, ChevronDown, History as HistoryIcon, Plus, SlidersHorizontal } from "lucide-react";
 import PrintButtons from "@/components/pos/PrintButtons";
-import type { Order, PaymentStatus } from "@/types/order";
+import type { Order, PaymentStatus, PaymentEntryType, AuditAction } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { productLabel } from "@/lib/product-i18n";
+import type { TranslationKey } from "@/lib/i18n";
 
 function isDispatchBlocked(order: Order): boolean {
   if (order.paymentStatus !== "unpaid") return false;
@@ -19,11 +21,30 @@ function isDispatchBlocked(order: Order): boolean {
   return dates.some(date => new Date(date) <= today);
 }
 
+function orderDeliveryDates(o: Order): string[] {
+  const dates = (o.deliveries?.map(d => d.deliveryDate).filter(Boolean) ?? []);
+  if (dates.length === 0 && o.deliveryDate) dates.push(o.deliveryDate);
+  return dates;
+}
+
 function daysAgo(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return d.toISOString().slice(0, 10);
 }
+
+const PAYMENT_TYPE_KEY: Record<PaymentEntryType, TranslationKey> = {
+  deposit: "pay_type_deposit",
+  balance: "pay_type_balance",
+  full: "pay_type_full",
+};
+
+const AUDIT_KEY: Record<AuditAction, TranslationKey> = {
+  created: "audit_created",
+  amended: "audit_amended",
+  balance_settled: "audit_balance_settled",
+  note_added: "audit_note_added",
+};
 
 interface OrderHistoryProps {
   orders: Order[];
@@ -31,6 +52,8 @@ interface OrderHistoryProps {
   onClose: () => void;
   onEdit?: (order: Order) => void;
   onReorder?: (order: Order) => void;
+  onSettleBalance?: (order: Order) => void;
+  onAddNote?: (order: Order, note: string) => void;
 }
 
 const STATUS_STYLES: Record<PaymentStatus, string> = {
@@ -39,17 +62,48 @@ const STATUS_STYLES: Record<PaymentStatus, string> = {
   deposit: "bg-amber-50 text-amber-700 border border-amber-200",
 };
 
-const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistoryProps) => {
+const OCCASION_KEYS: TranslationKey[] = [
+  "occasion_birthday", "occasion_mothers_day", "occasion_fathers_day",
+  "occasion_valentines", "occasion_christmas", "occasion_anniversary",
+  "occasion_graduation", "occasion_new_year", "occasion_other",
+];
+
+const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalance, onAddNote }: OrderHistoryProps) => {
   const { t, lang } = useLanguage();
   const [searchText, setSearchText] = useState("");
   const [staffFilter, setStaffFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
+  const [occasionFilter, setOccasionFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [upcomingOnly, setUpcomingOnly] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+
+  // How many orders were ever delivered to each recipient (across all orders)
+  const recipientCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const o of orders) {
+      const names = new Set(
+        (o.deliveries?.map(d => d.recipientName) ?? [o.recipientName])
+          .map(n => (n ?? "").trim().toLowerCase())
+          .filter(Boolean)
+      );
+      for (const n of names) counts[n] = (counts[n] ?? 0) + 1;
+    }
+    return counts;
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     let result = orders;
 
     if (staffFilter !== "all") {
       result = result.filter(o => o.salesId === staffFilter);
+    }
+
+    if (occasionFilter !== "all") {
+      result = result.filter(o => o.occasionTag === occasionFilter);
     }
 
     if (periodFilter !== "all") {
@@ -64,11 +118,27 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
       });
     }
 
+    // Delivery-date range filter
+    if (dateFrom || dateTo || upcomingOnly) {
+      const today = new Date().toISOString().slice(0, 10);
+      result = result.filter(o => {
+        const dates = orderDeliveryDates(o);
+        if (dates.length === 0) return false;
+        return dates.some(d => {
+          if (dateFrom && d < dateFrom) return false;
+          if (dateTo && d > dateTo) return false;
+          if (upcomingOnly && d < today) return false;
+          return true;
+        });
+      });
+    }
+
     if (searchText.trim()) {
       const q = searchText.toLowerCase();
       result = result.filter(o =>
         o.customerName?.toLowerCase().includes(q) ||
         o.phone?.includes(q) ||
+        o.invoiceNumber?.toLowerCase().includes(q) ||
         o.recipientName?.toLowerCase().includes(q) ||
         o.deliveries?.some(d =>
           d.recipientName?.toLowerCase().includes(q) || d.recipientPhone?.includes(q)
@@ -77,7 +147,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
     }
 
     return result;
-  }, [orders, staffFilter, periodFilter, searchText]);
+  }, [orders, staffFilter, occasionFilter, periodFilter, dateFrom, dateTo, upcomingOnly, searchText]);
 
   const driverGroups = useMemo(() => {
     const sorted = [...filteredOrders].sort((a, b) => {
@@ -101,8 +171,14 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
     });
   }, [filteredOrders]);
 
-  const hasFilters = staffFilter !== "all" || periodFilter !== "all" || searchText.trim() !== "";
+  const hasFilters = staffFilter !== "all" || periodFilter !== "all" || occasionFilter !== "all"
+    || dateFrom !== "" || dateTo !== "" || upcomingOnly || searchText.trim() !== "";
   const blockedCount = orders.filter(isDispatchBlocked).length;
+
+  const clearAll = () => {
+    setSearchText(""); setStaffFilter("all"); setPeriodFilter("all");
+    setOccasionFilter("all"); setDateFrom(""); setDateTo(""); setUpcomingOnly(false);
+  };
 
   if (!open) return null;
 
@@ -171,17 +247,61 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                 <SelectItem value="last30">{t("filter_last30")}</SelectItem>
               </SelectContent>
             </Select>
-            {hasFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-xs px-2 text-muted-foreground shrink-0"
-                onClick={() => { setSearchText(""); setStaffFilter("all"); setPeriodFilter("all"); }}
-              >
-                {t("btn_clear_filters")}
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-8 text-xs px-2 shrink-0 ${showFilters ? "text-primary" : "text-muted-foreground"}`}
+              onClick={() => setShowFilters(s => !s)}
+              aria-label={t("btn_more_filters")}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+            </Button>
           </div>
+
+          {showFilters && (
+            <div className="space-y-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+              <Select value={occasionFilter} onValueChange={setOccasionFilter}>
+                <SelectTrigger className="h-8 text-xs bg-card">
+                  <SelectValue placeholder={t("label_all_occasions")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("label_all_occasions")}</SelectItem>
+                  {OCCASION_KEYS.map(k => (
+                    <SelectItem key={k} value={k}>{t(k)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 space-y-0.5">
+                  <label className="text-[10px] text-muted-foreground">{t("label_filter_date_from")}</label>
+                  <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs bg-card" />
+                </div>
+                <div className="flex-1 space-y-0.5">
+                  <label className="text-[10px] text-muted-foreground">{t("label_filter_date_to")}</label>
+                  <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-xs bg-card" />
+                </div>
+              </div>
+              <button
+                onClick={() => setUpcomingOnly(v => !v)}
+                className={`w-full rounded-md px-3 py-1.5 text-xs font-medium border transition-colors ${
+                  upcomingOnly ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:border-primary/40"
+                }`}
+              >
+                {t("filter_upcoming")}
+              </button>
+            </div>
+          )}
+
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-full text-xs text-muted-foreground"
+              onClick={clearAll}
+            >
+              {t("btn_clear_filters")}
+            </Button>
+          )}
         </div>
 
         {/* Dispatch block alert */}
@@ -230,6 +350,12 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                       const extraDeliveries = (order.deliveries?.length ?? 0) > 1
                         ? order.deliveries!.slice(1)
                         : [];
+                      const primaryRecipient = (order.deliveries?.[0]?.recipientName || order.recipientName || "").trim();
+                      const recipientCount = primaryRecipient ? (recipientCounts[primaryRecipient.toLowerCase()] ?? 0) : 0;
+                      const depositPaid = (order.payments ?? []).filter(p => p.type === "deposit").reduce((s, p) => s + p.amount, 0);
+                      const balanceDue = order.finalPrice - depositPaid;
+                      const isExpanded = expandedId === order.id;
+                      const canSettle = order.paymentStatus === "unpaid" || order.paymentStatus === "deposit";
 
                       return (
                         <div
@@ -251,18 +377,25 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                           )}
 
                           <div className="p-3 space-y-2.5">
-                            {/* Customer + status */}
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="font-semibold text-sm leading-tight">{order.customerName || order.phone}</p>
-                                <p className="text-xs text-muted-foreground font-mono mt-0.5 tabular-nums flex items-center gap-1">
-                                <Phone className="w-3 h-3 shrink-0" />
-                                {order.phone}
-                              </p>
-                              </div>
+                            {/* Invoice + status */}
+                            <div className="flex items-center justify-between gap-2">
+                              {order.invoiceNumber ? (
+                                <span className="text-[10px] font-mono font-semibold text-primary bg-primary/10 rounded px-1.5 py-0.5">
+                                  {order.invoiceNumber}
+                                </span>
+                              ) : <span />}
                               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[order.paymentStatus]}`}>
                                 {badgeLabel}
                               </span>
+                            </div>
+
+                            {/* Customer */}
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm leading-tight">{order.customerName || order.phone}</p>
+                              <p className="text-xs text-muted-foreground font-mono mt-0.5 tabular-nums flex items-center gap-1">
+                                <Phone className="w-3 h-3 shrink-0" />
+                                {order.phone}
+                              </p>
                             </div>
 
                             {/* Delivery date(s) */}
@@ -273,6 +406,11 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                                   {order.deliveryDate}
                                   {order.deliveryTime && <span className="text-muted-foreground/60"> · {order.deliveryTime}</span>}
                                   {order.recipientName && <span> → <span className="text-foreground/70">{order.recipientName}</span></span>}
+                                  {recipientCount > 1 && (
+                                    <span className="ml-1.5 text-[10px] font-medium text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                                      {recipientCount}{t("label_deliveries_suffix")}
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             )}
@@ -298,6 +436,14 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                               ))}
                             </div>
 
+                            {/* Deposit / balance due */}
+                            {order.paymentStatus === "deposit" && (
+                              <div className="flex items-center justify-between text-xs rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5">
+                                <span className="text-amber-700">{t("pay_type_deposit")} ${depositPaid.toLocaleString()}</span>
+                                <span className="font-mono font-semibold text-destructive">{t("label_remaining_due")} ${balanceDue.toLocaleString()}</span>
+                              </div>
+                            )}
+
                             {/* Timestamp + total */}
                             <div className="flex items-center justify-between pt-0.5 border-t border-border/60">
                               <span className="text-xs text-muted-foreground tabular-nums">
@@ -305,6 +451,18 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                               </span>
                               <span className="font-mono font-bold text-sm tabular-nums">${order.finalPrice.toLocaleString()}</span>
                             </div>
+
+                            {/* Settle balance / mark paid */}
+                            {canSettle && onSettleBalance && (
+                              <Button
+                                size="sm"
+                                className="w-full h-9 text-xs gap-1.5 bg-primary"
+                                onClick={() => onSettleBalance(order)}
+                              >
+                                <Wallet className="w-3.5 h-3.5" />
+                                {order.paymentStatus === "deposit" ? t("btn_settle_balance") : t("btn_mark_paid")}
+                              </Button>
+                            )}
 
                             {/* Print buttons */}
                             <PrintButtons order={order} compact />
@@ -329,6 +487,83 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder }: OrderHistory
                                   >
                                     <RefreshCw className="w-3.5 h-3.5" /> {t("btn_reorder")}
                                   </Button>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Expand: payment log + audit + add note */}
+                            <button
+                              onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                              className="w-full flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground pt-0.5"
+                            >
+                              <HistoryIcon className="w-3 h-3" />
+                              {t("label_audit_log")}
+                              <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                            </button>
+
+                            {isExpanded && (
+                              <div className="space-y-2.5 pt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                                {/* Payment ledger */}
+                                {order.payments && order.payments.length > 0 && (
+                                  <div className="rounded-lg border border-border bg-secondary/30 p-2 space-y-1">
+                                    <p className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
+                                      <Receipt className="w-3 h-3" /> {t("payment_ledger")}
+                                    </p>
+                                    {order.payments.map((p, i) => (
+                                      <div key={i} className="flex items-center justify-between text-[11px]">
+                                        <span className="text-muted-foreground">
+                                          {t(PAYMENT_TYPE_KEY[p.type])} · {new Date(p.at).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
+                                        </span>
+                                        <span className="font-mono font-medium tabular-nums">${p.amount.toLocaleString()}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Audit log */}
+                                {order.auditLog && order.auditLog.length > 0 && (
+                                  <div className="space-y-1">
+                                    {order.auditLog.map((a, i) => {
+                                      const staff = SALES_STAFF.find(s => s.id === a.staffId);
+                                      return (
+                                        <div key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                                          <span className="w-1 h-1 rounded-full bg-primary/50 mt-1.5 shrink-0" />
+                                          <span>
+                                            <span className="font-medium text-foreground/70">{t(AUDIT_KEY[a.action])}</span>
+                                            {a.detail ? ` · ${a.detail}` : ""}
+                                            {" · "}{new Date(a.at).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
+                                            {staff ? ` · ${staff.name}` : ""}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {/* Retrospective note add */}
+                                {onAddNote && (
+                                  <div className="flex items-start gap-1.5">
+                                    <Textarea
+                                      value={noteDrafts[order.id] ?? ""}
+                                      onChange={e => setNoteDrafts(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                      placeholder={t("placeholder_add_note")}
+                                      className="text-xs min-h-[36px] flex-1"
+                                      maxLength={300}
+                                    />
+                                    <Button
+                                      size="icon"
+                                      variant="outline"
+                                      className="h-9 w-9 shrink-0"
+                                      disabled={!(noteDrafts[order.id] ?? "").trim()}
+                                      onClick={() => {
+                                        onAddNote(order, noteDrafts[order.id] ?? "");
+                                        setNoteDrafts(prev => ({ ...prev, [order.id]: "" }));
+                                      }}
+                                      aria-label={t("btn_add_note")}
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
                             )}

@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Truck, CheckCircle2, Clock, Camera, Package, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
-import { DRIVERS } from "@/types/order";
 import type { Order } from "@/types/order";
+import { loadDrivers } from "@/lib/drivers";
 import { loadOrders, updateOrder, loadPhotos, savePhoto, deletePhoto, compressImage } from "@/lib/orders";
 import type { OrderPhotos } from "@/lib/orders";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -55,6 +55,7 @@ const DriverApp = () => {
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  const drivers = loadDrivers();
   const productPhotoRef = useRef<Record<string, HTMLInputElement | null>>({});
   const receiptPhotoRef = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -124,12 +125,12 @@ const DriverApp = () => {
             <p className="text-muted-foreground text-sm">{t("msg_select_name")}</p>
           </div>
           <div className="grid grid-cols-2 gap-4 w-full max-w-md">
-            {DRIVERS.map((d, i) => (
+            {drivers.map((d, i) => (
                 <button
                   key={d.id}
                   onClick={() => setSelectedDriver(d.name)}
                   className={`group rounded-2xl border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ease-out p-8 text-center font-bold text-lg active:scale-95 ${
-                    i === DRIVERS.length - 1 && DRIVERS.length % 2 !== 0 ? "col-span-2" : ""
+                    i === drivers.length - 1 && drivers.length % 2 !== 0 ? "col-span-2" : ""
                   }`}
                 >
                   <span className="w-12 h-12 rounded-full bg-primary/10 text-primary text-lg font-bold flex items-center justify-center mx-auto mb-3 transition-transform duration-200 ease-out group-hover:scale-110">

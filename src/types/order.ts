@@ -32,6 +32,15 @@ export interface PaymentRecord {
   at: string; // ISO timestamp
 }
 
+export type AuditAction = "created" | "amended" | "balance_settled" | "note_added";
+
+export interface AuditEntry {
+  action: AuditAction;
+  at: string; // ISO timestamp
+  staffId: string;
+  detail?: string;
+}
+
 export interface Order {
   id: string;
   salesId: string;
@@ -67,6 +76,8 @@ export interface Order {
   internalNotes: string;
   occasionTag?: string;
   payments?: PaymentRecord[];
+  invoiceNumber?: string; // permanent, assigned once at creation
+  auditLog?: AuditEntry[];
   createdAt: string;
   deliveryStatus?: "pending" | "delivered";
   deliveredAt?: string;

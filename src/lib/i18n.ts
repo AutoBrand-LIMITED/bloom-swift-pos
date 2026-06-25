@@ -449,6 +449,43 @@ export const zh = {
   // Item code quick-search
   placeholder_code_search: "代碼或名稱快速搜尋（按 / ）",
   msg_no_match: "沒有符合項目",
+
+  // Settle balance / top-up
+  btn_settle_balance: "結清餘款",
+  btn_mark_paid: "標記已付",
+  toast_balance_settled: "已結清餘款",
+  toast_note_added: "已新增備註",
+
+  // Audit log + retrospective note
+  label_audit_log: "記錄與備註",
+  audit_created: "建立訂單",
+  audit_amended: "修改訂單",
+  audit_balance_settled: "結清餘款",
+  audit_note_added: "新增備註",
+  btn_add_note: "新增備註",
+  placeholder_add_note: "新增內部備註…",
+
+  // History filters / card
+  filter_upcoming: "只看即將送貨",
+  btn_more_filters: "更多篩選",
+  label_deliveries_suffix: "次",
+
+  // Settings — drivers
+  settings_drivers_section: "送貨司機",
+  settings_drivers_desc: "管理司機名單（旺季可加臨時司機）",
+  settings_add_driver: "新增司機",
+  settings_remove_driver: "移除司機",
+  settings_driver_casual: "臨時",
+  placeholder_driver_name: "司機名稱",
+
+  // Settings — occasion reminders
+  settings_reminders_section: "場合提醒時間",
+  settings_reminders_desc: "為每個場合設定預設提醒時間",
+
+  // Dispatch — grouping + vehicles
+  dispatch_vehicles: "車輛",
+  group_by_driver: "按司機",
+  group_by_district: "按地區",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
@@ -902,6 +939,43 @@ export const en: Record<TranslationKey, string> = {
   // Item code quick-search
   placeholder_code_search: "Quick search by code or name (press / )",
   msg_no_match: "No matching items",
+
+  // Settle balance / top-up
+  btn_settle_balance: "Settle Balance",
+  btn_mark_paid: "Mark Paid",
+  toast_balance_settled: "Balance settled",
+  toast_note_added: "Note added",
+
+  // Audit log + retrospective note
+  label_audit_log: "Log & Notes",
+  audit_created: "Created",
+  audit_amended: "Amended",
+  audit_balance_settled: "Balance Settled",
+  audit_note_added: "Note Added",
+  btn_add_note: "Add Note",
+  placeholder_add_note: "Add internal note…",
+
+  // History filters / card
+  filter_upcoming: "Upcoming only",
+  btn_more_filters: "More filters",
+  label_deliveries_suffix: "×",
+
+  // Settings — drivers
+  settings_drivers_section: "Delivery Drivers",
+  settings_drivers_desc: "Manage drivers (add casual drivers for peak season)",
+  settings_add_driver: "Add Driver",
+  settings_remove_driver: "Remove driver",
+  settings_driver_casual: "Casual",
+  placeholder_driver_name: "Driver name",
+
+  // Settings — occasion reminders
+  settings_reminders_section: "Occasion Reminder Timing",
+  settings_reminders_desc: "Set a default reminder timing per occasion",
+
+  // Dispatch — grouping + vehicles
+  dispatch_vehicles: "Vehicles",
+  group_by_driver: "By Driver",
+  group_by_district: "By District",
 };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { zh, en };

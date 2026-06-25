@@ -41,16 +41,16 @@ Built by: AutoBrand Limited
 
 ### §2.3 Delivery Management
 
-- [ ] Driver dispatch: orders assigned by district
+- [x] Driver dispatch: orders assigned by district — `/dispatch` "By District" grouping mode
 - [ ] Each driver sees only their own order list (identified by address, not order number)
 - [x] Driver interface: minimal — name select → assigned orders → tap address → upload photos
 - [x] No data entry required from driver
 - [x] Delivery tracking: 2 photos required per order (product photo + signed receipt photo)
-- [ ] Supports 6–7 concurrent drivers during peak season including casual/hired drivers
+- [x] Supports 6–7 concurrent drivers during peak season including casual/hired drivers — driver management in `/settings` (add/remove, casual flag)
 - [ ] Automated status updates: auto-advance at fixed time milestones
 - [ ] Auto WhatsApp message to colleagues if no update after set period
 - [x] Back-office dispatch view: orders by driver + district grouping ✅ full `/dispatch` screen
-- [ ] Management can see how many vehicles to deploy from dispatch view
+- [x] Management can see how many vehicles to deploy from dispatch view — vehicle-count stat (distinct drivers with pending orders)
 - [ ] Driver WhatsApp integration option: photo upload via WhatsApp → auto-sync to system
 
 ### §2.4 Payment & Invoice System
@@ -61,9 +61,9 @@ Built by: AutoBrand Limited
 - [x] Outstanding payment tracking: pre-delivery alert for unpaid orders
 - [x] System prompts staff before dispatching an unpaid order
 - [ ] Automatic Stripe webhook: payment confirmed → system updates in real time
-- [x] Split payment support: deposit + balance flow with per-payment timestamps (payment ledger) _(no post-amendment top-up yet)_
-- [ ] Invoice numbers are permanent and non-cancellable
-- [ ] All amendments retain full audit trail
+- [x] Split payment support: deposit + balance flow with per-payment timestamps (payment ledger) + settle-balance/top-up action
+- [x] Invoice numbers are permanent and non-cancellable — sequential INV-XXXX from localStorage counter, assigned once at creation
+- [x] All amendments retain full audit trail — per-order audit log (created/amended/balance settled/note added) with staff + timestamp
 
 ### §2.5 Document Design
 
@@ -92,7 +92,7 @@ Built by: AutoBrand Limited
 - [x] Staff can designate notes as persistent — Bookmark toggle on each note type; saved to customer on order submit ✅
 - [x] Persistent notes surface automatically when a new order is opened for that customer
 - [x] No manual searching required — new and part-time staff are always informed
-- [ ] Notes can be added retrospectively after an order is placed
+- [x] Notes can be added retrospectively after an order is placed — expand order in history → add internal note (logged in audit trail)
 
 **Customer flags:**
 - [x] Internal tagging with visual indicators (e.g. red dot, purple dot) — not visible to customers
@@ -101,25 +101,25 @@ Built by: AutoBrand Limited
 
 ### §2.7 VIP & Seasonal Management
 
-- [ ] VIP customer classification and tagging
-- [ ] VIP status: manual application OR triggered by purchase threshold
-- [ ] Birthday tracking by **recipient** (not sender) — system records who flowers were sent to + when
-- [ ] System reminds sender ahead of recipient's next birthday
-- [ ] Relationship field on recipient record (optional): mother, wife, colleague, etc.
-- [ ] Holiday tagging at order level: Mother's Day, Valentine's Day, etc.
-- [ ] Occasion and product tracked independently (customer may buy during Mother's Day but not a Mother's Day product)
-- [ ] Purchase date recorded separately from holiday tag
-- [ ] System reminds same sender at same time the following year
-- [ ] Automated WhatsApp reminders ahead of recurring occasions
-- [ ] Reminder timing configurable per customer or occasion type
+- [x] VIP customer classification and tagging — flag dot + badge (done P6)
+- [x] VIP status: manual application OR triggered by purchase threshold — auto-suggest banner ≥ HKD 5000 + one-tap mark
+- [x] Birthday tracking by **recipient** (not sender) — MM-DD per recipient, recorded with order
+- [x] System reminds sender ahead of recipient's next birthday — upcoming-birthday alert (within 30 days) on customer select
+- [x] Relationship field on recipient record (optional): mother, wife, colleague, etc. — dropdown per recipient
+- [x] Holiday tagging at order level: Mother's Day, Valentine's Day, etc. — occasion pill picker saved to order
+- [x] Occasion and product tracked independently (occasion tag is order-level, not tied to items)
+- [x] Purchase date recorded separately from holiday tag (createdAt vs occasionTag)
+- [ ] System reminds same sender at same time the following year — needs backend scheduler
+- [ ] Automated WhatsApp reminders ahead of recurring occasions — needs backend
+- [x] Reminder timing configurable per customer or occasion type — per-occasion reminder timing in `/settings`, auto-applied on occasion select
 
 ### §2.8 Search, Filters & Reporting
 
-- [ ] Phone search covers sender AND recipient records simultaneously
-- [ ] Single search returns all orders where that number appears in any role
+- [x] Phone search covers sender AND recipient records simultaneously — CustomerSection + OrderHistory search both
+- [x] Single search returns all orders where that number appears in any role
 - [x] Order history displayed by **delivery date** (sorted within driver group)
-- [ ] History view shows: delivery date, recipient name, delivery count for recipient, order summary
-- [ ] Filters: date range (e.g. last 10 days), specific staff member, upcoming delivery date range, occasion/holiday tag
+- [x] History view shows: delivery date, recipient name, delivery count for recipient, order summary — recipient delivery-count badge added
+- [x] Filters: date range, specific staff member, upcoming delivery date range, occasion/holiday tag — all in OrderHistory filters
 - [x] Order list sorted by delivery person — groups all orders for same driver together
 
 ---
@@ -163,6 +163,12 @@ Built by: AutoBrand Limited
 | Delivery slot settings | ✅ Exists | `/settings` — add/edit/remove slots; built-ins locked; persisted in localStorage |
 | Saved customer addresses | ✅ Exists | Structured addresses saved per customer on submit; one-tap recall |
 | Split payment timestamps | ✅ Exists | Payment ledger records deposit/balance/full each with timestamp |
+| Settle balance / top-up | ✅ Exists | OrderHistory action; appends balance/full payment + audit entry |
+| Driver management | ✅ Exists | `/settings` — add/remove drivers, casual flag; dynamic across delivery/dispatch/driver app |
+| Invoice numbers + audit log | ✅ Exists | Permanent INV-XXXX; per-order audit trail (created/amended/settled/note) |
+| Dispatch by district + vehicles | ✅ Exists | `/dispatch` driver/district toggle; vehicle-count stat |
+| History filters (full) | ✅ Exists | Text + staff + period + occasion + delivery date range + upcoming-only |
+| Per-occasion reminders | ✅ Exists | `/settings` default reminder timing per occasion; auto-applied on select |
 | Relationship field on recipient | ✅ Exists | Per-recipient dropdown in DeliverySection |
 | Birthday field on recipient | ✅ Exists | MM-DD field per recipient in DeliverySection |
 | Occasion / holiday tag on order | ✅ Exists | Pill picker UI ✅; saved to order ✅ |
@@ -193,7 +199,7 @@ Built by: AutoBrand Limited
 - [x] Pre-delivery unpaid order alert / dispatch block — shown in OrderHistory drawer
 - [ ] Shoppage payment link integration — needs API keys
 - [ ] Stripe webhook handler (real-time status update) — needs backend
-- [x] Split payment: deposit + balance with individual timestamps (payment ledger shown in PaymentSection on edit) _(top-up after amendment still pending)_
+- [x] Split payment: deposit + balance with individual timestamps + settle-balance/top-up action in OrderHistory (payment ledger)
 
 ### P3 — Delivery
 
@@ -235,9 +241,9 @@ Built by: AutoBrand Limited
 
 - [ ] Migrate from localStorage to Supabase (Supabase Pro: 8GB DB + 100GB Storage)
 - [ ] Product category structure in DB (bouquets, baskets, wreaths, etc.)
-- [ ] Item code search
+- [x] Item code search — code/name quick-search with `/` shortcut (frontend; DB-backed inventory still pending)
 - [ ] Legacy Excel import (including pre-2010 formats)
-- [ ] Invoice numbers: permanent, non-cancellable, full audit trail on amendments
+- [x] Invoice numbers: permanent, non-cancellable, full audit trail on amendments — frontend (localStorage counter + audit log; DB enforcement pending P7)
 - [ ] Stripe webhook integration
 
 ---
