@@ -389,10 +389,10 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                                 <span className="text-sm font-semibold truncate leading-tight">
                                   {order.customerName || order.phone}
                                 </span>
-                                <div className="flex items-center gap-1.5 shrink-0">
+                                <div className="flex items-center gap-2 shrink-0">
                                   {blocked && <AlertTriangle className="w-3 h-3 text-destructive" />}
                                   <span className="font-mono text-xs font-bold tabular-nums">${order.finalPrice.toLocaleString()}</span>
-                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLES[order.paymentStatus]}`}>
+                                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_STYLES[order.paymentStatus]}`}>
                                     {badgeLabel}
                                   </span>
                                 </div>
@@ -431,35 +431,19 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                               )}
 
                               {/* Invoice + phone */}
-                              <div className="flex items-center gap-2">
-                                {order.invoiceNumber && (
-                                  <span className="text-[10px] font-mono font-semibold text-primary bg-primary/10 rounded px-1.5 py-0.5">
-                                    {order.invoiceNumber}
-                                  </span>
-                                )}
-                                <span className="text-xs text-muted-foreground font-mono flex items-center gap-1 ml-auto">
+                              <div className="flex items-center justify-between gap-2">
+                                {order.invoiceNumber
+                                  ? <span className="text-[10px] font-mono font-semibold text-primary bg-primary/10 rounded px-1.5 py-0.5">{order.invoiceNumber}</span>
+                                  : <span />
+                                }
+                                <span className="text-[11px] text-muted-foreground font-mono flex items-center gap-1">
                                   <Phone className="w-3 h-3 shrink-0" />{order.phone}
                                 </span>
                               </div>
 
-                              {/* All deliveries */}
-                              {(primaryDate || extraDeliveries.length > 0) && (
+                              {/* Extra deliveries only — first already shown in compact row */}
+                              {extraDeliveries.length > 0 && (
                                 <div className="space-y-1">
-                                  {primaryDate && (
-                                    <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                                      <Calendar className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary/50" />
-                                      <span>
-                                        {primaryDate}
-                                        {primaryTime && <span className="text-muted-foreground/60"> · {primaryTime}</span>}
-                                        {primaryRecipient && <span> → <span className="text-foreground/70">{primaryRecipient}</span></span>}
-                                        {recipientCount > 1 && (
-                                          <span className="ml-1.5 text-[10px] font-medium text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
-                                            {recipientCount}{t("label_deliveries_suffix")}
-                                          </span>
-                                        )}
-                                      </span>
-                                    </div>
-                                  )}
                                   {extraDeliveries.map((d, i) => (
                                     <div key={d.id} className="flex items-start gap-1.5 text-xs text-muted-foreground">
                                       <Calendar className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary/50" />
