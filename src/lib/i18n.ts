@@ -487,11 +487,6 @@ export const zh = {
   btn_print_picking_slips: "執貨單",
   btn_print_delivery_notes: "送貨單",
 
-  // Today's deliveries view
-  nav_today_deliveries: "今日送貨",
-  title_today_deliveries: "今日送貨",
-  label_no_deliveries_today: "今天沒有送貨訂單",
-
 } as const;
 
 export type TranslationKey = keyof typeof zh;
@@ -982,11 +977,6 @@ export const en: Record<TranslationKey, string> = {
   label_x_selected: "Selected",
   btn_print_picking_slips: "Picking Slips",
   btn_print_delivery_notes: "Delivery Notes",
-
-  // Today's deliveries view
-  nav_today_deliveries: "Today's Deliveries",
-  title_today_deliveries: "Today's Deliveries",
-  label_no_deliveries_today: "No deliveries today",
 
 };
 
