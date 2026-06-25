@@ -25,9 +25,9 @@ export function loadSlots(): DeliverySlot[] {
     if (!raw) return DEFAULT_SLOTS;
     const parsed = JSON.parse(raw) as DeliverySlot[];
     if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_SLOTS;
-    // Strip `specified` from any non-locked slot to prevent crafted localStorage
-    // from injecting the flag onto a custom slot (which would corrupt deliveryTime)
-    const sanitized = parsed.map(s => s.locked ? s : { ...s, specified: false });
+    // Strip `specified` and `locked` from custom slots — only built-in slots
+    // may carry these flags. Prevents crafted localStorage from injecting them.
+    const sanitized = parsed.map(s => s.locked ? s : { ...s, specified: false, locked: false });
     // Guarantee the specified slot always exists (it drives the time picker)
     if (!sanitized.some(s => s.specified)) {
       return [...sanitized, DEFAULT_SLOTS.find(s => s.specified)!];

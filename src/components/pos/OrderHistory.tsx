@@ -167,15 +167,15 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
 
   const driverGroups = useMemo(() => {
     const sorted = [...filteredOrders].sort((a, b) => {
-      const da = a.deliveryDate || "";
-      const db = b.deliveryDate || "";
+      const da = a.deliveries?.[0]?.deliveryDate || a.deliveryDate || "";
+      const db = b.deliveries?.[0]?.deliveryDate || b.deliveryDate || "";
       if (da !== db) return da.localeCompare(db);
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
     const groups: Record<string, Order[]> = {};
     for (const order of sorted) {
-      const driver = order.deliveryPerson?.trim() || "未分配";
+      const driver = (order.deliveries?.[0]?.deliveryPerson || order.deliveryPerson)?.trim() || "未分配";
       if (!groups[driver]) groups[driver] = [];
       groups[driver].push(order);
     }
