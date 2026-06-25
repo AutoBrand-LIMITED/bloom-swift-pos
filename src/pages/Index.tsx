@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck, Crown, Gift, Tag, Pencil, MoreHorizontal, SlidersHorizontal } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck, Crown, Gift, Tag, Pencil, MoreHorizontal, SlidersHorizontal, Upload } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -12,7 +12,6 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
-import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
 import CustomerSection from "@/components/pos/CustomerSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
@@ -31,7 +30,8 @@ import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 import { loadOrders, saveOrders, nextInvoiceNumber } from "@/lib/orders";
 import { reminderForOccasion } from "@/lib/occasion-reminders";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { updateCustomerPersistentNotes, updateCustomerFlags, saveCustomerAddresses } from "@/lib/customer-utils";
+import { updateCustomerPersistentNotes, updateCustomerFlags, saveCustomerAddresses, extractCustomersFromOrders, loadStoredCustomers, mergeCustomers, saveCustomers } from "@/lib/customer-utils";
+import { parseCsvToOrders } from "@/lib/csv-import";
 import type { CustomerFlag, SavedAddress } from "@/data/demo-customers";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -44,6 +44,8 @@ const OCCASION_KEYS: TranslationKey[] = [
 const Index = () => {
   const navigate = useNavigate();
   const { lang, setLang, t } = useLanguage();
+
+  const csvFileRef = useRef<HTMLInputElement>(null);
 
   // Pre-generated order ID so it can be shown on the payment screen before submission
   const [currentOrderId, setCurrentOrderId] = useState(() => crypto.randomUUID());
@@ -62,6 +64,35 @@ const Index = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
   const [persistentNoteDismissed, setPersistentNoteDismissed] = useState(false);
+
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv") && file.type !== "text/csv") {
+      toast.error(t("csv_import_failed"));
+      if (csvFileRef.current) csvFileRef.current.value = "";
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error(t("csv_import_failed"));
+      if (csvFileRef.current) csvFileRef.current.value = "";
+      return;
+    }
+    try {
+      const text = await file.text();
+      const parsed = parseCsvToOrders(text);
+      if (parsed.length === 0) { toast.error(t("csv_no_data")); return; }
+      const merged = mergeCustomers(loadStoredCustomers(), extractCustomersFromOrders(parsed));
+      saveCustomers(merged);
+      setCustomerRefreshKey(k => k + 1);
+      const records = parsed.reduce((s, o) => s + o.items.length, 0);
+      toast.success(lang === "zh" ? `成功匯入 ${merged.length} 位客戶，共 ${records} 筆歷史記錄` : `Imported ${merged.length} customers, ${records} records`);
+    } catch (err) {
+      console.error("CSV import error:", err);
+      toast.error(t("csv_import_failed"));
+    }
+    if (csvFileRef.current) csvFileRef.current.value = "";
+  };
 
   // Items
   const [budget, setBudget] = useState(0);
@@ -536,16 +567,19 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-card/90 backdrop-blur-md border-b border-border shadow-[0_1px_0_0_hsl(var(--border))]">
-        <div className="max-w-full mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border">
+        <div className="max-w-full mx-auto px-4 h-[52px] flex items-center justify-between gap-3">
           {/* Brand */}
-          <div className="flex items-center gap-2.5 min-w-0 shrink-0">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 shrink-0">
-              <Flower2 className="w-4 h-4 text-primary" />
+          <div className="flex items-center gap-3 min-w-0 shrink-0">
+            <div className="flex items-center justify-center w-9 h-9 rounded-full bg-primary text-primary-foreground shrink-0 shadow-sm">
+              <Flower2 className="w-[18px] h-[18px]" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm font-bold tracking-tight leading-none truncate">Anglo Chinese Florist</h1>
-              <p className="text-[11px] text-muted-foreground leading-none mt-0.5 tabular-nums">
+              <div className="flex items-baseline gap-1.5">
+                <h1 className="text-[13px] font-bold tracking-tight leading-none">Anglo Chinese Florist</h1>
+                <span className="text-[11px] font-medium text-primary/60 leading-none hidden sm:block">英華花店</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-none mt-0.5 tabular-nums">
                 {new Date().toLocaleDateString(lang === "zh" ? "zh-HK" : "en-US", { weekday: "short", month: "long", day: "numeric" })}
                 {salesId && (() => {
                   const staff = (SALES_STAFF ?? []).find(s => s.id === salesId);
@@ -555,32 +589,48 @@ const Index = () => {
             </div>
           </div>
 
+          {/* Always-mounted file input — outside breakpoint divs so ref is reachable on all screen sizes */}
+          <input ref={csvFileRef} type="file" accept=".csv" className="sr-only" onChange={handleCsvImport} />
+
           {/* Desktop nav */}
-          <div className="hidden sm:flex items-center gap-1">
-            <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dispatch")} className="gap-1.5 text-xs">
+          <div className="hidden sm:flex items-center gap-1.5">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/dispatch")} className="gap-1.5 text-xs h-7 px-2.5">
               <Truck className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_dispatch")}</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs h-7 px-2.5">
               <BarChart3 className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_report")}</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/settings")} className="gap-1.5 text-xs">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/settings")} className="gap-1.5 text-xs h-7 px-2.5">
               <SlidersHorizontal className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_settings")}</span>
             </Button>
 
-            <div className="w-px h-4 bg-border mx-1 shrink-0" />
+            <div className="w-px h-4 bg-border shrink-0" />
 
-            <div className="flex rounded-md overflow-hidden border border-border">
+            <div className="flex rounded-lg overflow-hidden border border-border">
               <button onClick={() => setLang("zh")} className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>廣</button>
               <button onClick={() => setLang("en")} className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>EN</button>
             </div>
 
-            <div className="w-px h-4 bg-border mx-1 shrink-0" />
+            <div className="w-px h-4 bg-border shrink-0" />
 
-            <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-              <RotateCcw className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_clear")}</span>
-            </Button>
-            <Button size="sm" onClick={() => setHistoryOpen(true)} className="gap-1.5 text-xs relative">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 w-7 px-0 text-muted-foreground">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => csvFileRef.current?.click()}>
+                  <Upload className="w-4 h-4 mr-2" /> {lang === "zh" ? "匯入CSV" : "Import CSV"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={resetForm}>
+                  <RotateCcw className="w-4 h-4 mr-2" /> {t("nav_clear")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button size="sm" onClick={() => setHistoryOpen(true)} className="gap-1.5 text-xs h-7 relative">
               <ClipboardList className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_order_history")}</span>
               {unpaidCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
@@ -592,7 +642,7 @@ const Index = () => {
 
           {/* Mobile nav */}
           <div className="flex sm:hidden items-center gap-1.5">
-            <div className="flex rounded-md overflow-hidden border border-border">
+            <div className="flex rounded-lg overflow-hidden border border-border">
               <button onClick={() => setLang("zh")} className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${lang === "zh" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>廣</button>
               <button onClick={() => setLang("en")} className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>EN</button>
             </div>
@@ -619,6 +669,10 @@ const Index = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/settings")}>
                   <SlidersHorizontal className="w-4 h-4 mr-2" /> {t("nav_settings")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => csvFileRef.current?.click()}>
+                  <Upload className="w-4 h-4 mr-2" /> {lang === "zh" ? "匯入CSV" : "Import CSV"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={resetForm}>
