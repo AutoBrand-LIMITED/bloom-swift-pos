@@ -51,10 +51,16 @@ const SalesReport = () => {
   if (!authenticated) {
     return (
       <div
-        className="min-h-screen bg-background flex items-center justify-center p-4"
+        className="min-h-screen bg-background flex items-center justify-center p-4 animate-in fade-in duration-300"
         style={{ backgroundImage: "radial-gradient(ellipse at 50% 0%, hsl(152 45% 38% / 0.07) 0%, transparent 65%)" }}
       >
         <div className="w-full max-w-sm">
+          {/* Back button */}
+          <div className="mb-6">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-1.5 text-xs text-muted-foreground">
+              <ArrowLeft className="w-3.5 h-3.5" /> {t("btn_back_pos")}
+            </Button>
+          </div>
           {/* Brand */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 text-primary mb-4">
@@ -198,7 +204,7 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
         {/* Date filter */}
         <div className="flex flex-wrap gap-2 items-center">
           {(["all", "today", "week", "month", "custom"] as DatePreset[]).map((p) => {
@@ -245,10 +251,16 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
         {/* Stat strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label={t("stat_total_orders")} value={orders.length.toString()} icon={<ShoppingBag className="w-3.5 h-3.5" />} />
-          <StatCard label={t("stat_total_revenue")} value={`$${totalRevenue.toLocaleString()}`} icon={<DollarSign className="w-3.5 h-3.5" />} accent="primary" />
-          <StatCard label={t("stat_paid")} value={paidOrders.length.toString()} icon={<CheckCircle2 className="w-3.5 h-3.5" />} accent="success" />
-          <StatCard label={t("stat_unpaid")} value={unpaidOrders.length.toString()} icon={<AlertCircle className="w-3.5 h-3.5" />} accent="danger" />
+          {[
+            <StatCard label={t("stat_total_orders")} value={orders.length.toString()} icon={<ShoppingBag className="w-3.5 h-3.5" />} />,
+            <StatCard label={t("stat_total_revenue")} value={`$${totalRevenue.toLocaleString()}`} icon={<DollarSign className="w-3.5 h-3.5" />} accent="primary" />,
+            <StatCard label={t("stat_paid")} value={paidOrders.length.toString()} icon={<CheckCircle2 className="w-3.5 h-3.5" />} accent="success" />,
+            <StatCard label={t("stat_unpaid")} value={unpaidOrders.length.toString()} icon={<AlertCircle className="w-3.5 h-3.5" />} accent="danger" />,
+          ].map((card, i) => (
+            <div key={i} className="animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 60}ms` }}>
+              {card}
+            </div>
+          ))}
         </div>
 
         {depositOrders.length > 0 && (

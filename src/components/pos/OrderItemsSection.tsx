@@ -303,7 +303,7 @@ const OrderItemsSection = ({
       {items.length > 0 && (
         <div className="space-y-2">
           {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-2 bg-secondary/50 rounded-lg p-2.5">
+            <div key={item.id} className="flex items-center gap-2 bg-secondary/50 rounded-lg p-2.5 animate-in fade-in slide-in-from-top-1 duration-150">
               <Input
                 value={item.name}
                 onChange={(e) => updateItem(item.id, "name", e.target.value)}

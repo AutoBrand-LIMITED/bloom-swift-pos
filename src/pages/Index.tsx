@@ -569,13 +569,12 @@ const Index = () => {
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border">
         <div className="max-w-full mx-auto px-4 h-[52px] flex items-center justify-between gap-3">
           {/* Brand */}
-          <div className="flex items-center gap-3 min-w-0 shrink-0">
-            <img src="/logo512.png" alt="Anglo Chinese Florist" className="w-9 h-9 rounded-full object-cover shrink-0 shadow-sm" />
+          <div className="flex items-center gap-0 min-w-0 shrink-0">
+            <img src="/logo512.png" alt="Anglo Chinese Florist" className="w-16 h-16 object-contain shrink-0" />
             <div className="min-w-0">
-              <div className="flex items-baseline gap-1.5">
-                <h1 className="text-[13px] font-bold tracking-tight leading-none">Anglo Chinese Florist</h1>
-                <span className="text-[11px] font-medium text-primary/60 leading-none hidden sm:block">英華花店</span>
-              </div>
+              <h1 key={lang} className="text-[13px] font-bold tracking-tight leading-none animate-in fade-in slide-in-from-bottom-1 duration-200">
+                {lang === "zh" ? "英華花店" : "Anglo Chinese Florist Ltd"}
+              </h1>
               <p className="text-[10px] text-muted-foreground leading-none mt-0.5 tabular-nums">
                 {new Date().toLocaleDateString(lang === "zh" ? "zh-HK" : "en-US", { weekday: "short", month: "long", day: "numeric" })}
                 {salesId && (() => {
@@ -681,10 +680,10 @@ const Index = () => {
         {selectedCustomer && (
           <>
             <div
-              className="fixed inset-0 z-30 bg-foreground/40 sm:hidden"
+              className="fixed inset-0 z-30 bg-foreground/40 sm:hidden animate-in fade-in duration-200"
               onClick={() => setSelectedCustomer(null)}
             />
-            <div className="fixed top-[49px] bottom-0 left-0 z-50 sm:static sm:z-auto sm:top-auto sm:bottom-auto">
+            <div className="fixed top-[49px] bottom-0 left-0 z-50 sm:static sm:z-auto sm:top-auto sm:bottom-auto animate-in slide-in-from-left duration-200 sm:animate-none">
               <CustomerHistoryPanel
                 customer={selectedCustomer}
                 onClose={() => setSelectedCustomer(null)}
@@ -893,7 +892,8 @@ const Index = () => {
             orderId={currentOrderId}
             invoiceRef={editingOrderId ? orders.find(o => o.id === editingOrderId)?.invoiceNumber : undefined}
             payments={editingOrderId ? orders.find(o => o.id === editingOrderId)?.payments : undefined}
-            isComplete={paymentStatus !== "unpaid" || finalPrice === 0}
+            isComplete={items.length > 0 && (paymentStatus !== "unpaid" || finalPrice === 0)}
+            step={giftCardEnabled ? 6 : 5}
           />
 
           <AddOnsSection

@@ -938,7 +938,7 @@ export function printBatch(htmlDocs: string[]) {
   if (htmlDocs.length === 1) { printDocument(htmlDocs[0]); return; }
   const combined = htmlDocs
     .map((html, i) => {
-      const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
       const body = bodyMatch ? bodyMatch[1] : html;
       return `<div style="page-break-after:${i < htmlDocs.length - 1 ? "always" : "avoid"}">${body}</div>`;
     })

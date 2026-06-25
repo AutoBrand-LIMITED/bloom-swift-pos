@@ -32,6 +32,7 @@ interface PaymentSectionProps {
   invoiceRef?: string;
   payments?: PaymentRecord[];
   isComplete?: boolean;
+  step?: number;
 }
 
 const PAYMENT_TYPE_KEY: Record<PaymentEntryType, "pay_type_deposit" | "pay_type_balance" | "pay_type_full"> = {
@@ -54,7 +55,7 @@ const PaymentSection = ({
   depositAmount, onDepositAmountChange,
   followUpDate, onFollowUpDateChange,
   reminderOption, onReminderOptionChange,
-  priceWarning, orderId, invoiceRef, payments, isComplete,
+  priceWarning, orderId, invoiceRef, payments, isComplete, step = 6,
 }: PaymentSectionProps) => {
   const { t } = useLanguage();
 
@@ -76,7 +77,7 @@ const PaymentSection = ({
   return (
   <div className={`rounded-xl p-4 space-y-4 border transition-colors ${isComplete ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
     <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
-      <StepBadge n={6} done={!!isComplete} />
+      <StepBadge n={step} done={!!isComplete} />
       <CreditCard className="w-4 h-4" />
       {t("section_payment")}
     </h2>
@@ -124,7 +125,7 @@ const PaymentSection = ({
             <button
               key={status}
               onClick={() => onPaymentStatusChange(status)}
-              className={`rounded-lg py-2.5 px-3 text-sm font-medium transition-all border-2 ${
+              className={`rounded-lg py-2.5 px-3 text-sm font-medium transition-all duration-150 border-2 ${
                 isActive
                   ? `${STATUS_CLASSNAMES[status]} border-transparent shadow-md scale-[1.02]`
                   : "bg-secondary text-secondary-foreground border-transparent hover:border-border"

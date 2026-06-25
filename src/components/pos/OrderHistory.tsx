@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -78,6 +78,18 @@ const OCCASION_KEYS: TranslationKey[] = [
 
 const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalance, onAddNote }: OrderHistoryProps) => {
   const { t, lang } = useLanguage();
+  const [visible, setVisible] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  useEffect(() => {
+    if (open) { setVisible(true); setClosing(false); }
+    else {
+      setClosing(true);
+      const timer = setTimeout(() => { setVisible(false); setClosing(false); }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
   const [searchText, setSearchText] = useState("");
   const [staffFilter, setStaffFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
@@ -209,12 +221,12 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
 
   const selectedOrders = filteredOrders.filter(o => selectedIds.has(o.id));
 
-  if (!open) return null;
+  if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-foreground/40 flex justify-end" onClick={onClose}>
+    <div className={`fixed inset-0 z-50 bg-foreground/40 flex justify-end ${closing ? "animate-out fade-out duration-200" : "animate-in fade-in duration-200"}`} onClick={onClose}>
       <div
-        className="w-full max-w-md bg-card border-l border-border h-full animate-in slide-in-from-right duration-200 flex flex-col"
+        className={`w-full max-w-md bg-card border-l border-border h-full flex flex-col ${closing ? "animate-out slide-out-to-right duration-200" : "animate-in slide-in-from-right duration-200"}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -298,8 +310,9 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
             </Button>
           </div>
 
-          {showFilters && (
-            <div className="space-y-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${showFilters ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+            <div className="overflow-hidden">
+            <div className="space-y-2 pt-1">
               <Select value={paymentFilter} onValueChange={setPaymentFilter}>
                 <SelectTrigger className="h-8 text-xs bg-card">
                   <SelectValue />
@@ -341,7 +354,8 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                 {t("filter_upcoming")}
               </button>
             </div>
-          )}
+            </div>
+          </div>
 
           {hasFilters && (
             <Button

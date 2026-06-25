@@ -36,8 +36,9 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
         <Switch checked={enabled} onCheckedChange={onEnabledChange} />
       </div>
 
-      {enabled && (
-        <div className="space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+      <div className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${enabled ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+        <div className="overflow-hidden">
+        <div className="space-y-2.5 pt-1">
           {/* Quick templates — horizontal scroll, no wrap */}
           <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5">
             {TEMPLATES.map((tmpl) => (
@@ -96,7 +97,8 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
             </div>
           </div>
         </div>
-      )}
+        </div>
+      </div>
     </div>
   );
 };

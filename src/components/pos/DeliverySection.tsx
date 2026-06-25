@@ -442,7 +442,7 @@ const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: Deliver
       </div>
 
       {deliveries.map((d, i) => (
-        <div key={d.id}>
+        <div key={d.id} className="animate-in fade-in slide-in-from-top-2 duration-200">
           {i > 0 && <div className="border-t border-dashed border-border pt-4" />}
           <DeliveryCard
             delivery={d}

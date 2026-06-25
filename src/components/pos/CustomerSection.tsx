@@ -165,7 +165,7 @@ const CustomerSection = ({
                 : "bg-secondary text-secondary-foreground hover:bg-accent"
             }`}
           >
-            {t("btn_personal")}
+            <span className="flex items-center gap-1"><User className="w-3 h-3" /> {t("btn_personal")}</span>
           </button>
           <button
             onClick={() => onCustomerTypeChange("company")}
@@ -233,7 +233,7 @@ const CustomerSection = ({
         <div className="space-y-1.5 relative" ref={dropdownRef}>
           <Label className="text-xs font-medium">{t("label_customer_name")}</Label>
           <div
-            className="flex items-center h-10 border border-input rounded-md bg-background cursor-pointer hover:border-ring transition-colors"
+            className="flex items-center h-10 border border-input rounded-md bg-background cursor-pointer hover:border-ring transition-colors ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 overflow-hidden"
             onClick={() => setDropdownOpen(!dropdownOpen)}
           >
             <Input

@@ -17,7 +17,7 @@ const PaymentScreen = () => {
         <div className="absolute -bottom-32 -right-24 w-[28rem] h-[28rem] rounded-full bg-primary/[0.06] blur-3xl" />
       </div>
 
-      <div className="relative w-full max-w-xs space-y-6 text-center">
+      <div className="relative w-full max-w-xs space-y-6 text-center animate-in fade-in slide-in-from-bottom-3 duration-400">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
           <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 text-primary shrink-0">

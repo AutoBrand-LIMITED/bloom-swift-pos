@@ -129,7 +129,8 @@ const DriverApp = () => {
                 <button
                   key={d.id}
                   onClick={() => setSelectedDriver(d.name)}
-                  className={`group rounded-2xl border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ease-out p-8 text-center font-bold text-lg active:scale-95 ${
+                  style={{ animationDelay: `${i * 60}ms` }}
+                  className={`group rounded-2xl border border-border bg-card hover:bg-primary/5 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ease-out p-8 text-center font-bold text-lg active:scale-95 animate-in fade-in slide-in-from-bottom-2 duration-300 ${
                     i === drivers.length - 1 && drivers.length % 2 !== 0 ? "col-span-2" : ""
                   }`}
                 >
@@ -194,7 +195,8 @@ const DriverApp = () => {
           return (
             <div
               key={order.id}
-              className={`rounded-xl border bg-card transition-all ${isDelivered ? "opacity-60 border-border" : "border-border shadow-sm"}`}
+              style={{ animationDelay: `${sortedOrders.indexOf(order) * 50}ms` }}
+              className={`rounded-xl border bg-card transition-all animate-in fade-in slide-in-from-bottom-2 duration-200 ${isDelivered ? "opacity-60 border-border" : "border-border shadow-sm"}`}
             >
               <button
                 className="w-full text-left p-4"

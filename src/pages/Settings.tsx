@@ -60,7 +60,7 @@ const Settings = () => {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 pb-10">
+      <main className="max-w-2xl mx-auto px-4 py-6 pb-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
         {/* Section label */}
         <div className="flex items-center gap-2 mb-4">
           <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
