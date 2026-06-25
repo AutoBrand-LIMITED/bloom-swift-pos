@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck, Crown, Gift, Tag, Pencil, MoreHorizontal } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Truck, Crown, Gift, Tag, Pencil, MoreHorizontal, SlidersHorizontal } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -22,7 +22,7 @@ import PaymentSection from "@/components/pos/PaymentSection";
 import AddOnsSection from "@/components/pos/AddOnsSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
-import type { Order, OrderItem, PaymentStatus, Delivery } from "@/types/order";
+import type { Order, OrderItem, PaymentStatus, PaymentRecord, Delivery } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
 import { newDelivery } from "@/components/pos/DeliverySection";
@@ -30,8 +30,8 @@ import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
 
 import { loadOrders, saveOrders } from "@/lib/orders";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { updateCustomerPersistentNotes, updateCustomerFlags } from "@/lib/customer-utils";
-import type { CustomerFlag } from "@/data/demo-customers";
+import { updateCustomerPersistentNotes, updateCustomerFlags, saveCustomerAddresses } from "@/lib/customer-utils";
+import type { CustomerFlag, SavedAddress } from "@/data/demo-customers";
 import type { TranslationKey } from "@/lib/i18n";
 
 const OCCASION_KEYS: TranslationKey[] = [
@@ -333,6 +333,29 @@ const Index = () => {
     saveOrders(updated);
   };
 
+  // Build the payment ledger, preserving prior entries and stamping each
+  // deposit / balance / full payment with its own timestamp (SOP §2.4).
+  const buildPayments = (prev?: Order): PaymentRecord[] => {
+    const now = new Date().toISOString();
+    const existing = prev?.payments ?? [];
+
+    if (paymentStatus === "unpaid") return existing;
+
+    if (paymentStatus === "deposit") {
+      if (existing.some(p => p.type === "deposit")) return existing;
+      return [...existing, { type: "deposit", amount: depositAmount, method: paymentMethod, at: now }];
+    }
+
+    // paymentStatus === "paid"
+    const depositPaid = existing.filter(p => p.type === "deposit").reduce((s, p) => s + p.amount, 0);
+    if (depositPaid > 0) {
+      if (existing.some(p => p.type === "balance")) return existing;
+      return [...existing, { type: "balance", amount: finalPrice - depositPaid, method: paymentMethod, at: now }];
+    }
+    if (existing.some(p => p.type === "full")) return existing;
+    return [...existing, { type: "full", amount: finalPrice, method: paymentMethod, at: now }];
+  };
+
   const handleSubmit = () => {
     if (!salesId) {
       toast.error(t("toast_error_no_staff"));
@@ -354,6 +377,9 @@ const Index = () => {
     if (finalPrice === 0) {
       toast.warning(t("toast_warn_zero_price"));
     }
+
+    const prevOrder = editingOrderId ? orders.find(o => o.id === editingOrderId) : undefined;
+    const payments = buildPayments(prevOrder);
 
     const order: Order = {
       id: currentOrderId,
@@ -388,6 +414,7 @@ const Index = () => {
       deliveryNotes: deliveryNotes.trim(),
       internalNotes: internalNotes.trim(),
       occasionTag: occasionTag || undefined,
+      payments,
       createdAt: editingOrderId
         ? (orders.find(o => o.id === editingOrderId)?.createdAt ?? new Date().toISOString())
         : new Date().toISOString(),
@@ -404,6 +431,12 @@ const Index = () => {
 
   const commitOrder = (order: Order) => {
     saveOrder(order);
+
+    // Persist delivery addresses to the customer profile for one-tap recall
+    if (order.phone.trim() && order.deliveries?.length) {
+      saveCustomerAddresses(order.phone, order.deliveries);
+      setCustomerRefreshKey(k => k + 1);
+    }
 
     // Save pinned notes to customer persistent record (append to existing)
     const newPinned = [
@@ -483,6 +516,9 @@ const Index = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
               <BarChart3 className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_report")}</span>
             </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/settings")} className="gap-1.5 text-xs">
+              <SlidersHorizontal className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_settings")}</span>
+            </Button>
 
             <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
@@ -533,6 +569,9 @@ const Index = () => {
                 <DropdownMenuItem onClick={() => navigate("/report")}>
                   <BarChart3 className="w-4 h-4 mr-2" /> {t("nav_report")}
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/settings")}>
+                  <SlidersHorizontal className="w-4 h-4 mr-2" /> {t("nav_settings")}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={resetForm}>
                   <RotateCcw className="w-4 h-4 mr-2" /> {t("nav_clear")}
@@ -556,10 +595,18 @@ const Index = () => {
               <CustomerHistoryPanel
                 customer={selectedCustomer}
                 onClose={() => setSelectedCustomer(null)}
-                onUseAddress={(address, recipientNameVal) => {
+                onApplyAddress={(addr: SavedAddress) => {
                   setDeliveries(prev => {
                     const next = [...prev];
-                    next[0] = { ...next[0], deliveryDetail: address, ...(recipientNameVal ? { recipientName: recipientNameVal } : {}) };
+                    next[0] = {
+                      ...next[0],
+                      ...(addr.deliveryRegion ? { deliveryRegion: addr.deliveryRegion } : {}),
+                      ...(addr.deliveryDistrict ? { deliveryDistrict: addr.deliveryDistrict } : {}),
+                      ...(addr.deliveryArea ? { deliveryArea: addr.deliveryArea } : {}),
+                      deliveryDetail: addr.deliveryDetail,
+                      ...(addr.recipientName ? { recipientName: addr.recipientName } : {}),
+                      ...(addr.recipientPhone ? { recipientPhone: addr.recipientPhone } : {}),
+                    };
                     return next;
                   });
                   toast.success(t("toast_address_applied"));
@@ -743,6 +790,7 @@ const Index = () => {
             onReminderOptionChange={setReminderOption}
             priceWarning={finalPrice === 0 && items.length > 0}
             orderId={currentOrderId}
+            payments={editingOrderId ? orders.find(o => o.id === editingOrderId)?.payments : undefined}
             isComplete={paymentStatus !== "unpaid" || finalPrice === 0}
           />
 

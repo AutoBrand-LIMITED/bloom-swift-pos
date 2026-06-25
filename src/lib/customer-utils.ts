@@ -1,6 +1,6 @@
 import { DEMO_CUSTOMERS } from "@/data/demo-customers";
-import type { DemoCustomer, PurchaseRecord, CustomerFlag } from "@/data/demo-customers";
-import type { Order } from "@/types/order";
+import type { DemoCustomer, PurchaseRecord, CustomerFlag, SavedAddress } from "@/data/demo-customers";
+import type { Delivery, Order } from "@/types/order";
 
 const CUSTOMERS_STORAGE_KEY = "florist-pos-customers";
 
@@ -98,6 +98,53 @@ export function updateCustomerPersistentNotes(phone: string, note: string): void
   } else {
     const demo = DEMO_CUSTOMERS.find(c => c.phone.replace(/\s/g, "") === normalizedPhone);
     if (demo) saveCustomers([...stored, { ...demo, persistentNotes: note || undefined }]);
+  }
+}
+
+const addressKey = (a: SavedAddress | Delivery): string =>
+  [a.deliveryRegion, a.deliveryDistrict, a.deliveryArea, a.deliveryDetail.trim()]
+    .map(s => (s ?? "").trim())
+    .join("|");
+
+/** Persist delivery addresses (one per recipient) to the customer profile, deduped. */
+export function saveCustomerAddresses(phone: string, deliveries: Delivery[]): void {
+  const fresh: SavedAddress[] = deliveries
+    .filter(d => d.deliveryDetail.trim() || d.deliveryArea)
+    .map(d => ({
+      id: crypto.randomUUID(),
+      deliveryRegion: d.deliveryRegion,
+      deliveryDistrict: d.deliveryDistrict,
+      deliveryArea: d.deliveryArea,
+      deliveryDetail: d.deliveryDetail.trim(),
+      recipientName: d.recipientName.trim() || undefined,
+      recipientPhone: d.recipientPhone.trim() || undefined,
+    }));
+  if (fresh.length === 0) return;
+
+  const normalizedPhone = phone.replace(/\s/g, "");
+  const stored = loadStoredCustomers();
+  const idx = stored.findIndex(c => c.phone.replace(/\s/g, "") === normalizedPhone);
+  const base = idx >= 0
+    ? stored[idx]
+    : DEMO_CUSTOMERS.find(c => c.phone.replace(/\s/g, "") === normalizedPhone);
+  if (!base) return;
+
+  const existing = base.addresses ?? [];
+  const seen = new Set(existing.map(addressKey));
+  const merged = [...existing];
+  for (const a of fresh) {
+    const key = addressKey(a);
+    if (key.replace(/\|/g, "") && !seen.has(key)) {
+      seen.add(key);
+      merged.push(a);
+    }
+  }
+  const next = { ...base, addresses: merged };
+
+  if (idx >= 0) {
+    saveCustomers(stored.map((c, i) => (i === idx ? next : c)));
+  } else {
+    saveCustomers([...stored, next]);
   }
 }
 

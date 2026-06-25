@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import StepBadge from "@/components/pos/StepBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Trash2, Package, Wallet, Wand2, Bookmark } from "lucide-react";
+import { Plus, Trash2, Package, Wallet, Wand2, Bookmark, Search, CornerDownLeft } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
@@ -52,6 +52,8 @@ const OrderItemsSection = ({
   const [newPrice, setNewPrice] = useState("");
   const [customOrderOpen, setCustomOrderOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [codeQuery, setCodeQuery] = useState("");
+  const codeSearchRef = useRef<HTMLInputElement>(null);
 
   const CATEGORIES = [
     { id: "all", label: t("cat_all") },
@@ -63,29 +65,29 @@ const OrderItemsSection = ({
   ];
 
   const PRESETS = [
-    { name: "玫瑰花束", price: 680, category: "bouquet" },
-    { name: "向日葵花束", price: 480, category: "bouquet" },
-    { name: "百合花束", price: 580, category: "bouquet" },
-    { name: "繡球花束", price: 780, category: "bouquet" },
-    { name: "混合野花束", price: 520, category: "bouquet" },
-    { name: "牡丹花束", price: 980, category: "bouquet" },
-    { name: "鬱金香花束", price: 620, category: "bouquet" },
-    { name: "鮮花籃", price: 880, category: "basket" },
-    { name: "果籃連鮮花", price: 1200, category: "basket" },
-    { name: "蘭花籃", price: 1400, category: "basket" },
-    { name: "祝賀花籃", price: 980, category: "basket" },
-    { name: "蘭花盆栽", price: 1200, category: "plant" },
-    { name: "多肉植物", price: 280, category: "plant" },
-    { name: "幸福樹", price: 680, category: "plant" },
-    { name: "觀葉植物", price: 480, category: "plant" },
-    { name: "蝴蝶蘭（雙株）", price: 1800, category: "plant" },
-    { name: "喪禮花圈（白）", price: 1200, category: "wreath" },
-    { name: "喪禮花圈（混色）", price: 1400, category: "wreath" },
-    { name: "靈前擺設", price: 2200, category: "wreath" },
-    { name: "花藝佈置", price: 0, category: "other" },
-    { name: "園藝保養", price: 0, category: "other" },
-    { name: "套票（100支花）", price: 8800, category: "other" },
-    { name: "禮品套裝", price: 680, category: "other" },
+    { code: "B01", name: "玫瑰花束", price: 680, category: "bouquet" },
+    { code: "B02", name: "向日葵花束", price: 480, category: "bouquet" },
+    { code: "B03", name: "百合花束", price: 580, category: "bouquet" },
+    { code: "B04", name: "繡球花束", price: 780, category: "bouquet" },
+    { code: "B05", name: "混合野花束", price: 520, category: "bouquet" },
+    { code: "B06", name: "牡丹花束", price: 980, category: "bouquet" },
+    { code: "B07", name: "鬱金香花束", price: 620, category: "bouquet" },
+    { code: "K01", name: "鮮花籃", price: 880, category: "basket" },
+    { code: "K02", name: "果籃連鮮花", price: 1200, category: "basket" },
+    { code: "K03", name: "蘭花籃", price: 1400, category: "basket" },
+    { code: "K04", name: "祝賀花籃", price: 980, category: "basket" },
+    { code: "P01", name: "蘭花盆栽", price: 1200, category: "plant" },
+    { code: "P02", name: "多肉植物", price: 280, category: "plant" },
+    { code: "P03", name: "幸福樹", price: 680, category: "plant" },
+    { code: "P04", name: "觀葉植物", price: 480, category: "plant" },
+    { code: "P05", name: "蝴蝶蘭（雙株）", price: 1800, category: "plant" },
+    { code: "W01", name: "喪禮花圈（白）", price: 1200, category: "wreath" },
+    { code: "W02", name: "喪禮花圈（混色）", price: 1400, category: "wreath" },
+    { code: "W03", name: "靈前擺設", price: 2200, category: "wreath" },
+    { code: "O01", name: "花藝佈置", price: 0, category: "other" },
+    { code: "O02", name: "園藝保養", price: 0, category: "other" },
+    { code: "O03", name: "套票（100支花）", price: 8800, category: "other" },
+    { code: "O04", name: "禮品套裝", price: 680, category: "other" },
   ];
 
   const visiblePresets = selectedCategory === "all"
@@ -98,6 +100,37 @@ const OrderItemsSection = ({
       { id: crypto.randomUUID(), name: preset.name, price: preset.price, quantity: 1 },
     ]);
   };
+
+  // Quick code/name search — for experienced staff
+  const codeMatches = useMemo(() => {
+    const q = codeQuery.trim().toLowerCase();
+    if (!q) return [];
+    return PRESETS.filter((p) =>
+      p.code.toLowerCase().includes(q) ||
+      p.name.toLowerCase().includes(q) ||
+      productLabel(p.name, "en").toLowerCase().includes(q)
+    ).slice(0, 6);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeQuery]);
+
+  const addFromSearch = (preset: { name: string; price: number }) => {
+    addPreset(preset);
+    setCodeQuery("");
+  };
+
+  // Press "/" to focus the quick-search (unless already typing in a field)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/") return;
+      const el = document.activeElement;
+      const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+      if (typing) return;
+      e.preventDefault();
+      codeSearchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const addItem = () => {
     if (!newName.trim()) return;
@@ -185,6 +218,49 @@ const OrderItemsSection = ({
         )}
       </div>
 
+      {/* Quick code / name search */}
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        <Input
+          ref={codeSearchRef}
+          value={codeQuery}
+          onChange={(e) => setCodeQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && codeMatches[0]) {
+              e.preventDefault();
+              addFromSearch(codeMatches[0]);
+            } else if (e.key === "Escape") {
+              setCodeQuery("");
+            }
+          }}
+          placeholder={t("placeholder_code_search")}
+          className="pl-8 pr-12 h-9 text-sm font-mono"
+        />
+        <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground border border-border rounded px-1 py-0.5 pointer-events-none">/</kbd>
+        {codeQuery.trim() && (
+          <div className="absolute z-20 mt-1 w-full rounded-lg border border-border bg-card shadow-lg overflow-hidden">
+            {codeMatches.length === 0 ? (
+              <p className="px-3 py-2.5 text-xs text-muted-foreground">{t("msg_no_match")}</p>
+            ) : (
+              codeMatches.map((p, i) => (
+                <button
+                  key={p.code}
+                  onClick={() => addFromSearch(p)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-primary/10 ${
+                    i === 0 ? "bg-primary/[0.04]" : ""
+                  }`}
+                >
+                  <span className="font-mono text-xs font-semibold text-primary bg-primary/10 rounded px-1.5 py-0.5 shrink-0">{p.code}</span>
+                  <span className="flex-1 min-w-0 truncate">{productLabel(p.name, lang)}</span>
+                  {p.price > 0 && <span className="font-mono text-xs text-muted-foreground tabular-nums shrink-0">${p.price}</span>}
+                  {i === 0 && <CornerDownLeft className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Category filter */}
       <div className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {CATEGORIES.map((cat) => (
@@ -210,7 +286,10 @@ const OrderItemsSection = ({
             onClick={() => addPreset(p)}
             className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-left text-xs transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
           >
-            <span className="font-medium leading-snug">{productLabel(p.name, lang)}</span>
+            <span className="min-w-0 flex items-center gap-1.5">
+              <span className="font-mono text-[10px] text-muted-foreground group-hover:text-primary-foreground/70 shrink-0">{p.code}</span>
+              <span className="font-medium leading-snug truncate">{productLabel(p.name, lang)}</span>
+            </span>
             {p.price > 0 && (
               <span className="shrink-0 font-mono tabular-nums text-muted-foreground group-hover:text-primary-foreground/70">
                 ${p.price}

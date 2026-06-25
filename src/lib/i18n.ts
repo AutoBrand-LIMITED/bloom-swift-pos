@@ -421,6 +421,34 @@ export const zh = {
   addon_wrap_upgrade: "花束包裝升級",
   addon_card: "手寫賀卡",
   addon_led: "LED 燈串裝飾",
+
+  // Payment ledger (split payment timestamps)
+  payment_ledger: "付款記錄",
+  pay_type_deposit: "訂金",
+  pay_type_balance: "餘款",
+  pay_type_full: "全額",
+
+  // Settings — delivery slots
+  nav_settings: "設定",
+  settings_title: "送貨時段設定",
+  settings_slots_desc: "管理送貨時段（旺季可加時段）",
+  settings_slots_section: "送貨時段",
+  settings_slot_label: "時段名稱",
+  settings_slot_sublabel: "副標題 / 時間",
+  settings_add_slot: "新增時段",
+  settings_remove_slot: "移除時段",
+  settings_reset: "重設為預設",
+  settings_save: "儲存",
+  settings_saved: "時段已儲存",
+  settings_reset_done: "已重設為預設時段",
+  settings_locked_hint: "預設時段",
+  settings_specified_hint: "指定時間（系統用）",
+  placeholder_slot_label: "例如：母親節特快",
+  placeholder_slot_sub: "例如：6am – 9am",
+
+  // Item code quick-search
+  placeholder_code_search: "代碼或名稱快速搜尋（按 / ）",
+  msg_no_match: "沒有符合項目",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
@@ -846,6 +874,34 @@ export const en: Record<TranslationKey, string> = {
   addon_wrap_upgrade: "Wrap upgrade",
   addon_card: "Handwritten card",
   addon_led: "LED string lights",
+
+  // Payment ledger (split payment timestamps)
+  payment_ledger: "Payment Log",
+  pay_type_deposit: "Deposit",
+  pay_type_balance: "Balance",
+  pay_type_full: "Full Payment",
+
+  // Settings — delivery slots
+  nav_settings: "Settings",
+  settings_title: "Delivery Time Slots",
+  settings_slots_desc: "Manage delivery slots (add peak-season slots)",
+  settings_slots_section: "Delivery Slots",
+  settings_slot_label: "Slot Name",
+  settings_slot_sublabel: "Subtitle / Time",
+  settings_add_slot: "Add Slot",
+  settings_remove_slot: "Remove slot",
+  settings_reset: "Reset to Default",
+  settings_save: "Save",
+  settings_saved: "Slots saved",
+  settings_reset_done: "Reset to default slots",
+  settings_locked_hint: "Built-in",
+  settings_specified_hint: "Specified time (system)",
+  placeholder_slot_label: "e.g. Mother's Day Express",
+  placeholder_slot_sub: "e.g. 6am – 9am",
+
+  // Item code quick-search
+  placeholder_code_search: "Quick search by code or name (press / )",
+  msg_no_match: "No matching items",
 };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { zh, en };

@@ -17,7 +17,7 @@ Built by: AutoBrand Limited
 - [x] Auto-load customer history + past delivery addresses
 - [x] One tap to apply a saved address
 - [x] Product category selection (bouquets, baskets, wreaths, etc.) — category-specific options
-- [ ] Item code quick-search for experienced staff
+- [x] Item code quick-search for experienced staff — code/name search box with `/` shortcut, codes shown on presets
 - [x] Message card templates (Happy Birthday, preset greetings) + voice input for custom text
 - [x] One-tap batch printing — picking slip, delivery note, message card individually selectable (全部列印 dropdown)
 - [x] Option to skip message card printing entirely (checkbox in dropdown; skipped by default if no card)
@@ -27,13 +27,13 @@ Built by: AutoBrand Limited
 
 - [x] Full customer profiles: VIP flags, company name + address (required for listed companies)
 - [x] Contact person field (e.g. secretary placing order on behalf of boss)
-- [ ] Multiple delivery addresses per customer
+- [x] Multiple delivery addresses per customer — structured addresses saved to profile on submit, one-tap recall in CustomerHistoryPanel
 - [x] Phone search: spaced and unspaced formats simultaneously
 - [x] Area code auto-detection: HK 852 and Macau 853 without manual selection
 - [x] Contact person stored separately from customer name — both visible on order record
 - [x] Split-delivery orders: single invoice, multiple recipients, auto-numbered (INV-001-1, INV-001-2)
 - [x] Delivery time slots: 9am–1pm, 1pm–6pm, specified time (before 10am, before 12pm, office hours)
-- [ ] Peak season slots configurable in back-end settings
+- [x] Peak season slots configurable in back-end settings — `/settings` screen adds/edits/removes delivery slots
 - [x] Specified time delivery flagged separately + additional charge flag
 - [x] Google Maps integration for delivery address display and route planning
 - [x] Optimised order entry flow: phone + staff first → customer enters recipient/delivery → staff adds items
@@ -61,7 +61,7 @@ Built by: AutoBrand Limited
 - [x] Outstanding payment tracking: pre-delivery alert for unpaid orders
 - [x] System prompts staff before dispatching an unpaid order
 - [ ] Automatic Stripe webhook: payment confirmed → system updates in real time
-- [x] Split payment support: deposit + balance flow _(no post-amendment top-up or timestamps yet)_
+- [x] Split payment support: deposit + balance flow with per-payment timestamps (payment ledger) _(no post-amendment top-up yet)_
 - [ ] Invoice numbers are permanent and non-cancellable
 - [ ] All amendments retain full audit trail
 
@@ -131,7 +131,7 @@ Built by: AutoBrand Limited
 | Sales staff selection | ✅ Exists | First field; gates all other input |
 | Phone search + customer lookup | ✅ Exists | 852/853 auto-detect ✅; recipient phone search ✅ |
 | Personal / company toggle | ✅ Exists | — |
-| Order items + presets + voice input | ✅ Exists | Category filter: 全部/花束/花籃/盆栽/花圈/其他 ✅; no item code search |
+| Order items + presets + voice input | ✅ Exists | Category filter: 全部/花束/花籃/盆栽/花圈/其他 ✅; item code quick-search ✅ (`/` shortcut) |
 | Budget tracker with progress bar | ✅ Exists | — |
 | HK cascading address (region→district→area) | ✅ Exists | — |
 | Google Maps embed | ✅ Exists | — |
@@ -160,6 +160,9 @@ Built by: AutoBrand Limited
 | Message card standalone print | ✅ Exists | Styled card layout; card-only content |
 | Batch print with document toggles | ✅ Exists | 全部列印 dropdown; per-doc checkboxes; 列印所選 |
 | English / Cantonese language toggle | ✅ Exists | 廣/EN pill in header; persisted in localStorage; full app coverage |
+| Delivery slot settings | ✅ Exists | `/settings` — add/edit/remove slots; built-ins locked; persisted in localStorage |
+| Saved customer addresses | ✅ Exists | Structured addresses saved per customer on submit; one-tap recall |
+| Split payment timestamps | ✅ Exists | Payment ledger records deposit/balance/full each with timestamp |
 | Relationship field on recipient | ✅ Exists | Per-recipient dropdown in DeliverySection |
 | Birthday field on recipient | ✅ Exists | MM-DD field per recipient in DeliverySection |
 | Occasion / holiday tag on order | ✅ Exists | Pill picker UI ✅; saved to order ✅ |
@@ -190,12 +193,12 @@ Built by: AutoBrand Limited
 - [x] Pre-delivery unpaid order alert / dispatch block — shown in OrderHistory drawer
 - [ ] Shoppage payment link integration — needs API keys
 - [ ] Stripe webhook handler (real-time status update) — needs backend
-- [ ] Split payment: deposit + balance + top-up with individual timestamps
+- [x] Split payment: deposit + balance with individual timestamps (payment ledger shown in PaymentSection on edit) _(top-up after amendment still pending)_
 
 ### P3 — Delivery
 
 - [x] Replace time input with preset slots (9am–1pm, 1pm–6pm, specified time + surcharge flag)
-- [ ] Peak season slot configuration in settings
+- [x] Peak season slot configuration in settings (`/settings`)
 - [x] Driver list dropdown (not free text input)
 - [x] Split-delivery UI: add multiple recipients per order; shown in history grouped by driver
 - [x] Order list sorted by delivery person in history/dispatch views

@@ -23,6 +23,15 @@ export interface Delivery {
 
 export type PaymentStatus = "unpaid" | "paid" | "deposit";
 
+export type PaymentEntryType = "deposit" | "balance" | "full";
+
+export interface PaymentRecord {
+  type: PaymentEntryType;
+  amount: number;
+  method: string;
+  at: string; // ISO timestamp
+}
+
 export interface Order {
   id: string;
   salesId: string;
@@ -57,6 +66,7 @@ export interface Order {
   deliveryNotes: string;
   internalNotes: string;
   occasionTag?: string;
+  payments?: PaymentRecord[];
   createdAt: string;
   deliveryStatus?: "pending" | "delivered";
   deliveredAt?: string;

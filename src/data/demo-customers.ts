@@ -1,5 +1,15 @@
 export type CustomerFlag = 'vip' | 'warning' | 'internal';
 
+export interface SavedAddress {
+  id: string;
+  deliveryRegion: string;
+  deliveryDistrict: string;
+  deliveryArea: string;
+  deliveryDetail: string;
+  recipientName?: string;
+  recipientPhone?: string;
+}
+
 export interface DemoCustomer {
   id: string;
   name: string;
@@ -7,6 +17,7 @@ export interface DemoCustomer {
   contactPerson?: string;
   flags?: CustomerFlag[];
   persistentNotes?: string;
+  addresses?: SavedAddress[];
   history: PurchaseRecord[];
 }
 

@@ -1,17 +1,17 @@
-import { History, X } from "lucide-react";
+import { History, X, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMemo } from "react";
-import type { DemoCustomer } from "@/data/demo-customers";
+import type { DemoCustomer, SavedAddress } from "@/data/demo-customers";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CustomerHistoryPanelProps {
   customer: DemoCustomer | null;
   onClose: () => void;
-  onUseAddress?: (address: string, recipientName?: string) => void;
+  onApplyAddress?: (addr: SavedAddress) => void;
 }
 
-const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHistoryPanelProps) => {
+const CustomerHistoryPanel = ({ customer, onClose, onApplyAddress }: CustomerHistoryPanelProps) => {
   const { t } = useLanguage();
   const totalSpent = customer?.history.reduce((s, h) => s + h.total, 0) ?? 0;
   const unpaidCount = customer?.history.filter((h) => h.status === "unpaid").length ?? 0;
@@ -19,19 +19,43 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
     .filter((h) => h.status === "unpaid")
     .reduce((s, h) => s + h.total, 0) ?? 0;
 
-  const pastAddresses = useMemo(() => {
+  // Unified saved-address list: structured profile addresses first, then any
+  // history-derived addresses not already covered. Deduped by full address text.
+  const savedAddresses = useMemo<SavedAddress[]>(() => {
     if (!customer) return [];
     const seen = new Set<string>();
-    const addrs: { address: string; recipientName?: string; date: string }[] = [];
+    const result: SavedAddress[] = [];
+    const fullText = (a: SavedAddress) =>
+      [a.deliveryRegion, a.deliveryDistrict, a.deliveryArea, a.deliveryDetail]
+        .map(s => (s ?? "").trim()).filter(Boolean).join(" ");
+
+    for (const a of customer.addresses ?? []) {
+      const key = fullText(a);
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        result.push(a);
+      }
+    }
     for (const h of customer.history) {
       const addr = h.deliveryAddress?.trim();
       if (addr && !seen.has(addr)) {
         seen.add(addr);
-        addrs.push({ address: addr, recipientName: h.recipientName, date: h.date });
+        result.push({
+          id: `hist-${addr}`,
+          deliveryRegion: "",
+          deliveryDistrict: "",
+          deliveryArea: "",
+          deliveryDetail: addr,
+          recipientName: h.recipientName,
+        });
       }
     }
-    return addrs;
+    return result;
   }, [customer]);
+
+  const addrText = (a: SavedAddress) =>
+    [a.deliveryRegion, a.deliveryDistrict, a.deliveryArea, a.deliveryDetail]
+      .map(s => (s ?? "").trim()).filter(Boolean).join(" ");
 
   if (!customer) return null;
 
@@ -77,24 +101,28 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
         )}
       </div>
 
-      {/* Past addresses */}
-      {pastAddresses.length > 0 && (
+      {/* Saved addresses */}
+      {savedAddresses.length > 0 && (
         <div className="p-3 border-b border-border space-y-1.5">
           <p className="text-xs sm:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
             {t("label_past_addresses")}
+            <span className="font-mono text-muted-foreground/70">· {savedAddresses.length}</span>
           </p>
-          {pastAddresses.map((a, i) => (
+          {savedAddresses.map((a) => (
             <button
-              key={i}
+              key={a.id}
               type="button"
-              onClick={() => onUseAddress?.(a.address, a.recipientName)}
+              onClick={() => onApplyAddress?.(a)}
               className="w-full text-left rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 p-2 transition-colors group"
             >
-              <p className="text-xs leading-relaxed">{a.address}</p>
+              <p className="text-xs leading-relaxed flex items-start gap-1.5">
+                <MapPin className="w-3 h-3 mt-0.5 shrink-0 text-primary/60" />
+                <span>{addrText(a)}</span>
+              </p>
               {a.recipientName && (
-                <p className="text-xs sm:text-[10px] text-muted-foreground mt-0.5">{t("label_recipient_prefix")}{a.recipientName}</p>
+                <p className="text-xs sm:text-[10px] text-muted-foreground mt-0.5 pl-[18px]">{t("label_recipient_prefix")}{a.recipientName}</p>
               )}
-              <p className="text-xs sm:text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+              <p className="text-xs sm:text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 pl-[18px]">
                 {t("hint_use_address")}
               </p>
             </button>

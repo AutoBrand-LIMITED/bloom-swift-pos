@@ -6,7 +6,10 @@ import { Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart } 
 import StepBadge from "@/components/pos/StepBadge";
 import type { Delivery } from "@/types/order";
 import { DRIVERS } from "@/types/order";
+import { loadSlots } from "@/lib/delivery-slots";
 import { useLanguage } from "@/contexts/LanguageContext";
+
+const SPECIFIED_VALUE = "指定時間";
 
 const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
   "香港島": {
@@ -73,6 +76,9 @@ function DeliveryCard({
   onRemove: () => void;
 }) {
   const { t } = useLanguage();
+  // Read fresh each render (localStorage is cheap) so slot edits in /settings
+  // take effect without unmounting the form.
+  const slots = loadSlots();
   const set = <K extends keyof Delivery>(key: K, val: Delivery[K]) =>
     onChange({ ...delivery, [key]: val });
 
@@ -91,15 +97,15 @@ function DeliveryCard({
     onChange({ ...delivery, deliveryDistrict: v, deliveryArea: "" });
 
   const isSpecified =
-    delivery.deliveryTime === "指定時間" || delivery.deliveryTime.startsWith("指定");
+    delivery.deliveryTime === SPECIFIED_VALUE || delivery.deliveryTime.startsWith("指定");
   const specifiedTime = isSpecified
-    ? delivery.deliveryTime.replace("指定時間 ", "").replace("指定時間", "")
+    ? delivery.deliveryTime.replace(`${SPECIFIED_VALUE} `, "").replace(SPECIFIED_VALUE, "")
     : "";
 
   const handleSlotSelect = (slotValue: string) => set("deliveryTime", slotValue);
 
   const handleSpecifiedTime = (timeValue: string) =>
-    set("deliveryTime", timeValue ? `指定時間 ${timeValue}` : "指定時間");
+    set("deliveryTime", timeValue ? `${SPECIFIED_VALUE} ${timeValue}` : SPECIFIED_VALUE);
 
   const fullAddress = [
     delivery.deliveryRegion,
@@ -151,28 +157,26 @@ function DeliveryCard({
           <Label className="text-xs font-medium flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" /> {t("label_delivery_time")}
           </Label>
-          <div className="flex gap-1.5">
-            {[
-              { value: "上午 (9–1pm)", label: t("slot_morning_label"), sublabel: "9am – 1pm" },
-              { value: "下午 (1–6pm)", label: t("slot_afternoon_label"), sublabel: "1pm – 6pm" },
-              { value: "指定時間", label: t("slot_specified_label"), sublabel: t("slot_specified_sub") },
-            ].map((slot) => {
+          <div className="flex flex-wrap gap-1.5">
+            {slots.map((slot) => {
               const active =
                 delivery.deliveryTime === slot.value ||
-                (slot.value === "指定時間" && isSpecified);
+                (!!slot.specified && isSpecified);
+              const label = slot.labelKey ? t(slot.labelKey) : slot.label;
+              const sublabel = slot.sublabelKey ? t(slot.sublabelKey) : slot.sublabel;
               return (
                 <button
-                  key={slot.value}
+                  key={slot.id}
                   onClick={() => handleSlotSelect(slot.value)}
-                  className={`flex-1 rounded-lg py-1.5 px-1 text-center text-xs font-medium border transition-all ${
+                  className={`flex-1 min-w-[68px] rounded-lg py-1.5 px-1 text-center text-xs font-medium border transition-all ${
                     active
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-secondary text-secondary-foreground border-transparent hover:border-border"
                   }`}
                 >
-                  <div>{slot.label}</div>
+                  <div>{label}</div>
                   <div className={`text-[9px] ${active ? "opacity-80" : "text-muted-foreground"}`}>
-                    {slot.sublabel}
+                    {sublabel}
                   </div>
                 </button>
               );

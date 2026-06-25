@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, AlertTriangle, CalendarIcon, Store, MessageCircle, Apple, Wallet, Banknote, ExternalLink } from "lucide-react";
+import { CreditCard, AlertTriangle, CalendarIcon, Store, MessageCircle, Apple, Wallet, Banknote, ExternalLink, Receipt } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import type { PaymentStatus } from "@/types/order";
+import type { PaymentStatus, PaymentRecord, PaymentEntryType } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PaymentSectionProps {
@@ -29,8 +29,15 @@ interface PaymentSectionProps {
   onReminderOptionChange: (v: string) => void;
   priceWarning: boolean;
   orderId?: string;
+  payments?: PaymentRecord[];
   isComplete?: boolean;
 }
+
+const PAYMENT_TYPE_KEY: Record<PaymentEntryType, "pay_type_deposit" | "pay_type_balance" | "pay_type_full"> = {
+  deposit: "pay_type_deposit",
+  balance: "pay_type_balance",
+  full: "pay_type_full",
+};
 
 const STATUS_CLASSNAMES: Record<PaymentStatus, string> = {
   unpaid: "bg-destructive text-destructive-foreground",
@@ -46,7 +53,7 @@ const PaymentSection = ({
   depositAmount, onDepositAmountChange,
   followUpDate, onFollowUpDateChange,
   reminderOption, onReminderOptionChange,
-  priceWarning, orderId, isComplete,
+  priceWarning, orderId, payments, isComplete,
 }: PaymentSectionProps) => {
   const { t } = useLanguage();
 
@@ -182,6 +189,34 @@ const PaymentSection = ({
             {t("label_remaining_due")} <span className="font-mono font-medium text-destructive">${(finalPrice - depositAmount).toLocaleString()}</span>
           </p>
         )}
+      </div>
+    )}
+
+    {/* Payment ledger — individual timestamps per deposit / balance / full (SOP §2.4) */}
+    {payments && payments.length > 0 && (
+      <div className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
+        <p className="text-xs font-semibold text-foreground/70 flex items-center gap-1.5">
+          <Receipt className="w-3.5 h-3.5" /> {t("payment_ledger")}
+        </p>
+        <div className="space-y-1.5">
+          {payments.map((p, i) => (
+            <div key={i} className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-2">
+                <span className={`font-medium px-1.5 py-0.5 rounded ${
+                  p.type === "deposit" ? "bg-warning/15 text-warning"
+                  : p.type === "balance" ? "bg-primary/10 text-primary"
+                  : "bg-success/15 text-success"
+                }`}>
+                  {t(PAYMENT_TYPE_KEY[p.type])}
+                </span>
+                <span className="text-muted-foreground tabular-nums">
+                  {format(new Date(p.at), "yyyy-MM-dd HH:mm")}
+                </span>
+              </span>
+              <span className="font-mono font-semibold tabular-nums">${p.amount.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
       </div>
     )}
 
