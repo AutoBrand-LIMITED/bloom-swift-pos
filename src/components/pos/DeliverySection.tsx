@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -215,7 +216,7 @@ function DeliveryCard({
           <Label className="text-xs font-medium flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" /> {t("label_delivery_time")}
           </Label>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
             {slots.map((slot) => {
               const active =
                 delivery.deliveryTime === slot.value ||
@@ -226,11 +227,13 @@ function DeliveryCard({
                 <button
                   key={slot.id}
                   onClick={() => handleSlotSelect(slot.value)}
-                  className={`flex-1 min-w-[68px] rounded-lg py-1.5 px-1 text-center text-xs font-medium border transition-all ${
+                  className={cn(
+                    "rounded-lg py-1.5 px-2 text-center text-xs font-medium border transition-all",
+                    slot.specified && "col-span-2",
                     active
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-secondary text-secondary-foreground border-transparent hover:border-border"
-                  }`}
+                  )}
                 >
                   <div>{label}</div>
                   <div className={`text-[9px] ${active ? "opacity-80" : "text-muted-foreground"}`}>
