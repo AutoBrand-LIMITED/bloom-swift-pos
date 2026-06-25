@@ -846,6 +846,7 @@ const Index = () => {
             onReminderOptionChange={setReminderOption}
             priceWarning={finalPrice === 0 && items.length > 0}
             orderId={currentOrderId}
+            invoiceRef={editingOrderId ? orders.find(o => o.id === editingOrderId)?.invoiceNumber : undefined}
             payments={editingOrderId ? orders.find(o => o.id === editingOrderId)?.payments : undefined}
             isComplete={paymentStatus !== "unpaid" || finalPrice === 0}
           />

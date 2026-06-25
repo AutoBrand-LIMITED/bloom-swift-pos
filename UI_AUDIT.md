@@ -31,7 +31,7 @@ Built by: AutoBrand Limited
 - [x] Phone search: spaced and unspaced formats simultaneously
 - [x] Area code auto-detection: HK 852 and Macau 853 without manual selection
 - [x] Contact person stored separately from customer name — both visible on order record
-- [x] Split-delivery orders: single invoice, multiple recipients, auto-numbered (INV-001-1, INV-001-2)
+- [x] Split-delivery orders: single invoice, multiple recipients, auto-numbered (INV-XXXX-1, INV-XXXX-2) — per-recipient number printed on picking slip + delivery note
 - [x] Delivery time slots: 9am–1pm, 1pm–6pm, specified time (before 10am, before 12pm, office hours)
 - [x] Peak season slots configurable in back-end settings — `/settings` screen adds/edits/removes delivery slots
 - [x] Specified time delivery flagged separately + additional charge flag
@@ -42,7 +42,7 @@ Built by: AutoBrand Limited
 ### §2.3 Delivery Management
 
 - [x] Driver dispatch: orders assigned by district — `/dispatch` "By District" grouping mode
-- [ ] Each driver sees only their own order list (identified by address, not order number)
+- [x] Each driver sees only their own order list (identified by address, not order number) — DriverApp filters by selected driver; cards show recipient + address, no order number
 - [x] Driver interface: minimal — name select → assigned orders → tap address → upload photos
 - [x] No data entry required from driver
 - [x] Delivery tracking: 2 photos required per order (product photo + signed receipt photo)
@@ -62,7 +62,7 @@ Built by: AutoBrand Limited
 - [x] System prompts staff before dispatching an unpaid order
 - [ ] Automatic Stripe webhook: payment confirmed → system updates in real time
 - [x] Split payment support: deposit + balance flow with per-payment timestamps (payment ledger) + settle-balance/top-up action
-- [x] Invoice numbers are permanent and non-cancellable — sequential INV-XXXX from localStorage counter, assigned once at creation
+- [x] Invoice numbers are permanent and non-cancellable — sequential INV-XXXX from localStorage counter, assigned once at creation; printed on receipt / picking slip / delivery note / message card + payment screen ref
 - [x] All amendments retain full audit trail — per-order audit log (created/amended/balance settled/note added) with staff + timestamp
 
 ### §2.5 Document Design

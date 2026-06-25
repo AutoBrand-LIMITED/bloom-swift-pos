@@ -29,6 +29,7 @@ interface PaymentSectionProps {
   onReminderOptionChange: (v: string) => void;
   priceWarning: boolean;
   orderId?: string;
+  invoiceRef?: string;
   payments?: PaymentRecord[];
   isComplete?: boolean;
 }
@@ -53,7 +54,7 @@ const PaymentSection = ({
   depositAmount, onDepositAmountChange,
   followUpDate, onFollowUpDateChange,
   reminderOption, onReminderOptionChange,
-  priceWarning, orderId, payments, isComplete,
+  priceWarning, orderId, invoiceRef, payments, isComplete,
 }: PaymentSectionProps) => {
   const { t } = useLanguage();
 
@@ -67,7 +68,7 @@ const PaymentSection = ({
   ];
 
   const openPaymentScreen = () => {
-    const ref = orderId ? orderId.slice(-8).toUpperCase() : "—";
+    const ref = invoiceRef || (orderId ? orderId.slice(-8).toUpperCase() : "—");
     const url = `/payment?amount=${finalPrice}&ref=${ref}`;
     window.open(url, "_blank", "width=480,height=680,toolbar=no,menubar=no");
   };

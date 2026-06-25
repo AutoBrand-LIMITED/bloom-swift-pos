@@ -1,4 +1,5 @@
 import type { Order, Delivery } from "@/types/order";
+import { SALES_STAFF } from "@/types/order";
 
 const paymentLabel: Record<string, string> = {
   unpaid: "未付款",
@@ -121,7 +122,18 @@ function esc(s: string | undefined | null): string {
 }
 
 function orderRef(order: Order): string {
-  return order.id.slice(0, 8).toUpperCase();
+  // Permanent invoice number is the canonical reference shared across all docs;
+  // fall back to the order id for legacy orders created before invoice numbers.
+  return order.invoiceNumber || order.id.slice(0, 8).toUpperCase();
+}
+
+/** Per-recipient delivery-note number for split-delivery orders (INV-0012-1, INV-0012-2). */
+function recipientRef(order: Order, index: number): string {
+  return `${orderRef(order)}-${index + 1}`;
+}
+
+function staffName(salesId: string): string {
+  return SALES_STAFF.find((s) => s.id === salesId)?.name || salesId;
 }
 
 function primaryDelivery(order: Order): Delivery | null {
@@ -202,7 +214,7 @@ function orderMeta(order: Order): string {
       <div><span class="lbl">開單日期</span><span class="val">${esc(date)}</span></div>
       <div><span class="lbl">客戶</span><span class="val">${esc(order.customerName) || "—"}</span></div>
       <div><span class="lbl">電話</span><span class="val">${esc(order.phone)}</span></div>
-      ${order.salesId ? `<div><span class="lbl">員工</span><span class="val">${esc(order.salesId)}</span></div>` : ""}
+      ${order.salesId ? `<div><span class="lbl">員工</span><span class="val">${esc(staffName(order.salesId))}</span></div>` : ""}
     </div>
   `;
 }
@@ -276,7 +288,7 @@ export function generatePickingList(order: Order): string {
     </div>`).join("");
 
   const deliverySections = (allDeliveries ?? []).map((d, i) =>
-    d ? deliveryBlock(d, (allDeliveries?.length ?? 0) > 1 ? `收件人 ${i + 1}` : undefined) : ""
+    d ? deliveryBlock(d, (allDeliveries?.length ?? 0) > 1 ? `收件人 ${i + 1} · ${recipientRef(order, i)}` : undefined) : ""
   ).join("");
 
   const firstD = allDeliveries?.[0];
@@ -337,7 +349,7 @@ export function generateDeliveryNote(order: Order): string {
     const isExtra = i > 0;
     return `
       <div style="${isExtra ? "margin-top:20px;padding-top:16px;border-top:1.5px dashed #e0e0e0;" : ""}">
-        ${(allDeliveries?.length ?? 0) > 1 ? `<div class="recipient-label">收件人 ${i + 1}</div>` : ""}
+        ${(allDeliveries?.length ?? 0) > 1 ? `<div class="recipient-label">收件人 ${i + 1} · ${esc(recipientRef(order, i))}</div>` : ""}
         ${(d.deliveryDate || d.deliveryTime) ? `
         <div class="date-block">
           ${d.deliveryDate ? `<span class="date-lg">${esc(d.deliveryDate)}</span>` : ""}
