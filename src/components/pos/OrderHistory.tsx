@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardList, X, Search, Pencil, RefreshCw, Calendar, Phone, Receipt, Wallet, ChevronDown, History as HistoryIcon, Plus, SlidersHorizontal } from "lucide-react";
+import { ClipboardList, X, Search, Pencil, RefreshCw, Calendar, Phone, Receipt, Wallet, ChevronDown, History as HistoryIcon, Plus, SlidersHorizontal, CheckSquare, Square, Printer } from "lucide-react";
+import { generatePickingList, generateDeliveryNote, printBatch } from "@/lib/print-utils";
 import PrintButtons from "@/components/pos/PrintButtons";
 import type { Order, PaymentStatus, PaymentEntryType, AuditAction } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
@@ -81,6 +82,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
   const [staffFilter, setStaffFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
   const [occasionFilter, setOccasionFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [upcomingOnly, setUpcomingOnly] = useState(false);
@@ -88,6 +90,8 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
   const [openId, setOpenId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // How many orders were ever delivered to each recipient (across all orders)
   const recipientCounts = useMemo(() => {
@@ -108,6 +112,10 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
 
     if (staffFilter !== "all") {
       result = result.filter(o => o.salesId === staffFilter);
+    }
+
+    if (paymentFilter !== "all") {
+      result = result.filter(o => o.paymentStatus === paymentFilter);
     }
 
     if (occasionFilter !== "all") {
@@ -155,7 +163,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
     }
 
     return result;
-  }, [orders, staffFilter, occasionFilter, periodFilter, dateFrom, dateTo, upcomingOnly, searchText]);
+  }, [orders, staffFilter, paymentFilter, occasionFilter, periodFilter, dateFrom, dateTo, upcomingOnly, searchText]);
 
   const driverGroups = useMemo(() => {
     const sorted = [...filteredOrders].sort((a, b) => {
@@ -180,11 +188,26 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
   }, [filteredOrders]);
 
   const hasFilters = staffFilter !== "all" || periodFilter !== "all" || occasionFilter !== "all"
-    || dateFrom !== "" || dateTo !== "" || upcomingOnly || searchText.trim() !== "";
+    || paymentFilter !== "all" || dateFrom !== "" || dateTo !== "" || upcomingOnly || searchText.trim() !== "";
   const clearAll = () => {
     setSearchText(""); setStaffFilter("all"); setPeriodFilter("all");
-    setOccasionFilter("all"); setDateFrom(""); setDateTo(""); setUpcomingOnly(false);
+    setOccasionFilter("all"); setPaymentFilter("all"); setDateFrom(""); setDateTo(""); setUpcomingOnly(false);
   };
+
+  const toggleSelectMode = () => {
+    setSelectMode(v => !v);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedOrders = filteredOrders.filter(o => selectedIds.has(o.id));
 
   if (!open) return null;
 
@@ -205,9 +228,20 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
               {filteredOrders.length} / {orders.length}
             </p>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
-            <X className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-8 text-xs px-2 gap-1.5 ${selectMode ? "text-primary" : "text-muted-foreground"}`}
+              onClick={toggleSelectMode}
+            >
+              {selectMode ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{selectMode ? t("btn_cancel_select") : t("btn_select_mode")}</span>
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -266,6 +300,17 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
 
           {showFilters && (
             <div className="space-y-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+              <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                <SelectTrigger className="h-8 text-xs bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("filter_all_status")}</SelectItem>
+                  <SelectItem value="paid">{t("status_paid_short")}</SelectItem>
+                  <SelectItem value="unpaid">{t("status_unpaid_short")}</SelectItem>
+                  <SelectItem value="deposit">{t("status_deposit_short")}</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={occasionFilter} onValueChange={setOccasionFilter}>
                 <SelectTrigger className="h-8 text-xs bg-card">
                   <SelectValue placeholder={t("label_all_occasions")} />
@@ -362,21 +407,33 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                         ? "bg-red-500"
                         : "bg-amber-500";
 
+                      const isSelected = selectedIds.has(order.id);
+
                       return (
                         <div
                           key={order.id}
-                          className={`rounded-lg overflow-hidden border border-border transition-colors`}
+                          className={`rounded-lg overflow-hidden border transition-colors ${
+                            isSelected ? "border-primary/50 bg-primary/[0.03]" : "border-border"
+                          }`}
                         >
                           {/* Compact row — always visible */}
                           <button
                             className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
-                              isOpen ? "bg-secondary/40" : "hover:bg-secondary/30"
+                              isOpen && !selectMode ? "bg-secondary/40" : "hover:bg-secondary/30"
                             }`}
                             onClick={() => {
+                              if (selectMode) { toggleSelect(order.id); return; }
                               if (isOpen) { setOpenId(null); setExpandedId(null); }
                               else { setOpenId(order.id); setExpandedId(null); }
                             }}
                           >
+                            {selectMode && (
+                              <span className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                                isSelected ? "bg-primary border-primary" : "border-border bg-card"
+                              }`}>
+                                {isSelected && <CheckSquare className="w-3 h-3 text-primary-foreground" />}
+                              </span>
+                            )}
                             <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
 
                             <div className="flex-1 min-w-0">
@@ -593,6 +650,37 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
             </div>
           )}
         </ScrollArea>
+
+        {/* Bulk print bar */}
+        {selectMode && (
+          <div className="shrink-0 border-t border-border bg-card px-4 py-3 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground tabular-nums">{selectedOrders.length}</span> {t("label_x_selected")}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-9 text-xs gap-1.5"
+                disabled={selectedOrders.length === 0}
+                onClick={() => printBatch(selectedOrders.map(generatePickingList))}
+              >
+                <Printer className="w-3.5 h-3.5" />
+                {t("btn_print_picking_slips")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-9 text-xs gap-1.5"
+                disabled={selectedOrders.length === 0}
+                onClick={() => printBatch(selectedOrders.map(generateDeliveryNote))}
+              >
+                <Printer className="w-3.5 h-3.5" />
+                {t("btn_print_delivery_notes")}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

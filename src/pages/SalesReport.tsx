@@ -1,17 +1,32 @@
 import React, { useState, useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Lock, BarChart3, Users, Package, ArrowLeft, ShoppingBag, DollarSign, CheckCircle2, AlertCircle, User } from "lucide-react";
+import { Lock, BarChart3, Users, Package, ArrowLeft, ShoppingBag, DollarSign, CheckCircle2, AlertCircle, User, Clock, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { Order } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
 import { loadStoredCustomers } from "@/lib/customer-utils";
-
 import { loadOrders } from "@/lib/orders";
 import { useLanguage } from "@/contexts/LanguageContext";
+
+type DatePreset = "all" | "today" | "week" | "month" | "custom";
+
+function getDateRange(preset: DatePreset, customFrom: string, customTo: string): { from: string; to: string } | null {
+  const today = new Date().toISOString().slice(0, 10);
+  if (preset === "today") return { from: today, to: today };
+  if (preset === "week") {
+    const d = new Date(); d.setDate(d.getDate() - 6);
+    return { from: d.toISOString().slice(0, 10), to: today };
+  }
+  if (preset === "month") {
+    const d = new Date(); d.setDate(d.getDate() - 29);
+    return { from: d.toISOString().slice(0, 10), to: today };
+  }
+  if (preset === "custom" && (customFrom || customTo)) return { from: customFrom, to: customTo };
+  return null;
+}
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD as string;
 const UNSPECIFIED = "未指定";
@@ -35,17 +50,24 @@ const SalesReport = () => {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/[0.07] via-background to-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm shadow-lg border-border/60">
-          <CardHeader className="text-center">
-            <span className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 text-primary mx-auto mb-3">
-              <Lock className="w-7 h-7" />
-            </span>
-            <CardTitle className="text-lg">{t("title_analytics")}</CardTitle>
+      <div
+        className="min-h-screen bg-background flex items-center justify-center p-4"
+        style={{ backgroundImage: "radial-gradient(ellipse at 50% 0%, hsl(152 45% 38% / 0.07) 0%, transparent 65%)" }}
+      >
+        <div className="w-full max-w-sm">
+          {/* Brand */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 text-primary mb-4">
+              <Lock className="w-5 h-5" />
+            </div>
+            <p className="text-[11px] font-bold tracking-widest uppercase text-primary/60 mb-1">Anglo Chinese Florist</p>
+            <h1 className="text-xl font-bold tracking-tight">{t("title_analytics")}</h1>
+          </div>
+
+          {/* Form */}
+          <div className="bg-card rounded-2xl border border-border shadow-sm p-6 space-y-4">
             <p className="text-sm text-muted-foreground">{t("msg_enter_password")}</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-xs">{t("label_password")}</Label>
               <Input
                 type="password"
@@ -54,12 +76,17 @@ const SalesReport = () => {
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                 placeholder={t("placeholder_password")}
                 className={error ? "border-destructive" : ""}
+                autoFocus
               />
-              {error && <p className="text-xs text-destructive">{t("error_wrong_password")}</p>}
+              {error && <p className="text-xs text-destructive mt-1">{t("error_wrong_password")}</p>}
             </div>
             <Button onClick={handleLogin} className="w-full">{t("btn_login")}</Button>
-          </CardContent>
-        </Card>
+          </div>
+
+          <p className="text-center text-[10px] text-muted-foreground/50 mt-6">
+            {t("title_report")} · Anglo Chinese Florist
+          </p>
+        </div>
       </div>
     );
   }
@@ -69,15 +96,27 @@ const SalesReport = () => {
 
 const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
   const { t } = useLanguage();
-  const orders = useMemo(() => loadOrders(), []);
+  const allOrders = useMemo(() => loadOrders(), []);
   const customers = useMemo(() => loadStoredCustomers(), []);
+
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+
+  const orders = useMemo(() => {
+    const range = getDateRange(datePreset, customFrom, customTo);
+    if (!range) return allOrders;
+    return allOrders.filter((o) => {
+      const d = o.createdAt.slice(0, 10);
+      return (!range.from || d >= range.from) && (!range.to || d <= range.to);
+    });
+  }, [allOrders, datePreset, customFrom, customTo]);
 
   const totalRevenue = orders.reduce((s, o) => s + o.finalPrice, 0);
   const paidOrders = orders.filter((o) => o.paymentStatus === "paid");
   const unpaidOrders = orders.filter((o) => o.paymentStatus === "unpaid");
   const depositOrders = orders.filter((o) => o.paymentStatus === "deposit");
 
-  // Sales by staff
   const salesByStaff = useMemo(() => {
     const map: Record<string, { count: number; revenue: number; name: string }> = {};
     for (const o of orders) {
@@ -91,7 +130,6 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
     return Object.entries(map).sort((a, b) => b[1].revenue - a[1].revenue);
   }, [orders]);
 
-  // Product summary
   const productSummary = useMemo(() => {
     const map: Record<string, { qty: number; revenue: number }> = {};
     for (const o of orders) {
@@ -104,7 +142,6 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
     return Object.entries(map).sort((a, b) => b[1].revenue - a[1].revenue);
   }, [orders]);
 
-  // Customer summary
   const customerSummary = useMemo(() => {
     const map: Record<string, { name: string; count: number; revenue: number }> = {};
     for (const o of orders) {
@@ -116,7 +153,6 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
     return Object.entries(map).sort((a, b) => b[1].revenue - a[1].revenue);
   }, [orders]);
 
-  // Sales/Product: staff x product
   const salesProductSummary = useMemo(() => {
     const map: Record<string, Record<string, { qty: number; revenue: number }>> = {};
     for (const o of orders) {
@@ -133,7 +169,6 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
     return map;
   }, [orders]);
 
-  // Customer/Product
   const customerProductSummary = useMemo(() => {
     const map: Record<string, Record<string, { qty: number; revenue: number }>> = {};
     for (const o of orders) {
@@ -150,144 +185,164 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 bg-gradient-to-br from-primary/[0.06] via-card/80 to-card/80 backdrop-blur-md border-b border-border">
+      <header className="sticky top-0 z-40 bg-card/90 backdrop-blur-md border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs">
+          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs shrink-0">
             <ArrowLeft className="w-3.5 h-3.5" /> {t("btn_back_pos")}
           </Button>
-          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary shrink-0">
-            <BarChart3 className="w-4 h-4" />
-          </span>
-          <h1 className="text-lg font-bold">{t("title_report")}</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm font-bold tracking-tight leading-none">{t("title_report")}</h1>
+            <p className="text-[11px] text-muted-foreground leading-none mt-1">Anglo Chinese Florist</p>
+          </div>
+          <BarChart3 className="w-4 h-4 text-primary/50 shrink-0" />
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Overview cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label={t("stat_total_orders")} value={orders.length.toString()} icon={<ShoppingBag className="w-4 h-4" />} />
-          <StatCard label={t("stat_total_revenue")} value={`$${totalRevenue.toLocaleString()}`} icon={<DollarSign className="w-4 h-4" />} accent="primary" />
-          <StatCard label={t("stat_paid")} value={paidOrders.length.toString()} icon={<CheckCircle2 className="w-4 h-4" />} accent="success" />
-          <StatCard label={t("stat_unpaid")} value={unpaidOrders.length.toString()} icon={<AlertCircle className="w-4 h-4" />} accent="danger" />
+        {/* Date filter */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {(["all", "today", "week", "month", "custom"] as DatePreset[]).map((p) => {
+            const labels: Record<DatePreset, string> = {
+              all: t("report_filter_all"),
+              today: t("filter_today"),
+              week: t("report_filter_week"),
+              month: t("report_filter_month"),
+              custom: t("report_filter_custom"),
+            };
+            return (
+              <button
+                key={p}
+                onClick={() => setDatePreset(p)}
+                className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                  datePreset === p
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-foreground border-border hover:bg-accent"
+                }`}
+              >
+                {labels[p]}
+              </button>
+            );
+          })}
+          <CalendarDays className="w-3.5 h-3.5 text-muted-foreground ml-1" />
         </div>
+        {datePreset === "custom" && (
+          <div className="flex flex-wrap gap-2 items-center -mt-2">
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="h-8 px-2 text-xs rounded-lg border border-border bg-card text-foreground"
+            />
+            <span className="text-xs text-muted-foreground">→</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="h-8 px-2 text-xs rounded-lg border border-border bg-card text-foreground"
+            />
+          </div>
+        )}
+
+        {/* Stat strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard label={t("stat_total_orders")} value={orders.length.toString()} icon={<ShoppingBag className="w-3.5 h-3.5" />} />
+          <StatCard label={t("stat_total_revenue")} value={`$${totalRevenue.toLocaleString()}`} icon={<DollarSign className="w-3.5 h-3.5" />} accent="primary" />
+          <StatCard label={t("stat_paid")} value={paidOrders.length.toString()} icon={<CheckCircle2 className="w-3.5 h-3.5" />} accent="success" />
+          <StatCard label={t("stat_unpaid")} value={unpaidOrders.length.toString()} icon={<AlertCircle className="w-3.5 h-3.5" />} accent="danger" />
+        </div>
+
+        {depositOrders.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+            <Clock className="w-3.5 h-3.5 shrink-0" />
+            <span><span className="font-semibold">{depositOrders.length}</span> {t("stat_unpaid")} (deposit)</span>
+          </div>
+        )}
 
         {/* Report sections */}
         <Accordion type="multiple" className="space-y-2">
-          {/* Sales Summary */}
-          <AccordionItem value="sales" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">
-              <span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />{t("section_sales_summary")}</span>
+          <AccordionItem value="sales" className="border border-border rounded-xl bg-card overflow-hidden">
+            <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
+              <span className="flex items-center gap-2">
+                <BarChart3 className="w-3.5 h-3.5 text-primary" />
+                {t("section_sales_summary")}
+              </span>
             </AccordionTrigger>
-            <AccordionContent>
-              <table className="w-full text-sm">
-                <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">{t("col_staff")}</th><th className="text-right">{t("col_order_count")}</th><th className="text-right">{t("col_revenue")}</th></tr></thead>
-                <tbody>
-                  {salesByStaff.map(([id, d]) => (
-                    <tr key={id} className="border-b border-border/50">
-                      <td className="py-1.5">{d.name}</td>
-                      <td className="text-right">{d.count}</td>
-                      <td className="text-right font-mono">${d.revenue.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <AccordionContent className="px-4 pb-4">
+              <ReportTable
+                head={[t("col_staff"), t("col_order_count"), t("col_revenue")]}
+                rows={salesByStaff.map(([id, d]) => [d.name, d.count.toString(), `$${d.revenue.toLocaleString()}`])}
+              />
             </AccordionContent>
           </AccordionItem>
 
-          {/* Customer Summary */}
-          <AccordionItem value="customer" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">
-              <span className="flex items-center gap-2"><Users className="w-4 h-4 text-primary" />{t("section_customer_summary")}</span>
+          <AccordionItem value="customer" className="border border-border rounded-xl bg-card overflow-hidden">
+            <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
+              <span className="flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-primary" />
+                {t("section_customer_summary")}
+              </span>
             </AccordionTrigger>
-            <AccordionContent>
-              <table className="w-full text-sm">
-                <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">{t("col_customer")}</th><th className="text-right">{t("col_order_count")}</th><th className="text-right">{t("col_spending")}</th></tr></thead>
-                <tbody>
-                  {customerSummary.slice(0, 20).map(([key, d]) => (
-                    <tr key={key} className="border-b border-border/50">
-                      <td className="py-1.5">{d.name}</td>
-                      <td className="text-right">{d.count}</td>
-                      <td className="text-right font-mono">${d.revenue.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <AccordionContent className="px-4 pb-4">
+              <ReportTable
+                head={[t("col_customer"), t("col_order_count"), t("col_spending")]}
+                rows={customerSummary.slice(0, 20).map(([key, d]) => [d.name, d.count.toString(), `$${d.revenue.toLocaleString()}`])}
+              />
             </AccordionContent>
           </AccordionItem>
 
-          {/* Product Summary */}
-          <AccordionItem value="product" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">
-              <span className="flex items-center gap-2"><Package className="w-4 h-4 text-primary" />{t("section_product_summary")}</span>
+          <AccordionItem value="product" className="border border-border rounded-xl bg-card overflow-hidden">
+            <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
+              <span className="flex items-center gap-2">
+                <Package className="w-3.5 h-3.5 text-primary" />
+                {t("section_product_summary")}
+              </span>
             </AccordionTrigger>
-            <AccordionContent>
-              <table className="w-full text-sm">
-                <thead><tr className="text-left text-muted-foreground border-b"><th className="py-1.5">{t("col_product")}</th><th className="text-right">{t("col_quantity")}</th><th className="text-right">{t("col_revenue")}</th></tr></thead>
-                <tbody>
-                  {productSummary.slice(0, 20).map(([name, d]) => (
-                    <tr key={name} className="border-b border-border/50">
-                      <td className="py-1.5">{name}</td>
-                      <td className="text-right">{d.qty}</td>
-                      <td className="text-right font-mono">${d.revenue.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <AccordionContent className="px-4 pb-4">
+              <ReportTable
+                head={[t("col_product"), t("col_quantity"), t("col_revenue")]}
+                rows={productSummary.slice(0, 20).map(([name, d]) => [name, d.qty.toString(), `$${d.revenue.toLocaleString()}`])}
+              />
             </AccordionContent>
           </AccordionItem>
 
-          {/* Sales/Product Summary */}
-          <AccordionItem value="sales-product" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">{t("section_sales_product")}</AccordionTrigger>
-            <AccordionContent className="space-y-3">
+          <AccordionItem value="sales-product" className="border border-border rounded-xl bg-card overflow-hidden">
+            <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
+              {t("section_sales_product")}
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4 space-y-4">
               {Object.entries(salesProductSummary).map(([staff, products]) => (
                 <div key={staff}>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">{staff}</p>
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {Object.entries(products).sort((a, b) => b[1].revenue - a[1].revenue).map(([pName, d]) => (
-                        <tr key={pName} className="border-b border-border/30">
-                          <td className="py-1">{pName}</td>
-                          <td className="text-right">{d.qty}</td>
-                          <td className="text-right font-mono">${d.revenue.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-primary/60 mb-2">{staff}</p>
+                  <ReportTable
+                    rows={Object.entries(products).sort((a, b) => b[1].revenue - a[1].revenue).map(([pName, d]) => [pName, d.qty.toString(), `$${d.revenue.toLocaleString()}`])}
+                  />
                 </div>
               ))}
             </AccordionContent>
           </AccordionItem>
 
-          {/* Customer/Product Summary */}
-          <AccordionItem value="customer-product" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">{t("section_customer_product")}</AccordionTrigger>
-            <AccordionContent className="space-y-3">
+          <AccordionItem value="customer-product" className="border border-border rounded-xl bg-card overflow-hidden">
+            <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
+              {t("section_customer_product")}
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4 space-y-4">
               {Object.entries(customerProductSummary).slice(0, 15).map(([cust, products]) => (
                 <div key={cust}>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">{cust}</p>
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {Object.entries(products).sort((a, b) => b[1].revenue - a[1].revenue).map(([pName, d]) => (
-                        <tr key={pName} className="border-b border-border/30">
-                          <td className="py-1">{pName}</td>
-                          <td className="text-right">{d.qty}</td>
-                          <td className="text-right font-mono">${d.revenue.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-primary/60 mb-2">{cust}</p>
+                  <ReportTable
+                    rows={Object.entries(products).sort((a, b) => b[1].revenue - a[1].revenue).map(([pName, d]) => [pName, d.qty.toString(), `$${d.revenue.toLocaleString()}`])}
+                  />
                 </div>
               ))}
             </AccordionContent>
           </AccordionItem>
 
-          {/* S/C/Product Summary */}
-          <AccordionItem value="scp" className="border rounded-xl bg-card px-4">
-            <AccordionTrigger className="text-sm font-semibold">{t("section_scp_summary")}</AccordionTrigger>
-            <AccordionContent className="space-y-4">
-              {Object.entries(salesProductSummary).map(([staff, _]) => {
-                // For each staff, show their customers and products
+          <AccordionItem value="scp" className="border border-border rounded-xl bg-card overflow-hidden">
+            <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
+              {t("section_scp_summary")}
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4 space-y-5">
+              {Object.entries(salesProductSummary).map(([staff]) => {
                 const staffOrders = orders.filter((o) => {
                   const sid = o.salesId || UNSPECIFIED;
                   const s = SALES_STAFF.find((st) => st.id === sid);
@@ -305,21 +360,18 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
                 }
                 return (
                   <div key={staff}>
-                    <p className="text-sm font-bold text-foreground mb-2 flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-primary" /> {staff}</p>
+                    <p className="text-sm font-bold flex items-center gap-1.5 mb-2">
+                      <User className="w-3.5 h-3.5 text-primary" /> {staff}
+                    </p>
                     {Object.entries(custMap).map(([cust, products]) => (
-                      <div key={cust} className="ml-3 mb-2">
-                        <p className="text-xs font-semibold text-muted-foreground">{cust === UNKNOWN ? t("text_not_specified") : cust}</p>
-                        <table className="w-full text-sm">
-                          <tbody>
-                            {Object.entries(products).map(([pName, d]) => (
-                              <tr key={pName} className="border-b border-border/20">
-                                <td className="py-0.5 pl-2">{pName}</td>
-                                <td className="text-right">{d.qty}</td>
-                                <td className="text-right font-mono">${d.revenue.toLocaleString()}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div key={cust} className="ml-4 mb-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
+                          {cust === UNKNOWN ? t("text_not_specified") : cust}
+                        </p>
+                        <ReportTable
+                          rows={Object.entries(products).map(([pName, d]) => [pName, d.qty.toString(), `$${d.revenue.toLocaleString()}`])}
+                          compact
+                        />
                       </div>
                     ))}
                   </div>
@@ -334,9 +386,9 @@ const ReportDashboard = ({ onBack }: { onBack: () => void }) => {
 };
 
 const accentMap = {
-  primary: { icon: "text-primary", bg: "bg-primary/10", value: "text-primary" },
-  success: { icon: "text-emerald-600", bg: "bg-emerald-50", value: "text-emerald-700" },
-  danger: { icon: "text-destructive", bg: "bg-destructive/10", value: "text-destructive" },
+  primary: { value: "text-primary", dot: "bg-primary" },
+  success: { value: "text-emerald-700", dot: "bg-emerald-500" },
+  danger: { value: "text-destructive", dot: "bg-destructive" },
 } as const;
 
 const StatCard = ({
@@ -346,18 +398,46 @@ const StatCard = ({
 }) => {
   const colors = accent ? accentMap[accent] : null;
   return (
-    <Card className="transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
-      <CardContent className="p-4">
-        {icon && (
-          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg mb-2 ${colors ? `${colors.bg} ${colors.icon}` : "bg-muted text-muted-foreground"}`}>
-            {icon}
-          </span>
-        )}
-        <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</p>
-        <p className={`text-2xl font-bold font-mono mt-0.5 ${colors ? colors.value : "text-foreground"}`}>{value}</p>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-1">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 flex items-center gap-1.5">
+        {colors && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />}
+        {label}
+      </p>
+      <p className={`text-3xl font-bold font-mono leading-none ${colors ? colors.value : "text-foreground"}`}>{value}</p>
+      {icon && <span className="text-muted-foreground/40 mt-1">{icon}</span>}
+    </div>
   );
 };
+
+const ReportTable = ({
+  head, rows, compact = false,
+}: {
+  head?: string[]; rows: string[][]; compact?: boolean;
+}) => (
+  <table className="w-full text-sm">
+    {head && (
+      <thead>
+        <tr className="border-b border-border">
+          {head.map((h, i) => (
+            <th key={i} className={`py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 ${i > 0 ? "text-right" : "text-left"}`}>
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+    )}
+    <tbody>
+      {rows.map((row, ri) => (
+        <tr key={ri} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
+          {row.map((cell, ci) => (
+            <td key={ci} className={`${compact ? "py-0.5" : "py-1.5"} ${ci > 0 ? "text-right font-mono text-xs" : ""}`}>
+              {cell}
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
 
 export default SalesReport;

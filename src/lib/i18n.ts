@@ -471,6 +471,27 @@ export const zh = {
   settings_reminders_section: "場合提醒時間",
   settings_reminders_desc: "為每個場合設定預設提醒時間",
 
+  // Report date filter
+  report_filter_all: "全部時間",
+  report_filter_week: "本週",
+  report_filter_month: "本月",
+  report_filter_custom: "自訂",
+
+  // Order history — payment filter
+  filter_all_status: "所有狀態",
+
+  // Bulk select & print
+  btn_select_mode: "選擇",
+  btn_cancel_select: "取消",
+  label_x_selected: "已選",
+  btn_print_picking_slips: "執貨單",
+  btn_print_delivery_notes: "送貨單",
+
+  // Today's deliveries view
+  nav_today_deliveries: "今日送貨",
+  title_today_deliveries: "今日送貨",
+  label_no_deliveries_today: "今天沒有送貨訂單",
+
 } as const;
 
 export type TranslationKey = keyof typeof zh;
@@ -945,6 +966,27 @@ export const en: Record<TranslationKey, string> = {
   // Settings — occasion reminders
   settings_reminders_section: "Occasion Reminder Timing",
   settings_reminders_desc: "Set a default reminder timing per occasion",
+
+  // Report date filter
+  report_filter_all: "All time",
+  report_filter_week: "This week",
+  report_filter_month: "This month",
+  report_filter_custom: "Custom",
+
+  // Order history — payment filter
+  filter_all_status: "All status",
+
+  // Bulk select & print
+  btn_select_mode: "Select",
+  btn_cancel_select: "Cancel",
+  label_x_selected: "Selected",
+  btn_print_picking_slips: "Picking Slips",
+  btn_print_delivery_notes: "Delivery Notes",
+
+  // Today's deliveries view
+  nav_today_deliveries: "Today's Deliveries",
+  title_today_deliveries: "Today's Deliveries",
+  label_no_deliveries_today: "No deliveries today",
 
 };
 

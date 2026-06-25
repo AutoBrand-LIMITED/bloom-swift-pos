@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Crown, Gift, Tag, Pencil, MoreHorizontal, SlidersHorizontal, Upload } from "lucide-react";
+import { Flower2, ClipboardList, RotateCcw, BarChart3, AlertCircle, X, Crown, Gift, Tag, Pencil, MoreHorizontal, SlidersHorizontal, Upload, Truck } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -597,6 +597,9 @@ const Index = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs h-7 px-2.5">
               <BarChart3 className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_report")}</span>
             </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/deliveries")} className="gap-1.5 text-xs h-7 px-2.5">
+              <Truck className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_today_deliveries")}</span>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/settings")} className="gap-1.5 text-xs h-7 px-2.5">
               <SlidersHorizontal className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_settings")}</span>
             </Button>
@@ -660,6 +663,9 @@ const Index = () => {
               <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem onClick={() => navigate("/report")}>
                   <BarChart3 className="w-4 h-4 mr-2" /> {t("nav_report")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/deliveries")}>
+                  <Truck className="w-4 h-4 mr-2" /> {t("nav_today_deliveries")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/settings")}>
                   <SlidersHorizontal className="w-4 h-4 mr-2" /> {t("nav_settings")}
