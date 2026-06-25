@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardList, X, ShieldAlert, Truck, Search, Pencil, RefreshCw, Calendar, Phone, Receipt, Wallet, ChevronDown, History as HistoryIcon, Plus, SlidersHorizontal } from "lucide-react";
+import { ClipboardList, X, ShieldAlert, AlertTriangle, Truck, Search, Pencil, RefreshCw, Calendar, Phone, Receipt, Wallet, ChevronDown, History as HistoryIcon, Plus, SlidersHorizontal } from "lucide-react";
 import PrintButtons from "@/components/pos/PrintButtons";
 import type { Order, PaymentStatus, PaymentEntryType, AuditAction } from "@/types/order";
 import { SALES_STAFF } from "@/types/order";
@@ -78,6 +78,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
   const [dateTo, setDateTo] = useState("");
   const [upcomingOnly, setUpcomingOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
 
@@ -350,224 +351,275 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                       const extraDeliveries = (order.deliveries?.length ?? 0) > 1
                         ? order.deliveries!.slice(1)
                         : [];
+                      const primaryDate = order.deliveries?.[0]?.deliveryDate || order.deliveryDate || "";
+                      const primaryTime = order.deliveries?.[0]?.deliveryTime || order.deliveryTime || "";
                       const primaryRecipient = (order.deliveries?.[0]?.recipientName || order.recipientName || "").trim();
                       const recipientCount = primaryRecipient ? (recipientCounts[primaryRecipient.toLowerCase()] ?? 0) : 0;
                       const depositPaid = (order.payments ?? []).filter(p => p.type === "deposit").reduce((s, p) => s + p.amount, 0);
                       const balanceDue = order.finalPrice - depositPaid;
+                      const isOpen = openId === order.id;
                       const isExpanded = expandedId === order.id;
                       const canSettle = order.paymentStatus === "unpaid" || order.paymentStatus === "deposit";
+
+                      const dotColor = order.paymentStatus === "paid"
+                        ? "bg-emerald-500"
+                        : order.paymentStatus === "unpaid"
+                        ? "bg-red-500"
+                        : "bg-amber-500";
 
                       return (
                         <div
                           key={order.id}
-                          className={`rounded-xl overflow-hidden border transition-colors ${
+                          className={`rounded-lg overflow-hidden border transition-colors ${
                             blocked
-                              ? "border-destructive/50 shadow-sm"
+                              ? "border-border shadow-[inset_3px_0_0_0_hsl(var(--destructive)/0.7)]"
                               : order.paymentStatus === "unpaid"
-                              ? "border-destructive/30"
+                              ? "border-destructive/20"
                               : "border-border"
                           }`}
                         >
-                          {/* Blocked banner */}
-                          {blocked && (
-                            <div className="bg-destructive/10 px-3 py-2 flex items-center gap-2 border-b border-destructive/20">
-                              <ShieldAlert className="w-3.5 h-3.5 text-destructive shrink-0" />
-                              <span className="text-xs font-semibold text-destructive">{t("label_must_collect")}</span>
+                          {/* Compact row — always visible */}
+                          <button
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
+                              isOpen ? "bg-secondary/40" : "hover:bg-secondary/30"
+                            }`}
+                            onClick={() => {
+                              if (isOpen) { setOpenId(null); setExpandedId(null); }
+                              else { setOpenId(order.id); setExpandedId(null); }
+                            }}
+                          >
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-semibold truncate leading-tight">
+                                  {order.customerName || order.phone}
+                                </span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {blocked && <AlertTriangle className="w-3 h-3 text-destructive" />}
+                                  <span className="font-mono text-xs font-bold tabular-nums">${order.finalPrice.toLocaleString()}</span>
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_STYLES[order.paymentStatus]}`}>
+                                    {badgeLabel}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {primaryDate && (
+                                  <span className="text-[11px] text-muted-foreground tabular-nums">
+                                    {primaryDate}{primaryTime && ` · ${primaryTime}`}
+                                  </span>
+                                )}
+                                {primaryRecipient && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {primaryDate && " → "}<span className="text-foreground/60">{primaryRecipient}</span>
+                                  </span>
+                                )}
+                                {(order.deliveries?.length ?? 0) > 1 && (
+                                  <span className="text-[10px] font-medium text-primary bg-primary/10 rounded-full px-1.5 py-0.5 ml-1">
+                                    +{(order.deliveries!.length - 1)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+                          </button>
+
+                          {/* Expanded detail */}
+                          {isOpen && (
+                            <div className="px-3 pb-3 pt-2 space-y-2.5 border-t border-border/50 bg-muted/20 animate-in fade-in slide-in-from-top-2 duration-200">
+                              {/* Blocked warning */}
+                              {blocked && (
+                                <div className="flex items-center gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-2.5 py-1.5">
+                                  <ShieldAlert className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                  <span className="text-xs font-semibold text-destructive">{t("label_must_collect")}</span>
+                                </div>
+                              )}
+
+                              {/* Invoice + phone */}
+                              <div className="flex items-center gap-2">
+                                {order.invoiceNumber && (
+                                  <span className="text-[10px] font-mono font-semibold text-primary bg-primary/10 rounded px-1.5 py-0.5">
+                                    {order.invoiceNumber}
+                                  </span>
+                                )}
+                                <span className="text-xs text-muted-foreground font-mono flex items-center gap-1 ml-auto">
+                                  <Phone className="w-3 h-3 shrink-0" />{order.phone}
+                                </span>
+                              </div>
+
+                              {/* All deliveries */}
+                              {(primaryDate || extraDeliveries.length > 0) && (
+                                <div className="space-y-1">
+                                  {primaryDate && (
+                                    <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                                      <Calendar className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary/50" />
+                                      <span>
+                                        {primaryDate}
+                                        {primaryTime && <span className="text-muted-foreground/60"> · {primaryTime}</span>}
+                                        {primaryRecipient && <span> → <span className="text-foreground/70">{primaryRecipient}</span></span>}
+                                        {recipientCount > 1 && (
+                                          <span className="ml-1.5 text-[10px] font-medium text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                                            {recipientCount}{t("label_deliveries_suffix")}
+                                          </span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {extraDeliveries.map((d, i) => (
+                                    <div key={d.id} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                                      <Calendar className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary/50" />
+                                      <span>
+                                        [{i + 2}] {d.deliveryDate}
+                                        {d.deliveryTime && <span className="text-muted-foreground/60"> · {d.deliveryTime}</span>}
+                                        {d.recipientName && <span> → <span className="text-foreground/70">{d.recipientName}</span></span>}
+                                        {d.deliveryPerson && <span className="text-muted-foreground/60"> ({d.deliveryPerson})</span>}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Items */}
+                              <div className="rounded-lg bg-muted/50 px-2.5 py-2 space-y-0.5">
+                                {order.items.map((item) => (
+                                  <div key={item.id} className="flex justify-between items-baseline">
+                                    <span className="text-xs text-foreground/80">{productLabel(item.name, lang)} × {item.quantity}</span>
+                                    <span className="text-xs font-mono text-foreground/70 tabular-nums">${(item.price * item.quantity).toLocaleString()}</span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Deposit / balance due */}
+                              {order.paymentStatus === "deposit" && (
+                                <div className="flex items-center justify-between text-xs rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5">
+                                  <span className="text-amber-700">{t("pay_type_deposit")} ${depositPaid.toLocaleString()}</span>
+                                  <span className="font-mono font-semibold text-destructive">{t("label_remaining_due")} ${balanceDue.toLocaleString()}</span>
+                                </div>
+                              )}
+
+                              {/* Timestamp + total */}
+                              <div className="flex items-center justify-between pt-0.5 border-t border-border/60">
+                                <span className="text-xs text-muted-foreground tabular-nums">
+                                  {new Date(order.createdAt).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
+                                </span>
+                                <span className="font-mono font-bold text-sm tabular-nums">${order.finalPrice.toLocaleString()}</span>
+                              </div>
+
+                              {/* Settle balance / mark paid */}
+                              {canSettle && onSettleBalance && (
+                                <Button
+                                  size="sm"
+                                  className="w-full h-9 text-xs gap-1.5 bg-primary"
+                                  onClick={() => onSettleBalance(order)}
+                                >
+                                  <Wallet className="w-3.5 h-3.5" />
+                                  {order.paymentStatus === "deposit" ? t("btn_settle_balance") : t("btn_mark_paid")}
+                                </Button>
+                              )}
+
+                              {/* Print buttons */}
+                              <PrintButtons order={order} compact />
+
+                              {/* Edit / Reorder */}
+                              {(onEdit || onReorder) && (
+                                <div className="flex gap-2 pt-0.5">
+                                  {onEdit && (
+                                    <Button
+                                      variant="outline"
+                                      className="flex-1 h-9 text-xs gap-1.5"
+                                      onClick={() => { onEdit(order); onClose(); }}
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" /> {t("btn_edit_order")}
+                                    </Button>
+                                  )}
+                                  {onReorder && (
+                                    <Button
+                                      variant="ghost"
+                                      className="flex-1 h-9 text-xs gap-1.5"
+                                      onClick={() => { onReorder(order); onClose(); }}
+                                    >
+                                      <RefreshCw className="w-3.5 h-3.5" /> {t("btn_reorder")}
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Audit log toggle */}
+                              <button
+                                onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                                className="w-full flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground pt-0.5"
+                              >
+                                <HistoryIcon className="w-3 h-3" />
+                                {t("label_audit_log")}
+                                <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`} />
+                              </button>
+
+                              {isExpanded && (
+                                <div className="space-y-2.5 pt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                                  {order.payments && order.payments.length > 0 && (
+                                    <div className="rounded-lg border border-border bg-secondary/30 p-2 space-y-1">
+                                      <p className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
+                                        <Receipt className="w-3 h-3" /> {t("payment_ledger")}
+                                      </p>
+                                      {order.payments.map((p, i) => (
+                                        <div key={i} className="flex items-center justify-between text-[11px]">
+                                          <span className="text-muted-foreground">
+                                            {t(PAYMENT_TYPE_KEY[p.type])} · {new Date(p.at).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
+                                          </span>
+                                          <span className="font-mono font-medium tabular-nums">${p.amount.toLocaleString()}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {order.auditLog && order.auditLog.length > 0 && (
+                                    <div className="space-y-1">
+                                      {order.auditLog.map((a, i) => {
+                                        const staff = SALES_STAFF.find(s => s.id === a.staffId);
+                                        return (
+                                          <div key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                                            <span className="w-1 h-1 rounded-full bg-primary/50 mt-1.5 shrink-0" />
+                                            <span>
+                                              <span className="font-medium text-foreground/70">{t(AUDIT_KEY[a.action])}</span>
+                                              {a.detail ? ` · ${a.detail}` : ""}
+                                              {" · "}{new Date(a.at).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
+                                              {staff ? ` · ${staff.name}` : ""}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {onAddNote && (
+                                    <div className="flex items-start gap-1.5">
+                                      <Textarea
+                                        value={noteDrafts[order.id] ?? ""}
+                                        onChange={e => setNoteDrafts(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                        placeholder={t("placeholder_add_note")}
+                                        className="text-xs min-h-[36px] flex-1"
+                                        maxLength={300}
+                                      />
+                                      <Button
+                                        size="icon"
+                                        variant="outline"
+                                        className="h-9 w-9 shrink-0"
+                                        disabled={!(noteDrafts[order.id] ?? "").trim()}
+                                        onClick={() => {
+                                          onAddNote(order, noteDrafts[order.id] ?? "");
+                                          setNoteDrafts(prev => ({ ...prev, [order.id]: "" }));
+                                        }}
+                                        aria-label={t("btn_add_note")}
+                                      >
+                                        <Plus className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
-
-                          <div className="p-3 space-y-2.5">
-                            {/* Invoice + status */}
-                            <div className="flex items-center justify-between gap-2">
-                              {order.invoiceNumber ? (
-                                <span className="text-[10px] font-mono font-semibold text-primary bg-primary/10 rounded px-1.5 py-0.5">
-                                  {order.invoiceNumber}
-                                </span>
-                              ) : <span />}
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[order.paymentStatus]}`}>
-                                {badgeLabel}
-                              </span>
-                            </div>
-
-                            {/* Customer */}
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm leading-tight">{order.customerName || order.phone}</p>
-                              <p className="text-xs text-muted-foreground font-mono mt-0.5 tabular-nums flex items-center gap-1">
-                                <Phone className="w-3 h-3 shrink-0" />
-                                {order.phone}
-                              </p>
-                            </div>
-
-                            {/* Delivery date(s) */}
-                            {order.deliveryDate && (
-                              <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                                <Calendar className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary/50" />
-                                <span>
-                                  {order.deliveryDate}
-                                  {order.deliveryTime && <span className="text-muted-foreground/60"> · {order.deliveryTime}</span>}
-                                  {order.recipientName && <span> → <span className="text-foreground/70">{order.recipientName}</span></span>}
-                                  {recipientCount > 1 && (
-                                    <span className="ml-1.5 text-[10px] font-medium text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
-                                      {recipientCount}{t("label_deliveries_suffix")}
-                                    </span>
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                            {extraDeliveries.map((d, i) => (
-                              <div key={d.id} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                                <Calendar className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary/50" />
-                                <span>
-                                  [{i + 2}] {d.deliveryDate}
-                                  {d.deliveryTime && <span className="text-muted-foreground/60"> · {d.deliveryTime}</span>}
-                                  {d.recipientName && <span> → <span className="text-foreground/70">{d.recipientName}</span></span>}
-                                  {d.deliveryPerson && <span className="text-muted-foreground/60"> ({d.deliveryPerson})</span>}
-                                </span>
-                              </div>
-                            ))}
-
-                            {/* Items */}
-                            <div className="rounded-lg bg-muted/40 px-2.5 py-2 space-y-0.5">
-                              {order.items.map((item) => (
-                                <div key={item.id} className="flex justify-between items-baseline">
-                                  <span className="text-xs text-foreground/80">{productLabel(item.name, lang)} × {item.quantity}</span>
-                                  <span className="text-xs font-mono text-foreground/70 tabular-nums">${(item.price * item.quantity).toLocaleString()}</span>
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Deposit / balance due */}
-                            {order.paymentStatus === "deposit" && (
-                              <div className="flex items-center justify-between text-xs rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5">
-                                <span className="text-amber-700">{t("pay_type_deposit")} ${depositPaid.toLocaleString()}</span>
-                                <span className="font-mono font-semibold text-destructive">{t("label_remaining_due")} ${balanceDue.toLocaleString()}</span>
-                              </div>
-                            )}
-
-                            {/* Timestamp + total */}
-                            <div className="flex items-center justify-between pt-0.5 border-t border-border/60">
-                              <span className="text-xs text-muted-foreground tabular-nums">
-                                {new Date(order.createdAt).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
-                              </span>
-                              <span className="font-mono font-bold text-sm tabular-nums">${order.finalPrice.toLocaleString()}</span>
-                            </div>
-
-                            {/* Settle balance / mark paid */}
-                            {canSettle && onSettleBalance && (
-                              <Button
-                                size="sm"
-                                className="w-full h-9 text-xs gap-1.5 bg-primary"
-                                onClick={() => onSettleBalance(order)}
-                              >
-                                <Wallet className="w-3.5 h-3.5" />
-                                {order.paymentStatus === "deposit" ? t("btn_settle_balance") : t("btn_mark_paid")}
-                              </Button>
-                            )}
-
-                            {/* Print buttons */}
-                            <PrintButtons order={order} compact />
-
-                            {/* Edit / Reorder */}
-                            {(onEdit || onReorder) && (
-                              <div className="flex gap-2 pt-0.5">
-                                {onEdit && (
-                                  <Button
-                                    variant="outline"
-                                    className="flex-1 h-9 text-xs gap-1.5"
-                                    onClick={() => { onEdit(order); onClose(); }}
-                                  >
-                                    <Pencil className="w-3.5 h-3.5" /> {t("btn_edit_order")}
-                                  </Button>
-                                )}
-                                {onReorder && (
-                                  <Button
-                                    variant="ghost"
-                                    className="flex-1 h-9 text-xs gap-1.5"
-                                    onClick={() => { onReorder(order); onClose(); }}
-                                  >
-                                    <RefreshCw className="w-3.5 h-3.5" /> {t("btn_reorder")}
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Expand: payment log + audit + add note */}
-                            <button
-                              onClick={() => setExpandedId(isExpanded ? null : order.id)}
-                              className="w-full flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground pt-0.5"
-                            >
-                              <HistoryIcon className="w-3 h-3" />
-                              {t("label_audit_log")}
-                              <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                            </button>
-
-                            {isExpanded && (
-                              <div className="space-y-2.5 pt-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                                {/* Payment ledger */}
-                                {order.payments && order.payments.length > 0 && (
-                                  <div className="rounded-lg border border-border bg-secondary/30 p-2 space-y-1">
-                                    <p className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
-                                      <Receipt className="w-3 h-3" /> {t("payment_ledger")}
-                                    </p>
-                                    {order.payments.map((p, i) => (
-                                      <div key={i} className="flex items-center justify-between text-[11px]">
-                                        <span className="text-muted-foreground">
-                                          {t(PAYMENT_TYPE_KEY[p.type])} · {new Date(p.at).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
-                                        </span>
-                                        <span className="font-mono font-medium tabular-nums">${p.amount.toLocaleString()}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {/* Audit log */}
-                                {order.auditLog && order.auditLog.length > 0 && (
-                                  <div className="space-y-1">
-                                    {order.auditLog.map((a, i) => {
-                                      const staff = SALES_STAFF.find(s => s.id === a.staffId);
-                                      return (
-                                        <div key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
-                                          <span className="w-1 h-1 rounded-full bg-primary/50 mt-1.5 shrink-0" />
-                                          <span>
-                                            <span className="font-medium text-foreground/70">{t(AUDIT_KEY[a.action])}</span>
-                                            {a.detail ? ` · ${a.detail}` : ""}
-                                            {" · "}{new Date(a.at).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
-                                            {staff ? ` · ${staff.name}` : ""}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-
-                                {/* Retrospective note add */}
-                                {onAddNote && (
-                                  <div className="flex items-start gap-1.5">
-                                    <Textarea
-                                      value={noteDrafts[order.id] ?? ""}
-                                      onChange={e => setNoteDrafts(prev => ({ ...prev, [order.id]: e.target.value }))}
-                                      placeholder={t("placeholder_add_note")}
-                                      className="text-xs min-h-[36px] flex-1"
-                                      maxLength={300}
-                                    />
-                                    <Button
-                                      size="icon"
-                                      variant="outline"
-                                      className="h-9 w-9 shrink-0"
-                                      disabled={!(noteDrafts[order.id] ?? "").trim()}
-                                      onClick={() => {
-                                        onAddNote(order, noteDrafts[order.id] ?? "");
-                                        setNoteDrafts(prev => ({ ...prev, [order.id]: "" }));
-                                      }}
-                                      aria-label={t("btn_add_note")}
-                                    >
-                                      <Plus className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
                         </div>
                       );
                     })}
