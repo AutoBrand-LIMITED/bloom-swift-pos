@@ -339,65 +339,128 @@ export function generatePickingList(order: Order): string {
 /** 送貨單 — external, recipient info large, no price */
 export function generateDeliveryNote(order: Order): string {
   const ref = orderRef(order);
-  const date = new Date(order.createdAt).toLocaleDateString("zh-HK");
   const allDeliveries = order.deliveries?.length
     ? order.deliveries
     : ([primaryDelivery(order)].filter(Boolean) as Delivery[]);
 
-  const deliverySections = (allDeliveries ?? []).map((d, i) => {
+  const DAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
+
+  function fmtDate(iso: string): string {
+    if (!iso) return "";
+    const d = new Date(iso + "T00:00:00");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const dow = DAY_ZH[d.getDay()];
+    return `${dd}-${mm}-${yyyy} (週${dow})`;
+  }
+
+  const totalQty = order.items.reduce((s, i) => s + Number(i.quantity), 0);
+
+  const allNotes = [order.senderNotes, order.deliveryNotes, order.notes]
+    .filter(Boolean).map(esc).join("<br>");
+
+  const dnSections = (allDeliveries ?? []).map((d, i) => {
     if (!d) return "";
-    const rawAddr = [d.deliveryRegion, d.deliveryDistrict, d.deliveryArea, d.deliveryDetail].filter(Boolean).join(" ");
-    const addr = [d.deliveryRegion, d.deliveryDistrict, d.deliveryArea, d.deliveryDetail].filter(Boolean).map(esc).join(" ");
+    const rawAddr = [d.deliveryRegion, d.deliveryDistrict, d.deliveryArea, d.deliveryDetail].filter(Boolean).join(", ");
+    const addr = [d.deliveryRegion, d.deliveryDistrict, d.deliveryArea, d.deliveryDetail].filter(Boolean).map(esc).join(", ");
     const mapUrl = rawAddr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawAddr + " 香港")}` : "";
     const isExtra = i > 0;
+    const dnRef = (allDeliveries?.length ?? 0) > 1 ? `DN-${ref}-${i + 1}` : `DN-${ref}`;
+
+    const itemRows = order.items.map((item) => `
+      <tr>
+        <td style="font-size:12px;color:#888;font-family:monospace;white-space:nowrap">${esc(item.id?.slice(0,8).toUpperCase() ?? "")}</td>
+        <td>${esc(item.name)}</td>
+        <td class="num" style="color:#aaa">—</td>
+        <td class="num">${Number(item.quantity)}</td>
+      </tr>`).join("");
+
     return `
-      <div style="${isExtra ? "margin-top:20px;padding-top:16px;border-top:1.5px dashed #e0e0e0;" : ""}">
-        ${(allDeliveries?.length ?? 0) > 1 ? `<div class="recipient-label">收件人 ${i + 1} · ${esc(recipientRef(order, i))}</div>` : ""}
-        ${(d.deliveryDate || d.deliveryTime) ? `
-        <div class="date-block">
-          ${d.deliveryDate ? `<span class="date-lg">${esc(d.deliveryDate)}</span>` : ""}
-          ${d.deliveryTime ? `<span class="time-md">${esc(d.deliveryTime)}</span>` : ""}
-        </div>` : ""}
-        <div class="recipient-card">
-          ${d.recipientName ? `<div class="recipient-name-lg">${esc(d.recipientName)}</div>` : ""}
-          ${d.recipientPhone ? `<div class="recipient-phone-lg">${esc(d.recipientPhone)}</div>` : ""}
-          ${rawAddr ? `<div class="recipient-addr">${addr}</div>` : ""}
-          ${mapUrl ? `<div style="margin-top:4px;font-size:10px;color:#888"><a href="${mapUrl}" style="color:#2563eb">${esc(mapUrl)}</a></div>` : ""}
+    <div style="${isExtra ? "page-break-before:always;" : ""}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:2px solid #1a1a1a;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">
+          Anglo Chinese Florist · 英華花店
         </div>
-        ${d.deliveryPerson ? `<div style="margin-top:8px;font-size:11px;color:#aaa">司機：${esc(d.deliveryPerson)}</div>` : ""}
-      </div>`;
+        <div style="text-align:right;">
+          <div style="font-size:18px;font-weight:800;letter-spacing:-0.3px;">送貨單</div>
+          <div style="font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;font-weight:700;margin-top:2px;">${esc(dnRef)}</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:14px;">
+        <div style="padding-right:20px;border-right:1px solid #e8e8e8;">
+          <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">送貨地址</div>
+          ${d.recipientName ? `<div style="font-size:14px;font-weight:700;margin-bottom:4px;">${esc(d.recipientName)}</div>` : ""}
+          ${addr ? `<div style="font-size:12px;color:#333;line-height:1.55;margin-bottom:4px;">${addr}</div>` : ""}
+          ${d.recipientPhone ? `<div style="font-size:12px;color:#555;font-family:monospace;">${esc(d.recipientPhone)}</div>` : ""}
+          ${mapUrl ? `<div style="margin-top:4px;font-size:9px;"><a href="${mapUrl}" style="color:#2563eb;">${esc(mapUrl)}</a></div>` : ""}
+
+          <div style="margin-top:12px;border-top:1px solid #f0f0f0;padding-top:10px;">
+            <table style="width:100%;border:none;">
+              <tr><td style="font-size:11px;color:#999;padding:2px 0;width:52px;">客戶</td><td style="font-size:12px;font-weight:600;padding:2px 0;">${esc(order.customerName || order.phone)}</td></tr>
+              ${order.contactPerson ? `<tr><td style="font-size:11px;color:#999;padding:2px 0;">聯絡人</td><td style="font-size:12px;padding:2px 0;">${esc(order.contactPerson)}</td></tr>` : ""}
+              <tr><td style="font-size:11px;color:#999;padding:2px 0;">電話</td><td style="font-size:12px;font-family:monospace;padding:2px 0;">${esc(order.phone)}</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div style="padding-left:20px;">
+          <table style="width:100%;border:none;">
+            <tr>
+              <td style="font-size:11px;color:#999;padding:3px 0;width:60px;">送貨日期</td>
+              <td style="font-size:12px;font-weight:600;padding:3px 0;">${esc(fmtDate(d.deliveryDate || ""))}</td>
+            </tr>
+            <tr>
+              <td style="font-size:11px;color:#999;padding:3px 0;">送貨時間</td>
+              <td style="font-size:12px;font-weight:600;padding:3px 0;">${esc(d.deliveryTime || "")}</td>
+            </tr>
+            <tr>
+              <td style="font-size:11px;color:#999;padding:3px 0;">員工</td>
+              <td style="font-size:12px;font-weight:600;padding:3px 0;">${esc(staffName(order.salesId))}</td>
+            </tr>
+            ${d.deliveryPerson ? `<tr><td style="font-size:11px;color:#999;padding:3px 0;">司機</td><td style="font-size:12px;font-weight:600;padding:3px 0;">${esc(d.deliveryPerson)}</td></tr>` : ""}
+            <tr>
+              <td style="font-size:11px;color:#999;padding:3px 0;">Card</td>
+              <td style="font-size:12px;padding:3px 0;">${order.giftCardEnabled && order.giftCardMessage ? esc(order.giftCardMessage.slice(0, 40)) + (order.giftCardMessage.length > 40 ? "…" : "") : ""}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:80px;">產品編號</th>
+            <th>描述</th>
+            <th class="num" style="width:50px;">庫存</th>
+            <th class="num" style="width:50px;">數量</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemRows}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="text-align:right;font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;border-top:1.5px solid #ccc;padding-top:10px;">總數</td>
+            <td class="num" style="font-size:15px;font-weight:800;border-top:1.5px solid #ccc;padding-top:10px;">${totalQty}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      ${allNotes ? `<div style="margin-top:16px;"><span style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;">備註　</span><span style="font-size:12px;line-height:1.65;">${allNotes}</span></div>` : ""}
+
+      <div style="margin-top:40px;">
+        <div style="font-size:11px;font-weight:700;margin-bottom:32px;">簽收</div>
+        <div style="border-top:1.5px solid #ccc;width:220px;padding-top:5px;font-size:10px;color:#aaa;letter-spacing:0.04em;">收貨人簽署</div>
+      </div>
+
+      <div style="margin-top:24px;text-align:center;font-size:9px;color:#bbb;border-top:1px solid #eee;padding-top:8px;">Anglo Chinese Florist · 英華花店 · ${new Date().toLocaleDateString("zh-HK")}</div>
+    </div>`;
   }).join("");
 
-  const itemRows = order.items.map((item) => `
-    <tr>
-      <td>${esc(item.name)}</td>
-      <td class="num">${Number(item.quantity)}</td>
-    </tr>`).join("");
-
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送貨單 ${ref}</title>
-    <style>${commonStyles}</style></head><body>
-
-    ${docHeader("送貨單", "DELIVERY NOTE", ref, date)}
-
-    <div class="section-heading">收件資料</div>
-    ${deliverySections}
-
-    <div class="section-heading">送貨物品</div>
-    <table>
-      <thead><tr><th>項目</th><th class="num">數量</th></tr></thead>
-      <tbody>${itemRows}</tbody>
-    </table>
-
-    ${order.giftCardEnabled && order.giftCardMessage ? `<div class="section-heading">卡片內容</div><div class="notes">${esc(order.giftCardMessage).replace(/\n/g, "<br>")}</div>` : ""}
-    ${order.deliveryNotes ? `<div class="section-heading">送貨備註</div><div class="notes highlight">${esc(order.deliveryNotes)}</div>` : ""}
-
-    <div class="signatures">
-      <div class="sig-line">送貨人簽署</div>
-      <div class="sig-line">收貨人簽署</div>
-    </div>
-
-    <div class="footer">Anglo Chinese Florist · 英華花店 · ${new Date().toLocaleDateString("zh-HK")}</div>
-  </body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送貨單 DN-${ref}</title>
+    <style>${commonStyles}</style></head><body>${dnSections}</body></html>`;
 }
 
 /** 卡片 — gift message card only */
