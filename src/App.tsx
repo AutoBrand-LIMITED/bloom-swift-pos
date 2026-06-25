@@ -8,7 +8,6 @@ import Index from "./pages/Index.tsx";
 import SalesReport from "./pages/SalesReport.tsx";
 import PaymentScreen from "./pages/PaymentScreen.tsx";
 import DriverApp from "./pages/DriverApp.tsx";
-import DispatchView from "./pages/DispatchView.tsx";
 import Settings from "./pages/Settings.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -26,7 +25,6 @@ const App = () => (
           <Route path="/report" element={<SalesReport />} />
           <Route path="/payment" element={<PaymentScreen />} />
           <Route path="/driver" element={<DriverApp />} />
-          <Route path="/dispatch" element={<DispatchView />} />
           <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

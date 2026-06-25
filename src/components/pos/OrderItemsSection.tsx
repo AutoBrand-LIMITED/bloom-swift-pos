@@ -385,9 +385,7 @@ const OrderItemsSection = ({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
-            {t("label_urgent_fee")}
-          </Label>
+          <Label className="text-xs">{t("label_urgent_fee")}</Label>
           <Input
             type="number"
             value={urgentFee || ""}

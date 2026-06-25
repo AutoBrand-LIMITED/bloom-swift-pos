@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart } from "lucide-react";
+import { Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart, MapPin } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
 import type { Delivery } from "@/types/order";
 import { loadDrivers } from "@/lib/drivers";
@@ -10,6 +10,50 @@ import { loadSlots } from "@/lib/delivery-slots";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const SPECIFIED_VALUE = "指定時間";
+
+const REGION_EN: Record<string, string> = {
+  "香港島": "Hong Kong Island",
+  "九龍": "Kowloon",
+  "新界": "New Territories",
+  "離島": "Outlying Islands",
+};
+
+const DISTRICT_EN: Record<string, string> = {
+  "中西區": "Central & Western", "灣仔區": "Wan Chai", "東區": "Eastern", "南區": "Southern",
+  "油尖旺區": "Yau Tsim Mong", "深水埗區": "Sham Shui Po", "九龍城區": "Kowloon City",
+  "黃大仙區": "Wong Tai Sin", "觀塘區": "Kwun Tong",
+  "荃灣區": "Tsuen Wan", "葵青區": "Kwai Tsing", "屯門區": "Tuen Mun", "元朗區": "Yuen Long",
+  "北區": "North", "大埔區": "Tai Po", "沙田區": "Sha Tin", "西貢區": "Sai Kung",
+  "離島區": "Islands",
+};
+
+const AREA_EN: Record<string, string> = {
+  "中環": "Central", "上環": "Sheung Wan", "西營盤": "Sai Ying Pun", "堅尼地城": "Kennedy Town",
+  "山頂": "The Peak", "半山": "Mid-Levels", "灣仔": "Wan Chai", "銅鑼灣": "Causeway Bay",
+  "跑馬地": "Happy Valley", "大坑": "Tai Hang", "天后": "Tin Hau", "北角": "North Point",
+  "鰂魚涌": "Quarry Bay", "太古": "Taikoo", "西灣河": "Sai Wan Ho", "筲箕灣": "Shau Kei Wan",
+  "柴灣": "Chai Wan", "香港仔": "Aberdeen", "鴨脷洲": "Ap Lei Chau", "黃竹坑": "Wong Chuk Hang",
+  "淺水灣": "Repulse Bay", "赤柱": "Stanley", "尖沙咀": "Tsim Sha Tsui", "佐敦": "Jordan",
+  "油麻地": "Yau Ma Tei", "旺角": "Mong Kok", "太子": "Prince Edward", "大角咀": "Tai Kok Tsui",
+  "深水埗": "Sham Shui Po", "長沙灣": "Cheung Sha Wan", "荔枝角": "Lai Chi Kok",
+  "石硤尾": "Shek Kip Mei", "又一村": "Yau Yat Tsuen", "紅磡": "Hung Hom",
+  "土瓜灣": "To Kwa Wan", "九龍城": "Kowloon City", "何文田": "Ho Man Tin", "九龍塘": "Kowloon Tong",
+  "黃大仙": "Wong Tai Sin", "鑽石山": "Diamond Hill", "慈雲山": "Tsz Wan Shan",
+  "彩虹": "Choi Hung", "新蒲崗": "San Po Kong", "觀塘": "Kwun Tong", "牛頭角": "Ngau Tau Kok",
+  "九龍灣": "Kowloon Bay", "藍田": "Lam Tin", "秀茂坪": "Sau Mau Ping", "油塘": "Yau Tong",
+  "荃灣": "Tsuen Wan", "深井": "Sham Tseng", "青龍頭": "Tsing Lung Tau", "馬灣": "Ma Wan",
+  "葵芳": "Kwai Fong", "葵涌": "Kwai Chung", "青衣": "Tsing Yi",
+  "屯門市中心": "Tuen Mun Town Centre", "屯門碼頭": "Tuen Mun Ferry Pier",
+  "蝴蝶邨": "Butterfly Estate", "三聖": "Sam Shing",
+  "元朗": "Yuen Long", "天水圍": "Tin Shui Wai", "錦田": "Kam Tin", "流浮山": "Lau Fau Shan",
+  "上水": "Sheung Shui", "粉嶺": "Fanling", "沙頭角": "Sha Tau Kok", "古洞": "Kwu Tung",
+  "大埔": "Tai Po", "大埔墟": "Tai Po Market", "太和": "Tai Wo", "大美督": "Tai Mei Tuk",
+  "沙田": "Sha Tin", "火炭": "Fo Tan", "大圍": "Tai Wai", "馬鞍山": "Ma On Shan", "石門": "Shek Mun",
+  "將軍澳": "Tseung Kwan O", "坑口": "Hang Hau", "寶琳": "Po Lam",
+  "西貢市中心": "Sai Kung Town", "清水灣": "Clear Water Bay",
+  "東涌": "Tung Chung", "大嶼山": "Lantau Island", "長洲": "Cheung Chau",
+  "南丫島": "Lamma Island", "愉景灣": "Discovery Bay", "機場": "Airport",
+};
 
 const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
   "香港島": {
@@ -75,7 +119,7 @@ function DeliveryCard({
   onChange: (updated: Delivery) => void;
   onRemove: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   // Read fresh each render (localStorage is cheap) so slot/driver edits in
   // /settings take effect without unmounting the form.
   const slots = loadSlots();
@@ -108,6 +152,9 @@ function DeliveryCard({
   const handleSpecifiedTime = (timeValue: string) =>
     set("deliveryTime", timeValue ? `${SPECIFIED_VALUE} ${timeValue}` : SPECIFIED_VALUE);
 
+  const dl = (zh: string, map: Record<string, string>) =>
+    lang === "en" ? (map[zh] ?? zh) : zh;
+
   const fullAddress = [
     delivery.deliveryRegion,
     delivery.deliveryDistrict,
@@ -116,6 +163,16 @@ function DeliveryCard({
   ]
     .filter(Boolean)
     .join(" ");
+
+  const displayAddress = [
+    dl(delivery.deliveryRegion, REGION_EN),
+    dl(delivery.deliveryDistrict, DISTRICT_EN),
+    dl(delivery.deliveryArea, AREA_EN),
+    delivery.deliveryDetail,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   const mapQuery = encodeURIComponent(fullAddress + " 香港");
 
   return (
@@ -204,7 +261,7 @@ function DeliveryCard({
             </SelectTrigger>
             <SelectContent>
               {Object.keys(HK_DISTRICTS).map((r) => (
-                <SelectItem key={r} value={r}>{r}</SelectItem>
+                <SelectItem key={r} value={r}>{dl(r, REGION_EN)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -218,7 +275,7 @@ function DeliveryCard({
             </SelectTrigger>
             <SelectContent>
               {districts.map((d) => (
-                <SelectItem key={d} value={d}>{d}</SelectItem>
+                <SelectItem key={d} value={d}>{dl(d, DISTRICT_EN)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -232,7 +289,7 @@ function DeliveryCard({
             </SelectTrigger>
             <SelectContent>
               {areas.map((a) => (
-                <SelectItem key={a} value={a}>{a}</SelectItem>
+                <SelectItem key={a} value={a}>{dl(a, AREA_EN)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -245,19 +302,16 @@ function DeliveryCard({
           maxLength={200}
         />
         {fullAddress && (
-          <p className="text-xs text-muted-foreground">📍 {fullAddress}</p>
-        )}
-        {fullAddress.length > 2 && (
-          <div className="rounded-lg overflow-hidden border border-border mt-2">
-            <iframe
-              title={`Google Map ${index + 1}`}
-              width="100%"
-              height="160"
-              style={{ border: 0 }}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
-            />
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3 shrink-0" />{displayAddress}</p>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${mapQuery}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline flex items-center gap-1 shrink-0 ml-2"
+            >
+              View on Map ↗
+            </a>
           </div>
         )}
       </div>

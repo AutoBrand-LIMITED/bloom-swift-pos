@@ -3,8 +3,6 @@ export type Lang = "en" | "zh";
 export const zh = {
   // Nav
   nav_back: "返回",
-  nav_dispatch: "調度",
-  plan_route: "規劃路線",
   nav_report: "報告",
   nav_clear: "清空",
   nav_order_history: "訂單記錄",
@@ -159,13 +157,10 @@ export const zh = {
 
   // Order history panel
   panel_order_history: "訂單記錄",
-  alert_dispatch_warning: "派送前警告",
-  alert_dispatch_desc_suffix: "張訂單今日或之前送貨，但仍未收款。請先確認付款再派送。",
   msg_no_orders: "暫無訂單",
   msg_no_orders_filtered: "篩選條件下無訂單",
   unassigned: "未分配",
   unit_order: "單",
-  label_must_collect: "派送前必須收款",
 
   // Customer history panel
   panel_customer_history: "客戶記錄",
@@ -256,14 +251,6 @@ export const zh = {
   unit_items: "項",
   label_pending_count: "待送",
   label_delivered_count: "已送",
-
-  // Dispatch view
-  title_dispatch: "送貨調度",
-  msg_no_dispatch: "沒有送貨記錄",
-  text_unpaid_warning: "未付款警告",
-  dispatch_unit_order: "單",
-  dispatch_pending: "待送",
-  dispatch_delivered: "已送",
 
   // Payment screen
   label_amount_due: "應付金額",
@@ -484,10 +471,6 @@ export const zh = {
   settings_reminders_section: "場合提醒時間",
   settings_reminders_desc: "為每個場合設定預設提醒時間",
 
-  // Dispatch — grouping + vehicles
-  dispatch_vehicles: "車輛",
-  group_by_driver: "按司機",
-  group_by_district: "按地區",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
@@ -495,8 +478,6 @@ export type TranslationKey = keyof typeof zh;
 export const en: Record<TranslationKey, string> = {
   // Nav
   nav_back: "Back",
-  nav_dispatch: "Dispatch",
-  plan_route: "Plan Route",
   nav_report: "Report",
   nav_clear: "Clear",
   nav_order_history: "Order History",
@@ -651,13 +632,10 @@ export const en: Record<TranslationKey, string> = {
 
   // Order history panel
   panel_order_history: "Order History",
-  alert_dispatch_warning: "Dispatch Warning",
-  alert_dispatch_desc_suffix: "order(s) scheduled today or earlier with unpaid status. Collect payment before dispatching.",
   msg_no_orders: "No orders",
   msg_no_orders_filtered: "No orders match filters",
   unassigned: "Unassigned",
   unit_order: "orders",
-  label_must_collect: "Must collect payment before dispatch",
 
   // Customer history panel
   panel_customer_history: "Customer History",
@@ -748,14 +726,6 @@ export const en: Record<TranslationKey, string> = {
   unit_items: "items",
   label_pending_count: "pending",
   label_delivered_count: "delivered",
-
-  // Dispatch view
-  title_dispatch: "Dispatch",
-  msg_no_dispatch: "No delivery records",
-  text_unpaid_warning: "Unpaid Warning",
-  dispatch_unit_order: "orders",
-  dispatch_pending: "pending",
-  dispatch_delivered: "delivered",
 
   // Payment screen
   label_amount_due: "Amount Due",
@@ -976,10 +946,6 @@ export const en: Record<TranslationKey, string> = {
   settings_reminders_section: "Occasion Reminder Timing",
   settings_reminders_desc: "Set a default reminder timing per occasion",
 
-  // Dispatch — grouping + vehicles
-  dispatch_vehicles: "Vehicles",
-  group_by_driver: "By Driver",
-  group_by_district: "By District",
 };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { zh, en };
