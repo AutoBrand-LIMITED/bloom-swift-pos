@@ -55,12 +55,6 @@ const SalesReport = () => {
         style={{ backgroundImage: "radial-gradient(ellipse at 50% 0%, hsl(152 45% 38% / 0.07) 0%, transparent 65%)" }}
       >
         <div className="w-full max-w-sm">
-          {/* Back button */}
-          <div className="mb-6">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-1.5 text-xs text-muted-foreground">
-              <ArrowLeft className="w-3.5 h-3.5" /> {t("btn_back_pos")}
-            </Button>
-          </div>
           {/* Brand */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 text-primary mb-4">
