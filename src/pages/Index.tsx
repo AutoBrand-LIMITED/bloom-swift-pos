@@ -720,14 +720,6 @@ const Index = () => {
           {/* STEP 1: Staff — required gate */}
           <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} isComplete={!!salesId} />
 
-          {/* No-staff warning */}
-          {!salesId && (
-            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {t("warning_no_staff")}
-            </div>
-          )}
-
           {/* Persistent notes alert */}
           {showPersistentNote && (
             <div className="relative flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
@@ -797,15 +789,9 @@ const Index = () => {
           <OrderItemsSection
             items={items}
             onItemsChange={setItems}
-            deliveryFee={deliveryFee}
-            urgentFee={urgentFee}
-            onDeliveryFeeChange={setDeliveryFee}
-            onUrgentFeeChange={setUrgentFee}
             senderNotes={senderNotes}
-            deliveryNotes={deliveryNotes}
             internalNotes={internalNotes}
             onSenderNotesChange={setSenderNotes}
-            onDeliveryNotesChange={setDeliveryNotes}
             onInternalNotesChange={setInternalNotes}
             budget={budget}
             onBudgetChange={setBudget}
@@ -820,10 +806,8 @@ const Index = () => {
               }
             }}
             senderNotesPinned={senderNotesPinned}
-            deliveryNotesPinned={deliveryNotesPinned}
             internalNotesPinned={internalNotesPinned}
             onSenderNotesPinnedChange={setSenderNotesPinned}
-            onDeliveryNotesPinnedChange={setDeliveryNotesPinned}
             onInternalNotesPinnedChange={setInternalNotesPinned}
           />
 
@@ -836,6 +820,14 @@ const Index = () => {
             deliveries={deliveries}
             onDeliveriesChange={setDeliveries}
             isComplete={deliveries.every(d => d.deliveryDate && d.deliveryTime && d.recipientName && d.deliveryTime !== "指定時間")}
+            deliveryFee={deliveryFee}
+            urgentFee={urgentFee}
+            onDeliveryFeeChange={setDeliveryFee}
+            onUrgentFeeChange={setUrgentFee}
+            deliveryNotes={deliveryNotes}
+            onDeliveryNotesChange={setDeliveryNotes}
+            deliveryNotesPinned={deliveryNotesPinned}
+            onDeliveryNotesPinnedChange={setDeliveryNotesPinned}
           />
 
           <GiftCardSection

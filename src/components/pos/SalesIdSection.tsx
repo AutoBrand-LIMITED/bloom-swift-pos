@@ -1,6 +1,6 @@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserCheck } from "lucide-react";
+import { UserCheck, AlertCircle } from "lucide-react";
 import { SALES_STAFF } from "@/types/order";
 import StepBadge from "@/components/pos/StepBadge";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -34,6 +34,12 @@ const SalesIdSection = ({ salesId, onSalesIdChange, isComplete }: SalesIdSection
             ))}
           </SelectContent>
         </Select>
+        {!salesId && (
+          <p className="flex items-center gap-1.5 text-[11px] text-amber-600/80 animate-in fade-in duration-200">
+            <AlertCircle className="w-3 h-3 shrink-0" />
+            {t("warning_no_staff")}
+          </p>
+        )}
       </div>
     </div>
   );

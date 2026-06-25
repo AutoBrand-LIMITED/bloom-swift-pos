@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Trash2, Package, Wallet, Wand2, Bookmark, Search, CornerDownLeft, Tag } from "lucide-react";
+import { Plus, Trash2, Package, Wallet, Wand2, Bookmark, Search, CornerDownLeft } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
@@ -23,15 +23,9 @@ const OCCASION_KEYS: TranslationKey[] = [
 interface OrderItemsSectionProps {
   items: OrderItem[];
   onItemsChange: (items: OrderItem[]) => void;
-  deliveryFee: number;
-  urgentFee: number;
-  onDeliveryFeeChange: (v: number) => void;
-  onUrgentFeeChange: (v: number) => void;
   senderNotes: string;
-  deliveryNotes: string;
   internalNotes: string;
   onSenderNotesChange: (v: string) => void;
-  onDeliveryNotesChange: (v: string) => void;
   onInternalNotesChange: (v: string) => void;
   budget: number;
   onBudgetChange: (v: number) => void;
@@ -40,23 +34,19 @@ interface OrderItemsSectionProps {
   occasionTag?: string;
   onOccasionTagChange?: (key: string) => void;
   senderNotesPinned?: boolean;
-  deliveryNotesPinned?: boolean;
   internalNotesPinned?: boolean;
   onSenderNotesPinnedChange?: (v: boolean) => void;
-  onDeliveryNotesPinnedChange?: (v: boolean) => void;
   onInternalNotesPinnedChange?: (v: boolean) => void;
 }
 
 const OrderItemsSection = ({
   items, onItemsChange,
-  deliveryFee, urgentFee,
-  onDeliveryFeeChange, onUrgentFeeChange,
-  senderNotes, deliveryNotes, internalNotes,
-  onSenderNotesChange, onDeliveryNotesChange, onInternalNotesChange,
+  senderNotes, internalNotes,
+  onSenderNotesChange, onInternalNotesChange,
   budget, onBudgetChange, subtotal, isComplete,
   occasionTag, onOccasionTagChange,
-  senderNotesPinned, deliveryNotesPinned, internalNotesPinned,
-  onSenderNotesPinnedChange, onDeliveryNotesPinnedChange, onInternalNotesPinnedChange,
+  senderNotesPinned, internalNotesPinned,
+  onSenderNotesPinnedChange, onInternalNotesPinnedChange,
 }: OrderItemsSectionProps) => {
   const { t, lang } = useLanguage();
   const [newName, setNewName] = useState("");
@@ -193,30 +183,6 @@ const OrderItemsSection = ({
           setCustomOrderOpen(false);
         }}
       />
-
-      {/* Occasion */}
-      {onOccasionTagChange && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-            <Tag className="w-3 h-3" /> {t("label_occasion")}
-          </span>
-          <div className="flex gap-1.5 flex-wrap">
-            {OCCASION_KEYS.map(key => (
-              <button
-                key={key}
-                onClick={() => onOccasionTagChange(occasionTag === key ? "" : key)}
-                className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                  occasionTag === key
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-secondary-foreground hover:bg-primary/10 hover:text-primary"
-                }`}
-              >
-                {t(key)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Budget */}
       <div className="space-y-2 rounded-lg bg-secondary/50 p-3">
@@ -406,33 +372,31 @@ const OrderItemsSection = ({
         </Button>
       </div>
 
-      {/* Quick add fees */}
-      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
-        <div className="space-y-1">
-          <Label className="text-xs">{t("label_delivery_fee")}</Label>
-          <Input
-            type="number"
-            value={deliveryFee || ""}
-            onChange={(e) => onDeliveryFeeChange(parseFloat(e.target.value) || 0)}
-            placeholder="0"
-            className="text-sm font-mono"
-            min={0}
-          />
+      {/* Occasion */}
+      {onOccasionTagChange && (
+        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border">
+          <span className="text-xs text-muted-foreground shrink-0">
+            {t("label_occasion")}
+          </span>
+          <div className="flex gap-1.5 flex-wrap">
+            {OCCASION_KEYS.map(key => (
+              <button
+                key={key}
+                onClick={() => onOccasionTagChange(occasionTag === key ? "" : key)}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                  occasionTag === key
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-primary/10 hover:text-primary"
+                }`}
+              >
+                {t(key)}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">{t("label_urgent_fee")}</Label>
-          <Input
-            type="number"
-            value={urgentFee || ""}
-            onChange={(e) => onUrgentFeeChange(parseFloat(e.target.value) || 0)}
-            placeholder="0"
-            className="text-sm font-mono"
-            min={0}
-          />
-        </div>
-      </div>
+      )}
 
-      {/* 3 note types */}
+      {/* Notes */}
       <div className="space-y-3 pt-2 border-t border-border">
         {/* Sender notes */}
         <div className="space-y-1">
@@ -461,38 +425,6 @@ const OrderItemsSection = ({
             placeholder={t("placeholder_sender_notes")}
             value={senderNotes}
             onChange={(e) => onSenderNotesChange(e.target.value)}
-            className="text-sm min-h-[56px]"
-            maxLength={500}
-          />
-        </div>
-
-        {/* Delivery notes */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
-              {t("label_delivery_notes")}
-              <span className="text-xs sm:text-[10px] text-muted-foreground font-normal">{t("hint_delivery_notes")}</span>
-            </Label>
-            <div className="flex items-center gap-1">
-              {onDeliveryNotesPinnedChange && (
-                <button
-                  onClick={() => onDeliveryNotesPinnedChange(!deliveryNotesPinned)}
-                  title={t("label_pin_note")}
-                  className={`p-1 rounded transition-colors ${deliveryNotesPinned ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  <Bookmark className="w-3.5 h-3.5" fill={deliveryNotesPinned ? "currentColor" : "none"} />
-                </button>
-              )}
-              <VoiceInputButton
-                onResult={(text) => onDeliveryNotesChange(deliveryNotes ? `${deliveryNotes} ${text}` : text)}
-                className="h-7 w-7"
-              />
-            </div>
-          </div>
-          <Textarea
-            placeholder={t("placeholder_delivery_notes")}
-            value={deliveryNotes}
-            onChange={(e) => onDeliveryNotesChange(e.target.value)}
             className="text-sm min-h-[56px]"
             maxLength={500}
           />

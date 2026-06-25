@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart, MapPin } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart, MapPin, Bookmark } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
+import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import type { Delivery } from "@/types/order";
 import { loadDrivers } from "@/lib/drivers";
 import { loadSlots } from "@/lib/delivery-slots";
@@ -105,6 +109,14 @@ interface DeliverySectionProps {
   deliveries: Delivery[];
   onDeliveriesChange: (d: Delivery[]) => void;
   isComplete?: boolean;
+  deliveryFee: number;
+  urgentFee: number;
+  onDeliveryFeeChange: (v: number) => void;
+  onUrgentFeeChange: (v: number) => void;
+  deliveryNotes: string;
+  onDeliveryNotesChange: (v: string) => void;
+  deliveryNotesPinned?: boolean;
+  onDeliveryNotesPinnedChange?: (v: boolean) => void;
 }
 
 function DeliveryCard({
@@ -142,16 +154,55 @@ function DeliveryCard({
   const handleDistrictChange = (v: string) =>
     onChange({ ...delivery, deliveryDistrict: v, deliveryArea: "" });
 
+  const [timeModalOpen, setTimeModalOpen] = useState(false);
+  const [pendingHour, setPendingHour] = useState("12");
+  const [pendingMinute, setPendingMinute] = useState("00");
+  const [pendingPeriod, setPendingPeriod] = useState<"AM" | "PM">("AM");
+
   const isSpecified =
     delivery.deliveryTime === SPECIFIED_VALUE || delivery.deliveryTime.startsWith("指定");
   const specifiedTime = isSpecified
     ? delivery.deliveryTime.replace(`${SPECIFIED_VALUE} `, "").replace(SPECIFIED_VALUE, "")
     : "";
 
-  const handleSlotSelect = (slotValue: string) => set("deliveryTime", slotValue);
+  const format12h = (time24: string) => {
+    if (!time24) return "";
+    const [h, m] = time24.split(":").map(Number);
+    const period = h < 12 ? "AM" : "PM";
+    const hour = h % 12 || 12;
+    return `${hour}:${String(m).padStart(2, "0")} ${period}`;
+  };
 
-  const handleSpecifiedTime = (timeValue: string) =>
-    set("deliveryTime", timeValue ? `${SPECIFIED_VALUE} ${timeValue}` : SPECIFIED_VALUE);
+  const openTimeModal = () => {
+    if (specifiedTime) {
+      const [h, m] = specifiedTime.split(":").map(Number);
+      setPendingPeriod(h < 12 ? "AM" : "PM");
+      setPendingHour(String(h % 12 || 12));
+      setPendingMinute(String(m).padStart(2, "0"));
+    } else {
+      setPendingHour("12");
+      setPendingMinute("00");
+      setPendingPeriod("AM");
+    }
+    setTimeModalOpen(true);
+  };
+
+  const handleSlotSelect = (slotValue: string) => {
+    const slot = slots.find(s => s.value === slotValue);
+    if (slot?.specified) {
+      openTimeModal();
+    } else {
+      set("deliveryTime", slotValue);
+    }
+  };
+
+  const handleTimeConfirm = () => {
+    let h = parseInt(pendingHour) % 12;
+    if (pendingPeriod === "PM") h += 12;
+    const time24 = `${String(h).padStart(2, "0")}:${pendingMinute}`;
+    set("deliveryTime", `${SPECIFIED_VALUE} ${time24}`);
+    setTimeModalOpen(false);
+  };
 
   const dl = (zh: string, map: Record<string, string>) =>
     lang === "en" ? (map[zh] ?? zh) : zh;
@@ -200,7 +251,7 @@ function DeliveryCard({
       </div>
 
       {/* Date + Time slot */}
-      <div className="space-y-3">
+      <div className="grid grid-cols-[160px_1fr] gap-3 items-start">
         <div className="space-y-1.5">
           <Label className="text-xs font-medium flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" /> {t("label_delivery_date")}
@@ -209,27 +260,30 @@ function DeliveryCard({
             type="date"
             value={delivery.deliveryDate}
             onChange={(e) => set("deliveryDate", e.target.value)}
-            className="text-sm max-w-[220px]"
+            className="text-sm w-full"
           />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-medium flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" /> {t("label_delivery_time")}
           </Label>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-5 gap-1.5">
             {slots.map((slot) => {
               const active =
                 delivery.deliveryTime === slot.value ||
                 (!!slot.specified && isSpecified);
               const label = slot.labelKey ? t(slot.labelKey) : slot.label;
-              const sublabel = slot.sublabelKey ? t(slot.sublabelKey) : slot.sublabel;
+              const sublabel = slot.specified && specifiedTime
+                ? format12h(specifiedTime)
+                : slot.sublabelKey
+                  ? t(slot.sublabelKey)
+                  : slot.sublabel;
               return (
                 <button
                   key={slot.id}
                   onClick={() => handleSlotSelect(slot.value)}
                   className={cn(
-                    "rounded-lg py-1.5 px-2 text-center text-xs font-medium border transition-all",
-                    slot.specified && "col-span-2",
+                    "rounded-lg h-10 px-2 text-center text-xs font-medium border transition-all flex flex-col items-center justify-center",
                     active
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-secondary text-secondary-foreground border-transparent hover:border-border"
@@ -243,14 +297,70 @@ function DeliveryCard({
               );
             })}
           </div>
-          {isSpecified && (
-            <Input
-              type="time"
-              value={specifiedTime}
-              onChange={(e) => handleSpecifiedTime(e.target.value)}
-              className="text-sm mt-1"
-            />
-          )}
+
+          <Dialog open={timeModalOpen} onOpenChange={setTimeModalOpen}>
+            <DialogContent className="max-w-[280px] p-6">
+              <DialogHeader>
+                <DialogTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-primary" /> {t("slot_specified_label")}
+                </DialogTitle>
+              </DialogHeader>
+
+              {/* Time picker */}
+              <div className="flex flex-col gap-3 py-1">
+                <div className="flex items-center justify-center gap-1.5">
+                  <Select value={pendingHour} onValueChange={setPendingHour}>
+                    <SelectTrigger className="w-14 h-12 text-center font-mono text-xl font-semibold px-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(h => (
+                        <SelectItem key={h} value={h} className="font-mono">{h}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-2xl font-mono font-bold text-muted-foreground/60 leading-none pb-0.5">:</span>
+                  <Select value={pendingMinute} onValueChange={setPendingMinute}>
+                    <SelectTrigger className="w-14 h-12 text-center font-mono text-xl font-semibold px-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["00", "15", "30", "45"].map(m => (
+                        <SelectItem key={m} value={m} className="font-mono">{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* AM / PM segmented */}
+                  <div className="flex flex-col gap-1 ml-1">
+                    {(["AM", "PM"] as const).map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setPendingPeriod(p)}
+                        className={cn(
+                          "w-12 py-1.5 rounded-md text-xs font-bold tracking-wide transition-colors",
+                          pendingPeriod === p
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        )}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setTimeModalOpen(false)}>
+                  {t("btn_cancel")}
+                </Button>
+                <Button size="sm" className="flex-1" onClick={handleTimeConfirm}>
+                  {t("btn_confirm")}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -415,7 +525,11 @@ function DeliveryCard({
   );
 }
 
-const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: DeliverySectionProps) => {
+const DeliverySection = ({
+  deliveries, onDeliveriesChange, isComplete,
+  deliveryFee, urgentFee, onDeliveryFeeChange, onUrgentFeeChange,
+  deliveryNotes, onDeliveryNotesChange, deliveryNotesPinned, onDeliveryNotesPinnedChange,
+}: DeliverySectionProps) => {
   const { t } = useLanguage();
   const update = (index: number, updated: Delivery) => {
     const next = deliveries.map((d, i) => (i === index ? updated : d));
@@ -463,6 +577,64 @@ const DeliverySection = ({ deliveries, onDeliveriesChange, isComplete }: Deliver
         <Plus className="w-3.5 h-3.5" />
         {t("btn_add_recipient")}
       </Button>
+
+      {/* Fees */}
+      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+        <div className="space-y-1">
+          <Label className="text-xs">{t("label_delivery_fee")}</Label>
+          <Input
+            type="number"
+            value={deliveryFee || ""}
+            onChange={(e) => onDeliveryFeeChange(parseFloat(e.target.value) || 0)}
+            placeholder="0"
+            className="text-sm font-mono"
+            min={0}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">{t("label_urgent_fee")}</Label>
+          <Input
+            type="number"
+            value={urgentFee || ""}
+            onChange={(e) => onUrgentFeeChange(parseFloat(e.target.value) || 0)}
+            placeholder="0"
+            className="text-sm font-mono"
+            min={0}
+          />
+        </div>
+      </div>
+
+      {/* Delivery notes */}
+      <div className="space-y-1 pt-2 border-t border-border">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs flex items-center gap-1 text-foreground font-medium">
+            {t("label_delivery_notes")}
+            <span className="text-xs sm:text-[10px] text-muted-foreground font-normal">{t("hint_delivery_notes")}</span>
+          </Label>
+          <div className="flex items-center gap-1">
+            {onDeliveryNotesPinnedChange && (
+              <button
+                onClick={() => onDeliveryNotesPinnedChange(!deliveryNotesPinned)}
+                title={t("label_pin_note")}
+                className={`p-1 rounded transition-colors ${deliveryNotesPinned ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Bookmark className="w-3.5 h-3.5" fill={deliveryNotesPinned ? "currentColor" : "none"} />
+              </button>
+            )}
+            <VoiceInputButton
+              onResult={(text) => onDeliveryNotesChange(deliveryNotes ? `${deliveryNotes} ${text}` : text)}
+              className="h-7 w-7"
+            />
+          </div>
+        </div>
+        <Textarea
+          placeholder={t("placeholder_delivery_notes")}
+          value={deliveryNotes}
+          onChange={(e) => onDeliveryNotesChange(e.target.value)}
+          className="text-sm min-h-[56px]"
+          maxLength={500}
+        />
+      </div>
     </div>
   );
 };
