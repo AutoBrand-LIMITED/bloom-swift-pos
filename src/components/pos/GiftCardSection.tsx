@@ -26,19 +26,19 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
   ];
 
   return (
-    <div className={`rounded-xl p-4 space-y-3 border transition-colors ${isComplete ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
+    <div className={`rounded-xl px-4 py-3 border transition-colors ${isComplete ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
-          <StepBadge n={5} done={!!isComplete} />
+          <StepBadge n={5} done={enabled && !!isComplete} skipped={!enabled} />
           <Gift className="w-4 h-4" />
           {t("section_gift_card")}
         </h2>
-        <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+        <Switch checked={enabled} onCheckedChange={onEnabledChange} className="scale-90" />
       </div>
 
       <div className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${enabled ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
         <div className="overflow-hidden">
-        <div className="space-y-2.5 pt-1">
+        <div className="space-y-2.5 pt-3">
           {/* Quick templates — horizontal scroll, no wrap */}
           <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5">
             {TEMPLATES.map((tmpl) => (
@@ -77,15 +77,19 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
 
             {/* Body */}
             {preview ? (
-              <div className="p-4 min-h-[120px] prose prose-sm max-w-none bg-card text-sm">
-                <MarkdownPreview content={message} noContentLabel={t("msg_no_content")} />
+              <div className="relative">
+                <div className="p-3 max-h-40 overflow-y-auto prose prose-sm max-w-none bg-card text-sm">
+                  <MarkdownPreview content={message} noContentLabel={t("msg_no_content")} />
+                </div>
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-card to-transparent" />
               </div>
             ) : (
               <Textarea
                 placeholder={t("placeholder_card")}
                 value={message}
                 onChange={(e) => onMessageChange(e.target.value)}
-                className="min-h-[120px] font-mono text-sm border-0 rounded-none focus-visible:ring-0 bg-card resize-none"
+                rows={4}
+                className="!min-h-0 font-mono text-sm border-0 rounded-none focus-visible:ring-0 bg-card resize-none"
                 maxLength={1000}
               />
             )}

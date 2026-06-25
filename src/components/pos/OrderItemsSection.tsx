@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Trash2, Package, Wallet, Wand2, Bookmark, Search, CornerDownLeft } from "lucide-react";
+import { Plus, Trash2, ClipboardList, Wallet, Wand2, Bookmark, Search, CornerDownLeft } from "lucide-react";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import type { OrderItem } from "@/types/order";
@@ -157,7 +157,7 @@ const OrderItemsSection = ({
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
           <StepBadge n={3} done={!!isComplete} />
-          <Package className="w-4 h-4" />
+          <ClipboardList className="w-4 h-4" />
           {t("section_order_items")}
           {items.length > 0 && (
             <span className="ml-1 text-xs sm:text-[11px] font-normal normal-case text-muted-foreground">
@@ -185,18 +185,20 @@ const OrderItemsSection = ({
       />
 
       {/* Budget */}
-      <div className="space-y-2 rounded-lg bg-secondary/50 p-3">
-        <div className="flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-primary" />
-          <Label className="text-xs font-medium">{t("label_budget")}</Label>
-          <div className="flex items-center gap-1 ml-auto">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2 py-2 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-primary shrink-0" />
+            <Label className="text-xs font-medium">{t("label_budget")}</Label>
+          </div>
+          <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground">$</span>
             <Input
               type="number"
               value={budget || ""}
               onChange={(e) => onBudgetChange(parseFloat(e.target.value) || 0)}
               placeholder={t("placeholder_budget")}
-              className="w-28 h-8 text-sm font-mono text-center bg-card"
+              className="w-28 h-9 text-sm font-mono text-center"
               min={0}
             />
           </div>
@@ -340,7 +342,7 @@ const OrderItemsSection = ({
       )}
 
       {/* Add new item */}
-      <div className="flex items-end gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-2">
         <div className="flex-1 space-y-1">
           <Label className="text-xs">{t("label_add_item")}</Label>
           <div className="flex gap-1.5">
@@ -349,27 +351,29 @@ const OrderItemsSection = ({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addItem()}
-              className="text-sm"
+              className="text-sm h-9"
               maxLength={100}
             />
-            <VoiceInputButton onResult={(text) => setNewName((prev) => prev ? `${prev} ${text}` : text)} />
+            <VoiceInputButton onResult={(text) => setNewName((prev) => prev ? `${prev} ${text}` : text)} className="h-9 w-9" />
           </div>
         </div>
-        <div className="w-28 space-y-1">
-          <Label className="text-xs">{t("placeholder_price")} ($)</Label>
-          <Input
-            type="number"
-            placeholder="0"
-            value={newPrice}
-            onChange={(e) => setNewPrice(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addItem()}
-            className="text-sm font-mono"
-            min={0}
-          />
+        <div className="flex items-end gap-2">
+          <div className="flex-1 sm:w-28 sm:flex-none space-y-1">
+            <Label className="text-xs">{t("placeholder_price")} ($)</Label>
+            <Input
+              type="number"
+              placeholder="0"
+              value={newPrice}
+              onChange={(e) => setNewPrice(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addItem()}
+              className="text-sm font-mono h-9"
+              min={0}
+            />
+          </div>
+          <Button onClick={addItem} size="sm" variant="outline" className="h-9 gap-1.5 px-3 shrink-0">
+            <Plus className="w-4 h-4" /> {t("btn_add")}
+          </Button>
         </div>
-        <Button onClick={addItem} size="default" variant="outline" className="gap-1.5">
-          <Plus className="w-4 h-4" /> {t("btn_add")}
-        </Button>
       </div>
 
       {/* Occasion */}

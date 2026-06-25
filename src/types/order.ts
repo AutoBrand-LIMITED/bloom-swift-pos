@@ -9,6 +9,7 @@ export interface Delivery {
   id: string;
   deliveryDate: string;
   deliveryTime: string;
+  deliverySlotId?: string;
   deliveryRegion: string;
   deliveryDistrict: string;
   deliveryArea: string;

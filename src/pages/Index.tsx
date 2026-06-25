@@ -599,6 +599,15 @@ const Index = () => {
 
             <div className="w-px h-4 bg-border shrink-0" />
 
+            <Button size="sm" onClick={() => setHistoryOpen(true)} className="gap-1.5 text-xs h-7 relative">
+              <ClipboardList className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_order_history")}</span>
+              {unpaidCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {unpaidCount}
+                </span>
+              )}
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-7 w-7 px-0 text-muted-foreground">
@@ -615,15 +624,6 @@ const Index = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            <Button size="sm" onClick={() => setHistoryOpen(true)} className="gap-1.5 text-xs h-7 relative">
-              <ClipboardList className="w-3.5 h-3.5" /> <span className="hidden lg:inline">{t("nav_order_history")}</span>
-              {unpaidCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {unpaidCount}
-                </span>
-              )}
-            </Button>
           </div>
 
           {/* Mobile nav */}

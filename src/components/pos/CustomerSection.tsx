@@ -3,7 +3,7 @@ import StepBadge from "@/components/pos/StepBadge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Phone, ChevronDown, Building2, Crown, AlertTriangle, Tag } from "lucide-react";
+import { Users2, ChevronDown, Building2, Crown, AlertTriangle, Tag } from "lucide-react";
 import { DEMO_CUSTOMERS, type DemoCustomer, type CustomerFlag } from "@/data/demo-customers";
 import { loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -150,7 +150,7 @@ const CustomerSection = ({
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
           <StepBadge n={2} done={!!isComplete} />
-          <User className="w-4 h-4" />
+          <Users2 className="w-4 h-4" />
           {t("section_customer")}
           {selectedCustomer?.flags?.length ? (
             <CustomerFlags flags={selectedCustomer.flags} getLabel={getFlagLabel} />
@@ -165,7 +165,7 @@ const CustomerSection = ({
                 : "bg-secondary text-secondary-foreground hover:bg-accent"
             }`}
           >
-            <span className="flex items-center gap-1"><User className="w-3 h-3" /> {t("btn_personal")}</span>
+            <span className="flex items-center gap-1"><Users2 className="w-3 h-3" /> {t("btn_personal")}</span>
           </button>
           <button
             onClick={() => onCustomerTypeChange("company")}
@@ -214,14 +214,13 @@ const CustomerSection = ({
                 ))}
               </SelectContent>
             </Select>
-            <div className="relative flex-1">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <div className="flex-1">
               <Input
                 id="phone"
                 placeholder="9123 4567"
                 value={phone}
                 onChange={(e) => handlePhoneInput(e.target.value)}
-                className={`pl-9 font-mono text-base ${phoneError ? "border-destructive ring-1 ring-destructive" : ""}`}
+                className={`font-mono text-base ${phoneError ? "border-destructive ring-1 ring-destructive" : ""}`}
                 maxLength={20}
               />
             </div>
@@ -284,7 +283,7 @@ const CustomerSection = ({
 
       {/* Contact person (secretary) */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-muted-foreground">{t("label_contact_person")}</Label>
+        <Label className="text-xs font-medium">{t("label_contact_person")}</Label>
         <Input
           placeholder={t("placeholder_contact_person")}
           value={contactPerson}

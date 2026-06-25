@@ -1,4 +1,4 @@
-import { Gift, Check, Truck, PawPrint, Container, Flower2, Sprout, ShoppingBasket, Droplets, Package, PenLine, Lightbulb, ChevronDown } from "lucide-react";
+import { Tag, Check, Truck, PawPrint, Container, Flower2, Sprout, ShoppingBasket, Droplets, Package, PenLine, Lightbulb, ChevronDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrderItem } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -48,7 +48,7 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
         className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
       >
         <span className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
-          <Gift className="w-4 h-4" />
+          <Tag className="w-4 h-4" />
           {t("section_addons")}
         </span>
         <span className="flex items-center gap-2">

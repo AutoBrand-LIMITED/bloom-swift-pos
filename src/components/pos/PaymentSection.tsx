@@ -42,9 +42,9 @@ const PAYMENT_TYPE_KEY: Record<PaymentEntryType, "pay_type_deposit" | "pay_type_
 };
 
 const STATUS_CLASSNAMES: Record<PaymentStatus, string> = {
-  unpaid: "bg-destructive text-destructive-foreground",
+  unpaid: "bg-amber-500 text-white",
   paid: "bg-success text-success-foreground",
-  deposit: "bg-warning text-warning-foreground",
+  deposit: "bg-blue-500 text-white",
 };
 
 const PaymentSection = ({
@@ -96,7 +96,8 @@ const PaymentSection = ({
             type="number"
             value={finalPrice || ""}
             onChange={(e) => onFinalPriceChange(parseFloat(e.target.value) || 0)}
-            className="w-28 text-right font-mono text-lg font-bold h-10"
+            className="w-36 text-right font-mono text-lg font-bold h-10"
+            placeholder="0"
             min={0}
           />
           {priceOverridden && (
@@ -225,9 +226,7 @@ const PaymentSection = ({
     {/* Follow-up settings for unpaid / deposit */}
     {(paymentStatus === "unpaid" || paymentStatus === "deposit") && (
       <div className="space-y-3 pt-2 border-t border-border animate-in fade-in slide-in-from-top-2 duration-200">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          {t("label_followup")}
-        </div>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("label_followup")}</p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">{t("label_followup_date")}</Label>
@@ -291,12 +290,10 @@ const PaymentSection = ({
 
     {/* Unpaid warning */}
     {paymentStatus === "unpaid" && (
-      <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 flex items-start gap-2 animate-in fade-in duration-200">
-        <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
-        <div>
-          <p className="text-sm font-medium text-destructive">{t("warning_unpaid_badge")}</p>
-          <p className="text-xs text-destructive/80">{t("warning_unpaid_desc")}</p>
-        </div>
+      <div className="flex items-center gap-2 animate-in fade-in duration-200">
+        <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+        <span className="text-xs font-semibold text-amber-700">{t("warning_unpaid_badge")}</span>
+        <span className="text-xs text-amber-600/70">{t("warning_unpaid_desc")}</span>
       </div>
     )}
   </div>

@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Calendar, Clock, User, UserCheck, AlertCircle, Plus, X, Phone, Heart, MapPin, Bookmark } from "lucide-react";
+import { Clock, AlertCircle, Plus, X, Bookmark, Truck, MapPin, MoreHorizontal } from "lucide-react";
 import StepBadge from "@/components/pos/StepBadge";
 import VoiceInputButton from "@/components/pos/VoiceInputButton";
 import type { Delivery } from "@/types/order";
@@ -155,6 +155,8 @@ function DeliveryCard({
     onChange({ ...delivery, deliveryDistrict: v, deliveryArea: "" });
 
   const [timeModalOpen, setTimeModalOpen] = useState(false);
+  const [slotOverflowOpen, setSlotOverflowOpen] = useState(false);
+  const [pinnedSlotId, setPinnedSlotId] = useState<string | null>(delivery.deliverySlotId ?? null);
   const [pendingHour, setPendingHour] = useState("12");
   const [pendingMinute, setPendingMinute] = useState("00");
   const [pendingPeriod, setPendingPeriod] = useState<"AM" | "PM">("AM");
@@ -187,12 +189,15 @@ function DeliveryCard({
     setTimeModalOpen(true);
   };
 
-  const handleSlotSelect = (slotValue: string) => {
-    const slot = slots.find(s => s.value === slotValue);
-    if (slot?.specified) {
+  const handleSlotSelect = (slotId: string) => {
+    const slot = slots.find(s => s.id === slotId);
+    if (!slot) return;
+    if (slot.specified) {
+      set("deliverySlotId", slotId);
       openTimeModal();
     } else {
-      set("deliveryTime", slotValue);
+      set("deliveryTime", slot.value);
+      set("deliverySlotId", slotId);
     }
   };
 
@@ -251,11 +256,9 @@ function DeliveryCard({
       </div>
 
       {/* Date + Time slot */}
-      <div className="grid grid-cols-[160px_1fr] gap-3 items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-3 items-start">
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5" /> {t("label_delivery_date")}
-          </Label>
+          <Label className="text-xs font-medium">{t("label_delivery_date")}</Label>
           <Input
             type="date"
             value={delivery.deliveryDate}
@@ -264,39 +267,103 @@ function DeliveryCard({
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" /> {t("label_delivery_time")}
-          </Label>
-          <div className="grid grid-cols-5 gap-1.5">
-            {slots.map((slot) => {
-              const active =
-                delivery.deliveryTime === slot.value ||
-                (!!slot.specified && isSpecified);
+          <Label className="text-xs font-medium">{t("label_delivery_time")}</Label>
+          {(() => {
+            const MAX_INLINE = 4;
+            // If pinned slot would land in overflow, swap it into the last inline position
+            const effectivePinId = pinnedSlotId ?? delivery.deliverySlotId ?? null;
+            let displaySlots = slots;
+            if (slots.length > MAX_INLINE && effectivePinId) {
+              const pinnedIdx = slots.findIndex(s => s.id === effectivePinId);
+              if (pinnedIdx >= MAX_INLINE - 1) {
+                const d = [...slots];
+                [d[MAX_INLINE - 2], d[pinnedIdx]] = [d[pinnedIdx], d[MAX_INLINE - 2]];
+                displaySlots = d;
+              }
+            }
+            const inlineSlots = displaySlots.length <= MAX_INLINE ? displaySlots : displaySlots.slice(0, MAX_INLINE - 1);
+            const overflowSlots = displaySlots.length <= MAX_INLINE ? [] : displaySlots.slice(MAX_INLINE - 1);
+            const hasOverflow = overflowSlots.length > 0;
+            // Prefer stored slot ID; fall back to first value match for old orders
+            const activeSlotId = delivery.deliverySlotId ??
+              slots.find(s =>
+                delivery.deliveryTime === s.value ||
+                (!!s.specified && delivery.deliveryTime.startsWith(SPECIFIED_VALUE + " "))
+              )?.id;
+            const inlineActive = inlineSlots.some(s => s.id === activeSlotId);
+            const overflowActive = !inlineActive && overflowSlots.some(s => s.id === activeSlotId);
+
+            const renderSlotBtn = (slot: typeof slots[0]) => {
+              const active = slot.id === activeSlotId;
               const label = slot.labelKey ? t(slot.labelKey) : slot.label;
               const sublabel = slot.specified && specifiedTime
                 ? format12h(specifiedTime)
-                : slot.sublabelKey
-                  ? t(slot.sublabelKey)
-                  : slot.sublabel;
+                : slot.sublabelKey ? t(slot.sublabelKey) : slot.sublabel;
               return (
                 <button
                   key={slot.id}
-                  onClick={() => handleSlotSelect(slot.value)}
+                  onClick={() => { handleSlotSelect(slot.id); setSlotOverflowOpen(false); }}
                   className={cn(
-                    "rounded-lg h-10 px-2 text-center text-xs font-medium border transition-all flex flex-col items-center justify-center",
+                    "flex-1 min-w-0 rounded-lg h-10 px-2 text-center text-xs font-medium border transition-all flex flex-col items-center justify-center overflow-hidden",
                     active
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-secondary text-secondary-foreground border-transparent hover:border-border"
                   )}
                 >
-                  <div>{label}</div>
-                  <div className={`text-[9px] ${active ? "opacity-80" : "text-muted-foreground"}`}>
-                    {sublabel}
-                  </div>
+                  <div className="w-full truncate text-center">{label}</div>
+                  <div className={`text-[9px] w-full truncate text-center ${active ? "opacity-80" : "text-muted-foreground"}`}>{sublabel}</div>
                 </button>
               );
-            })}
-          </div>
+            };
+
+            return (
+              <div className="flex gap-1.5">
+                {inlineSlots.map(renderSlotBtn)}
+                {hasOverflow && (
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => setSlotOverflowOpen(v => !v)}
+                      className={cn(
+                        "rounded-lg h-10 w-10 border transition-all flex items-center justify-center",
+                        overflowActive
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-secondary text-secondary-foreground border-transparent hover:border-border"
+                      )}
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                    {slotOverflowOpen && (
+                      <>
+                      <div className="fixed inset-0 z-40" onClick={() => setSlotOverflowOpen(false)} />
+                      <div className="absolute right-0 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-lg overflow-hidden min-w-[180px] animate-in fade-in slide-in-from-top-2 duration-150">
+                        {overflowSlots.map(slot => {
+                          const active = slot.id === activeSlotId;
+                          const label = slot.labelKey ? t(slot.labelKey) : slot.label;
+                          const sublabel = slot.specified && specifiedTime
+                            ? format12h(specifiedTime)
+                            : slot.sublabelKey ? t(slot.sublabelKey) : slot.sublabel;
+                          return (
+                            <button
+                              key={slot.id}
+                              onClick={() => { setPinnedSlotId(slot.id); handleSlotSelect(slot.id); setSlotOverflowOpen(false); }}
+                              className={cn(
+                                "w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors border-b border-border last:border-0",
+                                active ? "bg-primary/10 text-primary" : "hover:bg-accent/50"
+                              )}
+                            >
+                              <span className="truncate mr-2">{label}</span>
+                              <span className={`text-[9px] shrink-0 ${active ? "opacity-80" : "text-muted-foreground"}`}>{sublabel}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           <Dialog open={timeModalOpen} onOpenChange={setTimeModalOpen}>
             <DialogContent className="max-w-[280px] p-6">
@@ -309,27 +376,40 @@ function DeliveryCard({
               {/* Time picker */}
               <div className="flex flex-col gap-3 py-1">
                 <div className="flex items-center justify-center gap-1.5">
-                  <Select value={pendingHour} onValueChange={setPendingHour}>
-                    <SelectTrigger className="w-14 h-12 text-center font-mono text-xl font-semibold px-2">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(h => (
-                        <SelectItem key={h} value={h} className="font-mono">{h}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={pendingHour}
+                    onChange={e => {
+                      const v = e.target.value.replace(/\D/g, "");
+                      const n = parseInt(v);
+                      if (v === "" || (n >= 1 && n <= 12)) setPendingHour(v);
+                    }}
+                    onBlur={e => {
+                      const n = parseInt(e.target.value);
+                      if (!n || n < 1) setPendingHour("1");
+                      else if (n > 12) setPendingHour("12");
+                    }}
+                    className="w-14 h-12 text-center font-mono text-xl font-semibold rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
                   <span className="text-2xl font-mono font-bold text-muted-foreground/60 leading-none pb-0.5">:</span>
-                  <Select value={pendingMinute} onValueChange={setPendingMinute}>
-                    <SelectTrigger className="w-14 h-12 text-center font-mono text-xl font-semibold px-2">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {["00", "15", "30", "45"].map(m => (
-                        <SelectItem key={m} value={m} className="font-mono">{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={pendingMinute}
+                    onChange={e => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                      const n = parseInt(v);
+                      if (v === "" || (n >= 0 && n <= 59)) setPendingMinute(v);
+                    }}
+                    onBlur={e => {
+                      const n = parseInt(e.target.value);
+                      setPendingMinute(isNaN(n) ? "00" : String(Math.min(59, Math.max(0, n))).padStart(2, "0"));
+                    }}
+                    className="w-14 h-12 text-center font-mono text-xl font-semibold rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
 
                   {/* AM / PM segmented */}
                   <div className="flex flex-col gap-1 ml-1">
@@ -340,7 +420,7 @@ function DeliveryCard({
                         className={cn(
                           "w-12 py-1.5 rounded-md text-xs font-bold tracking-wide transition-colors",
                           pendingPeriod === p
-                            ? "bg-primary text-primary-foreground"
+                            ? "bg-primary text-white"
                             : "bg-muted text-muted-foreground hover:bg-muted/80"
                         )}
                       >
@@ -432,9 +512,7 @@ function DeliveryCard({
       {/* Recipient + Driver */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium flex items-center gap-1">
-            <User className="w-3.5 h-3.5" /> {t("label_recipient_name")}
-          </Label>
+          <Label className="text-xs font-medium">{t("label_recipient_name")}</Label>
           <Input
             placeholder={t("placeholder_recipient_name")}
             value={delivery.recipientName}
@@ -444,7 +522,7 @@ function DeliveryCard({
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> {t("label_recipient_phone")}</Label>
+          <Label className="text-xs font-medium">{t("label_recipient_phone")}</Label>
           <Input
             placeholder={t("placeholder_recipient_phone")}
             value={delivery.recipientPhone}
@@ -458,7 +536,7 @@ function DeliveryCard({
       {/* Relationship + Birthday */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium flex items-center gap-1"><Heart className="w-3.5 h-3.5" /> {t("label_relationship")}</Label>
+          <Label className="text-xs font-medium">{t("label_relationship")}</Label>
           <Select value={delivery.recipientRelationship || ""} onValueChange={(v) => set("recipientRelationship", v)}>
             <SelectTrigger className="text-sm">
               <SelectValue placeholder={t("placeholder_relationship")} />
@@ -484,9 +562,7 @@ function DeliveryCard({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium flex items-center gap-1">
-            <UserCheck className="w-3.5 h-3.5" /> {t("label_driver")}
-          </Label>
+          <Label className="text-xs font-medium">{t("label_driver")}</Label>
           <Select value={delivery.deliveryPerson} onValueChange={(v) => set("deliveryPerson", v)}>
             <SelectTrigger className="text-sm">
               <SelectValue placeholder={t("placeholder_select_driver")} />
@@ -499,9 +575,7 @@ function DeliveryCard({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium flex items-center gap-1">
-            <AlertCircle className="w-3.5 h-3.5" /> {t("label_failed_delivery")}
-          </Label>
+          <Label className="text-xs font-medium">{t("label_failed_delivery")}</Label>
           <Select
             value={delivery.failedDeliveryAction}
             onValueChange={(v) => set("failedDeliveryAction", v)}
@@ -546,6 +620,7 @@ const DeliverySection = ({
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
           <StepBadge n={4} done={!!isComplete} />
+          <Truck className="w-4 h-4" />
           {t("section_delivery")}
           {deliveries.length > 1 && (
             <span className="ml-1 text-xs sm:text-[11px] font-normal normal-case text-muted-foreground">
@@ -581,7 +656,7 @@ const DeliverySection = ({
       {/* Fees */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="space-y-1">
-          <Label className="text-xs">{t("label_delivery_fee")}</Label>
+          <Label className="text-xs font-medium">{t("label_delivery_fee")}</Label>
           <Input
             type="number"
             value={deliveryFee || ""}
@@ -592,7 +667,7 @@ const DeliverySection = ({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">{t("label_urgent_fee")}</Label>
+          <Label className="text-xs font-medium">{t("label_urgent_fee")}</Label>
           <Input
             type="number"
             value={urgentFee || ""}
