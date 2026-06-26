@@ -618,7 +618,7 @@ const DeliverySection = ({
   return (
     <div className={`rounded-xl p-4 space-y-4 border transition-colors ${isComplete ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
+        <h2 className="text-sm sm:text-[13px] font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
           <StepBadge n={4} done={!!isComplete} />
           <Truck className="w-4 h-4" />
           {t("section_delivery")}

@@ -30,7 +30,7 @@ Each section (SalesId, Customer, OrderItems, Delivery, GiftCard, Payment) follow
 
 - `isComplete` prop drives the green tint — always pass it.
 - Section headers use Lucide icons, never emoji.
-- `StepBadge` shows number or checkmark.
+- `StepBadge` shows number or checkmark; pass `skipped` prop to show `–` for N/A steps.
 
 ### Design tokens (src/index.css)
 - Background: warm off-white `hsl(40 20% 97%)`
@@ -55,12 +55,21 @@ const stepsDone = useMemo(() => [
 ```
 src/types/order.ts
   Order         — full order record
-  Delivery      — per-recipient (recipientRelationship?, recipientBirthday? MM-DD)
+  Delivery      — per-recipient (recipientRelationship?, recipientBirthday? MM-DD, deliverySlotId?)
   OrderItem     — { id, name, price, quantity }
   PaymentStatus — "unpaid" | "paid" | "deposit"
   SALES_STAFF   — static array
   DRIVERS       — static array
 ```
+
+`deliverySlotId` on `Delivery` stores the selected slot's ID for precise active-state tracking. Old orders without it fall back to value-string matching.
+
+### Delivery slot system
+- Slots configured in `/settings` (`florist-pos-slots` localStorage key)
+- Built-in slots are locked; custom slots can be added/removed
+- Slots with `specified: true` open a time picker modal (HH:MM AM/PM)
+- Slot overflow: 5+ slots collapse into a `⋯` dropdown; selecting from overflow pins it to the 3rd inline position
+- Active slot matched by `deliverySlotId` (ID-based), not value string — prevents duplicate-value highlights
 
 ### Print HTML (`src/lib/print-utils.ts`)
 - `generateReceipt()`, `generatePickingSlip()`, `generateDeliveryNote()`, `generateMessageCard()`
@@ -71,6 +80,10 @@ src/types/order.ts
 - `florist-pos-customers` → imported customer records
 - `florist-pos-photos-{orderId}` → delivery photos (base64)
 - `florist-pos-lang` → `"zh"` | `"en"`
+- `florist-pos-slots` → delivery time slot configuration
+- `florist-pos-drivers` → driver list
+- `florist-pos-invoice-seq` → invoice number sequence
+- `florist-pos-occasion-reminders` → dismissed occasion reminders
 
 ## Dev Commands
 
@@ -99,6 +112,7 @@ npx tsc --noEmit # type check
 - CustomerHistoryPanel: `fixed top-[49px] bottom-0 left-0 z-50 sm:static` on mobile (overlay), sidebar on desktop
 - Mobile overlay backdrop: `fixed inset-0 z-30 bg-foreground/40 sm:hidden`
 - Footer progress bar: `hidden sm:flex`; compact `x/y` step counter shown on mobile instead
+- Desktop header nav order: history button → `⋯` DropdownMenu
 
 ## Security Notes
 

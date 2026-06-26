@@ -565,10 +565,10 @@ const Index = () => {
           <div className="flex items-center gap-0 min-w-0 shrink-0">
             <img src="/logo512.png" alt="Anglo Chinese Florist" className="w-16 h-16 object-contain shrink-0" />
             <div className="min-w-0">
-              <h1 key={lang} className="text-[13px] font-bold tracking-tight leading-none animate-in fade-in slide-in-from-bottom-1 duration-200">
+              <h1 key={lang} className="text-sm sm:text-[13px] font-bold tracking-tight leading-none animate-in fade-in slide-in-from-bottom-1 duration-200">
                 {lang === "zh" ? "英華花店" : "Anglo Chinese Florist Ltd"}
               </h1>
-              <p className="text-[10px] text-muted-foreground leading-none mt-0.5 tabular-nums">
+              <p className="text-xs sm:text-[10px] text-muted-foreground leading-none mt-0.5 tabular-nums">
                 {new Date().toLocaleDateString(lang === "zh" ? "zh-HK" : "en-US", { weekday: "short", month: "long", day: "numeric" })}
                 {salesId && (() => {
                   const staff = (SALES_STAFF ?? []).find(s => s.id === salesId);

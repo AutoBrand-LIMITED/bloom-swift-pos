@@ -337,11 +337,11 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
               </Select>
               <div className="flex items-center gap-2">
                 <div className="flex-1 space-y-0.5">
-                  <label className="text-[10px] text-muted-foreground">{t("label_filter_date_from")}</label>
+                  <label className="text-xs sm:text-[10px] text-muted-foreground">{t("label_filter_date_from")}</label>
                   <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs bg-card" />
                 </div>
                 <div className="flex-1 space-y-0.5">
-                  <label className="text-[10px] text-muted-foreground">{t("label_filter_date_to")}</label>
+                  <label className="text-xs sm:text-[10px] text-muted-foreground">{t("label_filter_date_to")}</label>
                   <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-xs bg-card" />
                 </div>
               </div>
@@ -464,12 +464,12 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                               </div>
                               <div className="flex items-center gap-1 mt-0.5">
                                 {primaryDate && (
-                                  <span className="text-[11px] text-muted-foreground tabular-nums">
+                                  <span className="text-xs sm:text-[11px] text-muted-foreground tabular-nums">
                                     {primaryDate}{primaryTime && ` · ${primaryTime}`}
                                   </span>
                                 )}
                                 {primaryRecipient && (
-                                  <span className="text-[11px] text-muted-foreground">
+                                  <span className="text-xs sm:text-[11px] text-muted-foreground">
                                     {primaryDate && " → "}<span className="text-foreground/60">{primaryRecipient}</span>
                                   </span>
                                 )}
@@ -493,7 +493,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                                   ? <span className="text-[10px] font-mono font-semibold text-primary bg-primary/10 rounded px-1.5 py-0.5">{order.invoiceNumber}</span>
                                   : <span />
                                 }
-                                <span className="text-[11px] text-muted-foreground font-mono flex items-center gap-1">
+                                <span className="text-xs sm:text-[11px] text-muted-foreground font-mono flex items-center gap-1">
                                   <Phone className="w-3 h-3 shrink-0" />{order.phone}
                                 </span>
                               </div>
@@ -583,7 +583,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                               {/* Audit log toggle */}
                               <button
                                 onClick={() => setExpandedId(isExpanded ? null : order.id)}
-                                className="w-full flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground pt-0.5"
+                                className="w-full flex items-center justify-center gap-1 text-xs sm:text-[11px] text-muted-foreground hover:text-foreground pt-0.5"
                               >
                                 <HistoryIcon className="w-3 h-3" />
                                 {t("label_audit_log")}
@@ -598,7 +598,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                                         <Receipt className="w-3 h-3" /> {t("payment_ledger")}
                                       </p>
                                       {order.payments.map((p, i) => (
-                                        <div key={i} className="flex items-center justify-between text-[11px]">
+                                        <div key={i} className="flex items-center justify-between text-xs sm:text-[11px]">
                                           <span className="text-muted-foreground">
                                             {t(PAYMENT_TYPE_KEY[p.type])} · {new Date(p.at).toLocaleString(lang === "zh" ? "zh-HK" : "en-US")}
                                           </span>
@@ -613,7 +613,7 @@ const OrderHistory = ({ orders, open, onClose, onEdit, onReorder, onSettleBalanc
                                       {order.auditLog.map((a, i) => {
                                         const staff = SALES_STAFF.find(s => s.id === a.staffId);
                                         return (
-                                          <div key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                                          <div key={i} className="flex items-start gap-1.5 text-xs sm:text-[11px] text-muted-foreground">
                                             <span className="w-1 h-1 rounded-full bg-primary/50 mt-1.5 shrink-0" />
                                             <span>
                                               <span className="font-medium text-foreground/70">{t(AUDIT_KEY[a.action])}</span>

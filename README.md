@@ -43,10 +43,10 @@ Copy `.env.local.example` → `.env.local` and fill in.
 | Route | Description |
 |-------|-------------|
 | `/` | Main POS order entry |
-| `/dispatch` | Back-office dispatch view (driver groups, date filter) |
 | `/driver` | Driver-facing screen (name select → orders → photo upload) |
 | `/report` | Sales analytics (password-protected) |
 | `/payment` | Customer-facing payment screen (`?amount=X&ref=Y`) |
+| `/settings` | Delivery time slot configuration |
 
 ## Project Structure
 
@@ -54,11 +54,11 @@ Copy `.env.local.example` → `.env.local` and fill in.
 src/
 ├── pages/
 │   ├── Index.tsx          # Main POS screen (6-step order flow)
-│   ├── DispatchView.tsx   # Back-office dispatch (orders by driver)
 │   ├── DriverApp.tsx      # Driver interface (photo upload, delivery status)
 │   ├── SalesReport.tsx    # Sales analytics (VITE_ADMIN_PASSWORD required)
-│   └── PaymentScreen.tsx  # Customer-facing payment display
-├── components/pos/        # POS section components (SalesId, Customer, etc.)
+│   ├── PaymentScreen.tsx  # Customer-facing payment display
+│   └── Settings.tsx       # Delivery slot configuration
+├── components/pos/        # POS section components (SalesId, Customer, OrderItems, Delivery, GiftCard, Payment, AddOns)
 ├── components/ui/         # shadcn/ui component library
 ├── contexts/
 │   └── LanguageContext.tsx # useLanguage() hook — lang, setLang, t()
@@ -77,11 +77,11 @@ src/
 
 1. **Staff selection** — required gate before any other input
 2. **Customer details** — phone search with HK (+852) / Macau (+853) prefix, customer name, contact person
-3. **Order items** — product presets, custom items, fees, 3-type notes
-4. **Delivery** — date, time, HK cascading address, recipient, Google Maps
-5. **Gift card** — templates + markdown editor + voice input
-6. **Payment** — paid / unpaid / deposit with follow-up date
-7. **Add-ons** — supplementary products grid
+3. **Order items** — product presets, custom items, budget tracking, 3-type notes (sender / delivery / internal)
+4. **Add-ons** — supplementary products grid
+5. **Delivery** — date, preset time slots, HK cascading address, recipient, relationship, birthday, driver
+6. **Gift card** — templates + markdown editor + voice input
+7. **Payment** — paid / unpaid / deposit with split-payment ledger and follow-up date
 
 ## Notes System
 
@@ -93,27 +93,41 @@ Three note types per order:
 | 送貨備註 (Delivery notes) | Delivery instructions | Picking slip |
 | 內部備註 (Internal notes) | Staff-only comments | Internal only |
 
+Notes marked as persistent are saved to the customer record and auto-surface on every new order.
+
 ## Customer Flags
 
 Visual dot indicators on customer records:
 
-- 🟡 **VIP** — priority customer
+- 🟡 **VIP** — priority customer (auto-suggested at HKD 5,000+ lifetime spend)
 - 🔴 **Warning** — late payer / difficult customer
 - 🟣 **Internal** — internal tag / special handling
 
-Persistent notes auto-surface when a customer record is loaded.
+## Delivery Slot System
+
+Slots configured at `/settings`. Built-in slots are locked; custom slots can be added per season. Slots with a `specified` flag open a time-picker modal (HH:MM AM/PM). Overflow slots (5+) collapse into a `⋯` dropdown; selecting one pins it to the inline row.
 
 ## Data Storage
 
 All data in `localStorage`:
-- `florist-pos-orders` → `Order[]`
-- `florist-pos-customers` → imported customer records
+
+| Key | Contents |
+|-----|----------|
+| `florist-pos-orders` | `Order[]` |
+| `florist-pos-customers` | Customer records |
+| `florist-pos-photos-{orderId}` | Delivery photos (base64) |
+| `florist-pos-lang` | `"zh"` \| `"en"` |
+| `florist-pos-slots` | Delivery time slot config |
+| `florist-pos-drivers` | Driver list |
+| `florist-pos-invoice-seq` | Invoice number sequence |
+| `florist-pos-occasion-reminders` | Dismissed occasion reminders |
 
 ## Print Documents
 
 - **Receipt** — full order with sender info and price
 - **Delivery Note** — recipient name and phone only (no price, no sender)
 - **Picking List** — product detail for fulfilment staff
+- **Message Card** — gift card content only
 
 ## SOP Key Rules
 

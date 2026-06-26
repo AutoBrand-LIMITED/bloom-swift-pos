@@ -28,7 +28,7 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
   return (
     <div className={`rounded-xl px-4 py-3 border transition-colors ${isComplete ? "bg-primary/[0.04] border-primary/20" : "bg-card border-border"}`}>
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
+        <h2 className="text-sm sm:text-[13px] font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
           <StepBadge n={5} done={enabled && !!isComplete} skipped={!enabled} />
           <Gift className="w-4 h-4" />
           {t("section_gift_card")}
@@ -96,8 +96,8 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange, i
 
             {/* Footer */}
             <div className="flex items-center justify-between px-3 py-1.5 bg-muted/20 border-t border-border">
-              <p className="text-[10px] text-muted-foreground">{t("hint_markdown")}</p>
-              <span className="text-[10px] text-muted-foreground tabular-nums font-mono">{message.length}/1000</span>
+              <p className="text-xs sm:text-[10px] text-muted-foreground">{t("hint_markdown")}</p>
+              <span className="text-xs sm:text-[10px] text-muted-foreground tabular-nums font-mono">{message.length}/1000</span>
             </div>
           </div>
         </div>

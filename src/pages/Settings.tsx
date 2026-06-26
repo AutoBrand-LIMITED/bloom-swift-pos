@@ -52,7 +52,7 @@ const Settings = () => {
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-sm font-bold tracking-tight leading-none">{t("settings_title")}</h1>
-            <p className="text-[11px] text-muted-foreground leading-none mt-1">{t("settings_slots_desc")}</p>
+            <p className="text-xs sm:text-[11px] text-muted-foreground leading-none mt-1">{t("settings_slots_desc")}</p>
           </div>
           <Button size="sm" className="gap-1.5 shrink-0" onClick={handleSave}>
             <Save className="w-3.5 h-3.5" /> {t("settings_save")}
@@ -64,7 +64,7 @@ const Settings = () => {
         {/* Section label */}
         <div className="flex items-center gap-2 mb-4">
           <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
-          <span className="text-[11px] font-bold tracking-widest uppercase text-primary/70">
+          <span className="text-xs sm:text-[11px] font-bold tracking-widest uppercase text-primary/70">
             {t("settings_slots_section")}
           </span>
         </div>
@@ -88,7 +88,7 @@ const Settings = () => {
                   <div className="flex items-center gap-3 px-4 py-3.5">
                     {/* Time label — dominant */}
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[15px] font-semibold leading-tight ${isSpecified ? "text-amber-800 dark:text-amber-300" : "text-foreground"}`}>
+                      <p className={`text-base font-semibold leading-tight ${isSpecified ? "text-amber-800 dark:text-amber-300" : "text-foreground"}`}>
                         {slot.labelKey ? t(slot.labelKey) : slot.label}
                       </p>
                       <p className={`text-xs mt-0.5 font-mono ${isSpecified ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>

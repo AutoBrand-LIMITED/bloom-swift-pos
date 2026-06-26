@@ -319,7 +319,7 @@ const DriverApp = () => {
                         {t("btn_complete_delivery")}
                       </Button>
                       {!hasAllPhotos && (
-                        <p className="text-[11px] text-muted-foreground text-center">{t("msg_need_photos")}</p>
+                        <p className="text-xs sm:text-[11px] text-muted-foreground text-center">{t("msg_need_photos")}</p>
                       )}
                     </div>
                   )}
