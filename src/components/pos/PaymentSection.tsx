@@ -292,8 +292,8 @@ const PaymentSection = ({
     {paymentStatus === "unpaid" && (
       <div className="flex items-center gap-2 animate-in fade-in duration-200">
         <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-        <span className="text-xs font-semibold text-amber-700">{t("warning_unpaid_badge")}</span>
-        <span className="text-xs text-amber-600/70">{t("warning_unpaid_desc")}</span>
+        <span className="text-xs font-semibold text-amber-600">{t("warning_unpaid_badge")}</span>
+        <span className="text-xs text-amber-600/80">{t("warning_unpaid_desc")}</span>
       </div>
     )}
   </div>

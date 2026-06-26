@@ -110,7 +110,6 @@ Built by: AutoBrand Limited
 - [x] Occasion and product tracked independently (occasion tag is order-level, not tied to items)
 - [x] Purchase date recorded separately from holiday tag (createdAt vs occasionTag)
 - [ ] System reminds same sender at same time the following year — needs backend scheduler
-- [ ] Automated WhatsApp reminders ahead of recurring occasions — needs backend
 - [x] Reminder timing configurable per customer or occasion type — per-occasion reminder timing in `/settings`, auto-applied on occasion select
 
 ### §2.8 Search, Filters & Reporting
@@ -238,6 +237,41 @@ Built by: AutoBrand Limited
 - [x] Order history sorted by delivery date ✅ already done in P3
 - [x] History filters: text search + staff member + date period (today/last7/last30/all) ✅
 - [x] Phone search across sender + recipient simultaneously ✅
+
+### P8 — UI/UX Redesign (`feat/ui-redesign`) ✅ IN PROGRESS (2026-06-25)
+
+**Delivery Section**
+- [x] Date + time stacks on mobile (`grid-cols-1` → `sm:grid-cols-[160px_1fr]`)
+- [x] Slot overflow: ⋯ dropdown for 5+ slots; clicking overflow slot pins it to 3rd inline position
+- [x] Active slot tracked by ID (`deliverySlotId` on Delivery) — fixes duplicate slot highlights
+- [x] Time picker replaced with free-form number inputs (hour 1–12, minute 0–59)
+- [x] AM/PM toggle explicit `text-white` fix
+- [x] Label icons removed from all delivery fields
+
+**Payment Section**
+- [x] Unpaid badge = amber (`bg-amber-500`), deposit = blue (`bg-blue-500`)
+- [x] Follow-up subheader demoted to muted uppercase label
+- [x] Final price input widened (`w-36`)
+- [x] Unpaid warning condensed to single inline line
+
+**Gift Card Section**
+- [x] StepBadge shows `–` when gift card switch is off (`skipped` prop)
+- [x] Preview area: max-height + scroll + fade gradient
+
+**Order Items Section**
+- [x] Add-item row responsive (`flex-col` on mobile, `flex-row` on sm+)
+- [x] All inputs + buttons aligned to `h-9`
+
+**StepBadge**
+- [x] `skipped` prop: shows `–` for N/A steps (e.g. gift card disabled)
+
+**Header**
+- [x] Desktop nav: order history button moved before ⋯ dropdown
+
+**Sales Report**
+- [x] Removed "Back to POS" button from login screen
+
+---
 
 ### P7 — Infrastructure
 

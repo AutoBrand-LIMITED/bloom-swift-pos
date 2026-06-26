@@ -35,7 +35,7 @@ const SalesIdSection = ({ salesId, onSalesIdChange, isComplete }: SalesIdSection
           </SelectContent>
         </Select>
         {!salesId && (
-          <p className="flex items-center gap-1.5 text-[11px] text-amber-600/80 animate-in fade-in duration-200">
+          <p className="flex items-center gap-1.5 text-xs text-amber-600/80 animate-in fade-in duration-200">
             <AlertCircle className="w-3 h-3 shrink-0" />
             {t("warning_no_staff")}
           </p>

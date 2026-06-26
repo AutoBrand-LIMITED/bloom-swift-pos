@@ -344,7 +344,7 @@ const OrderItemsSection = ({
       {/* Add new item */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-2">
         <div className="flex-1 space-y-1">
-          <Label className="text-xs">{t("label_add_item")}</Label>
+          <Label className="text-xs font-medium">{t("label_add_item")}</Label>
           <div className="flex gap-1.5">
             <Input
               placeholder={t("placeholder_add_item")}
@@ -359,7 +359,7 @@ const OrderItemsSection = ({
         </div>
         <div className="flex items-end gap-2">
           <div className="flex-1 sm:w-28 sm:flex-none space-y-1">
-            <Label className="text-xs">{t("placeholder_price")} ($)</Label>
+            <Label className="text-xs font-medium">{t("placeholder_price")} ($)</Label>
             <Input
               type="number"
               placeholder="0"
@@ -379,9 +379,9 @@ const OrderItemsSection = ({
       {/* Occasion */}
       {onOccasionTagChange && (
         <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border">
-          <span className="text-xs text-muted-foreground shrink-0">
+          <Label className="text-xs font-medium shrink-0">
             {t("label_occasion")}
-          </span>
+          </Label>
           <div className="flex gap-1.5 flex-wrap">
             {OCCASION_KEYS.map(key => (
               <button
