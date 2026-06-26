@@ -1,9 +1,8 @@
-import { Tag, Check, Truck, PawPrint, Container, Flower2, Sprout, ShoppingBasket, Droplets, Package, PenLine, Lightbulb, ChevronDown } from "lucide-react";
+import { Tag, Check, Truck, PawPrint, Container, Flower2, Sprout, ShoppingBasket, Droplets, Package, PenLine, Lightbulb } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrderItem } from "@/types/order";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TranslationKey } from "@/lib/i18n";
-import { useState } from "react";
 
 interface AddOnsSectionProps {
   items: OrderItem[];
@@ -26,7 +25,6 @@ const ADDONS: { name: string; key: TranslationKey; price: number; icon: LucideIc
 
 const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
   const { t } = useLanguage();
-  const [open, setOpen] = useState(true);
   const addedNames = new Set(items.map((i) => i.name));
   const addedCount = ADDONS.filter((a) => addedNames.has(a.name)).length;
 
@@ -43,56 +41,46 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
-      >
-        <span className="text-sm font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 px-4 py-3">
+        <h2 className="text-sm sm:text-[13px] font-semibold tracking-wide uppercase text-foreground/85 flex items-center gap-2">
           <Tag className="w-4 h-4" />
           {t("section_addons")}
-        </span>
-        <span className="flex items-center gap-2">
-          {addedCount > 0 && (
-            <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
-              {addedCount} added
-            </span>
-          )}
-          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-        </span>
-      </button>
-      <div className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-        <div className="overflow-hidden">
-        <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-          {ADDONS.map((addon) => {
-            const isAdded = addedNames.has(addon.name);
-            const Icon = addon.icon;
-            return (
-              <button
-                key={addon.name}
-                onClick={() => toggleAddon(addon)}
-                aria-pressed={isAdded}
-                aria-label={`${t(addon.key)} $${addon.price}${isAdded ? ` — ${t("addon_added_suffix")}` : ""}`}
-                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
-                  isAdded
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border hover:border-primary/40 hover:bg-accent/30"
-                }`}
-              >
-                <Icon className={`w-4 h-4 shrink-0 ${addon.color}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium leading-tight">{t(addon.key)}</p>
-                  <p className="text-xs font-mono text-muted-foreground tabular-nums">${addon.price}</p>
-                </div>
-                <div className={`w-4 h-4 rounded-full shrink-0 flex items-center justify-center transition-all ${
-                  isAdded ? "bg-primary" : "border border-border/60"
-                }`}>
-                  {isAdded && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        </div>
+        </h2>
+        {addedCount > 0 && (
+          <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
+            {addedCount} added
+          </span>
+        )}
+      </div>
+      <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+        {ADDONS.map((addon) => {
+          const isAdded = addedNames.has(addon.name);
+          const Icon = addon.icon;
+          return (
+            <button
+              key={addon.name}
+              onClick={() => toggleAddon(addon)}
+              aria-pressed={isAdded}
+              aria-label={`${t(addon.key)} $${addon.price}${isAdded ? ` — ${t("addon_added_suffix")}` : ""}`}
+              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
+                isAdded
+                  ? "border-primary bg-primary/5 shadow-sm"
+                  : "border-border hover:border-primary/40 hover:bg-accent/30"
+              }`}
+            >
+              <Icon className={`w-4 h-4 shrink-0 ${addon.color}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium leading-tight">{t(addon.key)}</p>
+                <p className="text-xs font-mono text-muted-foreground tabular-nums">${addon.price}</p>
+              </div>
+              <div className={`w-4 h-4 rounded-full shrink-0 flex items-center justify-center transition-all ${
+                isAdded ? "bg-primary" : "border border-border/60"
+              }`}>
+                {isAdded && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
