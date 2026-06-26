@@ -525,17 +525,9 @@ const Index = () => {
       setCustomerRefreshKey(k => k + 1);
     }
 
-    if (editingOrderId) {
-      toast.success(t("toast_order_updated"));
-    } else if (paymentStatus === "unpaid") {
-      toast.warning(t("toast_order_unpaid"), { duration: 5000 });
-    } else if (paymentStatus === "deposit") {
-      toast.info(`${t("toast_order_deposit")} $${depositAmount} · ${t("label_remaining_due")} $${order.finalPrice - depositAmount}`);
-    } else {
-      toast.success(t("toast_order_success"));
-    }
-
-    toast(t("toast_print_prompt"), {
+    // Single toast per submit: status is the title, print actions attach to it.
+    // Two separate toasts stacked and reordered on hover (sonner collapse behaviour).
+    const printToastOptions = {
       duration: 15000,
       description: t("toast_print_desc"),
       action: {
@@ -550,7 +542,17 @@ const Index = () => {
           setTimeout(() => printDocument(generatePickingList(order)), 1000);
         },
       },
-    });
+    };
+
+    if (editingOrderId) {
+      toast.success(t("toast_order_updated"), printToastOptions);
+    } else if (paymentStatus === "unpaid") {
+      toast.warning(t("toast_order_unpaid"), printToastOptions);
+    } else if (paymentStatus === "deposit") {
+      toast.info(`${t("toast_order_deposit")} $${depositAmount} · ${t("label_remaining_due")} $${order.finalPrice - depositAmount}`, printToastOptions);
+    } else {
+      toast.success(t("toast_order_success"), printToastOptions);
+    }
 
     setPendingOrder(null);
     resetForm();
