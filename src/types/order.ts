@@ -3,6 +3,7 @@ export interface OrderItem {
   name: string;
   price: number;
   quantity: number;
+  isAddon?: boolean;
 }
 
 export interface Delivery {

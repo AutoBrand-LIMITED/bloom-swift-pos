@@ -192,20 +192,23 @@ const Index = () => {
     return results.sort((a, b) => a.daysUntil - b.daysUntil);
   }, [selectedCustomer, orders]);
 
+  // Add-ons are optional; only real product items satisfy the required Order Items step.
+  const hasItems = useMemo(() => items.some(i => !i.isAddon), [items]);
+
   const totalSteps = giftCardEnabled ? 6 : 5;
   const stepsDone = useMemo(() => [
     !!salesId,
     !!phone.trim() && !!customerName.trim(),
-    items.length > 0,
+    hasItems,
     deliveries.every(d => d.deliveryDate && d.deliveryTime && d.recipientName && d.deliveryTime !== "指定時間"),
     ...(giftCardEnabled ? [!!giftCardMessage.trim()] : []),
-    items.length > 0 && paymentStatus !== "unpaid",
-  ].filter(Boolean).length, [salesId, phone, customerName, items, deliveries, giftCardEnabled, giftCardMessage, paymentStatus]);
+    hasItems && paymentStatus !== "unpaid",
+  ].filter(Boolean).length, [salesId, phone, customerName, hasItems, deliveries, giftCardEnabled, giftCardMessage, paymentStatus]);
 
   const blockingReason = !salesId ? t("blocking_no_staff") :
     !phone.trim() ? t("blocking_no_phone") :
     !customerName.trim() ? t("blocking_no_name") :
-    items.length === 0 ? t("blocking_no_items") : null;
+    !hasItems ? t("blocking_no_items") : null;
 
   const resetForm = useCallback(() => {
     setSalesId("");
@@ -796,7 +799,7 @@ const Index = () => {
             budget={budget}
             onBudgetChange={setBudget}
             subtotal={subtotal}
-            isComplete={items.length > 0}
+            isComplete={hasItems}
             occasionTag={occasionTag}
             onOccasionTagChange={(key) => {
               setOccasionTag(key);
@@ -858,7 +861,7 @@ const Index = () => {
             orderId={currentOrderId}
             invoiceRef={editingOrderId ? orders.find(o => o.id === editingOrderId)?.invoiceNumber : undefined}
             payments={editingOrderId ? orders.find(o => o.id === editingOrderId)?.payments : undefined}
-            isComplete={items.length > 0 && (paymentStatus !== "unpaid" || finalPrice === 0)}
+            isComplete={hasItems && (paymentStatus !== "unpaid" || finalPrice === 0)}
             step={giftCardEnabled ? 6 : 5}
           />
         </main>

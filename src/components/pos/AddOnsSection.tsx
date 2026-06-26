@@ -34,7 +34,7 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
     } else {
       onItemsChange([
         ...items,
-        { id: crypto.randomUUID(), name: addon.name, price: addon.price, quantity: 1 },
+        { id: crypto.randomUUID(), name: addon.name, price: addon.price, quantity: 1, isAddon: true },
       ]);
     }
   };
