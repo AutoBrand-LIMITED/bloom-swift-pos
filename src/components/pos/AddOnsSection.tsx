@@ -48,7 +48,7 @@ const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
         </h2>
         {addedCount > 0 && (
           <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
-            {addedCount} added
+            {addedCount} {t("addon_added_suffix")}
           </span>
         )}
       </div>

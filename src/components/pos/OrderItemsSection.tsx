@@ -49,6 +49,9 @@ const OrderItemsSection = ({
   onSenderNotesPinnedChange, onInternalNotesPinnedChange,
 }: OrderItemsSectionProps) => {
   const { t, lang } = useLanguage();
+  // Add-ons live in their own section; this list shows real product items only.
+  const productItems = items.filter((i) => !i.isAddon);
+  const productSubtotal = productItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [customOrderOpen, setCustomOrderOpen] = useState(false);
@@ -159,9 +162,9 @@ const OrderItemsSection = ({
           <StepBadge n={3} done={!!isComplete} />
           <ClipboardList className="w-4 h-4" />
           {t("section_order_items")}
-          {items.length > 0 && (
+          {productItems.length > 0 && (
             <span className="ml-1 text-xs sm:text-[11px] font-normal normal-case text-muted-foreground">
-              {items.length} {t("unit_items")} · ${subtotal.toLocaleString()}
+              {productItems.length} {t("unit_items")} · ${productSubtotal.toLocaleString()}
             </span>
           )}
         </h2>
@@ -303,9 +306,9 @@ const OrderItemsSection = ({
       </div>
 
       {/* Item list */}
-      {items.length > 0 && (
+      {productItems.length > 0 && (
         <div className="space-y-2">
-          {items.map((item) => (
+          {productItems.map((item) => (
             <div key={item.id} className="flex items-center gap-2 bg-secondary/50 rounded-lg p-2.5 animate-in fade-in slide-in-from-top-1 duration-150">
               <Input
                 value={item.name}

@@ -210,7 +210,7 @@ function orderMeta(order: Order): string {
   const date = new Date(order.createdAt).toLocaleString("zh-HK");
   return `
     <div class="meta">
-      <div><span class="lbl">訂單編號</span><span class="val">${orderRef(order)}</span></div>
+      <div><span class="lbl">訂單編號</span><span class="val">${esc(orderRef(order))}</span></div>
       <div><span class="lbl">開單日期</span><span class="val">${esc(date)}</span></div>
       <div><span class="lbl">客戶</span><span class="val">${esc(order.customerName) || "—"}</span></div>
       <div><span class="lbl">電話</span><span class="val">${esc(order.phone)}</span></div>
@@ -335,7 +335,7 @@ export function generateReceipt(order: Order): string {
     @media print { body { padding: 14px 18px; } }
   `;
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>收據 ${ref}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>收據 ${esc(ref)}</title>
     <style>${receiptStyles}</style></head><body>
 
     <div class="r-header">
@@ -477,7 +477,7 @@ export function generatePickingList(order: Order): string {
       <div class="ps-price">$${(item.price * item.quantity).toLocaleString()}</div>
     </div>`).join("");
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>執貨單 ${ref}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>執貨單 ${esc(ref)}</title>
     <style>${pickStyles}</style></head><body>
 
     <div class="ps-header">
@@ -883,7 +883,7 @@ export function generateDeliveryNote(order: Order): string {
     </div>`;
   }).join("");
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送貨單 DN-${ref}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送貨單 DN-${esc(ref)}</title>
     <style>${dnStyles}</style></head><body>${dnSections}</body></html>`;
 }
 
@@ -898,7 +898,7 @@ export function generateMessageCard(order: Order): string {
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(/\n/g, "<br>");
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>卡片 ${ref}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>卡片 ${esc(ref)}</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { font-family: 'DM Sans', -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; padding: 40px; background: #faf8f4; }
@@ -915,7 +915,7 @@ export function generateMessageCard(order: Order): string {
       ${d?.recipientName ? `<div class="recipient">致：${esc(d.recipientName)}</div>` : ""}
       <div class="message">${formattedMsg || "<em style='color:#ddd'>（無卡片內容）</em>"}</div>
       <hr class="divider" />
-      <div class="meta">${ref}</div>
+      <div class="meta">${esc(ref)}</div>
     </div>
   </body></html>`;
 }
