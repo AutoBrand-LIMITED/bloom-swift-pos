@@ -26,7 +26,7 @@ const ADDONS: { name: string; key: TranslationKey; price: number; icon: LucideIc
 
 const AddOnsSection = ({ items, onItemsChange }: AddOnsSectionProps) => {
   const { t } = useLanguage();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const addedNames = new Set(items.map((i) => i.name));
   const addedCount = ADDONS.filter((a) => addedNames.has(a.name)).length;
 
