@@ -41,7 +41,7 @@ Built by: AutoBrand Limited
 
 ### §2.3 Delivery Management
 
-- [x] Driver dispatch: orders assigned by district — `/dispatch` "By District" grouping mode
+- [ ] Driver dispatch: orders assigned by district — ❌ **removed** (Dispatch screen deleted 2026-06-26)
 - [x] Each driver sees only their own order list (identified by address, not order number) — DriverApp filters by selected driver; cards show recipient + address, no order number
 - [x] Driver interface: minimal — name select → assigned orders → tap address → upload photos
 - [x] No data entry required from driver
@@ -49,8 +49,8 @@ Built by: AutoBrand Limited
 - [x] Supports 6–7 concurrent drivers during peak season including casual/hired drivers — driver management in `/settings` (add/remove, casual flag)
 - [ ] Automated status updates: auto-advance at fixed time milestones
 - [ ] Auto WhatsApp message to colleagues if no update after set period
-- [x] Back-office dispatch view: orders by driver + district grouping ✅ full `/dispatch` screen
-- [x] Management can see how many vehicles to deploy from dispatch view — vehicle-count stat (distinct drivers with pending orders)
+- [ ] Back-office dispatch view: orders by driver + district grouping — ❌ **removed** (Dispatch screen deleted 2026-06-26)
+- [ ] Management can see how many vehicles to deploy from dispatch view — ❌ **removed** (vehicle-count stat lived in Dispatch screen)
 - [ ] Driver WhatsApp integration option: photo upload via WhatsApp → auto-sync to system
 
 ### §2.4 Payment & Invoice System
@@ -133,8 +133,8 @@ Built by: AutoBrand Limited
 | Order items + presets + voice input | ✅ Exists | Category filter: 全部/花束/花籃/盆栽/花圈/其他 ✅; item code quick-search ✅ (`/` shortcut) |
 | Budget tracker with progress bar | ✅ Exists | — |
 | HK cascading address (region→district→area) | ✅ Exists | — |
-| Google Maps — per-address pin (Dispatch) | ✅ Exists | Opens individual delivery in Maps |
-| Google Maps — Plan Route (Dispatch) | ✅ Exists | Multi-stop route URL per driver, opens Maps directions |
+| Google Maps — per-address pin (Dispatch) | ❌ Removed | Dispatch screen deleted 2026-06-26; address pin still in DeliverySection order form |
+| Google Maps — Plan Route (Dispatch) | ❌ Removed | Multi-stop route planning deleted with Dispatch screen |
 | Google Maps — delivery note link (print) | ✅ Exists | URL printed on delivery slip |
 | Delivery date / time input | ✅ Exists | Preset slots: 上午/下午/指定時間 |
 | Recipient fields + failed delivery action | ✅ Exists | — |
@@ -153,7 +153,7 @@ Built by: AutoBrand Limited
 | Delivery time preset slots | ✅ Exists | 上午 9–1pm / 下午 1–6pm / 指定時間 + surcharge flag |
 | Driver list (not free text) | ✅ Exists | DRIVERS dropdown (阿明/阿強/阿偉/阿華/臨時司機) |
 | Driver interface screen | ✅ Exists | `/driver` — name select → orders → 2-photo upload → mark delivered |
-| Dispatch view (back-office) | ✅ Exists | `/dispatch` — driver groups, date filter, status + payment badges |
+| Dispatch view (back-office) | ❌ Removed | `/dispatch` screen + DispatchView deleted 2026-06-26 |
 | Standalone payment screen | ✅ Exists | /payment?amount=X&ref=Y — customer-facing, amount only |
 | Stripe / Apple Pay / Google Pay / WhatsApp link | ⚠️ UI only | Methods selectable; no real payment integration yet |
 | Picking slip per SOP (hide sender, tear-off) | ✅ Exists | Hides sender; shows price + items; tear-off stub with order ref |
@@ -167,7 +167,7 @@ Built by: AutoBrand Limited
 | Settle balance / top-up | ✅ Exists | OrderHistory action; appends balance/full payment + audit entry |
 | Driver management | ✅ Exists | `/settings` — add/remove drivers, casual flag; dynamic across delivery/dispatch/driver app |
 | Invoice numbers + audit log | ✅ Exists | Permanent INV-XXXX; per-order audit trail (created/amended/settled/note) |
-| Dispatch by district + vehicles | ✅ Exists | `/dispatch` driver/district toggle; vehicle-count stat |
+| Dispatch by district + vehicles | ❌ Removed | Dispatch screen deleted 2026-06-26 |
 | History filters (full) | ✅ Exists | Text + staff + period + occasion + delivery date range + upcoming-only |
 | Per-occasion reminders | ✅ Exists | `/settings` default reminder timing per occasion; auto-applied on select |
 | Relationship field on recipient | ✅ Exists | Per-recipient dropdown in DeliverySection |
@@ -222,7 +222,7 @@ Built by: AutoBrand Limited
 ### P5 — New Screens
 
 - [x] Driver app screen: name select → assigned orders (today/tomorrow/all) → 2-photo upload → mark delivered (`/driver`)
-- [x] Dispatch view: back-office orders grouped by driver, date filter, status + payment badges, blocked unpaid orders highlighted (`/dispatch`)
+- [ ] Dispatch view: back-office orders grouped by driver, date filter, status + payment badges, blocked unpaid orders highlighted — ❌ **removed** (Dispatch screen deleted 2026-06-26)
 - [ ] Auto WhatsApp notification if delivery not updated after set period
 
 ### P6 — VIP & Seasonal ✅ DONE (2026-06-24)
