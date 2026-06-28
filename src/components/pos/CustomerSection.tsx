@@ -18,12 +18,14 @@ interface CustomerSectionProps {
   customerType: CustomerType;
   companyName: string;
   contactPerson: string;
+  email: string;
   onPhoneChange: (v: string) => void;
   onPhonePrefixChange: (v: string) => void;
   onNameChange: (v: string) => void;
   onCustomerTypeChange: (v: CustomerType) => void;
   onCompanyNameChange: (v: string) => void;
   onContactPersonChange: (v: string) => void;
+  onEmailChange: (v: string) => void;
   onCustomerSelect: (c: DemoCustomer) => void;
   phoneError: boolean;
   selectedCustomer: DemoCustomer | null;
@@ -73,9 +75,9 @@ function detectPrefix(phone: string): string {
 }
 
 const CustomerSection = ({
-  phone, phonePrefix, customerName, customerType, companyName, contactPerson,
+  phone, phonePrefix, customerName, customerType, companyName, contactPerson, email,
   onPhoneChange, onPhonePrefixChange, onNameChange, onCustomerTypeChange,
-  onCompanyNameChange, onContactPersonChange,
+  onCompanyNameChange, onContactPersonChange, onEmailChange,
   onCustomerSelect, phoneError, selectedCustomer, refreshKey, isComplete, orders,
 }: CustomerSectionProps) => {
   const { t } = useLanguage();
@@ -281,16 +283,33 @@ const CustomerSection = ({
         </div>
       </div>
 
-      {/* Contact person (secretary) */}
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium">{t("label_contact_person")}</Label>
-        <Input
-          placeholder={t("placeholder_contact_person")}
-          value={contactPerson}
-          onChange={(e) => onContactPersonChange(e.target.value)}
-          className="text-sm"
-          maxLength={100}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Email */}
+        <div className="space-y-1.5">
+          <Label htmlFor="customer-email" className="text-xs font-medium">{t("label_email")}</Label>
+          <Input
+            id="customer-email"
+            type="email"
+            inputMode="email"
+            placeholder={t("placeholder_email")}
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
+            className="text-sm"
+            maxLength={254}
+          />
+        </div>
+
+        {/* Contact person (secretary) */}
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">{t("label_contact_person")}</Label>
+          <Input
+            placeholder={t("placeholder_contact_person")}
+            value={contactPerson}
+            onChange={(e) => onContactPersonChange(e.target.value)}
+            className="text-sm"
+            maxLength={100}
+          />
+        </div>
       </div>
     </div>
   );

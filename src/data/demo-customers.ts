@@ -15,6 +15,7 @@ export interface DemoCustomer {
   name: string;
   phone: string;
   contactPerson?: string;
+  email?: string;
   flags?: CustomerFlag[];
   persistentNotes?: string;
   addresses?: SavedAddress[];

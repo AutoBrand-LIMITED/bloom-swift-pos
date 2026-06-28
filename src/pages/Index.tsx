@@ -53,6 +53,7 @@ const Index = () => {
   const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
   const [companyName, setCompanyName] = useState("");
   const [contactPerson, setContactPerson] = useState("");
+  const [email, setEmail] = useState("");
   const [phoneError, setPhoneError] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
@@ -218,6 +219,7 @@ const Index = () => {
     setCustomerType("personal");
     setCompanyName("");
     setContactPerson("");
+    setEmail("");
     setPhoneError(false);
     setSelectedCustomer(null);
     setPersistentNoteDismissed(false);
@@ -253,6 +255,7 @@ const Index = () => {
     setPhone(c.phone);
     setPhoneError(false);
     setContactPerson(c.contactPerson ?? "");
+    setEmail(c.email ?? "");
     setPersistentNoteDismissed(false);
   };
 
@@ -274,6 +277,7 @@ const Index = () => {
     setCustomerType(order.customerType ?? "personal");
     setCompanyName(order.companyName ?? "");
     setContactPerson(order.contactPerson ?? "");
+    setEmail(order.email ?? "");
     setItems(order.items);
     setDeliveryFee(order.deliveryFee);
     setUrgentFee(order.urgentFee);
@@ -309,6 +313,7 @@ const Index = () => {
     setCustomerType(order.customerType ?? "personal");
     setCompanyName(order.companyName ?? "");
     setContactPerson(order.contactPerson ?? "");
+    setEmail(order.email ?? "");
     setItems(order.items);
     setDeliveryFee(order.deliveryFee);
     setUrgentFee(order.urgentFee);
@@ -459,6 +464,7 @@ const Index = () => {
       customerName: customerName.trim(),
       phone: `${phonePrefix} ${phone.trim()}`,
       contactPerson: contactPerson.trim(),
+      email: email.trim() || undefined,
       items,
       deliveryFee,
       urgentFee,
@@ -749,12 +755,14 @@ const Index = () => {
             customerType={customerType}
             companyName={companyName}
             contactPerson={contactPerson}
+            email={email}
             onPhoneChange={(v) => { setPhone(v); if (v.trim()) setPhoneError(false); }}
             onPhonePrefixChange={setPhonePrefix}
             onNameChange={setCustomerName}
             onCustomerTypeChange={setCustomerType}
             onCompanyNameChange={setCompanyName}
             onContactPersonChange={setContactPerson}
+            onEmailChange={setEmail}
             onCustomerSelect={handleCustomerSelect}
             phoneError={phoneError}
             selectedCustomer={selectedCustomer}

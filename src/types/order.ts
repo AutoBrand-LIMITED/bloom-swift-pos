@@ -49,6 +49,7 @@ export interface Order {
   customerName: string;
   phone: string;
   contactPerson: string;
+  email?: string;
   items: OrderItem[];
   deliveryFee: number;
   urgentFee: number;
