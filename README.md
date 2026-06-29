@@ -12,7 +12,7 @@ Point-of-sale system for **Anglo Chinese Florist Limited**, built by AutoBrand L
 | Components | shadcn/ui |
 | Routing | React Router v6 |
 | State | useState / useMemo (local) |
-| Storage | localStorage (Supabase migration planned) |
+| Storage | localStorage (no backend) |
 | Icons | Lucide React |
 | i18n | Custom hook — `useLanguage()` with `zh`/`en` dicts |
 
@@ -75,13 +75,16 @@ src/
 
 ## Order Entry Flow
 
+Steps 1–5 (or 1–6 with gift card) are tracked in the progress bar. Add-ons are an unnumbered section between Order Items and Delivery — they do not count as a required step.
+
 1. **Staff selection** — required gate before any other input
-2. **Customer details** — phone search with HK (+852) / Macau (+853) prefix, customer name, contact person
+2. **Customer details** — phone (+852/+853 prefix), name, email, contact person; personal or company type
 3. **Order items** — product presets, custom items, budget tracking, 3-type notes (sender / delivery / internal)
-4. **Add-ons** — supplementary products grid
-5. **Delivery** — date, preset time slots, HK cascading address, recipient, relationship, birthday, driver
-6. **Gift card** — templates + markdown editor + voice input
-7. **Payment** — paid / unpaid / deposit with split-payment ledger and follow-up date
+4. **Delivery** — date, preset time slots, HK cascading address, recipient, relationship, birthday, driver
+5. **Gift card** (optional step) — templates + markdown editor + voice input
+6. **Payment** — paid / unpaid / deposit with split-payment ledger and follow-up date
+
+**Add-ons section** (between steps 3 and 4) — supplementary products grid; items flagged `isAddon: true`, excluded from the required Order Items check.
 
 ## Notes System
 
@@ -97,11 +100,11 @@ Notes marked as persistent are saved to the customer record and auto-surface on 
 
 ## Customer Flags
 
-Visual dot indicators on customer records:
+Visual badge indicators on customer records:
 
-- 🟡 **VIP** — priority customer (auto-suggested at HKD 5,000+ lifetime spend)
-- 🔴 **Warning** — late payer / difficult customer
-- 🟣 **Internal** — internal tag / special handling
+- **VIP** (yellow) — priority customer; auto-suggested at HKD 5,000+ lifetime spend
+- **Warning** (red) — late payer / difficult customer
+- **Internal** (purple) — internal tag / special handling
 
 ## Delivery Slot System
 

@@ -13,7 +13,7 @@ Custom system — do not use any external i18n library.
 - Adding a new string: add to `zh` first, TypeScript will error on `en` until it's added there too.
 
 ### Section components (`src/components/pos/`)
-Each section (SalesId, Customer, OrderItems, Delivery, GiftCard, Payment) follows this pattern:
+Each section (SalesId, Customer, AddOns, OrderItems, Delivery, GiftCard, Payment) follows this pattern:
 
 ```tsx
 <div className={`rounded-xl p-4 space-y-X border transition-colors ${
@@ -41,15 +41,19 @@ Each section (SalesId, Customer, OrderItems, Delivery, GiftCard, Payment) follow
 ### stepsDone / progress bar (Index.tsx)
 ```tsx
 const totalSteps = giftCardEnabled ? 6 : 5;  // gift card is N/A when disabled
+// hasItems excludes add-on items (i.isAddon) — only real products satisfy Order Items step
+const hasItems = useMemo(() => items.some(i => !i.isAddon), [items]);
 const stepsDone = useMemo(() => [
   !!salesId,
   !!phone.trim() && !!customerName.trim(),
-  items.length > 0,
+  hasItems,
   deliveries.every(d => d.deliveryDate && d.deliveryTime && d.recipientName && d.deliveryTime !== "指定時間"),
   ...(giftCardEnabled ? [!!giftCardMessage.trim()] : []),
-  items.length > 0 && paymentStatus !== "unpaid",
+  hasItems && paymentStatus !== "unpaid",
 ].filter(Boolean).length, [...deps]);
 ```
+
+Add-ons (`OrderItem` with `isAddon: true`) render in a separate `AddOnsSection` between Order Items and Delivery. They are **not a numbered step** and do not affect `stepsDone`.
 
 ### Types
 ```
