@@ -1,14 +1,16 @@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserCheck } from "lucide-react";
-import { SALES_STAFF } from "@/types/order";
+import { salesStaffDisplayName, useOdooEmployees } from "@/hooks/use-odoo-employees";
 
 interface SalesIdSectionProps {
   salesId: string;
-  onSalesIdChange: (v: string) => void;
+  onSalespersonChange: (label: string, employeeId?: number) => void;
 }
 
-const SalesIdSection = ({ salesId, onSalesIdChange }: SalesIdSectionProps) => {
+const SalesIdSection = ({ salesId, onSalespersonChange }: SalesIdSectionProps) => {
+  const { staff, loading, error, usingOdoo } = useOdooEmployees();
+
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-2">
       <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
@@ -16,19 +18,34 @@ const SalesIdSection = ({ salesId, onSalesIdChange }: SalesIdSectionProps) => {
         銷售員
       </h2>
       <div className="space-y-1">
-        <Label className="text-xs">負責員工</Label>
-        <Select value={salesId} onValueChange={onSalesIdChange}>
-          <SelectTrigger className="text-sm">
-            <SelectValue placeholder="選擇員工" />
+        <Label className="text-xs">
+          負責員工 <span className="text-destructive" aria-hidden="true">*</span>
+        </Label>
+        <Select
+          value={salesId}
+          onValueChange={(value) => {
+            const employee = staff.find((candidate) => salesStaffDisplayName(candidate) === value);
+            onSalespersonChange(value, employee?.odooEmployeeId);
+          }}
+        >
+          <SelectTrigger className="text-sm" aria-label="負責員工" aria-required="true">
+            <SelectValue placeholder={loading ? "正在載入 Odoo 員工..." : "選擇員工"} />
           </SelectTrigger>
           <SelectContent>
-            {SALES_STAFF.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.id} — {s.name}
-              </SelectItem>
-            ))}
+            {staff.map((s) => {
+              const displayName = salesStaffDisplayName(s);
+              return (
+                <SelectItem key={s.id} value={displayName}>
+                  {displayName}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
+        {error && (
+          <p className="text-[10px] text-destructive">未能同步 Odoo 員工，暫時使用本機清單</p>
+        )}
+        {usingOdoo && <p className="text-[10px] text-muted-foreground">已同步 Odoo 員工清單</p>}
       </div>
     </div>
   );

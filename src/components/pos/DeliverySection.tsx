@@ -1,40 +1,41 @@
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Calendar, Clock, User, UserCheck, AlertCircle } from "lucide-react";
-
-const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
-  "香港島": {
-    "中西區": ["中環", "上環", "西營盤", "堅尼地城", "山頂", "半山"],
-    "灣仔區": ["灣仔", "銅鑼灣", "跑馬地", "大坑", "天后"],
-    "東區": ["北角", "鰂魚涌", "太古", "西灣河", "筲箕灣", "柴灣"],
-    "南區": ["香港仔", "鴨脷洲", "黃竹坑", "淺水灣", "赤柱"],
-  },
-  "九龍": {
-    "油尖旺區": ["尖沙咀", "佐敦", "油麻地", "旺角", "太子", "大角咀"],
-    "深水埗區": ["深水埗", "長沙灣", "荔枝角", "石硤尾", "又一村"],
-    "九龍城區": ["紅磡", "土瓜灣", "九龍城", "何文田", "九龍塘"],
-    "黃大仙區": ["黃大仙", "鑽石山", "慈雲山", "彩虹", "新蒲崗"],
-    "觀塘區": ["觀塘", "牛頭角", "九龍灣", "藍田", "秀茂坪", "油塘"],
-  },
-  "新界": {
-    "荃灣區": ["荃灣", "深井", "青龍頭", "馬灣"],
-    "葵青區": ["葵芳", "葵涌", "青衣"],
-    "屯門區": ["屯門市中心", "屯門碼頭", "蝴蝶邨", "三聖"],
-    "元朗區": ["元朗", "天水圍", "錦田", "流浮山"],
-    "北區": ["上水", "粉嶺", "沙頭角", "古洞"],
-    "大埔區": ["大埔", "大埔墟", "太和", "大美督"],
-    "沙田區": ["沙田", "火炭", "大圍", "馬鞍山", "石門"],
-    "西貢區": ["將軍澳", "坑口", "寶琳", "西貢市中心", "清水灣"],
-  },
-  "離島": {
-    "離島區": ["東涌", "大嶼山", "長洲", "南丫島", "愉景灣", "機場"],
-  },
-};
+import {
+  deliverySlotSnapshot,
+  findDeliverySlot,
+  type FrozenDeliverySlotSelection,
+} from "@/lib/delivery-slots";
+import type { DeliverySlot } from "@/lib/odoo-api";
+import { HK_DISTRICTS } from "@/lib/hk-address";
+import type { DeliveryTimeMode } from "@/types/order";
+import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
+import type { KeyboardEvent } from "react";
+import {
+  AlertCircle,
+  Calendar,
+  CircleDollarSign,
+  Clock,
+  LoaderCircle,
+  MapPin,
+  RefreshCw,
+  User,
+  UserCheck,
+} from "lucide-react";
 
 interface DeliverySectionProps {
   deliveryDate: string;
   deliveryTime: string;
+  deliveryTimeMode?: DeliveryTimeMode;
+  deliverySlotId?: number;
+  frozenSlotSelection?: FrozenDeliverySlotSelection;
+  deliverySlots: readonly DeliverySlot[];
+  deliverySlotsLoading: boolean;
+  deliverySlotsError: string | null;
+  deliveryTimeError: string | null;
+  legacyDeliveryTime: boolean;
   deliveryRegion: string;
   deliveryDistrict: string;
   deliveryArea: string;
@@ -45,6 +46,9 @@ interface DeliverySectionProps {
   failedDeliveryAction: string;
   onDateChange: (v: string) => void;
   onTimeChange: (v: string) => void;
+  onSlotChange: (slot: DeliverySlot) => void;
+  onSpecifiedTimeSelect: () => void;
+  onRetryDeliverySlots: () => void;
   onRegionChange: (v: string) => void;
   onDistrictChange: (v: string) => void;
   onAreaChange: (v: string) => void;
@@ -56,10 +60,13 @@ interface DeliverySectionProps {
 }
 
 const DeliverySection = ({
-  deliveryDate, deliveryTime,
+  deliveryDate, deliveryTime, deliveryTimeMode, deliverySlotId,
+  frozenSlotSelection,
+  deliverySlots, deliverySlotsLoading, deliverySlotsError, deliveryTimeError,
+  legacyDeliveryTime,
   deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
   recipientName, recipientPhone, deliveryPerson, failedDeliveryAction,
-  onDateChange, onTimeChange,
+  onDateChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect, onRetryDeliverySlots,
   onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
   onRecipientNameChange, onRecipientPhoneChange, onDeliveryPersonChange,
   onFailedDeliveryActionChange,
@@ -68,6 +75,37 @@ const DeliverySection = ({
   const areas = deliveryRegion && deliveryDistrict
     ? HK_DISTRICTS[deliveryRegion]?.[deliveryDistrict] || []
     : [];
+  const selectedSlot = findDeliverySlot(deliverySlots, deliverySlotId);
+  const frozenSelectedSnapshot = frozenSlotSelection
+    && frozenSlotSelection.slotId === deliverySlotId
+    ? frozenSlotSelection.snapshot
+    : undefined;
+  const selectedUnavailableSlot = deliveryTimeMode === "slot"
+    && deliverySlotId !== undefined
+    && !selectedSlot
+    && Boolean((frozenSelectedSnapshot || deliveryTime).trim());
+  const selectedTimeValue = deliveryTimeMode === "slot" && deliverySlotId !== undefined
+    ? `slot:${deliverySlotId}`
+    : deliveryTimeMode === "specified"
+      ? "specified"
+      : "";
+
+  const handleTimeSelectionChange = (value: string) => {
+    if (value === "specified") {
+      onSpecifiedTimeSelect();
+      return;
+    }
+    if (!value.startsWith("slot:")) return;
+    const slot = findDeliverySlot(deliverySlots, Number(value.slice("slot:".length)));
+    if (slot) onSlotChange(slot);
+  };
+
+  const handleTimeSelectionKeyUp = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(event.key)) return;
+    const focusedRadio = event.currentTarget.querySelector<HTMLElement>('[role="radio"]:focus');
+    const focusedValue = focusedRadio?.getAttribute("value");
+    if (focusedValue) handleTimeSelectionChange(focusedValue);
+  };
 
   const handleRegionChange = (v: string) => {
     onRegionChange(v);
@@ -93,29 +131,150 @@ const DeliverySection = ({
         <MapPin className="w-4 h-4" />
         送貨資料
       </h2>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
+      <div className="space-y-3">
+        <div className="space-y-1 max-w-xs">
+          <Label htmlFor="delivery-date" className="text-xs flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" /> 送貨日期
           </Label>
           <Input
+            id="delivery-date"
+            aria-label="送貨日期"
             type="date"
             value={deliveryDate}
             onChange={(e) => onDateChange(e.target.value)}
             className="text-sm"
           />
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
+
+        <fieldset className="space-y-2" aria-describedby={deliveryTimeError ? "delivery-time-error" : undefined}>
+          <legend className="text-xs flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" /> 送貨時間
-          </Label>
-          <Input
-            type="time"
-            value={deliveryTime}
-            onChange={(e) => onTimeChange(e.target.value)}
-            className="text-sm"
-          />
-        </div>
+          </legend>
+
+          {legacyDeliveryTime ? (
+            <div className="space-y-1">
+              <Label htmlFor="legacy-delivery-time" className="text-xs text-muted-foreground">
+                舊格式時間
+              </Label>
+              <Input
+                id="legacy-delivery-time"
+                aria-label="舊格式送貨時間"
+                value={deliveryTime}
+                readOnly
+                className="min-h-11 bg-muted text-sm font-mono"
+              />
+            </div>
+          ) : (
+            <>
+              <RadioGroup
+                aria-label="送貨時間選擇"
+                value={selectedTimeValue}
+                onValueChange={handleTimeSelectionChange}
+                onKeyUp={handleTimeSelectionKeyUp}
+                className="grid gap-2 sm:grid-cols-2"
+              >
+                {deliverySlotsLoading && (
+                  <div className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground sm:col-span-2">
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    正在載入標準時段...
+                  </div>
+                )}
+
+                {!deliverySlotsLoading && deliverySlotsError && (
+                  <div role="alert" className="flex min-h-11 flex-wrap items-center justify-between gap-2 border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm sm:col-span-2">
+                    <span>{deliverySlotsError}</span>
+                    <Button type="button" variant="outline" size="sm" onClick={onRetryDeliverySlots} className="min-h-11 gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      重試
+                    </Button>
+                  </div>
+                )}
+
+                {!deliverySlotsLoading && !deliverySlotsError && deliverySlots.length === 0 && (
+                  <p className="flex min-h-11 items-center text-sm text-muted-foreground sm:col-span-2">
+                    目前沒有標準時段
+                  </p>
+                )}
+
+                {!deliverySlotsLoading && !deliverySlotsError && deliverySlots.map((slot) => {
+                  const selected = deliveryTimeMode === "slot" && deliverySlotId === slot.id;
+                  const snapshot = selected && frozenSelectedSnapshot?.trim()
+                    ? frozenSelectedSnapshot
+                    : deliverySlotSnapshot(slot);
+                  const value = `slot:${slot.id}`;
+                  return (
+                    <RadioGroupPrimitive.Item
+                      key={slot.id}
+                      id={`delivery-slot-${slot.id}`}
+                      value={value}
+                      aria-label={snapshot}
+                      className={`min-h-11 border px-3 py-2 text-left text-sm font-medium transition-colors touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                        selected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-background hover:bg-muted"
+                      }`}
+                    >
+                      {snapshot}
+                    </RadioGroupPrimitive.Item>
+                  );
+                })}
+
+                {selectedUnavailableSlot && (
+                  <RadioGroupPrimitive.Item
+                    id="delivery-slot-unavailable"
+                    value={`slot:${deliverySlotId}`}
+                    aria-label={frozenSelectedSnapshot || deliveryTime}
+                    className="min-h-11 border border-primary bg-primary px-3 py-2 text-left text-sm font-medium text-primary-foreground opacity-80"
+                    disabled
+                  >
+                    {frozenSelectedSnapshot || deliveryTime}
+                  </RadioGroupPrimitive.Item>
+                )}
+
+                <RadioGroupPrimitive.Item
+                  id="delivery-time-specified"
+                  value="specified"
+                  aria-label="指定時間"
+                  className={`min-h-11 border px-3 py-2 text-left text-sm font-medium transition-colors touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    deliveryTimeMode === "specified"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background hover:bg-muted"
+                  }`}
+                >
+                  指定時間
+                </RadioGroupPrimitive.Item>
+              </RadioGroup>
+
+              {deliveryTimeMode === "specified" && (
+                <div className="space-y-1 pt-1">
+                  <Label htmlFor="specified-delivery-time" className="text-xs">
+                    指定送貨時間
+                  </Label>
+                  <Input
+                    id="specified-delivery-time"
+                    aria-label="指定送貨時間"
+                    aria-invalid={Boolean(deliveryTimeError)}
+                    value={deliveryTime}
+                    onChange={(event) => onTimeChange(event.target.value)}
+                    placeholder="例如：上午 10 時前／辦公時間"
+                    maxLength={120}
+                    className="min-h-11 text-sm"
+                  />
+                  <p className="flex items-start gap-1 text-xs text-muted-foreground">
+                    <CircleDollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    指定時間可能另收附加費
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {deliveryTimeError && (
+            <p id="delivery-time-error" role="alert" className="text-xs font-medium text-destructive">
+              {deliveryTimeError}
+            </p>
+          )}
+        </fieldset>
       </div>
 
       {/* Address: Region → District → Area */}
@@ -123,7 +282,7 @@ const DeliverySection = ({
         <Label className="text-xs">送貨地址</Label>
         <div className="grid grid-cols-3 gap-2">
           <Select value={deliveryRegion} onValueChange={handleRegionChange}>
-            <SelectTrigger className="text-sm">
+            <SelectTrigger className="text-sm" aria-label="送貨地區">
               <SelectValue placeholder="地區" />
             </SelectTrigger>
             <SelectContent>
@@ -134,7 +293,7 @@ const DeliverySection = ({
           </Select>
 
           <Select value={deliveryDistrict} onValueChange={handleDistrictChange} disabled={!deliveryRegion}>
-            <SelectTrigger className="text-sm">
+            <SelectTrigger className="text-sm" aria-label="送貨分區">
               <SelectValue placeholder="分區" />
             </SelectTrigger>
             <SelectContent>
@@ -145,7 +304,7 @@ const DeliverySection = ({
           </Select>
 
           <Select value={deliveryArea} onValueChange={onAreaChange} disabled={!deliveryDistrict}>
-            <SelectTrigger className="text-sm">
+            <SelectTrigger className="text-sm" aria-label="送貨地點">
               <SelectValue placeholder="地點" />
             </SelectTrigger>
             <SelectContent>

@@ -89,6 +89,79 @@ All colors MUST be HSL.
   }
 }
 
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  .day-end-page {
+    min-height: auto;
+    background: white;
+    font-size: 10px;
+  }
+
+  .day-end-header {
+    position: static;
+    border: 0;
+    background: white;
+    backdrop-filter: none;
+  }
+
+  .day-end-header > div,
+  .day-end-main {
+    max-width: none;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .day-end-controls {
+    display: none;
+  }
+
+  .day-end-main {
+    padding-top: 4mm;
+    padding-bottom: 0;
+  }
+
+  .day-end-page .relative.overflow-auto {
+    overflow: visible;
+  }
+
+  .day-end-order-table {
+    width: 100%;
+    table-layout: fixed;
+    font-size: 9px;
+  }
+
+  .day-end-order-table th,
+  .day-end-order-table td {
+    min-width: 0 !important;
+    height: auto;
+    padding: 4px;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+  }
+
+  .day-end-order-table th:nth-child(1) { width: 13%; }
+  .day-end-order-table th:nth-child(2) { width: 11%; }
+  .day-end-order-table th:nth-child(3) { width: 15%; }
+  .day-end-order-table th:nth-child(4) { width: 10%; }
+  .day-end-order-table th:nth-child(5),
+  .day-end-order-table th:nth-child(6) { width: 9%; }
+  .day-end-order-table th:nth-child(7) { width: 13%; }
+  .day-end-order-table th:nth-child(8) { width: 20%; }
+
+  .day-end-order-table thead {
+    display: table-header-group;
+  }
+
+  .day-end-order-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

@@ -8,8 +8,13 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:e2e:staging": "playwright test e2e/staging-full-day.spec.ts",
+    "test:e2e:staging:api": "POS_E2E_API_ONLY=1 playwright test e2e/staging-api-contract.spec.ts",
+    "test:e2e:staging:browser": "playwright test e2e/staging-full-day.spec.ts",
+    "test:e2e:staging:list": "playwright test e2e/staging-full-day.spec.ts --list",
     "test:watch": "vitest"
   },
   "dependencies": {

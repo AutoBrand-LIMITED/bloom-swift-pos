@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Flower2, ClipboardList, RotateCcw, BarChart3 } from "lucide-react";
+import { Calculator, ClipboardList, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
@@ -10,32 +10,64 @@ import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
 import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
-import AddOnsSection from "@/components/pos/AddOnsSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
-import type { Order, OrderItem, PaymentStatus } from "@/types/order";
-import { SALES_STAFF } from "@/types/order";
+import OrderNotesSection, { type NotesConflictTarget } from "@/components/pos/OrderNotesSection";
+import type { DeliveryTimeMode, Order, OrderItem, PaymentStatus } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
-import { DEMO_CUSTOMERS, type DemoCustomer } from "@/data/demo-customers";
-
-const STORAGE_KEY = "florist-pos-orders";
-
-function loadOrders(): Order[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
+import type { DemoCustomer } from "@/data/demo-customers";
+import { buildPartnerNoteMutation } from "@/lib/customer-notes";
+import {
+  deliveryContractFieldsForSubmission,
+  isDeterministicSubmissionFailure,
+  loadPendingSubmission,
+  submissionPayloadMatches,
+  submitPersistedOrder,
+  type PendingOrderSubmission,
+} from "@/lib/pending-submission";
+import {
+  getDeliverySlots,
+  getOdooPartnerNotes,
+  getOdooOrderRecords,
+  getAccountingPaymentOptions,
+  allowLocalOnlyOrders,
+  hasOdooBackend,
+  OdooConflictError,
+  submitOdooOrder,
+  updateOdooPartnerNotes,
+  type AccountingPaymentOption,
+  type DeliverySlot,
+  type PartnerNoteRecord,
+} from "@/lib/odoo-api";
+import {
+  DEMO_DELIVERY_SLOTS,
+  deliverySlotSnapshot,
+  validateDeliveryTimeSelection,
+} from "@/lib/delivery-slots";
+import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pricing";
+import { parseDeliveryAddress } from "@/lib/hk-address";
+import {
+  hongKongBusinessDate,
+  loadUnsyncedOrders,
+  mergeOrderRecords,
+  removeSyncedLocalOrders,
+  saveUnsyncedOrders,
+} from "@/lib/order-records";
 
 const Index = () => {
   const navigate = useNavigate();
+  const [pendingSubmission, setPendingSubmission] = useState<PendingOrderSubmission | null>(
+    loadPendingSubmission,
+  );
+  const restoredPendingSubmission = useRef(pendingSubmission).current;
   // Customer
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [senderName, setSenderName] = useState("");
   const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
   const [companyName, setCompanyName] = useState("");
   const [phoneError, setPhoneError] = useState(false);
+  const [senderNameError, setSenderNameError] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
 
@@ -44,11 +76,36 @@ const Index = () => {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [urgentFee, setUrgentFee] = useState(0);
-  const [notes, setNotes] = useState("");
+  const [senderNote, setSenderNote] = useState("");
+  const [deliveryNote, setDeliveryNote] = useState("");
+  const [internalNote, setInternalNote] = useState("");
+  const [saveSenderNote, setSaveSenderNote] = useState(false);
+  const [saveRecipientNote, setSaveRecipientNote] = useState(false);
+  const [recipientPartnerId, setRecipientPartnerId] = useState<number | undefined>();
+  const [recipientContact, setRecipientContact] = useState<PartnerNoteRecord | null>(null);
+  const [senderContactDraft, setSenderContactDraft] = useState("");
+  const [recipientContactDraft, setRecipientContactDraft] = useState("");
+  const [refreshingSender, setRefreshingSender] = useState(false);
+  const [refreshingRecipient, setRefreshingRecipient] = useState(false);
+  const [savingSenderContact, setSavingSenderContact] = useState(false);
+  const [savingRecipientContact, setSavingRecipientContact] = useState(false);
+  const [notesConflict, setNotesConflict] = useState<{
+    target: NotesConflictTarget;
+    message: string;
+  } | null>(null);
 
   // Delivery
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
+  const [deliveryTimeMode, setDeliveryTimeMode] = useState<DeliveryTimeMode>();
+  const [deliverySlotId, setDeliverySlotId] = useState<number>();
+  const [deliverySlots, setDeliverySlots] = useState<DeliverySlot[]>(
+    () => hasOdooBackend ? [] : [...DEMO_DELIVERY_SLOTS],
+  );
+  const [deliverySlotsLoading, setDeliverySlotsLoading] = useState(hasOdooBackend);
+  const [deliverySlotsError, setDeliverySlotsError] = useState<string | null>(null);
+  const [deliverySlotsRefreshKey, setDeliverySlotsRefreshKey] = useState(0);
+  const [deliveryTimeError, setDeliveryTimeError] = useState<string | null>(null);
   const [deliveryRegion, setDeliveryRegion] = useState("");
   const [deliveryDistrict, setDeliveryDistrict] = useState("");
   const [deliveryArea, setDeliveryArea] = useState("");
@@ -65,22 +122,123 @@ const Index = () => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [depositAmount, setDepositAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("");
-  const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
+  const [paymentReference, setPaymentReference] = useState("");
+  const [paymentReceivedAt, setPaymentReceivedAt] = useState("");
+  const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState(
+    () => pendingSubmission?.order.paymentIdempotencyKey || crypto.randomUUID(),
+  );
+  const [checkoutId, setCheckoutId] = useState(
+    () => pendingSubmission?.order.id || crypto.randomUUID(),
+  );
+  const [paymentOptions, setPaymentOptions] = useState<AccountingPaymentOption[]>([]);
+  const [paymentOptionsLoading, setPaymentOptionsLoading] = useState(false);
+  const [paymentOptionsError, setPaymentOptionsError] = useState<string | null>(null);
   const [salesId, setSalesId] = useState("");
-  const [reminderOption, setReminderOption] = useState("none");
+  const [operatorEmployeeId, setOperatorEmployeeId] = useState<number | undefined>();
   const [priceOverridden, setPriceOverridden] = useState(false);
   const [manualPrice, setManualPrice] = useState<number | null>(null);
 
   // History
-  const [orders, setOrders] = useState<Order[]>(loadOrders);
+  const [localOrders, setLocalOrders] = useState<Order[]>(loadUnsyncedOrders);
+  const [remoteOrders, setRemoteOrders] = useState<Order[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [orderRecordsLoading, setOrderRecordsLoading] = useState(false);
+  const [orderRecordsLoaded, setOrderRecordsLoaded] = useState(!hasOdooBackend);
+  const [orderRecordsError, setOrderRecordsError] = useState<string | null>(null);
+  const [orderRecordsTruncated, setOrderRecordsTruncated] = useState(false);
+  const [orderRecordsRefreshKey, setOrderRecordsRefreshKey] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const visibleOrderRecords = useMemo(
+    () => mergeOrderRecords(remoteOrders, localOrders, pendingSubmission?.order),
+    [localOrders, pendingSubmission, remoteOrders],
+  );
+
+  useEffect(() => {
+    if (!historyOpen || !hasOdooBackend) return;
+    const controller = new AbortController();
+    setOrderRecordsLoading(true);
+    setOrderRecordsError(null);
+
+    getOdooOrderRecords(hongKongBusinessDate(), controller.signal)
+      .then((response) => {
+        setRemoteOrders(response.orders);
+        setLocalOrders((current) => {
+          const remaining = removeSyncedLocalOrders(response.orders, current);
+          if (remaining.length === current.length) return current;
+          saveUnsyncedOrders(remaining);
+          return remaining;
+        });
+        setOrderRecordsTruncated(response.truncated);
+        setOrderRecordsLoaded(true);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setOrderRecordsError(error instanceof Error ? error.message : "未能載入 Odoo 訂單記錄");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setOrderRecordsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [historyOpen, orderRecordsRefreshKey]);
 
   const subtotal = useMemo(() => {
-    const itemsTotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const itemsTotal = orderItemsTotal(items);
     return itemsTotal + deliveryFee + urgentFee;
   }, [items, deliveryFee, urgentFee]);
 
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
+  const hasSalesperson = salesId.trim().length > 0;
+  const frozenDeliverySlotSelection = pendingSubmission?.order.deliveryTimeMode === "slot"
+    && pendingSubmission.order.deliverySlotId !== undefined
+    ? {
+        slotId: pendingSubmission.order.deliverySlotId,
+        snapshot: pendingSubmission.order.deliveryTime,
+      }
+    : undefined;
+
+  useEffect(() => {
+    if (!hasOdooBackend) return;
+    const controller = new AbortController();
+    setPaymentOptionsLoading(true);
+    setPaymentOptionsError(null);
+    getAccountingPaymentOptions(controller.signal)
+      .then(setPaymentOptions)
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setPaymentOptions([]);
+        setPaymentOptionsError(error instanceof Error ? error.message : "未能檢查 Odoo 收款設定");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPaymentOptionsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!hasOdooBackend) {
+      setDeliverySlots([...DEMO_DELIVERY_SLOTS]);
+      setDeliverySlotsLoading(false);
+      setDeliverySlotsError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    setDeliverySlotsLoading(true);
+    setDeliverySlotsError(null);
+    getDeliverySlots(controller.signal)
+      .then(setDeliverySlots)
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setDeliverySlots([]);
+        setDeliverySlotsError(error instanceof Error ? error.message : "未能載入送貨時段");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDeliverySlotsLoading(false);
+      });
+    return () => controller.abort();
+  }, [deliverySlotsRefreshKey]);
 
   const handleFinalPriceChange = (v: number) => {
     setManualPrice(v);
@@ -92,22 +250,46 @@ const Index = () => {
     setManualPrice(null);
   };
 
-  const unpaidCount = useMemo(() => orders.filter((o) => o.paymentStatus === "unpaid").length, [orders]);
+  const clearRecipientPersistenceBinding = useCallback(() => {
+    setRecipientPartnerId(undefined);
+    setRecipientContact(null);
+    setNotesConflict((current) => current?.target === "recipient" ? null : current);
+  }, []);
 
-  const resetForm = useCallback(() => {
+  const resetRecipientPersistence = useCallback(() => {
+    clearRecipientPersistenceBinding();
+    setRecipientContactDraft("");
+    setSaveRecipientNote(false);
+  }, [clearRecipientPersistenceBinding]);
+
+  const resetOrderForm = useCallback(() => {
     setPhone("");
     setCustomerName("");
+    setSenderName("");
     setCustomerType("personal");
     setCompanyName("");
     setPhoneError(false);
+    setSenderNameError(false);
     setSelectedCustomer(null);
     setItems([]);
     setBudget(0);
     setDeliveryFee(0);
     setUrgentFee(0);
-    setNotes("");
+    setSenderNote("");
+    setDeliveryNote("");
+    setInternalNote("");
+    setSaveSenderNote(false);
+    setSaveRecipientNote(false);
+    setRecipientPartnerId(undefined);
+    setRecipientContact(null);
+    setSenderContactDraft("");
+    setRecipientContactDraft("");
+    setNotesConflict(null);
     setDeliveryDate("");
     setDeliveryTime("");
+    setDeliveryTimeMode(undefined);
+    setDeliverySlotId(undefined);
+    setDeliveryTimeError(null);
     setDeliveryRegion("");
     setDeliveryDistrict("");
     setDeliveryArea("");
@@ -121,15 +303,242 @@ const Index = () => {
     setPaymentStatus("unpaid");
     setDepositAmount(0);
     setPaymentMethod("");
-    setFollowUpDate(undefined);
-    setReminderOption("none");
+    setPaymentReference("");
+    setPaymentReceivedAt("");
+    setPaymentIdempotencyKey(crypto.randomUUID());
+    setCheckoutId(crypto.randomUUID());
     setPriceOverridden(false);
     setManualPrice(null);
-    setSalesId("");
   }, []);
 
-  const handleSubmit = () => {
+  const handleClearForm = useCallback(() => {
+    if (pendingSubmission) {
+      toast.error("呢張 Odoo 訂單嘅結果仍未確認，請先用原本資料重試，唔可以清空");
+      return;
+    }
+    resetOrderForm();
+  }, [pendingSubmission, resetOrderForm]);
+
+  useEffect(() => {
+    if (!restoredPendingSubmission) return;
+    const { order, options } = restoredPendingSubmission;
+    setPhone(order.phone);
+    setCustomerName(order.customerName);
+    setSenderName(order.senderName ?? order.customerName ?? "");
+    setCustomerType(options.customerType || "personal");
+    setCompanyName(options.companyName || "");
+    setSelectedCustomer(options.customerId ? {
+      id: `odoo-${options.customerId}`,
+      name: order.customerName,
+      phone: order.phone,
+      history: [],
+      odooPartnerId: options.customerId,
+    } : null);
+    setItems(order.items);
+    setDeliveryFee(order.deliveryFee);
+    setUrgentFee(order.urgentFee);
+    setSenderNote(order.senderNote);
+    setDeliveryNote(order.deliveryNote);
+    setInternalNote(order.internalNote);
+    setSenderContactDraft(order.customerNoteMutation?.commentText || "");
+    setRecipientContactDraft(order.recipientNoteMutation?.commentText || "");
+    setRecipientPartnerId(order.recipientPartnerId);
+    setDeliveryDate(order.deliveryDate);
+    setDeliveryTime(order.deliveryTime);
+    setDeliveryTimeMode(order.deliveryTimeMode);
+    setDeliverySlotId(order.deliverySlotId);
+    setDeliveryTimeError(null);
+    setDeliveryRegion("");
+    setDeliveryDistrict("");
+    setDeliveryArea("");
+    setDeliveryDetail(order.deliveryAddress);
+    setRecipientName(order.recipientName);
+    setRecipientPhone(order.recipientPhone);
+    setDeliveryPerson(order.deliveryPerson);
+    setGiftCardEnabled(order.giftCardEnabled);
+    setGiftCardMessage(order.giftCardMessage);
+    setPaymentStatus(order.paymentStatus);
+    setDepositAmount(order.depositAmount);
+    setPaymentMethod(order.paymentMethod);
+    setPaymentReference(order.paymentReference || "");
+    setPaymentReceivedAt(order.paymentReceivedAt || "");
+    setPaymentIdempotencyKey(order.paymentIdempotencyKey || crypto.randomUUID());
+    setCheckoutId(order.id);
+    setPriceOverridden(order.priceOverridden);
+    setManualPrice(order.priceOverridden ? order.finalPrice : null);
+    setSalesId(order.salesId);
+    setOperatorEmployeeId(order.operatorEmployeeId);
+    toast.info("已恢復尚未確認嘅 Odoo 訂單，重試會沿用原本嘅訂單編號");
+  }, [restoredPendingSubmission]);
+
+  const handleDeliverySlotChange = (slot: DeliverySlot) => {
+    setDeliveryTimeMode("slot");
+    setDeliverySlotId(slot.id);
+    setDeliveryTime(deliverySlotSnapshot(slot));
+    setDeliveryTimeError(null);
+  };
+
+  const handleSpecifiedTimeSelect = () => {
+    if (deliveryTimeMode !== "specified") setDeliveryTime("");
+    setDeliveryTimeMode("specified");
+    setDeliverySlotId(undefined);
+    setDeliveryTimeError(null);
+  };
+
+  const applyPartnerRecord = useCallback((target: NotesConflictTarget, record: PartnerNoteRecord) => {
+    if (target === "recipient") {
+      setRecipientContact(record);
+      setRecipientContactDraft(record.commentText);
+      return;
+    }
+
+    setSelectedCustomer((current) => {
+      if (!current || current.odooPartnerId !== record.partnerId) return current;
+      return {
+        ...current,
+        commentText: record.commentText,
+        tags: record.tags,
+        writeDate: record.writeDate,
+      };
+    });
+    setSenderContactDraft(record.commentText);
+  }, []);
+
+  const refreshSenderContact = useCallback(async (signal?: AbortSignal) => {
+    if (!selectedCustomer?.odooPartnerId || !hasOdooBackend) return;
+    setRefreshingSender(true);
+    try {
+      const record = await getOdooPartnerNotes(selectedCustomer.odooPartnerId, signal);
+      applyPartnerRecord("sender", record);
+      setNotesConflict((current) => current?.target === "sender" ? null : current);
+    } catch (error) {
+      if (signal?.aborted) return;
+      toast.error(error instanceof Error ? error.message : "未能載入客戶長期備註");
+    } finally {
+      if (!signal?.aborted) setRefreshingSender(false);
+    }
+  }, [applyPartnerRecord, selectedCustomer?.odooPartnerId]);
+
+  useEffect(() => {
+    if (!selectedCustomer?.odooPartnerId) return;
+    const controller = new AbortController();
+    void refreshSenderContact(controller.signal);
+    return () => controller.abort();
+  }, [refreshSenderContact, selectedCustomer?.odooPartnerId]);
+
+  const refreshRecipientContact = useCallback(async (signal?: AbortSignal) => {
+    if (!recipientPartnerId || !hasOdooBackend) return;
+    setRefreshingRecipient(true);
+    try {
+      const record = await getOdooPartnerNotes(recipientPartnerId, signal);
+      applyPartnerRecord("recipient", record);
+      setNotesConflict((current) => current?.target === "recipient" ? null : current);
+    } catch (error) {
+      if (signal?.aborted) return;
+      setRecipientContact(null);
+      toast.error(error instanceof Error ? error.message : "未能載入收花人長期備註");
+    } finally {
+      if (!signal?.aborted) setRefreshingRecipient(false);
+    }
+  }, [applyPartnerRecord, recipientPartnerId]);
+
+  useEffect(() => {
+    if (!recipientPartnerId) return;
+    const controller = new AbortController();
+    void refreshRecipientContact(controller.signal);
+    return () => controller.abort();
+  }, [recipientPartnerId, refreshRecipientContact]);
+
+  const writePartnerComment = async (
+    target: NotesConflictTarget,
+    partnerId: number,
+    current: PartnerNoteRecord,
+    commentText: string
+  ): Promise<PartnerNoteRecord | null> => {
+    try {
+      const record = await updateOdooPartnerNotes(partnerId, {
+        commentText,
+        expectedWriteDate: current.writeDate,
+      });
+      applyPartnerRecord(target, record);
+      return record;
+    } catch (error) {
+      if (error instanceof OdooConflictError) {
+        const latest = error.latest as PartnerNoteRecord | undefined;
+        if (latest?.writeDate) applyPartnerRecord(target, latest);
+        setNotesConflict({
+          target,
+          message: `${error.message}。請核對 Odoo 最新內容後再確認訂單。`,
+        });
+        toast.error("長期備註有新版本，已停止送出訂單");
+      } else {
+        toast.error(error instanceof Error ? error.message : "長期備註儲存失敗");
+      }
+      return null;
+    }
+  };
+
+  const saveSenderContactComment = async () => {
+    if (!selectedCustomer?.odooPartnerId || !selectedCustomer.writeDate) return;
+    setSavingSenderContact(true);
+    const current: PartnerNoteRecord = {
+      partnerId: selectedCustomer.odooPartnerId,
+      commentText: selectedCustomer.commentText || "",
+      tags: selectedCustomer.tags || [],
+      writeDate: selectedCustomer.writeDate,
+    };
+    try {
+      const updated = await writePartnerComment(
+        "sender",
+        selectedCustomer.odooPartnerId,
+        current,
+        senderContactDraft
+      );
+      if (updated) {
+        setNotesConflict((conflict) => conflict?.target === "sender" ? null : conflict);
+        toast.success("客戶長期備註已儲存到 Odoo");
+      }
+    } finally {
+      setSavingSenderContact(false);
+    }
+  };
+
+  const saveRecipientContactComment = async () => {
+    if (!recipientPartnerId || !recipientContact?.writeDate) return;
+    setSavingRecipientContact(true);
+    try {
+      const updated = await writePartnerComment(
+        "recipient",
+        recipientPartnerId,
+        recipientContact,
+        recipientContactDraft
+      );
+      if (updated) {
+        setNotesConflict((conflict) => conflict?.target === "recipient" ? null : conflict);
+        toast.success("收花人長期備註已儲存到 Odoo");
+      }
+    } finally {
+      setSavingRecipientContact(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    if (!hasOdooBackend && !allowLocalOnlyOrders) {
+      toast.error("未連接 Odoo backend，訂單未建立。請先恢復 backend 連線後再試。", {
+        duration: 8000,
+      });
+      return;
+    }
     // Validation
+    if (!salesId.trim()) {
+      toast.error("請先選擇負責員工");
+      return;
+    }
+    if (hasOdooBackend && !operatorEmployeeId) {
+      toast.error("請選擇已同步到 Odoo 嘅負責員工");
+      return;
+    }
     if (!phone.trim()) {
       setPhoneError(true);
       toast.error("請輸入客戶電話號碼");
@@ -137,19 +546,105 @@ const Index = () => {
     }
     setPhoneError(false);
 
+    if (!senderName.trim()) {
+      setSenderNameError(true);
+      toast.error("請輸入送花人名稱");
+      return;
+    }
+    setSenderNameError(false);
+
     if (items.length === 0) {
       toast.error("請至少加入一個項目");
       return;
     }
 
+    if (hasOdooBackend && priceOverridden) {
+      toast.error("Odoo 訂單價格必須跟商品目錄；請先重設最終價格");
+      return;
+    }
+
+    const itemMissingAdjustmentReason = items.find(orderLineAdjustmentNeedsReason);
+    if (itemMissingAdjustmentReason) {
+      toast.error(`「${itemMissingAdjustmentReason.name}」已改價或折扣，請填寫原因`);
+      return;
+    }
+
+    const deliverySelectionError = validateDeliveryTimeSelection({
+      deliveryDate,
+      deliveryTime,
+      deliveryTimeMode,
+      deliverySlotId,
+      slots: deliverySlots,
+      frozenSlotSelection: frozenDeliverySlotSelection,
+    });
+    if (deliverySelectionError) {
+      setDeliveryTimeError(deliverySelectionError);
+      toast.error(deliverySelectionError);
+      return;
+    }
+    setDeliveryTimeError(null);
+
     if (finalPrice === 0) {
       toast.warning("價格為 $0，訂單仍會建立");
     }
 
-    const order: Order = {
-      id: crypto.randomUUID(),
+    const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
+    if (receivesPayment && !paymentMethod) {
+      toast.error("請選擇已啟用嘅 Odoo 付款方式");
+      return;
+    }
+    if (receivesPayment && !paymentReference.trim()) {
+      toast.error("請輸入付款參考編號");
+      return;
+    }
+    if (paymentStatus === "deposit" && (depositAmount <= 0 || depositAmount >= finalPrice)) {
+      toast.error("訂金必須大過 $0 並少過訂單總額");
+      return;
+    }
+    const receiptTimestamp = receivesPayment
+      ? (paymentReceivedAt || new Date().toISOString())
+      : "";
+    const receiptIdempotencyKey = receivesPayment ? paymentIdempotencyKey : "";
+    if (receivesPayment && !paymentReceivedAt) setPaymentReceivedAt(receiptTimestamp);
+
+    const hasRecipientIdentity = Boolean(
+      recipientPartnerId || recipientName.trim() || recipientPhone.trim() || deliveryDetail.trim()
+    );
+    if (recipientContactDraft && !hasRecipientIdentity) {
+      toast.error("請先輸入收花人資料，先可以儲存收花人長期備註");
+      return;
+    }
+
+    const customerNoteMutation = pendingSubmission
+      ? pendingSubmission.order.customerNoteMutation
+      : buildPartnerNoteMutation({
+          draft: senderContactDraft,
+          currentComment: selectedCustomer?.commentText || "",
+          appendNote: senderNote,
+          shouldAppend: saveSenderNote,
+          targetPartnerId: selectedCustomer?.odooPartnerId,
+          expectedWriteDate: selectedCustomer?.writeDate,
+        });
+    const recipientNoteMutation = pendingSubmission
+      ? pendingSubmission.order.recipientNoteMutation
+      : buildPartnerNoteMutation({
+          draft: recipientContactDraft,
+          currentComment: recipientContact?.commentText || "",
+          appendNote: deliveryNote,
+          shouldAppend: saveRecipientNote,
+          targetPartnerId: recipientPartnerId,
+          expectedWriteDate: recipientContact?.writeDate,
+        });
+
+    const preserveLegacySenderPayload = Boolean(
+      pendingSubmission && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "senderName")
+    );
+    const currentOrder: Order = {
+      id: pendingSubmission?.order.id || checkoutId,
       salesId,
+      operatorEmployeeId,
       customerName: customerName.trim(),
+      ...(preserveLegacySenderPayload ? {} : { senderName: senderName.trim() }),
       phone: phone.trim(),
       items,
       deliveryFee,
@@ -159,9 +654,16 @@ const Index = () => {
       priceOverridden,
       paymentStatus,
       depositAmount: paymentStatus === "deposit" ? depositAmount : 0,
-      followUpDate: followUpDate ? followUpDate.toISOString() : "",
-      reminderOption,
+      paymentMethod,
+      paymentReference: receivesPayment ? paymentReference.trim() : "",
+      paymentReceivedAt: receiptTimestamp,
+      paymentIdempotencyKey: pendingSubmission?.order.paymentIdempotencyKey || receiptIdempotencyKey,
       deliveryDate,
+      ...deliveryContractFieldsForSubmission(
+        deliveryTimeMode,
+        deliverySlotId,
+        pendingSubmission?.order,
+      ),
       deliveryTime,
       deliveryAddress: [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail.trim()].filter(Boolean).join(" "),
       recipientName: recipientName.trim(),
@@ -169,18 +671,87 @@ const Index = () => {
       deliveryPerson: deliveryPerson.trim(),
       giftCardEnabled,
       giftCardMessage: giftCardEnabled ? giftCardMessage.trim() : "",
-      notes: notes.trim(),
-      createdAt: new Date().toISOString(),
+      senderNote: senderNote.trim(),
+      deliveryNote: deliveryNote.trim(),
+      internalNote: internalNote.trim(),
+      ...(customerNoteMutation ? { customerNoteMutation } : {}),
+      ...(recipientNoteMutation ? { recipientNoteMutation } : {}),
+      recipientPartnerId,
+      createdAt: pendingSubmission?.order.createdAt || new Date().toISOString(),
     };
+    const currentOptions = {
+      customerId: selectedCustomer?.odooPartnerId,
+      customerType,
+      companyName,
+    };
+    if (pendingSubmission && !submissionPayloadMatches(pendingSubmission, {
+      order: currentOrder,
+      options: currentOptions,
+      savedAt: pendingSubmission.savedAt,
+    })) {
+      toast.error("已恢復嘅待確認訂單曾被修改；請還原原本內容後先重試");
+      return;
+    }
 
-    const updated = [...orders, order];
-    setOrders(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    setIsSubmitting(true);
+    setNotesConflict(null);
 
-    if (paymentStatus === "unpaid") {
-      toast.warning("訂單已建立 — 未付款，請跟進！", { duration: 5000 });
-    } else if (paymentStatus === "deposit") {
-      toast.info(`訂單已建立 — 已收訂金 $${depositAmount}，尚欠 $${finalPrice - depositAmount}`);
+    const submission: PendingOrderSubmission = pendingSubmission || {
+      order: currentOrder,
+      options: currentOptions,
+      savedAt: new Date().toISOString(),
+    };
+    const order = submission.order;
+
+    let syncedOrder: Order = order;
+
+    try {
+      if (hasOdooBackend) {
+        setPendingSubmission(submission);
+        const odooOrder = await submitPersistedOrder(submission, submitOdooOrder);
+        setPendingSubmission(null);
+        syncedOrder = {
+          ...order,
+          odooOrderId: odooOrder.id,
+          odooOrderName: odooOrder.name,
+          odooInvoiceId: odooOrder.accounting?.invoice.id,
+          odooInvoiceName: odooOrder.accounting?.invoice.name,
+          odooPaymentId: odooOrder.accounting?.payment?.id,
+          odooPaymentName: odooOrder.accounting?.payment?.name,
+        };
+        const references = [
+          `訂單 ${odooOrder.name}`,
+          odooOrder.accounting?.invoice.name ? `發票 ${odooOrder.accounting.invoice.name}` : null,
+          odooOrder.accounting?.payment?.name ? `收款 ${odooOrder.accounting.payment.name}` : null,
+        ].filter(Boolean).join(" · ");
+        toast.success(`已同步到 Odoo staging：${references}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "未知錯誤";
+      if (isDeterministicSubmissionFailure(err)) {
+        setPendingSubmission(null);
+        toast.error(`Odoo 驗證失敗：${message}。訂單已解鎖，可以修改後再提交。`, { duration: 9000 });
+      } else {
+        toast.error(`Odoo 同步失敗：${message}`, { duration: 8000 });
+      }
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (hasOdooBackend) {
+      setOrderRecordsRefreshKey((key) => key + 1);
+    } else {
+      const updated = [...localOrders, syncedOrder];
+      setLocalOrders(updated);
+      saveUnsyncedOrders(updated);
+    }
+
+    if (order.paymentStatus === "unpaid") {
+      toast.warning("訂單已建立 — 未付款", { duration: 5000 });
+    } else if (order.paymentStatus === "deposit") {
+      toast.info(
+        `訂單已建立 — 已收訂金 $${order.depositAmount}，尚欠 $${order.finalPrice - order.depositAmount}`,
+      );
     } else {
       toast.success("訂單已建立 ✓");
     }
@@ -191,36 +762,40 @@ const Index = () => {
       description: "選擇要列印嘅單據：",
       action: {
         label: "收據",
-        onClick: () => printDocument(generateReceipt(order)),
+        onClick: () => printDocument(generateReceipt(syncedOrder)),
       },
       cancel: {
         label: "全部列印",
         onClick: () => {
-          printDocument(generateReceipt(order));
-          setTimeout(() => printDocument(generateDeliveryNote(order)), 500);
-          setTimeout(() => printDocument(generatePickingList(order)), 1000);
+          printDocument(generateReceipt(syncedOrder));
+          setTimeout(() => printDocument(generateDeliveryNote(syncedOrder)), 500);
+          setTimeout(() => printDocument(generatePickingList(syncedOrder)), 1000);
         },
       },
     });
 
-    resetForm();
+    resetOrderForm();
+    setIsSubmitting(false);
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Flower2 className="w-6 h-6 text-primary" />
-            <h1 className="text-lg font-bold tracking-tight">花店 POS</h1>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-full flex-col items-stretch gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <h1 className="flex min-w-0 items-center" aria-label="中西花店 POS">
+            <img
+              src="/anglo-chinese-florist-logo.webp"
+              alt="中西花店 Anglo Chinese Florist"
+              className="h-9 w-auto max-w-[150px] object-contain sm:h-10 sm:max-w-[180px]"
+            />
+          </h1>
+          <div className="flex w-full items-center justify-end gap-1 overflow-x-auto sm:w-auto sm:gap-2">
             <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
-            <Button variant="ghost" size="sm" onClick={() => navigate("/report")} className="gap-1.5 text-xs">
-              <BarChart3 className="w-3.5 h-3.5" /> 報告
+            <Button variant="ghost" size="sm" onClick={() => navigate("/day-end")} className="gap-1.5 text-xs">
+              <Calculator className="w-3.5 h-3.5" /> 日結
             </Button>
-            <Button variant="ghost" size="sm" onClick={resetForm} className="gap-1.5 text-xs">
+            <Button variant="ghost" size="sm" onClick={handleClearForm} className="gap-1.5 text-xs">
               <RotateCcw className="w-3.5 h-3.5" /> 清空
             </Button>
             <Button
@@ -230,11 +805,6 @@ const Index = () => {
               className="gap-1.5 text-xs relative"
             >
               <ClipboardList className="w-3.5 h-3.5" /> 訂單記錄
-              {unpaidCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {unpaidCount}
-                </span>
-              )}
             </Button>
           </div>
         </div>
@@ -243,13 +813,27 @@ const Index = () => {
       {/* Body: left panel + main */}
       <div className="flex flex-1">
         {/* Left: Customer history panel */}
-        {selectedCustomer && (
+        {hasSalesperson && selectedCustomer && (
           <CustomerHistoryPanel
             customer={selectedCustomer}
-            onClose={() => setSelectedCustomer(null)}
-            onUseAddress={(address, recipientName) => {
-              setDeliveryDetail(address);
-              if (recipientName) setRecipientName(recipientName);
+            onClose={() => {
+              setSelectedCustomer(null);
+              setSenderContactDraft("");
+              setSaveSenderNote(false);
+              resetRecipientPersistence();
+            }}
+            onUseAddress={(selection) => {
+              const parsed = parseDeliveryAddress(selection.address);
+              setDeliveryRegion(parsed.region);
+              setDeliveryDistrict(parsed.district);
+              setDeliveryArea(parsed.area);
+              setDeliveryDetail(parsed.detail);
+              setRecipientName(selection.recipientName || "");
+              setRecipientPhone(selection.recipientPhone || "");
+              setRecipientPartnerId(selection.shippingPartnerId);
+              setRecipientContact(null);
+              setRecipientContactDraft("");
+              setSaveRecipientNote(false);
               toast.success("已套用過往送貨地址");
             }}
           />
@@ -257,13 +841,45 @@ const Index = () => {
 
         {/* Main form */}
         <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
+        <SalesIdSection
+          salesId={salesId}
+          onSalespersonChange={(label, employeeId) => {
+            setSalesId(label);
+            setOperatorEmployeeId(employeeId);
+          }}
+        />
+
+        {hasSalesperson ? (
+          <>
         <CustomerSection
           phone={phone}
           customerName={customerName}
+          senderName={senderName}
           customerType={customerType}
           companyName={companyName}
-          onPhoneChange={(v) => { setPhone(v); if (v.trim()) setPhoneError(false); }}
-          onNameChange={setCustomerName}
+          onPhoneChange={(v) => {
+            setPhone(v);
+            if (v.trim()) setPhoneError(false);
+            if (selectedCustomer && v !== selectedCustomer.phone) {
+              setSelectedCustomer(null);
+              setSenderContactDraft("");
+              setSaveSenderNote(false);
+              resetRecipientPersistence();
+            }
+          }}
+          onNameChange={(value) => {
+            setCustomerName(value);
+            if (selectedCustomer && value !== selectedCustomer.name) {
+              setSelectedCustomer(null);
+              setSenderContactDraft("");
+              setSaveSenderNote(false);
+              resetRecipientPersistence();
+            }
+          }}
+          onSenderNameChange={(value) => {
+            setSenderName(value);
+            if (value.trim()) setSenderNameError(false);
+          }}
           onCustomerTypeChange={setCustomerType}
           onCompanyNameChange={setCompanyName}
           onCustomerSelect={(c) => {
@@ -271,13 +887,16 @@ const Index = () => {
             setCustomerName(c.name);
             setPhone(c.phone);
             setPhoneError(false);
+            setSenderContactDraft(c.commentText || "");
+            setSaveSenderNote(false);
+            setNotesConflict(null);
+            resetRecipientPersistence();
           }}
-           phoneError={phoneError}
-           selectedCustomer={selectedCustomer}
-           refreshKey={customerRefreshKey}
+          phoneError={phoneError}
+          senderNameError={senderNameError}
+          selectedCustomer={selectedCustomer}
+          refreshKey={customerRefreshKey}
         />
-
-        <SalesIdSection salesId={salesId} onSalesIdChange={setSalesId} />
 
         <OrderItemsSection
           items={items}
@@ -286,8 +905,9 @@ const Index = () => {
           urgentFee={urgentFee}
           onDeliveryFeeChange={setDeliveryFee}
           onUrgentFeeChange={setUrgentFee}
-          notes={notes}
-          onNotesChange={setNotes}
+          onCustomOrderSummary={(summary) => {
+            setInternalNote((current) => current ? `${current}\n\n${summary}` : summary);
+          }}
           budget={budget}
           onBudgetChange={setBudget}
           subtotal={subtotal}
@@ -296,6 +916,19 @@ const Index = () => {
         <DeliverySection
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
+          deliveryTimeMode={deliveryTimeMode}
+          deliverySlotId={deliverySlotId}
+          frozenSlotSelection={frozenDeliverySlotSelection}
+          deliverySlots={deliverySlots}
+          deliverySlotsLoading={deliverySlotsLoading}
+          deliverySlotsError={deliverySlotsError}
+          deliveryTimeError={deliveryTimeError}
+          legacyDeliveryTime={Boolean(
+            pendingSubmission
+              && pendingSubmission.order.deliveryTime
+              && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "deliveryTimeMode")
+              && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "deliverySlotId")
+          )}
           deliveryRegion={deliveryRegion}
           deliveryDistrict={deliveryDistrict}
           deliveryArea={deliveryArea}
@@ -303,17 +936,81 @@ const Index = () => {
           recipientName={recipientName}
           recipientPhone={recipientPhone}
           deliveryPerson={deliveryPerson}
-          onDateChange={setDeliveryDate}
-          onTimeChange={setDeliveryTime}
-          onRegionChange={setDeliveryRegion}
-          onDistrictChange={setDeliveryDistrict}
-          onAreaChange={setDeliveryArea}
-          onDetailChange={setDeliveryDetail}
-          onRecipientNameChange={setRecipientName}
-          onRecipientPhoneChange={setRecipientPhone}
+          onDateChange={(value) => {
+            setDeliveryDate(value);
+            setDeliveryTimeError(null);
+          }}
+          onTimeChange={(value) => {
+            setDeliveryTime(value);
+            setDeliveryTimeError(null);
+          }}
+          onSlotChange={handleDeliverySlotChange}
+          onSpecifiedTimeSelect={handleSpecifiedTimeSelect}
+          onRetryDeliverySlots={() => setDeliverySlotsRefreshKey((key) => key + 1)}
+          onRegionChange={(value) => {
+            setDeliveryRegion(value);
+            resetRecipientPersistence();
+          }}
+          onDistrictChange={(value) => {
+            setDeliveryDistrict(value);
+            resetRecipientPersistence();
+          }}
+          onAreaChange={(value) => {
+            setDeliveryArea(value);
+            resetRecipientPersistence();
+          }}
+          onDetailChange={(value) => {
+            setDeliveryDetail(value);
+            resetRecipientPersistence();
+          }}
+          onRecipientNameChange={(value) => {
+            setRecipientName(value);
+            resetRecipientPersistence();
+          }}
+          onRecipientPhoneChange={(value) => {
+            setRecipientPhone(value);
+            resetRecipientPersistence();
+          }}
           onDeliveryPersonChange={setDeliveryPerson}
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}
+        />
+
+        <OrderNotesSection
+          senderNote={senderNote}
+          deliveryNote={deliveryNote}
+          internalNote={internalNote}
+          onSenderNoteChange={(value) => {
+            setSenderNote(value);
+          }}
+          onDeliveryNoteChange={(value) => {
+            setDeliveryNote(value);
+          }}
+          onInternalNoteChange={setInternalNote}
+          senderCustomer={selectedCustomer}
+          hasSenderIdentity={Boolean(phone.trim() || customerName.trim())}
+          hasRecipientIdentity={Boolean(
+            recipientPartnerId || recipientName.trim() || recipientPhone.trim() || deliveryDetail.trim()
+          )}
+          recipientPartnerId={recipientPartnerId}
+          recipientContact={recipientContact}
+          senderContactDraft={senderContactDraft}
+          recipientContactDraft={recipientContactDraft}
+          onSenderContactDraftChange={setSenderContactDraft}
+          onRecipientContactDraftChange={setRecipientContactDraft}
+          onSaveSenderContact={() => void saveSenderContactComment()}
+          onSaveRecipientContact={() => void saveRecipientContactComment()}
+          saveSenderNote={saveSenderNote}
+          saveRecipientNote={saveRecipientNote}
+          onSaveSenderNoteChange={setSaveSenderNote}
+          onSaveRecipientNoteChange={setSaveRecipientNote}
+          onRefreshSender={() => void refreshSenderContact()}
+          onRefreshRecipient={() => void refreshRecipientContact()}
+          refreshingSender={refreshingSender}
+          refreshingRecipient={refreshingRecipient}
+          savingSender={savingSenderContact}
+          savingRecipient={savingRecipientContact}
+          conflict={notesConflict}
         />
 
         <GiftCardSection
@@ -327,29 +1024,44 @@ const Index = () => {
           subtotal={subtotal}
           finalPrice={finalPrice}
           priceOverridden={priceOverridden}
+          allowPriceOverride={!hasOdooBackend}
           onFinalPriceChange={handleFinalPriceChange}
           onResetPrice={resetPrice}
           paymentStatus={paymentStatus}
-          onPaymentStatusChange={setPaymentStatus}
+          onPaymentStatusChange={(status) => {
+            setPaymentStatus(status);
+            if (status === "unpaid") {
+              setPaymentMethod("");
+              setPaymentReference("");
+              setPaymentReceivedAt("");
+            }
+          }}
           paymentMethod={paymentMethod}
           onPaymentMethodChange={setPaymentMethod}
+          paymentReference={paymentReference}
+          onPaymentReferenceChange={setPaymentReference}
+          paymentOptions={paymentOptions}
+          paymentOptionsLoading={paymentOptionsLoading}
+          paymentOptionsError={paymentOptionsError}
           depositAmount={depositAmount}
           onDepositAmountChange={setDepositAmount}
-          followUpDate={followUpDate}
-          onFollowUpDateChange={setFollowUpDate}
-          reminderOption={reminderOption}
-          onReminderOptionChange={setReminderOption}
           priceWarning={finalPrice === 0 && items.length > 0}
         />
 
-        <AddOnsSection
-          items={items}
-          onItemsChange={setItems}
-        />
+          </>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-8 text-center">
+            <p className="text-sm font-medium">請先選擇負責員工</p>
+            <p className="mt-1 text-xs text-muted-foreground">選擇後先會顯示客戶及訂單資料。</p>
+          </div>
+        )}
       </main>
       </div>
       {/* Sticky submit */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border">
+      {hasSalesperson && <div
+        className="fixed bottom-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border transition-[left]"
+        style={{ left: selectedCustomer ? "min(360px, 85vw)" : 0 }}
+      >
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="text-right">
             <p className="text-xs text-muted-foreground">總計</p>
@@ -357,16 +1069,27 @@ const Index = () => {
           </div>
           <Button
             onClick={handleSubmit}
+            disabled={isSubmitting}
             size="lg"
             className="px-8 text-base font-semibold shadow-lg"
           >
-            確認訂單
+            {isSubmitting ? "同步中..." : "確認訂單"}
           </Button>
         </div>
-      </div>
+      </div>}
 
       {/* Order history drawer */}
-      <OrderHistory orders={orders} open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <OrderHistory
+        orders={visibleOrderRecords}
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        loading={orderRecordsLoading}
+        loaded={orderRecordsLoaded}
+        error={orderRecordsError}
+        stale={orderRecordsLoaded && Boolean(orderRecordsError)}
+        truncated={orderRecordsTruncated}
+        onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
+      />
     </div>
   );
 };

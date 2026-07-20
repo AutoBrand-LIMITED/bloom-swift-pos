@@ -11,7 +11,6 @@ import { Switch } from "@/components/ui/switch";
 import {
   Flower2, Leaf, Package, Palette, Ruler, Wind, AlertTriangle, Sparkles, Plus, Minus, X, Tag, Heart,
 } from "lucide-react";
-import VoiceInputButton from "@/components/pos/VoiceInputButton";
 
 // ─── Product Types ───────────────────────────────────────────
 type ProductType = "bouquet" | "basket" | "stand" | "fruit_basket" | "preserved" | "potted" | "wreath";
@@ -504,7 +503,6 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                         onKeyDown={(e) => e.key === "Enter" && addCustomFlower()}
                         className="text-sm"
                       />
-                      <VoiceInputButton onResult={(text) => update("customFlower", text)} />
                       <Button variant="outline" size="sm" onClick={addCustomFlower} className="gap-1">
                         <Plus className="w-3.5 h-3.5" /> 加入
                       </Button>
@@ -656,11 +654,8 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                       <Label className="text-xs">客人有花粉過敏或其他過敏</Label>
                     </div>
                     {state.hasAllergy && (
-                      <div className="flex gap-2">
-                        <Textarea placeholder="請列明需要避開嘅花材或過敏原..." value={state.allergyNotes}
-                          onChange={(e) => update("allergyNotes", e.target.value)} className="text-sm min-h-[60px]" />
-                        <VoiceInputButton onResult={(text) => update("allergyNotes", state.allergyNotes ? `${state.allergyNotes} ${text}` : text)} className="self-start" />
-                      </div>
+                      <Textarea placeholder="請列明需要避開嘅花材或過敏原..." value={state.allergyNotes}
+                        onChange={(e) => update("allergyNotes", e.target.value)} className="text-sm min-h-[60px]" />
                     )}
                   </div>
                 </Section>
@@ -668,11 +663,8 @@ const CustomOrderDialog = ({ open, onClose, onConfirm }: CustomOrderDialogProps)
                 {/* Special notes */}
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground flex items-center gap-1">📝 特殊備註</Label>
-                  <div className="flex gap-2">
-                    <Textarea placeholder="例如：花頭要開、去刺、花腳要長..." value={state.specialNotes}
-                      onChange={(e) => update("specialNotes", e.target.value)} className="text-sm min-h-[60px]" />
-                    <VoiceInputButton onResult={(text) => update("specialNotes", state.specialNotes ? `${state.specialNotes} ${text}` : text)} className="self-start" />
-                  </div>
+                  <Textarea placeholder="例如：花頭要開、去刺、花腳要長..." value={state.specialNotes}
+                    onChange={(e) => update("specialNotes", e.target.value)} className="text-sm min-h-[60px]" />
                 </div>
               </>
             )}

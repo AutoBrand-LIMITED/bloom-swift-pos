@@ -99,6 +99,16 @@ function determinePaymentStatus(paymentNotes: string): PaymentStatus {
   return "unpaid";
 }
 
+function determinePaymentMethod(paymentNotes: string): string {
+  const lower = paymentNotes.toLowerCase();
+  if (lower.includes("payme")) return "payme";
+  if (lower.includes("stripe") || lower.includes("paylink")) return "stripe_paylink";
+  if (lower.includes("fps") || lower.includes("bank")) return "bank_in_fps";
+  if (lower.includes("amex")) return "amex";
+  if (lower.includes("alipay") || lower.includes("wonder")) return "wonder_alipay";
+  return "";
+}
+
 export function parseCsvToOrders(csvText: string): Order[] {
   const lines = csvText.split("\n").filter((l) => l.trim());
   if (lines.length < 2) return [];
@@ -166,8 +176,7 @@ export function parseCsvToOrders(csvText: string): Order[] {
       priceOverridden: finalPrice !== subtotal,
       paymentStatus,
       depositAmount: 0,
-      followUpDate: "",
-      reminderOption: "none",
+      paymentMethod: determinePaymentMethod(first.paymentNotes),
       deliveryDate: deliveryDateParsed || "",
       deliveryTime: "",
       deliveryAddress: first.deliveryAddress,
@@ -176,7 +185,9 @@ export function parseCsvToOrders(csvText: string): Order[] {
       deliveryPerson: "",
       giftCardEnabled: false,
       giftCardMessage: "",
-      notes: noteParts.join("\n"),
+      senderNote: "",
+      deliveryNote: "",
+      internalNote: noteParts.join("\n"),
       createdAt,
     };
 

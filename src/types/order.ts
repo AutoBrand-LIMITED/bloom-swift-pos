@@ -1,16 +1,35 @@
 export interface OrderItem {
   id: string;
   name: string;
+  /** Order-specific unit price before any percentage discount. */
   price: number;
   quantity: number;
+  /** Odoo list price captured when the product was added to the order. */
+  catalogPrice?: number;
+  discountPercent?: number;
+  priceOverrideReason?: string;
+  productId?: number;
+  productCode?: string | null;
+  categoryId?: number | null;
+  categoryName?: string | null;
 }
 
 export type PaymentStatus = "unpaid" | "paid" | "deposit";
+export type DeliveryTimeMode = "slot" | "specified";
+
+export interface PartnerNoteMutation {
+  commentText: string;
+  targetPartnerId?: number;
+  expectedWriteDate?: string;
+}
 
 export interface Order {
   id: string;
   salesId: string;
+  operatorEmployeeId?: number;
   customerName: string;
+  /** Gift sender shown on the florist order; may differ from the ordering customer. */
+  senderName?: string;
   phone: string;
   items: OrderItem[];
   deliveryFee: number;
@@ -20,9 +39,14 @@ export interface Order {
   priceOverridden: boolean;
   paymentStatus: PaymentStatus;
   depositAmount: number;
-  followUpDate: string;
-  reminderOption: string;
+  paymentMethod: string;
+  paymentReference?: string;
+  paymentReceivedAt?: string;
+  paymentIdempotencyKey?: string;
   deliveryDate: string;
+  deliveryTimeMode?: DeliveryTimeMode;
+  deliverySlotId?: number;
+  /** Human-readable snapshot retained even if the configured slot changes later. */
   deliveryTime: string;
   deliveryAddress: string;
   recipientName: string;
@@ -30,11 +54,32 @@ export interface Order {
   deliveryPerson: string;
   giftCardEnabled: boolean;
   giftCardMessage: string;
-  notes: string;
+  senderNote: string;
+  deliveryNote: string;
+  internalNote: string;
+  customerNoteMutation?: PartnerNoteMutation;
+  recipientNoteMutation?: PartnerNoteMutation;
+  recipientPartnerId?: number;
+  /** Legacy local/imported orders used one internal notes field. */
+  notes?: string;
   createdAt: string;
+  odooOrderId?: number;
+  odooOrderName?: string;
+  odooInvoiceId?: number;
+  odooInvoiceName?: string;
+  odooPaymentId?: number;
+  odooPaymentName?: string;
 }
 
-export const SALES_STAFF = [
+export interface SalesStaff {
+  id: string;
+  name: string;
+  code?: string | null;
+  jobTitle?: string | null;
+  odooEmployeeId?: number;
+}
+
+export const SALES_STAFF: SalesStaff[] = [
   { id: "S001", name: "陳小明" },
   { id: "S002", name: "李美玲" },
   { id: "S003", name: "張大偉" },

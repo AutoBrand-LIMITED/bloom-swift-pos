@@ -3,7 +3,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Gift } from "lucide-react";
-import VoiceInputButton from "@/components/pos/VoiceInputButton";
 
 interface GiftCardSectionProps {
   enabled: boolean;
@@ -11,14 +10,6 @@ interface GiftCardSectionProps {
   onEnabledChange: (v: boolean) => void;
   onMessageChange: (v: string) => void;
 }
-
-const TEMPLATES = [
-  "祝你生日快樂！🎂",
-  "恭喜恭喜！🎊",
-  "多謝你！❤️",
-  "祝早日康復 🌻",
-  "情人節快樂 🌹",
-];
 
 const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange }: GiftCardSectionProps) => {
   const [preview, setPreview] = useState(false);
@@ -35,35 +26,17 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange }:
 
       {enabled && (
         <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-          {/* Quick templates */}
-          <div className="flex flex-wrap gap-1.5">
-            {TEMPLATES.map((t) => (
-              <button
-                key={t}
-                onClick={() => onMessageChange(message ? message + "\n\n" + t : t)}
-                className="rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs transition-colors hover:bg-primary hover:text-primary-foreground"
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
           {/* Markdown editor */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label className="text-xs">卡片內容（支援 Markdown）</Label>
-              <div className="flex items-center gap-2">
-                <VoiceInputButton
-                  onResult={(text) => onMessageChange(message ? `${message} ${text}` : text)}
-                  className="h-7 w-7"
-                />
-                <button
-                  onClick={() => setPreview(!preview)}
-                  className="text-xs text-primary hover:underline"
-                >
-                  {preview ? "編輯" : "預覽"}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setPreview(!preview)}
+                className="text-xs text-primary hover:underline"
+              >
+                {preview ? "編輯" : "預覽"}
+              </button>
             </div>
 
             {preview ? (

@@ -3,6 +3,14 @@ import type { Order } from "@/types/order";
 
 const CUSTOMERS_STORAGE_KEY = "florist-pos-customers";
 
+export function customerIdentityKey(
+  customer: Pick<DemoCustomer, "id" | "odooPartnerId">
+): string {
+  return customer.odooPartnerId
+    ? `odoo:${customer.odooPartnerId}`
+    : `local:${customer.id}`;
+}
+
 export function loadStoredCustomers(): DemoCustomer[] {
   try {
     return JSON.parse(localStorage.getItem(CUSTOMERS_STORAGE_KEY) || "[]");
@@ -39,6 +47,9 @@ export function extractCustomersFromOrders(orders: Order[]): DemoCustomer[] {
       status: order.paymentStatus === "unpaid" ? "unpaid" : "paid",
       deliveryAddress: order.deliveryAddress || "",
       recipientName: order.recipientName || "",
+      recipientPhone: order.recipientPhone || "",
+      customerName: order.customerName || "",
+      senderName: order.senderName || order.customerName || "",
     });
 
     phoneMap.set(phone, existing);

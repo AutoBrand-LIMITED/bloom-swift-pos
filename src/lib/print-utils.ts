@@ -1,4 +1,8 @@
 import type { Order } from "@/types/order";
+import {
+  normalizeDiscountPercent,
+  orderItemTotal,
+} from "@/lib/order-pricing";
 
 const paymentLabel: Record<string, string> = {
   unpaid: "未付款",
@@ -7,71 +11,253 @@ const paymentLabel: Record<string, string> = {
 };
 
 const commonStyles = `
+  @page { size: A4 landscape; margin: 8mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'DM Sans', -apple-system, 'Helvetica Neue', sans-serif; color: #1a1a1a; padding: 24px; font-size: 13px; line-height: 1.5; }
-  h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-  h2 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-  .header { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #333; padding-bottom: 12px; }
-  .header .subtitle { font-size: 11px; color: #888; }
-  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 12px; font-size: 12px; }
-  .meta .label { color: #888; }
-  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 12px; }
-  th { font-weight: 600; background: #f5f5f5; border-bottom: 2px solid #ddd; }
-  td.num { text-align: right; font-family: 'JetBrains Mono', monospace; }
-  th.num { text-align: right; }
-  .total-row td { border-top: 2px solid #333; font-weight: 700; font-size: 14px; }
-  .notes { background: #f9f9f5; border: 1px solid #eee; border-radius: 6px; padding: 8px 12px; margin-top: 8px; font-size: 12px; }
-  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-  .badge-unpaid { background: #fee2e2; color: #dc2626; }
-  .badge-paid { background: #dcfce7; color: #16a34a; }
-  .badge-deposit { background: #fef3c7; color: #d97706; }
-  .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #aaa; border-top: 1px solid #eee; padding-top: 8px; }
-  .checkbox { display: inline-block; width: 14px; height: 14px; border: 2px solid #999; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
-  .pick-item { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; }
-  .pick-item .qty { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; min-width: 50px; }
-  @media print { body { padding: 12px; } }
+  html { background: #fff; }
+  body {
+    width: 281mm;
+    min-height: 194mm;
+    font-family: Arial, 'Helvetica Neue', 'Noto Sans TC', sans-serif;
+    color: #000;
+    background: #fff;
+    font-size: 11pt;
+    line-height: 1.4;
+    letter-spacing: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-document { width: 281mm; min-height: 194mm; }
+  .document-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 82mm;
+    gap: 8mm;
+    align-items: end;
+    min-height: 28mm;
+    padding-bottom: 5mm;
+    border-bottom: 0.7mm solid #000;
+  }
+  .brand-name { font-size: 10pt; font-weight: 700; }
+  .document-title h1 { margin-top: 1.5mm; font-size: 24pt; line-height: 1.1; font-weight: 700; }
+  .english-title { margin-top: 1mm; font-size: 10pt; font-weight: 700; }
+  .document-reference { border-left: 0.5mm solid #000; padding-left: 5mm; }
+  .field-row {
+    display: grid;
+    grid-template-columns: 29mm minmax(0, 1fr);
+    gap: 3mm;
+    align-items: baseline;
+    min-height: 6mm;
+    padding: 0.8mm 0;
+  }
+  .field-label { font-size: 9.5pt; font-weight: 700; }
+  .field-value { min-width: 0; overflow-wrap: anywhere; }
+  .section-heading {
+    margin: 6mm 0 2.5mm;
+    padding-bottom: 1.5mm;
+    border-bottom: 0.4mm solid #000;
+    font-size: 13pt;
+    line-height: 1.2;
+    font-weight: 700;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 12mm;
+    row-gap: 1mm;
+    margin-top: 5mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .meta-field {
+    display: grid;
+    grid-template-columns: 32mm minmax(0, 1fr);
+    gap: 3mm;
+    min-height: 7mm;
+    padding: 1.2mm 0;
+    border-bottom: 0.3mm solid #000;
+  }
+  .meta-field .label { font-size: 9.5pt; font-weight: 700; }
+  .items-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 2mm; }
+  .items-table thead { display: table-header-group; }
+  .items-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .items-table th,
+  .items-table td {
+    padding: 2.4mm 3mm;
+    border: 0.3mm solid #000;
+    font-size: 10.5pt;
+    line-height: 1.3;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+  .items-table th { font-weight: 700; }
+  .items-table .quantity-column { width: 25mm; }
+  .items-table .price-column { width: 34mm; }
+  .items-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .items-table .total-row td { border-top: 0.7mm solid #000; font-size: 12pt; font-weight: 700; }
+  .item-adjustment { margin-top: 0.8mm; font-size: 8.5pt; }
+  .document-notes {
+    min-height: 20mm;
+    margin-top: 3mm;
+    padding: 3mm 4mm;
+    border: 0.4mm solid #000;
+    font-size: 11pt;
+    overflow-wrap: anywhere;
+  }
+  .payment-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8mm;
+    align-items: center;
+    margin-top: 4mm;
+    padding: 3mm 4mm;
+    border: 0.5mm solid #000;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .payment-status { font-size: 12pt; font-weight: 700; }
+  .payment-detail { display: flex; gap: 8mm; font-variant-numeric: tabular-nums; }
+  .signature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18mm;
+    margin-top: 16mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .signature-line { padding-top: 2mm; border-top: 0.4mm solid #000; font-size: 10pt; font-weight: 700; }
+  .footer { margin-top: 8mm; padding-top: 2mm; border-top: 0.3mm solid #000; font-size: 8.5pt; text-align: center; }
+  @media print {
+    html, body { width: 281mm; min-height: 194mm; }
+    body { margin: 0; }
+  }
 `;
 
-function orderMeta(order: Order) {
-  const date = new Date(order.createdAt).toLocaleString("zh-HK");
+export function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function nl2br(value: unknown): string {
+  return escapeHtml(value).replace(/\r?\n/g, "<br>");
+}
+
+function orderReference(order: Order): string {
+  return order.odooOrderName || order.id.slice(0, 8).toUpperCase();
+}
+
+function createdAtLabel(order: Order): string {
+  const date = new Date(order.createdAt);
+  return Number.isNaN(date.getTime()) ? order.createdAt : date.toLocaleString("zh-HK");
+}
+
+function deliveryTimeLabel(order: Order): string {
+  const snapshot = order.deliveryTime.trim();
+  if (order.deliveryTimeMode !== "specified" || !snapshot) return snapshot;
+  return snapshot.startsWith("指定時間：") ? snapshot : `指定時間：${snapshot}`;
+}
+
+function displayValue(value: unknown): string {
+  const snapshot = String(value ?? "").trim();
+  return snapshot ? escapeHtml(snapshot) : "未提供";
+}
+
+function fieldRows(rows: Array<[label: string, value: unknown]>): string {
+  return rows
+    .map(
+      ([label, value]) => `
+        <div class="field-row">
+          <span class="field-label">${label}</span>
+          <span class="field-value">${displayValue(value)}</span>
+        </div>`
+    )
+    .join("");
+}
+
+function documentHeader(
+  order: Order,
+  chineseTitle: string,
+  englishTitle: string
+): string {
   return `
-    <div class="meta">
-      <div><span class="label">訂單編號：</span>${order.id.slice(0, 8).toUpperCase()}</div>
-      <div><span class="label">開單日期：</span>${date}</div>
-      <div><span class="label">客戶：</span>${order.customerName || "—"}</div>
-      <div><span class="label">電話：</span>${order.phone}</div>
+    <header class="document-header">
+      <div class="document-title">
+        <div class="brand-name">中西花店</div>
+        <h1>${chineseTitle}</h1>
+        <div class="english-title">${englishTitle}</div>
+      </div>
+      <div class="document-reference">
+        ${fieldRows([
+          ["訂單編號", orderReference(order)],
+          ["開單日期", createdAtLabel(order)],
+        ])}
+      </div>
+    </header>`;
+}
+
+function receiptMeta(order: Order): string {
+  const senderName = order.senderName?.trim() || order.customerName?.trim() || "未提供";
+  return `
+    <section class="meta-grid receipt-meta" data-document-section="customer-details">
+      <div class="meta-field"><span class="label">下單／付款人</span><span>${displayValue(order.customerName)}</span></div>
+      <div class="meta-field"><span class="label">下單人電話</span><span>${displayValue(order.phone)}</span></div>
+      <div class="meta-field"><span class="label">送花人</span><span>${displayValue(senderName)}</span></div>
+    </section>
+  `;
+}
+
+function privateDocumentMeta(order: Order): string {
+  return `
+    <div class="pick-reference">
+      ${fieldRows([
+        ["訂單編號", orderReference(order)],
+        ["開單日期", createdAtLabel(order)],
+      ])}
     </div>
   `;
 }
 
-function itemsTable(order: Order, showPrice: boolean) {
+function itemsTable(order: Order, showPrice: boolean): string {
   const rows = order.items
-    .map(
-      (item) => `
+    .map((item) => {
+      const discountPercent = normalizeDiscountPercent(item.discountPercent);
+      const adjustment = showPrice && discountPercent > 0
+        ? `<div class="item-adjustment">折扣 ${escapeHtml(discountPercent)}% / DISCOUNT</div>`
+        : "";
+      const unitPriceNote = discountPercent > 0
+        ? '<div class="item-adjustment">折扣前 / BEFORE DISCOUNT</div>'
+        : "";
+
+      return `
     <tr>
-      <td>${item.name}</td>
-      <td class="num">${item.quantity}</td>
-      ${showPrice ? `<td class="num">$${item.price.toLocaleString()}</td>` : ""}
-      ${showPrice ? `<td class="num">$${(item.price * item.quantity).toLocaleString()}</td>` : ""}
-    </tr>`
-    )
+      <td>${escapeHtml(item.name)}${adjustment}</td>
+      <td class="num">${escapeHtml(item.quantity)}</td>
+      ${showPrice ? `<td class="num">$${escapeHtml(item.price.toLocaleString())}${unitPriceNote}</td>` : ""}
+      ${showPrice ? `<td class="num">$${escapeHtml(orderItemTotal(item).toLocaleString())}</td>` : ""}
+    </tr>`;
+    })
     .join("");
 
   const extras: string[] = [];
-  if (order.deliveryFee > 0)
-    extras.push(`<tr><td colspan="${showPrice ? 3 : 1}">送貨費</td>${showPrice ? `<td class="num">$${order.deliveryFee.toLocaleString()}</td>` : ""}</tr>`);
-  if (order.urgentFee > 0)
-    extras.push(`<tr><td colspan="${showPrice ? 3 : 1}">急單費</td>${showPrice ? `<td class="num">$${order.urgentFee.toLocaleString()}</td>` : ""}</tr>`);
+  if (showPrice && order.deliveryFee > 0) {
+    extras.push(`<tr><td colspan="3">送貨費</td><td class="num">$${order.deliveryFee.toLocaleString()}</td></tr>`);
+  }
+  if (showPrice && order.urgentFee > 0) {
+    extras.push(`<tr><td colspan="3">急單費</td><td class="num">$${order.urgentFee.toLocaleString()}</td></tr>`);
+  }
 
   return `
-    <table>
+    <table class="items-table ${showPrice ? "priced-items" : "unpriced-items"}" data-price-display="${showPrice ? "shown" : "hidden"}">
       <thead>
         <tr>
-          <th>項目</th>
-          <th class="num">數量</th>
-          ${showPrice ? '<th class="num">單價</th>' : ""}
-          ${showPrice ? '<th class="num">小計</th>' : ""}
+          <th>項目 / ITEM</th>
+          <th class="num quantity-column">數量 / QTY</th>
+          ${showPrice ? '<th class="num price-column">單價 / UNIT PRICE</th>' : ""}
+          ${showPrice ? '<th class="num price-column">小計 / AMOUNT</th>' : ""}
         </tr>
       </thead>
       <tbody>
@@ -80,7 +266,7 @@ function itemsTable(order: Order, showPrice: boolean) {
         ${
           showPrice
             ? `<tr class="total-row">
-                <td colspan="3">總計</td>
+                <td colspan="3">總計 / TOTAL</td>
                 <td class="num">$${order.finalPrice.toLocaleString()}</td>
               </tr>`
             : ""
@@ -90,94 +276,264 @@ function itemsTable(order: Order, showPrice: boolean) {
   `;
 }
 
-function deliveryInfo(order: Order) {
-  if (!order.deliveryDate && !order.deliveryAddress && !order.recipientName) return "";
+function receiptNotes(title: string, englishTitle: string, value: unknown): string {
+  return value
+    ? `<section data-document-section="customer-note"><h2 class="section-heading">${title} / ${englishTitle}</h2><div class="document-notes">${nl2br(value)}</div></section>`
+    : "";
+}
+
+function pickingDeliveryInfo(order: Order): string {
   return `
-    <h2>📦 送貨資料</h2>
-    <div class="meta">
-      ${order.deliveryDate ? `<div><span class="label">送貨日期：</span>${order.deliveryDate}</div>` : ""}
-      ${order.deliveryTime ? `<div><span class="label">送貨時間：</span>${order.deliveryTime}</div>` : ""}
-      ${order.recipientName ? `<div><span class="label">收貨人：</span>${order.recipientName}</div>` : ""}
-      ${order.recipientPhone ? `<div><span class="label">收貨人電話：</span>${order.recipientPhone}</div>` : ""}
-      ${order.deliveryAddress ? `<div style="grid-column:1/-1"><span class="label">地址：</span>${order.deliveryAddress}</div>` : ""}
-      ${order.deliveryPerson ? `<div><span class="label">送貨人：</span>${order.deliveryPerson}</div>` : ""}
+    <div class="pick-delivery-grid" data-document-section="delivery-details">
+      <div><span class="label">送貨日期</span>${displayValue(order.deliveryDate)}</div>
+      <div><span class="label">送貨時間</span>${displayValue(deliveryTimeLabel(order))}</div>
+      <div><span class="label">收貨人</span>${displayValue(order.recipientName)}</div>
+      <div><span class="label">收貨人電話</span>${displayValue(order.recipientPhone)}</div>
+      <div class="wide"><span class="label">地址</span>${displayValue(order.deliveryAddress)}</div>
+      ${order.deliveryPerson ? `<div><span class="label">送貨人</span>${displayValue(order.deliveryPerson)}</div>` : ""}
     </div>
   `;
 }
 
+function pickingInstructions(order: Order): string {
+  return order.deliveryNote
+    ? `<div class="pick-instructions"><span class="label">送貨指示</span>${nl2br(order.deliveryNote)}</div>`
+    : "";
+}
+
 /** 客人收據 */
 export function generateReceipt(order: Order): string {
-  const badgeClass = `badge badge-${order.paymentStatus}`;
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>收據 - ${order.id.slice(0, 8)}</title>
+  const status = paymentLabel[order.paymentStatus] || order.paymentStatus;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>收據 - ${escapeHtml(orderReference(order))}</title>
     <style>${commonStyles}</style></head><body>
-    <div class="header">
-      <h1>🌸 收據</h1>
-      <div class="subtitle">感謝惠顧</div>
-    </div>
-    ${orderMeta(order)}
-    <h2>🛒 訂單明細</h2>
-    ${itemsTable(order, true)}
-    <div style="margin-top:8px">
-      <span class="label">付款狀態：</span>
-      <span class="${badgeClass}">${paymentLabel[order.paymentStatus]}</span>
-      ${order.paymentStatus === "deposit" ? `<span style="margin-left:8px;font-size:12px">（訂金 $${order.depositAmount.toLocaleString()}，尚欠 $${(order.finalPrice - order.depositAmount).toLocaleString()}）</span>` : ""}
-    </div>
-    ${order.notes ? `<h2>📝 備註</h2><div class="notes">${order.notes}</div>` : ""}
-    ${order.giftCardEnabled && order.giftCardMessage ? `<h2>💌 卡片內容</h2><div class="notes">${order.giftCardMessage.replace(/\n/g, "<br>")}</div>` : ""}
-    <div class="footer">此收據由花店 POS 系統產生 · ${new Date().toLocaleDateString("zh-HK")}</div>
+    <main class="print-document receipt-document" data-print-document="receipt">
+      ${documentHeader(order, "收據", "RECEIPT")}
+      ${receiptMeta(order)}
+      <section data-document-section="items">
+        <h2 class="section-heading">訂單明細 / ORDER DETAILS</h2>
+        ${itemsTable(order, true)}
+      </section>
+      <section class="payment-summary" data-document-section="payment-summary">
+        <div><span class="field-label">付款狀態 / PAYMENT STATUS：</span><span class="payment-status">${escapeHtml(status)}</span></div>
+        ${
+          order.paymentStatus === "deposit"
+            ? `<div class="payment-detail"><span>訂金 $${order.depositAmount.toLocaleString()}</span><span>尚欠 $${(order.finalPrice - order.depositAmount).toLocaleString()}</span></div>`
+            : ""
+        }
+      </section>
+      ${order.giftCardEnabled ? receiptNotes("卡片內容", "CARD MESSAGE", order.giftCardMessage) : ""}
+      <div class="footer">此收據由花店 POS 系統產生 | ${new Date().toLocaleDateString("zh-HK")}</div>
+    </main>
   </body></html>`;
 }
 
 /** 客人送貨單 */
 export function generateDeliveryNote(order: Order): string {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送貨單 - ${order.id.slice(0, 8)}</title>
-    <style>${commonStyles}</style></head><body>
-    <div class="header">
-      <h1>🚚 送貨單</h1>
-      <div class="subtitle">DELIVERY NOTE</div>
-    </div>
-    ${orderMeta(order)}
-    ${deliveryInfo(order)}
-    <h2>🛒 送貨物品</h2>
-    ${itemsTable(order, false)}
-    ${order.notes ? `<h2>📝 備註</h2><div class="notes">${order.notes}</div>` : ""}
-    ${order.giftCardEnabled && order.giftCardMessage ? `<h2>💌 卡片內容</h2><div class="notes">${order.giftCardMessage.replace(/\n/g, "<br>")}</div>` : ""}
-    <div style="margin-top:32px; display:grid; grid-template-columns:1fr 1fr; gap:24px;">
-      <div style="border-top:1px solid #999; padding-top:4px; font-size:11px; color:#888;">送貨人簽署</div>
-      <div style="border-top:1px solid #999; padding-top:4px; font-size:11px; color:#888;">收貨人簽署</div>
-    </div>
-    <div class="footer">此送貨單由花店 POS 系統產生 · ${new Date().toLocaleDateString("zh-HK")}</div>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送貨單 - ${escapeHtml(orderReference(order))}</title>
+    <style>${commonStyles}
+      .delivery-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        min-height: 28mm;
+        padding-bottom: 5mm;
+        border-bottom: 0.7mm solid #000;
+      }
+      .delivery-overview {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(72mm, 0.8fr);
+        gap: 12mm;
+        margin-top: 6mm;
+      }
+      .delivery-overview > section {
+        min-height: 48mm;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .delivery-overview .block-title {
+        padding-bottom: 1.5mm;
+        border-bottom: 0.4mm solid #000;
+        font-size: 12pt;
+        font-weight: 700;
+      }
+      .delivery-overview .field-row { grid-template-columns: 31mm minmax(0, 1fr); padding: 1.5mm 0; }
+      .recipient-address { white-space: normal; }
+    </style></head><body>
+    <main class="print-document delivery-document" data-print-document="delivery-note">
+      <header class="delivery-heading">
+        <div class="document-title">
+          <div class="brand-name">中西花店</div>
+          <h1>送貨單</h1>
+          <div class="english-title">DELIVERY NOTE</div>
+        </div>
+      </header>
+      <div class="delivery-overview" data-document-section="delivery-overview">
+        <section class="recipient-block" data-delivery-column="recipient">
+          <h2 class="block-title">收貨資料 / RECIPIENT</h2>
+          ${fieldRows([
+            ["收貨人", order.recipientName],
+            ["收貨人電話", order.recipientPhone],
+            ["送貨地址", order.deliveryAddress],
+          ])}
+        </section>
+        <section class="delivery-reference-block" data-delivery-column="reference">
+          <h2 class="block-title">送貨資料 / REFERENCE</h2>
+          ${fieldRows([
+            ["訂單編號", orderReference(order)],
+            ["送貨日期", order.deliveryDate],
+            ["送貨時間", deliveryTimeLabel(order)],
+          ])}
+        </section>
+      </div>
+      <section data-document-section="items">
+        <h2 class="section-heading">送貨物品 / ITEMS</h2>
+        ${itemsTable(order, false)}
+      </section>
+      <section data-document-section="delivery-note">
+        <h2 class="section-heading">送貨備註 / DELIVERY NOTE</h2>
+        <div class="document-notes">${order.deliveryNote ? nl2br(order.deliveryNote) : "&nbsp;"}</div>
+      </section>
+      <div class="signature-grid" data-document-section="signatures">
+        <div class="signature-line" data-signature="delivery">送貨人簽署 / DELIVERED BY</div>
+        <div class="signature-line" data-signature="recipient">收貨人簽署 / RECEIVED BY</div>
+      </div>
+      <div class="footer">此送貨單由花店 POS 系統產生 | ${new Date().toLocaleDateString("zh-HK")}</div>
+    </main>
   </body></html>`;
 }
 
 /** 倉庫執貨單 */
 export function generatePickingList(order: Order): string {
-  const pickItems = order.items
-    .map(
-      (item) => `
-    <div class="pick-item">
-      <span class="checkbox"></span>
-      <span class="qty">× ${item.quantity}</span>
-      <span style="flex:1">${item.name}</span>
-    </div>`
-    )
-    .join("");
+  const estimatedItemLines = order.items.reduce(
+    (total, item) => total + Math.max(1, Math.ceil(item.name.length / 70)),
+    0,
+  );
+  const estimatedDetailLines = Math.ceil(order.deliveryAddress.length / 100)
+    + Math.ceil(order.deliveryNote.length / 100)
+    + Math.ceil(deliveryTimeLabel(order).length / 40)
+    + Math.ceil(order.recipientName.length / 50);
+  const hasDiscountRows = order.items.some(
+    (item) => normalizeDiscountPercent(item.discountPercent) > 0,
+  );
+  const feeRowCount = Number(order.deliveryFee > 0) + Number(order.urgentFee > 0);
+  const usesDenseLayout = order.items.length >= 4
+    || hasDiscountRows
+    || feeRowCount > 1
+    || estimatedItemLines + estimatedDetailLines > 8;
+  const copy = (kind: "warehouse" | "dispatch", subtitle: string) => `
+    <section class="pick-copy" data-picking-copy="${kind}" data-page-format="landscape-full-page">
+      <header class="pick-header">
+        <div>
+          <div class="brand-name">中西花店</div>
+          <h1>執貨單</h1>
+          <div class="english-title">${subtitle}</div>
+        </div>
+        ${privateDocumentMeta(order)}
+      </header>
+      ${pickingDeliveryInfo(order)}
+      <div class="pick-table-wrap">${itemsTable(order, true)}</div>
+      ${pickingInstructions(order)}
+      <div class="pick-signature">執貨員核對及簽署 / CHECKED BY</div>
+    </section>`;
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>執貨單 - ${order.id.slice(0, 8)}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>執貨單 - ${escapeHtml(orderReference(order))}</title>
     <style>${commonStyles}
-      .pick-item { font-size: 15px; }
-    </style></head><body>
-    <div class="header">
-      <h1>📋 執貨單</h1>
-      <div class="subtitle">PICKING LIST</div>
-    </div>
-    ${orderMeta(order)}
-    ${order.deliveryDate ? `<div style="font-size:13px;margin-bottom:12px"><strong>⏰ 需要日期：</strong>${order.deliveryDate} ${order.deliveryTime || ""}</div>` : ""}
-    <h2>執貨清單</h2>
-    ${pickItems}
-    ${order.notes ? `<h2>📝 備註（重要）</h2><div class="notes" style="font-size:14px;font-weight:500">${order.notes}</div>` : ""}
-    <div style="margin-top:32px; border-top:1px solid #999; padding-top:4px; font-size:11px; color:#888; width:200px;">執貨員簽署</div>
-    <div class="footer">此執貨單由花店 POS 系統產生 · ${new Date().toLocaleDateString("zh-HK")}</div>
+      .picking-sheet { width: 281mm; min-height: 194mm; }
+      .picking-document {
+        width: 281mm;
+        min-height: 194mm;
+      }
+      .pick-copy {
+        min-height: 194mm;
+        padding: 2mm 0;
+        break-after: page;
+        page-break-after: always;
+      }
+      .pick-copy:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+      .pick-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 76mm;
+        gap: 6mm;
+        align-items: end;
+        min-height: 28mm;
+        padding-bottom: 4mm;
+        border-bottom: 0.7mm solid #000;
+      }
+      .pick-header h1 { margin-top: 1.5mm; font-size: 24pt; line-height: 1.1; }
+      .pick-header .brand-name,
+      .pick-header .english-title { font-size: 10pt; }
+      .pick-reference .field-row {
+        grid-template-columns: 24mm minmax(0, 1fr);
+        min-height: 6mm;
+        padding: 0.8mm 0;
+        font-size: 10.5pt;
+      }
+      .pick-reference .field-label { font-size: 9.5pt; }
+      .pick-delivery-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1.5mm 6mm;
+        margin-top: 4mm;
+        font-size: 11pt;
+      }
+      .pick-delivery-grid > div { min-width: 0; overflow-wrap: anywhere; }
+      .pick-delivery-grid .wide { grid-column: span 3; }
+      .pick-delivery-grid .label,
+      .pick-instructions .label { margin-right: 2mm; font-size: 10pt; font-weight: 700; }
+      .pick-table-wrap { margin-top: 4mm; }
+      .pick-table-wrap .items-table { margin: 0; }
+      .pick-table-wrap .items-table th,
+      .pick-table-wrap .items-table td { padding: 2.2mm 2.5mm; font-size: 11pt; line-height: 1.25; }
+      .pick-table-wrap .items-table .quantity-column { width: 20mm; }
+      .pick-table-wrap .items-table .price-column { width: 28mm; }
+      .pick-table-wrap .items-table .total-row td { font-size: 12pt; }
+      .pick-instructions { margin-top: 3mm; font-size: 11pt; overflow-wrap: anywhere; }
+      .pick-signature { width: 80mm; margin-top: 16mm; padding-top: 2mm; border-top: 0.4mm solid #000; font-size: 10pt; font-weight: 700; }
+      .picking-document--dense .pick-header {
+        min-height: 20mm;
+        padding-bottom: 2mm;
+        border-bottom-width: 0.5mm;
+      }
+      .picking-document--dense .pick-header h1 { margin-top: 0.5mm; font-size: 18pt; line-height: 1; }
+      .picking-document--dense .pick-header .brand-name,
+      .picking-document--dense .pick-header .english-title { font-size: 8.5pt; }
+      .picking-document--dense .pick-reference .field-row {
+        min-height: 4.5mm;
+        padding: 0;
+        font-size: 9pt;
+      }
+      .picking-document--dense .pick-reference .field-label { font-size: 8.5pt; }
+      .picking-document--dense .pick-delivery-grid {
+        gap: 0.5mm 5mm;
+        margin-top: 1.5mm;
+        font-size: 9pt;
+      }
+      .picking-document--dense .pick-delivery-grid .label,
+      .picking-document--dense .pick-instructions .label { font-size: 8.5pt; }
+      .picking-document--dense .pick-table-wrap { margin-top: 1.5mm; }
+      .picking-document--dense .pick-table-wrap .items-table th,
+      .picking-document--dense .pick-table-wrap .items-table td {
+        padding: 1mm 1.8mm;
+        font-size: 9.5pt;
+        line-height: 1.15;
+      }
+      .picking-document--dense .pick-table-wrap .items-table .total-row td { font-size: 10pt; }
+      .picking-document--dense .pick-instructions { margin-top: 1.5mm; font-size: 9pt; }
+      .picking-document--dense .pick-signature {
+        width: 72mm;
+        margin-top: 5mm;
+        padding-top: 1mm;
+        border-top-width: 0.3mm;
+        font-size: 8.5pt;
+      }
+    </style></head><body class="picking-sheet">
+    <main class="print-document picking-document picking-document--full-page${usesDenseLayout ? " picking-document--dense" : ""}" data-print-document="picking-list">
+      ${copy("warehouse", "PICKING LIST · 倉庫聯")}
+      ${copy("dispatch", "PICKING LIST · 出貨聯")}
+    </main>
   </body></html>`;
 }
 
