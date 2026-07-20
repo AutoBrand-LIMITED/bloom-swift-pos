@@ -1,5 +1,6 @@
 import type { CustomerTag, DemoCustomer, PurchaseRecord } from "@/data/demo-customers";
 import type { Order, SalesStaff } from "@/types/order";
+import { authenticatedFetch } from "@/lib/pos-auth";
 
 interface OdooPartner {
   id: number;
@@ -247,7 +248,7 @@ async function throwApiError<T>(res: Response, fallback: string): Promise<never>
 export async function getOdooProducts(signal?: AbortSignal): Promise<OdooProduct[]> {
   if (!BACKEND_URL) return [];
 
-  const res = await fetch(`${BACKEND_URL}/products`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/products`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -270,7 +271,7 @@ export async function searchManageableOdooProducts(
   if (query.trim()) params.set("q", query.trim());
   params.set("limit", "180");
 
-  const res = await fetch(`${BACKEND_URL}/products/manage?${params.toString()}`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/products/manage?${params.toString()}`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -288,7 +289,7 @@ export async function createOdooProduct(payload: OdooProductWritePayload): Promi
     throw new Error("Odoo backend is not configured");
   }
 
-  const res = await fetch(`${BACKEND_URL}/products`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/products`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -310,7 +311,7 @@ export async function updateOdooProduct(
     throw new Error("Odoo backend is not configured");
   }
 
-  const res = await fetch(`${BACKEND_URL}/products/${productId}`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/products/${productId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -327,7 +328,7 @@ export async function updateOdooProduct(
 export async function getOdooProductCategories(signal?: AbortSignal): Promise<OdooProductCategory[]> {
   if (!BACKEND_URL) return [];
 
-  const res = await fetch(`${BACKEND_URL}/categories`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/categories`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -350,7 +351,7 @@ export async function submitOdooOrder(
   }
 
   const { notes: _legacyNotes, ...orderPayload } = order;
-  const res = await fetch(`${BACKEND_URL}/orders`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -372,7 +373,7 @@ export async function submitOdooOrder(
 export async function getAccountingPaymentOptions(signal?: AbortSignal): Promise<AccountingPaymentOption[]> {
   if (!BACKEND_URL) return [];
 
-  const res = await fetch(`${BACKEND_URL}/accounting/payment-options`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/accounting/payment-options`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -385,7 +386,7 @@ export async function getAccountingPaymentOptions(signal?: AbortSignal): Promise
 export async function getDeliverySlots(signal?: AbortSignal): Promise<DeliverySlot[]> {
   if (!BACKEND_URL) return [];
 
-  const res = await fetch(`${BACKEND_URL}/delivery-slots`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/delivery-slots`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -402,7 +403,7 @@ export async function searchOdooCustomers(
   const trimmed = query.trim();
   if (!BACKEND_URL || trimmed.length < 2) return [];
 
-  const res = await fetch(`${BACKEND_URL}/customers?q=${encodeURIComponent(trimmed)}`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/customers?q=${encodeURIComponent(trimmed)}`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -435,7 +436,7 @@ export async function getOdooPartnerNotes(
     throw new Error("Odoo backend is not configured");
   }
 
-  const res = await fetch(`${BACKEND_URL}/customers/${partnerId}/notes`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/customers/${partnerId}/notes`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -456,7 +457,7 @@ export async function updateOdooPartnerNotes(
     throw new Error("Odoo backend is not configured");
   }
 
-  const res = await fetch(`${BACKEND_URL}/customers/${partnerId}/notes`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/customers/${partnerId}/notes`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -473,7 +474,7 @@ export async function updateOdooPartnerNotes(
 export async function getOdooCustomerTags(signal?: AbortSignal): Promise<CustomerTag[]> {
   if (!BACKEND_URL) return [];
 
-  const res = await fetch(`${BACKEND_URL}/customer-tags`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/customer-tags`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -493,7 +494,7 @@ export async function getOdooOrderNotes(
     throw new Error("Odoo backend is not configured");
   }
 
-  const res = await fetch(`${BACKEND_URL}/orders/${orderId}/notes`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}/notes`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -514,7 +515,7 @@ export async function updateOdooOrderNotes(
     throw new Error("Odoo backend is not configured");
   }
 
-  const res = await fetch(`${BACKEND_URL}/orders/${orderId}/notes`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}/notes`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -534,7 +535,7 @@ export async function getOdooCustomerHistory(
 ): Promise<Pick<DemoCustomer, "history" | "historyCount" | "totalSpent">> {
   if (!BACKEND_URL) return { history: [], historyCount: 0, totalSpent: 0 };
 
-  const res = await fetch(`${BACKEND_URL}/customers/${partnerId}/history?refresh=true`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/customers/${partnerId}/history?refresh=true`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -555,7 +556,7 @@ export async function getOdooCustomerHistory(
 export async function getOdooEmployees(signal?: AbortSignal): Promise<SalesStaff[]> {
   if (!BACKEND_URL) return [];
 
-  const res = await fetch(`${BACKEND_URL}/employees`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/employees`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -588,7 +589,7 @@ export async function getDayEndSummary(date: string, signal?: AbortSignal): Prom
     throw new Error("Odoo backend is not configured");
   }
 
-  const res = await fetch(`${BACKEND_URL}/day-end/summary?date=${encodeURIComponent(date)}`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/day-end/summary?date=${encodeURIComponent(date)}`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -609,7 +610,7 @@ export async function getOdooOrderRecords(
     return { date, generatedAt: "", truncated: false, orders: [] };
   }
 
-  const res = await fetch(`${BACKEND_URL}/orders?date=${encodeURIComponent(date)}`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders?date=${encodeURIComponent(date)}`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
