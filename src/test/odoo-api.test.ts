@@ -209,7 +209,11 @@ describe("odoo-api note contracts", () => {
 
   it("loads only backend-approved accounting payment options", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
-    const options = [{ code: "bank_in_fps", label: "Bank-in / FPS" }];
+    const options = [
+      { code: "bank_in_fps", label: "Bank-in / FPS" },
+      { code: "cash", label: "Cash" },
+      { code: "card_terminal", label: "Card Terminal" },
+    ];
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(options));
     vi.stubGlobal("fetch", fetchMock);
     const { getAccountingPaymentOptions } = await import("@/lib/odoo-api");

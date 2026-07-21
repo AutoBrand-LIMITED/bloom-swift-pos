@@ -141,8 +141,9 @@ const PaymentSection = ({
             aria-label="付款參考編號"
             value={paymentReference}
             onChange={(event) => onPaymentReferenceChange(event.target.value)}
-            placeholder="收據、FPS 或銀行參考編號"
+            placeholder="收據、卡機、FPS 或銀行參考編號"
             maxLength={120}
+            required
           />
         </div>
       </div>
