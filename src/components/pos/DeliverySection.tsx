@@ -35,6 +35,10 @@ interface DeliverySectionProps {
   deliverySlotsLoading: boolean;
   deliverySlotsError: string | null;
   deliveryTimeError: string | null;
+  deliveryDateError?: string;
+  deliveryAddressError?: string;
+  recipientNameError?: string;
+  recipientPhoneError?: string;
   legacyDeliveryTime: boolean;
   deliveryRegion: string;
   deliveryDistrict: string;
@@ -63,6 +67,7 @@ const DeliverySection = ({
   deliveryDate, deliveryTime, deliveryTimeMode, deliverySlotId,
   frozenSlotSelection,
   deliverySlots, deliverySlotsLoading, deliverySlotsError, deliveryTimeError,
+  deliveryDateError, deliveryAddressError, recipientNameError, recipientPhoneError,
   legacyDeliveryTime,
   deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
   recipientName, recipientPhone, deliveryPerson, failedDeliveryAction,
@@ -135,26 +140,39 @@ const DeliverySection = ({
         <div className="space-y-1 max-w-xs">
           <Label htmlFor="delivery-date" className="text-xs flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" /> 送貨日期
+            <span className="text-destructive">*</span>
           </Label>
           <Input
             id="delivery-date"
             aria-label="送貨日期"
+            aria-invalid={Boolean(deliveryDateError)}
+            aria-describedby={deliveryDateError ? "delivery-date-error" : undefined}
             type="date"
             value={deliveryDate}
             onChange={(e) => onDateChange(e.target.value)}
-            className="text-sm"
+            className={`text-sm ${deliveryDateError ? "border-destructive ring-1 ring-destructive" : ""}`}
           />
+          {deliveryDateError && (
+            <p id="delivery-date-error" role="alert" className="text-xs font-medium text-destructive">
+              {deliveryDateError}
+            </p>
+          )}
         </div>
 
-        <fieldset className="space-y-2" aria-describedby={deliveryTimeError ? "delivery-time-error" : undefined}>
+        <fieldset
+          className="space-y-2"
+          aria-invalid={Boolean(deliveryTimeError)}
+          aria-describedby={deliveryTimeError ? "delivery-time-error" : undefined}
+        >
           <legend className="text-xs flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" /> 送貨時間
+            <span className="text-destructive">*</span>
           </legend>
 
-          {legacyDeliveryTime ? (
-            <div className="space-y-1">
+          {legacyDeliveryTime && (
+            <div role="alert" className="space-y-1 border border-destructive/40 bg-destructive/5 p-3">
               <Label htmlFor="legacy-delivery-time" className="text-xs text-muted-foreground">
-                舊格式時間
+                舊格式時間（請重新選擇）
               </Label>
               <Input
                 id="legacy-delivery-time"
@@ -164,9 +182,9 @@ const DeliverySection = ({
                 className="min-h-11 bg-muted text-sm font-mono"
               />
             </div>
-          ) : (
-            <>
-              <RadioGroup
+          )}
+          <>
+            <RadioGroup
                 aria-label="送貨時間選擇"
                 value={selectedTimeValue}
                 onValueChange={handleTimeSelectionChange}
@@ -245,8 +263,8 @@ const DeliverySection = ({
                 </RadioGroupPrimitive.Item>
               </RadioGroup>
 
-              {deliveryTimeMode === "specified" && (
-                <div className="space-y-1 pt-1">
+            {deliveryTimeMode === "specified" && (
+              <div className="space-y-1 pt-1">
                   <Label htmlFor="specified-delivery-time" className="text-xs">
                     指定送貨時間
                   </Label>
@@ -264,10 +282,9 @@ const DeliverySection = ({
                     <CircleDollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     指定時間可能另收附加費
                   </p>
-                </div>
-              )}
-            </>
-          )}
+              </div>
+            )}
+          </>
 
           {deliveryTimeError && (
             <p id="delivery-time-error" role="alert" className="text-xs font-medium text-destructive">
@@ -279,7 +296,9 @@ const DeliverySection = ({
 
       {/* Address: Region → District → Area */}
       <div className="space-y-2">
-        <Label className="text-xs">送貨地址</Label>
+        <Label htmlFor="delivery-detail" className="text-xs">
+          送貨地址 <span className="text-destructive">*</span>
+        </Label>
         <div className="grid grid-cols-3 gap-2">
           <Select value={deliveryRegion} onValueChange={handleRegionChange}>
             <SelectTrigger className="text-sm" aria-label="送貨地區">
@@ -315,12 +334,20 @@ const DeliverySection = ({
           </Select>
         </div>
         <Input
+          id="delivery-detail"
           placeholder="詳細地址（大廈名 / 樓層 / 室）"
           value={deliveryDetail}
           onChange={(e) => onDetailChange(e.target.value)}
-          className="text-sm"
+          className={`text-sm ${deliveryAddressError ? "border-destructive ring-1 ring-destructive" : ""}`}
           maxLength={200}
+          aria-invalid={Boolean(deliveryAddressError)}
+          aria-describedby={deliveryAddressError ? "delivery-address-error" : undefined}
         />
+        {deliveryAddressError && (
+          <p id="delivery-address-error" role="alert" className="text-xs font-medium text-destructive">
+            {deliveryAddressError}
+          </p>
+        )}
         {fullAddress && (
           <p className="text-xs text-muted-foreground">
             📍 {fullAddress}
@@ -344,26 +371,45 @@ const DeliverySection = ({
       {/* Recipient info */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">
+          <Label htmlFor="recipient-name" className="text-xs flex items-center gap-1">
             <User className="w-3.5 h-3.5" /> 收貨人姓名
+            <span className="text-destructive">*</span>
           </Label>
           <Input
+            id="recipient-name"
             placeholder="收貨人姓名"
             value={recipientName}
             onChange={(e) => onRecipientNameChange(e.target.value)}
-            className="text-sm"
+            className={`text-sm ${recipientNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
             maxLength={100}
+            aria-invalid={Boolean(recipientNameError)}
+            aria-describedby={recipientNameError ? "recipient-name-error" : undefined}
           />
+          {recipientNameError && (
+            <p id="recipient-name-error" role="alert" className="text-xs font-medium text-destructive">
+              {recipientNameError}
+            </p>
+          )}
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">收貨人電話</Label>
+          <Label htmlFor="recipient-phone" className="text-xs">
+            收貨人電話 <span className="text-destructive">*</span>
+          </Label>
           <Input
+            id="recipient-phone"
             placeholder="收貨人電話"
             value={recipientPhone}
             onChange={(e) => onRecipientPhoneChange(e.target.value)}
-            className="text-sm font-mono"
-            maxLength={20}
+            className={`text-sm font-mono ${recipientPhoneError ? "border-destructive ring-1 ring-destructive" : ""}`}
+            maxLength={30}
+            aria-invalid={Boolean(recipientPhoneError)}
+            aria-describedby={recipientPhoneError ? "recipient-phone-error" : undefined}
           />
+          {recipientPhoneError && (
+            <p id="recipient-phone-error" role="alert" className="text-xs font-medium text-destructive">
+              {recipientPhoneError}
+            </p>
+          )}
         </div>
       </div>
 

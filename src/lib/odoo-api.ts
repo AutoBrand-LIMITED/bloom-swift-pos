@@ -8,6 +8,7 @@ interface OdooPartner {
   email: string | null;
   phone: string | null;
   mobile: string | null;
+  customerCode: string | null;
   history_count: number | null;
   total_spent: number | null;
   history: PurchaseRecord[];
@@ -398,12 +399,18 @@ export async function getDeliverySlots(signal?: AbortSignal): Promise<DeliverySl
 
 export async function searchOdooCustomers(
   query: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  searchType: "general" | "customer_code" = "general",
 ): Promise<DemoCustomer[]> {
   const trimmed = query.trim();
-  if (!BACKEND_URL || trimmed.length < 2) return [];
+  const minimumLength = searchType === "customer_code" ? 1 : 2;
+  if (!BACKEND_URL || trimmed.length < minimumLength) return [];
 
-  const res = await authenticatedFetch(`${BACKEND_URL}/customers?q=${encodeURIComponent(trimmed)}`, {
+  const params = new URLSearchParams({ q: trimmed });
+  if (searchType === "customer_code") {
+    params.set("searchType", searchType);
+  }
+  const res = await authenticatedFetch(`${BACKEND_URL}/customers?${params.toString()}`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -419,6 +426,7 @@ export async function searchOdooCustomers(
     odooPartnerId: p.id,
     name: p.name,
     phone: p.phone || p.mobile || "",
+    customerCode: p.customerCode || undefined,
     history: p.history || [],
     historyCount: p.history_count ?? undefined,
     totalSpent: p.total_spent ?? undefined,

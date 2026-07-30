@@ -6,6 +6,7 @@ export interface DemoCustomer {
   historyCount?: number;
   totalSpent?: number;
   odooPartnerId?: number;
+  customerCode?: string;
   commentText?: string;
   tags?: CustomerTag[];
   writeDate?: string;

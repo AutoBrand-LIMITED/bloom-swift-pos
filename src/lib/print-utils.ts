@@ -537,6 +537,56 @@ export function generatePickingList(order: Order): string {
   </body></html>`;
 }
 
+interface PrintableDocumentParts {
+  body: string;
+  styles: string;
+}
+
+function printableDocumentParts(html: string): PrintableDocumentParts {
+  const styles = html.match(/<style>([\s\S]*?)<\/style>/)?.[1];
+  const body = html.match(/<body(?:\s[^>]*)?>([\s\S]*?)<\/body>/)?.[1];
+
+  if (!styles || !body) {
+    throw new Error("Unable to prepare the printable document bundle.");
+  }
+
+  return { body, styles };
+}
+
+/** 客人收據、送貨單及執貨單，以一次列印操作輸出 */
+export function generateAllDocuments(order: Order): string {
+  const documents = [
+    ["receipt", generateReceipt(order)],
+    ["delivery-note", generateDeliveryNote(order)],
+    ["picking-list", generatePickingList(order)],
+  ] as const;
+  const parts = documents.map(([kind, html]) => ({
+    kind,
+    ...printableDocumentParts(html),
+  }));
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>全部文件 - ${escapeHtml(orderReference(order))}</title>
+    <style>
+      ${parts.map(({ styles }) => styles).join("\n")}
+      .batch-print-document {
+        width: 281mm;
+        min-height: 194mm;
+      }
+      .batch-print-document + .batch-print-document {
+        break-before: page;
+        page-break-before: always;
+      }
+    </style></head><body class="batch-print">
+      ${parts
+        .map(
+          ({ kind, body }) => `<section class="batch-print-document" data-batch-print-document="${kind}">
+            ${body}
+          </section>`,
+        )
+        .join("\n")}
+    </body></html>`;
+}
+
 /** Open a print window with the given HTML */
 export function printDocument(html: string) {
   const win = window.open("", "_blank", "width=800,height=900");

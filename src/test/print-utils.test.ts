@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { generateDeliveryNote, generatePickingList, generateReceipt } from "@/lib/print-utils";
+import {
+  generateAllDocuments,
+  generateDeliveryNote,
+  generatePickingList,
+  generateReceipt,
+} from "@/lib/print-utils";
 import type { Order } from "@/types/order";
 
 const orderFixture = (overrides: Partial<Order> = {}): Order => ({
@@ -40,6 +45,19 @@ const documentGenerators = [
 ] as const;
 
 describe("print layout contract", () => {
+  it("bundles all three document types into one print job with page breaks", () => {
+    const html = generateAllDocuments(orderFixture());
+
+    expect(html.match(/<!DOCTYPE html>/g)).toHaveLength(1);
+    expect(html.match(/data-batch-print-document=/g)).toHaveLength(3);
+    expect(html).toContain('data-batch-print-document="receipt"');
+    expect(html).toContain('data-batch-print-document="delivery-note"');
+    expect(html).toContain('data-batch-print-document="picking-list"');
+    expect(html).toContain(".batch-print-document + .batch-print-document");
+    expect(html).toContain("page-break-before: always");
+    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(2);
+  });
+
   it.each(documentGenerators)("prints the %s as monochrome A4 landscape without emoji", (_, generator) => {
     const html = generator(orderFixture());
 

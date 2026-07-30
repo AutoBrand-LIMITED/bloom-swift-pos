@@ -69,6 +69,39 @@ describe("odoo-api note contracts", () => {
     expect(customer.totalSpent).toBeUndefined();
   });
 
+  it("uses the explicit Customer ID search mode and preserves the returned code", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([{
+      id: 42,
+      name: "Alice",
+      email: null,
+      phone: "91234567",
+      mobile: null,
+      customerCode: "00-Ab/C",
+      history_count: null,
+      total_spent: null,
+      history: [],
+      tags: [],
+    }]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooCustomers } = await import("@/lib/odoo-api");
+
+    const [customer] = await searchOdooCustomers(
+      " 00-aB/C ",
+      undefined,
+      "customer_code",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/customers?q=00-aB%2FC&searchType=customer_code",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+    expect(customer).toMatchObject({
+      odooPartnerId: 42,
+      customerCode: "00-Ab/C",
+    });
+  });
+
   it("raises a typed conflict error with the latest Odoo partner record", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const current = {

@@ -122,12 +122,30 @@ describe("DeliverySection delivery time controls", () => {
     expect(screen.getByRole("radio", { name: "指定時間" })).toBeVisible();
   });
 
-  it("shows legacy pending time as read-only without inventing a mode", () => {
+  it("shows legacy pending time as read-only and requires a new mode selection", () => {
     renderSection({ legacyDeliveryTime: true, deliveryTime: "14:00", deliverySlots: [] });
 
     expect(screen.getByRole("textbox", { name: "舊格式送貨時間" })).toHaveValue("14:00");
     expect(screen.getByRole("textbox", { name: "舊格式送貨時間" })).toHaveAttribute("readonly");
-    expect(screen.queryByRole("radio", { name: "指定時間" })).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "指定時間" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("請重新選擇");
+  });
+
+  it("shows accessible inline errors for required delivery details", () => {
+    renderSection({
+      deliveryDate: "",
+      deliveryDateError: "請選擇送貨日期",
+      deliveryTimeError: "請選擇送貨時間",
+      deliveryAddressError: "請輸入送貨地址",
+      recipientNameError: "請輸入收花人姓名",
+      recipientPhoneError: "請輸入收花人電話",
+    });
+
+    expect(screen.getByLabelText("送貨日期")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/送貨地址/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/收貨人姓名/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/收貨人電話/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getAllByRole("alert")).toHaveLength(5);
   });
 });
 

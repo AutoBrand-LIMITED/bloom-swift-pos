@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Printer, Receipt, Truck, ClipboardCheck } from "lucide-react";
 import {
+  generateAllDocuments,
   generateReceipt,
   generateDeliveryNote,
   generatePickingList,
@@ -15,6 +16,13 @@ interface PrintButtonsProps {
 
 const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => (
   <div className="flex flex-wrap gap-1.5">
+    <Button
+      size={size}
+      className="gap-1.5 text-xs"
+      onClick={(e) => { e.stopPropagation(); printDocument(generateAllDocuments(order)); }}
+    >
+      <Printer className="w-3.5 h-3.5" /> 全部列印
+    </Button>
     <Button
       variant="outline"
       size={size}

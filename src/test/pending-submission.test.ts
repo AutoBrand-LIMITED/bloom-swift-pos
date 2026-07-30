@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   clearPendingSubmission,
@@ -8,6 +8,7 @@ import {
   savePendingSubmission,
   submissionPayloadMatches,
   submitPersistedOrder,
+  upgradeLegacyPendingDeliverySelection,
   type PendingOrderSubmission,
 } from "@/lib/pending-submission";
 import { OdooApiError } from "@/lib/odoo-api";
@@ -55,8 +56,33 @@ function buildSubmission(): PendingOrderSubmission {
   };
 }
 
+function buildPageOrderedDeliveryOrder(
+  order: Order,
+  selection: Pick<Order, "deliveryTimeMode" | "deliveryTime"> & Pick<Partial<Order>, "deliverySlotId">,
+): Order {
+  const entriesWithoutLegacyTime = Object.entries(order)
+    .filter(([key]) => key !== "deliveryTime");
+  return {
+    ...Object.fromEntries(entriesWithoutLegacyTime),
+    deliveryTimeMode: selection.deliveryTimeMode,
+    ...(selection.deliverySlotId === undefined ? {} : { deliverySlotId: selection.deliverySlotId }),
+    deliveryTime: selection.deliveryTime,
+  } as Order;
+}
+
 describe("pending Odoo submission", () => {
-  beforeEach(() => clearPendingSubmission());
+  beforeEach(() => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+      clear: () => values.clear(),
+    });
+    clearPendingSubmission();
+  });
+
+  afterAll(() => vi.unstubAllGlobals());
 
   it("keeps the same checkout and payment keys after an ambiguous failure and reload", async () => {
     const submission = buildSubmission();
@@ -142,6 +168,95 @@ describe("pending Odoo submission", () => {
     const pending = buildSubmission();
 
     expect(deliveryContractFieldsForSubmission("slot", 11, pending.order)).toEqual({});
+  });
+
+  it("upgrades a restored legacy delivery selection without changing checkout or payment IDs", async () => {
+    const pending = buildSubmission();
+    savePendingSubmission(pending);
+    const restored = loadPendingSubmission();
+    expect(restored).not.toBeNull();
+
+    const upgraded = upgradeLegacyPendingDeliverySelection(restored!, {
+      deliveryTimeMode: "slot",
+      deliverySlotId: 11,
+      deliveryTime: "上午 09:00-13:00",
+    }, {
+      ...restored!,
+      order: buildPageOrderedDeliveryOrder(restored!.order, {
+        deliveryTimeMode: "slot",
+        deliverySlotId: 11,
+        deliveryTime: "上午 09:00-13:00",
+      }),
+    });
+
+    expect(upgraded).toEqual({
+      ...restored,
+      order: {
+        ...restored!.order,
+        deliveryTimeMode: "slot",
+        deliverySlotId: 11,
+        deliveryTime: "上午 09:00-13:00",
+      },
+    });
+    expect(upgraded.order.id).toBe(pending.order.id);
+    expect(upgraded.order.paymentIdempotencyKey).toBe(pending.order.paymentIdempotencyKey);
+    expect(loadPendingSubmission()).toEqual(upgraded);
+
+    const submitter = vi.fn().mockResolvedValue({ id: 501 });
+    await expect(submitPersistedOrder(upgraded, submitter)).resolves.toEqual({ id: 501 });
+    expect(submitter).toHaveBeenCalledWith(upgraded.order, upgraded.options);
+    expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
+  });
+
+  it("keeps legacy drafts out of storage, upgrades once at submit, and then locks the payload", async () => {
+    const original = buildSubmission();
+    savePendingSubmission(original);
+    const restored = loadPendingSubmission();
+    expect(restored).not.toBeNull();
+
+    const typedDrafts = ["上", "上午", "上午 10 時前"];
+    expect(typedDrafts.at(-1)).toBe("上午 10 時前");
+    const reloadedBeforeSubmit = loadPendingSubmission();
+    expect(reloadedBeforeSubmit).toEqual(original);
+    expect(reloadedBeforeSubmit?.order).not.toHaveProperty("deliveryTimeMode");
+
+    const finalCandidate: PendingOrderSubmission = {
+      ...restored!,
+      order: buildPageOrderedDeliveryOrder(restored!.order, {
+        deliveryTimeMode: "specified",
+        deliveryTime: "上午 10 時前",
+      }),
+    };
+    const upgraded = upgradeLegacyPendingDeliverySelection(restored!, {
+      deliveryTimeMode: "specified",
+      deliveryTime: "上午 10 時前",
+    }, finalCandidate);
+
+    expect(upgraded.order.deliveryTime).toBe("上午 10 時前");
+    expect(upgraded.order.id).toBe(original.order.id);
+    expect(upgraded.order.paymentIdempotencyKey).toBe(
+      original.order.paymentIdempotencyKey,
+    );
+    expect(upgraded.order.customerName).toBe(original.order.customerName);
+    expect(upgraded.order.items).toEqual(original.order.items);
+    expect(upgraded.options).toEqual(original.options);
+    expect(upgraded.savedAt).toBe(original.savedAt);
+    expect(loadPendingSubmission()).toEqual(upgraded);
+
+    const editedAfterUpgrade = {
+      ...upgraded,
+      order: { ...upgraded.order, deliveryTime: "上午 11 時前" },
+    };
+    expect(() => upgradeLegacyPendingDeliverySelection(upgraded, {
+      deliveryTimeMode: "specified",
+      deliveryTime: "上午 11 時前",
+    }, editedAfterUpgrade)).toThrow("只適用於尚未提交");
+    expect(loadPendingSubmission()).toEqual(upgraded);
+
+    const submitter = vi.fn().mockResolvedValue({ id: 502 });
+    await expect(submitPersistedOrder(upgraded, submitter)).resolves.toEqual({ id: 502 });
+    expect(submitter).toHaveBeenCalledWith(upgraded.order, original.options);
+    expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
   });
 
   it("retains present delivery contract keys so visible retry edits are detectable", () => {

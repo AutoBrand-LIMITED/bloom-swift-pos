@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Calculator, ClipboardList, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
-import { generateReceipt, generateDeliveryNote, generatePickingList, printDocument } from "@/lib/print-utils";
+import { generateAllDocuments, generateReceipt, printDocument } from "@/lib/print-utils";
 import CustomerSection from "@/components/pos/CustomerSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
@@ -23,6 +23,7 @@ import {
   loadPendingSubmission,
   submissionPayloadMatches,
   submitPersistedOrder,
+  upgradeLegacyPendingDeliverySelection,
   type PendingOrderSubmission,
 } from "@/lib/pending-submission";
 import {
@@ -42,8 +43,13 @@ import {
 import {
   DEMO_DELIVERY_SLOTS,
   deliverySlotSnapshot,
-  validateDeliveryTimeSelection,
 } from "@/lib/delivery-slots";
+import {
+  validateCheckout,
+  normalizePhoneNumber,
+  type CheckoutErrors,
+  type CheckoutField,
+} from "@/lib/checkout-validation";
 import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pricing";
 import { parseDeliveryAddress } from "@/lib/hk-address";
 import {
@@ -66,9 +72,9 @@ const Index = () => {
   const [senderName, setSenderName] = useState("");
   const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
   const [companyName, setCompanyName] = useState("");
-  const [phoneError, setPhoneError] = useState(false);
-  const [senderNameError, setSenderNameError] = useState(false);
+  const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({});
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
+  const [confirmedNewCustomerPhone, setConfirmedNewCustomerPhone] = useState<string | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
 
   // Items
@@ -105,7 +111,6 @@ const Index = () => {
   const [deliverySlotsLoading, setDeliverySlotsLoading] = useState(hasOdooBackend);
   const [deliverySlotsError, setDeliverySlotsError] = useState<string | null>(null);
   const [deliverySlotsRefreshKey, setDeliverySlotsRefreshKey] = useState(0);
-  const [deliveryTimeError, setDeliveryTimeError] = useState<string | null>(null);
   const [deliveryRegion, setDeliveryRegion] = useState("");
   const [deliveryDistrict, setDeliveryDistrict] = useState("");
   const [deliveryArea, setDeliveryArea] = useState("");
@@ -197,6 +202,11 @@ const Index = () => {
         snapshot: pendingSubmission.order.deliveryTime,
       }
     : undefined;
+  const hasLegacyPendingDelivery = Boolean(
+    pendingSubmission
+      && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "deliveryTimeMode")
+      && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "deliverySlotId"),
+  );
 
   useEffect(() => {
     if (!hasOdooBackend) return;
@@ -262,15 +272,24 @@ const Index = () => {
     setSaveRecipientNote(false);
   }, [clearRecipientPersistenceBinding]);
 
+  const clearCheckoutErrors = useCallback((...fields: CheckoutField[]) => {
+    setCheckoutErrors((current) => {
+      if (!fields.some((field) => current[field])) return current;
+      const next = { ...current };
+      fields.forEach((field) => delete next[field]);
+      return next;
+    });
+  }, []);
+
   const resetOrderForm = useCallback(() => {
     setPhone("");
     setCustomerName("");
     setSenderName("");
     setCustomerType("personal");
     setCompanyName("");
-    setPhoneError(false);
-    setSenderNameError(false);
+    setCheckoutErrors({});
     setSelectedCustomer(null);
+    setConfirmedNewCustomerPhone(null);
     setItems([]);
     setBudget(0);
     setDeliveryFee(0);
@@ -289,7 +308,6 @@ const Index = () => {
     setDeliveryTime("");
     setDeliveryTimeMode(undefined);
     setDeliverySlotId(undefined);
-    setDeliveryTimeError(null);
     setDeliveryRegion("");
     setDeliveryDistrict("");
     setDeliveryArea("");
@@ -347,7 +365,6 @@ const Index = () => {
     setDeliveryTime(order.deliveryTime);
     setDeliveryTimeMode(order.deliveryTimeMode);
     setDeliverySlotId(order.deliverySlotId);
-    setDeliveryTimeError(null);
     setDeliveryRegion("");
     setDeliveryDistrict("");
     setDeliveryArea("");
@@ -372,17 +389,18 @@ const Index = () => {
   }, [restoredPendingSubmission]);
 
   const handleDeliverySlotChange = (slot: DeliverySlot) => {
+    const snapshot = deliverySlotSnapshot(slot);
     setDeliveryTimeMode("slot");
     setDeliverySlotId(slot.id);
-    setDeliveryTime(deliverySlotSnapshot(slot));
-    setDeliveryTimeError(null);
+    setDeliveryTime(snapshot);
+    clearCheckoutErrors("deliveryTime");
   };
 
   const handleSpecifiedTimeSelect = () => {
     if (deliveryTimeMode !== "specified") setDeliveryTime("");
     setDeliveryTimeMode("specified");
     setDeliverySlotId(undefined);
-    setDeliveryTimeError(null);
+    clearCheckoutErrors("deliveryTime");
   };
 
   const applyPartnerRecord = useCallback((target: NotesConflictTarget, record: PartnerNoteRecord) => {
@@ -539,19 +557,36 @@ const Index = () => {
       toast.error("請選擇已同步到 Odoo 嘅負責員工");
       return;
     }
-    if (!phone.trim()) {
-      setPhoneError(true);
-      toast.error("請輸入客戶電話號碼");
+    const deliveryAddress = [
+      deliveryRegion,
+      deliveryDistrict,
+      deliveryArea,
+      deliveryDetail.trim(),
+    ].filter(Boolean).join(" ");
+    const validationErrors = validateCheckout({
+      customerName,
+      phone,
+      selectedCustomerPhone: selectedCustomer?.phone,
+      confirmedNewCustomerPhone,
+      restoredPendingSubmission: Boolean(pendingSubmission),
+      requiresCustomerResolution: hasOdooBackend,
+      senderName,
+      recipientName,
+      recipientPhone,
+      deliveryAddress,
+      deliveryDate,
+      deliveryTime,
+      deliveryTimeMode,
+      deliverySlotId,
+      deliverySlots,
+      frozenSlotSelection: frozenDeliverySlotSelection,
+    });
+    setCheckoutErrors(validationErrors);
+    const validationErrorCount = Object.keys(validationErrors).length;
+    if (validationErrorCount > 0) {
+      toast.error(`請修正以下 ${validationErrorCount} 項訂單資料`);
       return;
     }
-    setPhoneError(false);
-
-    if (!senderName.trim()) {
-      setSenderNameError(true);
-      toast.error("請輸入送花人名稱");
-      return;
-    }
-    setSenderNameError(false);
 
     if (items.length === 0) {
       toast.error("請至少加入一個項目");
@@ -568,21 +603,6 @@ const Index = () => {
       toast.error(`「${itemMissingAdjustmentReason.name}」已改價或折扣，請填寫原因`);
       return;
     }
-
-    const deliverySelectionError = validateDeliveryTimeSelection({
-      deliveryDate,
-      deliveryTime,
-      deliveryTimeMode,
-      deliverySlotId,
-      slots: deliverySlots,
-      frozenSlotSelection: frozenDeliverySlotSelection,
-    });
-    if (deliverySelectionError) {
-      setDeliveryTimeError(deliverySelectionError);
-      toast.error(deliverySelectionError);
-      return;
-    }
-    setDeliveryTimeError(null);
 
     if (finalPrice === 0) {
       toast.warning("價格為 $0，訂單仍會建立");
@@ -662,10 +682,10 @@ const Index = () => {
       ...deliveryContractFieldsForSubmission(
         deliveryTimeMode,
         deliverySlotId,
-        pendingSubmission?.order,
+        hasLegacyPendingDelivery ? undefined : pendingSubmission?.order,
       ),
       deliveryTime,
-      deliveryAddress: [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail.trim()].filter(Boolean).join(" "),
+      deliveryAddress,
       recipientName: recipientName.trim(),
       recipientPhone: recipientPhone.trim(),
       deliveryPerson: deliveryPerson.trim(),
@@ -684,23 +704,44 @@ const Index = () => {
       customerType,
       companyName,
     };
-    if (pendingSubmission && !submissionPayloadMatches(pendingSubmission, {
+    const currentSubmission = {
       order: currentOrder,
       options: currentOptions,
-      savedAt: pendingSubmission.savedAt,
-    })) {
-      toast.error("已恢復嘅待確認訂單曾被修改；請還原原本內容後先重試");
-      return;
+      savedAt: pendingSubmission?.savedAt || new Date().toISOString(),
+    };
+    let submission: PendingOrderSubmission = currentSubmission;
+    if (pendingSubmission) {
+      if (hasLegacyPendingDelivery) {
+        try {
+          submission = upgradeLegacyPendingDeliverySelection(
+            pendingSubmission,
+            {
+              deliveryTimeMode: deliveryTimeMode!,
+              deliverySlotId,
+              deliveryTime,
+            },
+            currentSubmission,
+          );
+          setPendingSubmission(submission);
+        } catch (error) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "未能安全更新待確認訂單嘅送貨時間",
+          );
+          return;
+        }
+      } else if (!submissionPayloadMatches(pendingSubmission, currentSubmission)) {
+        toast.error("已恢復嘅待確認訂單曾被修改；請還原原本內容後先重試");
+        return;
+      } else {
+        submission = pendingSubmission;
+      }
     }
 
     setIsSubmitting(true);
     setNotesConflict(null);
 
-    const submission: PendingOrderSubmission = pendingSubmission || {
-      order: currentOrder,
-      options: currentOptions,
-      savedAt: new Date().toISOString(),
-    };
     const order = submission.order;
 
     let syncedOrder: Order = order;
@@ -766,11 +807,7 @@ const Index = () => {
       },
       cancel: {
         label: "全部列印",
-        onClick: () => {
-          printDocument(generateReceipt(syncedOrder));
-          setTimeout(() => printDocument(generateDeliveryNote(syncedOrder)), 500);
-          setTimeout(() => printDocument(generatePickingList(syncedOrder)), 1000);
-        },
+        onClick: () => printDocument(generateAllDocuments(syncedOrder)),
       },
     });
 
@@ -834,6 +871,7 @@ const Index = () => {
               setRecipientContact(null);
               setRecipientContactDraft("");
               setSaveRecipientNote(false);
+              clearCheckoutErrors("deliveryAddress", "recipientName", "recipientPhone");
               toast.success("已套用過往送貨地址");
             }}
           />
@@ -851,6 +889,22 @@ const Index = () => {
 
         {hasSalesperson ? (
           <>
+        {Object.keys(checkoutErrors).length > 0 && (
+          <div
+            role="alert"
+            aria-labelledby="checkout-errors-title"
+            className="rounded-xl border border-destructive/50 bg-destructive/5 p-4 text-destructive"
+          >
+            <p id="checkout-errors-title" className="text-sm font-semibold">
+              請修正以下訂單資料
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+              {Object.values(checkoutErrors).map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <CustomerSection
           phone={phone}
           customerName={customerName}
@@ -859,8 +913,15 @@ const Index = () => {
           companyName={companyName}
           onPhoneChange={(v) => {
             setPhone(v);
-            if (v.trim()) setPhoneError(false);
-            if (selectedCustomer && v !== selectedCustomer.phone) {
+            clearCheckoutErrors("phone");
+            const normalizedPhone = normalizePhoneNumber(v);
+            setConfirmedNewCustomerPhone((current) => (
+              current && current !== normalizedPhone ? null : current
+            ));
+            if (
+              selectedCustomer
+              && normalizedPhone !== normalizePhoneNumber(selectedCustomer.phone)
+            ) {
               setSelectedCustomer(null);
               setSenderContactDraft("");
               setSaveSenderNote(false);
@@ -869,6 +930,7 @@ const Index = () => {
           }}
           onNameChange={(value) => {
             setCustomerName(value);
+            clearCheckoutErrors("customerName");
             if (selectedCustomer && value !== selectedCustomer.name) {
               setSelectedCustomer(null);
               setSenderContactDraft("");
@@ -878,23 +940,31 @@ const Index = () => {
           }}
           onSenderNameChange={(value) => {
             setSenderName(value);
-            if (value.trim()) setSenderNameError(false);
+            clearCheckoutErrors("senderName");
           }}
           onCustomerTypeChange={setCustomerType}
           onCompanyNameChange={setCompanyName}
           onCustomerSelect={(c) => {
             setSelectedCustomer(c);
+            setConfirmedNewCustomerPhone(null);
             setCustomerName(c.name);
             setPhone(c.phone);
-            setPhoneError(false);
+            clearCheckoutErrors("customerName", "phone");
             setSenderContactDraft(c.commentText || "");
             setSaveSenderNote(false);
             setNotesConflict(null);
             resetRecipientPersistence();
           }}
-          phoneError={phoneError}
-          senderNameError={senderNameError}
+          phoneError={checkoutErrors.phone}
+          customerNameError={checkoutErrors.customerName}
+          senderNameError={checkoutErrors.senderName}
           selectedCustomer={selectedCustomer}
+          confirmedNewCustomerPhone={confirmedNewCustomerPhone}
+          onConfirmNewCustomer={(normalizedPhone) => {
+            setSelectedCustomer(null);
+            setConfirmedNewCustomerPhone(normalizedPhone);
+            clearCheckoutErrors("phone");
+          }}
           refreshKey={customerRefreshKey}
         />
 
@@ -922,12 +992,15 @@ const Index = () => {
           deliverySlots={deliverySlots}
           deliverySlotsLoading={deliverySlotsLoading}
           deliverySlotsError={deliverySlotsError}
-          deliveryTimeError={deliveryTimeError}
+          deliveryTimeError={checkoutErrors.deliveryTime ?? null}
+          deliveryDateError={checkoutErrors.deliveryDate}
+          deliveryAddressError={checkoutErrors.deliveryAddress}
+          recipientNameError={checkoutErrors.recipientName}
+          recipientPhoneError={checkoutErrors.recipientPhone}
           legacyDeliveryTime={Boolean(
-            pendingSubmission
-              && pendingSubmission.order.deliveryTime
-              && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "deliveryTimeMode")
-              && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "deliverySlotId")
+            hasLegacyPendingDelivery
+              && deliveryTimeMode === undefined
+              && pendingSubmission?.order.deliveryTime
           )}
           deliveryRegion={deliveryRegion}
           deliveryDistrict={deliveryDistrict}
@@ -938,37 +1011,43 @@ const Index = () => {
           deliveryPerson={deliveryPerson}
           onDateChange={(value) => {
             setDeliveryDate(value);
-            setDeliveryTimeError(null);
+            clearCheckoutErrors("deliveryDate", "deliveryTime");
           }}
           onTimeChange={(value) => {
             setDeliveryTime(value);
-            setDeliveryTimeError(null);
+            clearCheckoutErrors("deliveryTime");
           }}
           onSlotChange={handleDeliverySlotChange}
           onSpecifiedTimeSelect={handleSpecifiedTimeSelect}
           onRetryDeliverySlots={() => setDeliverySlotsRefreshKey((key) => key + 1)}
           onRegionChange={(value) => {
             setDeliveryRegion(value);
+            clearCheckoutErrors("deliveryAddress");
             resetRecipientPersistence();
           }}
           onDistrictChange={(value) => {
             setDeliveryDistrict(value);
+            clearCheckoutErrors("deliveryAddress");
             resetRecipientPersistence();
           }}
           onAreaChange={(value) => {
             setDeliveryArea(value);
+            clearCheckoutErrors("deliveryAddress");
             resetRecipientPersistence();
           }}
           onDetailChange={(value) => {
             setDeliveryDetail(value);
+            clearCheckoutErrors("deliveryAddress");
             resetRecipientPersistence();
           }}
           onRecipientNameChange={(value) => {
             setRecipientName(value);
+            clearCheckoutErrors("recipientName");
             resetRecipientPersistence();
           }}
           onRecipientPhoneChange={(value) => {
             setRecipientPhone(value);
+            clearCheckoutErrors("recipientPhone");
             resetRecipientPersistence();
           }}
           onDeliveryPersonChange={setDeliveryPerson}
