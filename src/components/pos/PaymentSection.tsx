@@ -77,9 +77,9 @@ const PaymentSection = ({
         </div>
       </div>
       {priceWarning && (
-        <div className="flex items-center gap-1.5 text-warning text-xs">
+        <div className="flex items-center gap-1.5 text-destructive text-xs">
           <AlertTriangle className="w-3.5 h-3.5" />
-          價格為 $0，請確認是否正確
+          訂單總額必須大過 $0，未能提交
         </div>
       )}
     </div>

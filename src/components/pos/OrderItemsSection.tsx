@@ -460,6 +460,31 @@ const OrderItemsSection = ({
                   <span className="font-mono font-semibold">小計 ${orderItemTotal(item).toLocaleString()}</span>
                 </div>
 
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">包裝</Label>
+                    <Input
+                      aria-label={`${item.name} 包裝`}
+                      value={item.packing || ""}
+                      onChange={(event) => updateItem(item.id, "packing", event.target.value)}
+                      className="min-h-11 bg-card text-sm"
+                      placeholder="例如：禮盒、花紙"
+                      maxLength={500}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">項目備註</Label>
+                    <Input
+                      aria-label={`${item.name} 項目備註`}
+                      value={item.remarks || ""}
+                      onChange={(event) => updateItem(item.id, "remarks", event.target.value)}
+                      className="min-h-11 bg-card text-sm"
+                      placeholder="只適用於此項目"
+                      maxLength={1000}
+                    />
+                  </div>
+                </div>
+
                 {adjusted && (
                   <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-amber-700">

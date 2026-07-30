@@ -9,6 +9,9 @@ export type CheckoutField =
   | "customerName"
   | "phone"
   | "senderName"
+  | "companyName"
+  | "customerEmail"
+  | "billingAddress"
   | "recipientName"
   | "recipientPhone"
   | "deliveryAddress"
@@ -19,6 +22,11 @@ export type CheckoutErrors = Partial<Record<CheckoutField, string>>;
 
 interface CheckoutValidationInput {
   customerName: string;
+  customerType: "personal" | "company";
+  companyName: string;
+  customerEmail: string;
+  billingAddress: string;
+  allowLegacyMissingCompanyFields?: boolean;
   phone: string;
   selectedCustomerPhone?: string;
   confirmedNewCustomerPhone?: string | null;
@@ -37,6 +45,7 @@ interface CheckoutValidationInput {
 }
 
 const ALLOWED_PHONE_CHARACTERS = /^\+?[0-9 ()-]+$/;
+const EMAIL_ADDRESS = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const ISO_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 
 export function normalizePhoneNumber(value: string): string {
@@ -62,10 +71,28 @@ export function isValidDeliveryDate(value: string): boolean {
     && parsed.getUTCDate() === day;
 }
 
+export function isValidEmailAddress(value: string): boolean {
+  const email = value.trim();
+  return !email || (email.length <= 254 && EMAIL_ADDRESS.test(email));
+}
+
+export function validatePositiveOrderTotal(finalPrice: number): string | null {
+  return Number.isFinite(finalPrice) && finalPrice > 0
+    ? null
+    : "訂單總額必須大過 $0，請調整商品、附加費或折扣後再提交";
+}
+
 export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors {
   const errors: CheckoutErrors = {};
 
   if (!input.customerName.trim()) errors.customerName = "請輸入下單人／聯絡人名稱";
+  if (input.customerType === "company" && !input.allowLegacyMissingCompanyFields) {
+    if (!input.companyName.trim()) errors.companyName = "公司客戶必須輸入公司名稱";
+    if (!input.billingAddress.trim()) errors.billingAddress = "公司客戶必須輸入帳單地址";
+  }
+  if (!isValidEmailAddress(input.customerEmail)) {
+    errors.customerEmail = "請輸入有效電郵地址";
+  }
   if (!input.phone.trim()) {
     errors.phone = "請輸入下單人電話";
   } else if (!isValidPhoneNumber(input.phone)) {

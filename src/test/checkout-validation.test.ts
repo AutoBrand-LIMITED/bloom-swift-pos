@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isValidDeliveryDate,
   isValidPhoneNumber,
+  validatePositiveOrderTotal,
   validateCheckout,
 } from "@/lib/checkout-validation";
 import type { DeliverySlot } from "@/lib/odoo-api";
@@ -13,6 +14,10 @@ const slots: DeliverySlot[] = [
 
 const validCheckout = {
   customerName: "陳小姐",
+  customerType: "personal" as const,
+  companyName: "",
+  customerEmail: "",
+  billingAddress: "",
   phone: "9123 4567",
   senderName: "陳小姐",
   recipientName: "李先生",
@@ -95,6 +100,47 @@ describe("checkout required-field validation", () => {
     })).toEqual({});
   });
 
+  it("requires company name and billing address only for company customers", () => {
+    const companyErrors = validateCheckout({
+      ...validCheckout,
+      customerType: "company",
+      companyName: " ",
+      billingAddress: "",
+    });
+    expect(companyErrors.companyName).toBe("公司客戶必須輸入公司名稱");
+    expect(companyErrors.billingAddress).toBe("公司客戶必須輸入帳單地址");
+
+    expect(validateCheckout({
+      ...validCheckout,
+      customerType: "company",
+      companyName: "中西花店有限公司",
+      billingAddress: "香港中環花園道 1 號",
+      customerEmail: " accounts@example.com ",
+    })).toEqual({});
+    expect(validateCheckout({
+      ...validCheckout,
+      customerEmail: "not-an-email",
+    }).customerEmail).toBe("請輸入有效電郵地址");
+  });
+
+  it("allows only a restored legacy company snapshot to replay without new company fields", () => {
+    expect(validateCheckout({
+      ...validCheckout,
+      customerType: "company",
+      companyName: "舊公司訂單",
+      billingAddress: "",
+      allowLegacyMissingCompanyFields: true,
+      restoredPendingSubmission: true,
+    })).toEqual({});
+
+    expect(validateCheckout({
+      ...validCheckout,
+      customerType: "company",
+      companyName: "舊公司訂單",
+      billingAddress: "",
+    }).billingAddress).toBe("公司客戶必須輸入帳單地址");
+  });
+
   it("preserves stale-slot validation", () => {
     expect(validateCheckout({
       ...validCheckout,
@@ -165,5 +211,15 @@ describe("checkout required-field validation", () => {
       restoredPendingSubmission: false,
     });
     expect(nextOrderErrors.phone).toBe("請先搜尋並選擇現有客戶，或確認新增客戶");
+  });
+});
+
+describe("checkout total validation", () => {
+  it("blocks zero and negative computed totals before submission", () => {
+    expect(validatePositiveOrderTotal(0)).toBe(
+      "訂單總額必須大過 $0，請調整商品、附加費或折扣後再提交",
+    );
+    expect(validatePositiveOrderTotal(-0.01)).not.toBeNull();
+    expect(validatePositiveOrderTotal(0.01)).toBeNull();
   });
 });

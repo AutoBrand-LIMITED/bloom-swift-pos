@@ -12,6 +12,8 @@ export interface OrderItem {
   productCode?: string | null;
   categoryId?: number | null;
   categoryName?: string | null;
+  packing?: string;
+  remarks?: string;
 }
 
 export type PaymentStatus = "unpaid" | "paid" | "deposit";
@@ -28,6 +30,16 @@ export interface Order {
   salesId: string;
   operatorEmployeeId?: number;
   customerName: string;
+  customerType?: "personal" | "company";
+  companyName?: string;
+  customerEmail?: string;
+  billingAddress?: string;
+  customerGroup?: string;
+  senderDoNumber?: string;
+  recipientDoNumber?: string;
+  sourceReference?: string;
+  department?: string;
+  terms?: string;
   /** Gift sender shown on the florist order; may differ from the ordering customer. */
   senderName?: string;
   phone: string;

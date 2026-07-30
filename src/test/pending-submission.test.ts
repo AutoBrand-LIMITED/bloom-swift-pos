@@ -3,7 +3,9 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearPendingSubmission,
   deliveryContractFieldsForSubmission,
+  firstAddedLegacyBusinessField,
   loadPendingSubmission,
+  pendingOptionBindingsMatch,
   PENDING_SUBMISSION_KEY,
   savePendingSubmission,
   submissionPayloadMatches,
@@ -162,6 +164,127 @@ describe("pending Odoo submission", () => {
     savePendingSubmission(pending);
 
     expect(loadPendingSubmission()?.order).not.toHaveProperty("senderName");
+  });
+
+  it("replays an old personal pending order without adding business snapshot fields", async () => {
+    const pending = buildSubmission();
+    savePendingSubmission(pending);
+    const restored = loadPendingSubmission()!;
+    const submitter = vi.fn().mockResolvedValue({ id: 501 });
+
+    await submitPersistedOrder(restored, submitter);
+
+    expect(submitter).toHaveBeenCalledWith(pending.order, pending.options);
+    const replayedOrder = submitter.mock.calls[0][0] as Order;
+    expect(replayedOrder).not.toHaveProperty("customerEmail");
+    expect(replayedOrder).not.toHaveProperty("billingAddress");
+    expect(replayedOrder).not.toHaveProperty("customerGroup");
+    expect(replayedOrder).not.toHaveProperty("terms");
+  });
+
+  it("does not rewrite an old company pending order to add a billing address", () => {
+    const pending = buildSubmission();
+    pending.order.customerType = "company";
+    pending.order.companyName = "Reload Test Limited";
+    pending.options.customerType = "company";
+    pending.options.companyName = "Reload Test Limited";
+    savePendingSubmission(pending);
+    const candidate: PendingOrderSubmission = {
+      ...pending,
+      order: {
+        ...pending.order,
+        customerType: "company",
+        companyName: "Reload Test Limited",
+        customerEmail: "accounts@example.com",
+        billingAddress: "1 Flower Market Road",
+        customerGroup: "",
+        senderDoNumber: "",
+        recipientDoNumber: "",
+        sourceReference: "",
+        department: "",
+        terms: "",
+        deliveryTimeMode: "specified",
+      },
+      options: {
+        ...pending.options,
+        customerType: "company",
+        companyName: "Reload Test Limited",
+      },
+    };
+
+    expect(() => savePendingSubmission(candidate)).toThrow("內容已改變");
+    expect(loadPendingSubmission()).toEqual(pending);
+    expect(loadPendingSubmission()?.order).not.toHaveProperty("billingAddress");
+  });
+
+  it("preserves a legacy raw company option during an exact pending replay", () => {
+    const pending = buildSubmission();
+    pending.order.customerType = "company";
+    delete pending.order.companyName;
+    pending.options.customerType = "company";
+    pending.options.companyName = "  Reload Test Limited  ";
+    savePendingSubmission(pending);
+
+    const restored = loadPendingSubmission()!;
+    const rebuilt = {
+      ...restored,
+      options: {
+        ...restored.options,
+        companyName: restored.options.companyName,
+      },
+    };
+
+    expect(submissionPayloadMatches(restored, rebuilt)).toBe(true);
+    expect(rebuilt.options.companyName).toBe("  Reload Test Limited  ");
+  });
+
+  it("detects a new field entered on an immutable legacy pending order", () => {
+    const pending = buildSubmission();
+
+    expect(firstAddedLegacyBusinessField(pending.order, {
+      billingAddress: "1 Newly Entered Street",
+    })).toBe("帳單地址");
+    expect(firstAddedLegacyBusinessField(pending.order, {
+      billingAddress: "",
+      customerEmail: "",
+    })).toBeNull();
+
+    pending.order.billingAddress = "";
+    expect(firstAddedLegacyBusinessField(pending.order, {
+      billingAddress: "1 Newly Entered Street",
+    })).toBeNull();
+  });
+
+  it("rejects customer option changes while preserving raw legacy options for replay", () => {
+    const pending = buildSubmission();
+    delete pending.order.customerType;
+    delete pending.order.companyName;
+    pending.options = {
+      customerId: 42,
+      customerType: "company",
+      companyName: "  Reload Test Limited  ",
+    };
+
+    expect(pendingOptionBindingsMatch(pending, {
+      customerId: 42,
+      customerType: "company",
+      companyName: "  Reload Test Limited  ",
+    })).toBe(true);
+    expect(pendingOptionBindingsMatch(pending, {
+      customerId: 42,
+      customerType: "personal",
+      companyName: "",
+    })).toBe(false);
+    expect(pendingOptionBindingsMatch(pending, {
+      customerId: 42,
+      customerType: "company",
+      companyName: "Edited Company",
+    })).toBe(false);
+    expect(pendingOptionBindingsMatch(pending, {
+      customerId: 84,
+      customerType: "company",
+      companyName: "  Reload Test Limited  ",
+    })).toBe(false);
   });
 
   it("keeps legacy delivery contract keys absent when rebuilding a retry", () => {

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import OrderHistory from "@/components/pos/OrderHistory";
@@ -67,5 +67,32 @@ describe("OrderHistory delivery summary", () => {
 
     expect(screen.getByText("未能確認 Odoo 訂單記錄，請重試")).toBeVisible();
     expect(screen.queryByText("暫無訂單")).not.toBeInTheDocument();
+  });
+
+  it("shows business snapshots plus per-line packing and remarks in order details", () => {
+    render(<OrderHistory orders={[orderFixture({
+      customerEmail: "accounts@example.com",
+      billingAddress: "香港中環花園道 1 號",
+      customerGroup: "Corporate",
+      senderDoNumber: "SDO-100",
+      recipientDoNumber: "RDO-200",
+      sourceReference: "PO-300",
+      department: "Marketing",
+      terms: "Net 30",
+      items: [{
+        id: "line-1",
+        name: "花束",
+        price: 680,
+        quantity: 1,
+        packing: "禮盒",
+        remarks: "白色絲帶",
+      }],
+    })]} open onClose={vi.fn()} />);
+
+    expect(screen.getByText("包裝：禮盒 · 備註：白色絲帶")).toBeVisible();
+    fireEvent.click(screen.getByText("業務詳情"));
+    expect(screen.getByText("accounts@example.com")).toBeVisible();
+    expect(screen.getByText("PO-300")).toBeVisible();
+    expect(screen.getByText("Net 30")).toBeVisible();
   });
 });

@@ -94,6 +94,17 @@ const OrderHistory = ({
                 const deliveryTimeLabel = order.deliveryTimeMode === "specified"
                   ? `指定時間：${order.deliveryTime || "未指定"}`
                   : order.deliveryTime || "未指定時段";
+                const businessDetails = [
+                  ["公司名稱", order.companyName],
+                  ["客戶電郵", order.customerEmail],
+                  ["帳單地址", order.billingAddress],
+                  ["客戶群組", order.customerGroup],
+                  ["送花人 DO", order.senderDoNumber],
+                  ["收花人 DO", order.recipientDoNumber],
+                  ["客戶參考／PO", order.sourceReference],
+                  ["部門", order.department],
+                  ["條款", order.terms],
+                ].filter((detail): detail is [string, string] => Boolean(detail[1]?.trim()));
                 return (
                   <div
                     key={order.id}
@@ -116,11 +127,34 @@ const OrderHistory = ({
                         送貨：{order.deliveryDate || "未指定日期"} · {deliveryTimeLabel}
                       </p>
                       {order.items.map((item) => (
-                        <p key={item.id}>
-                          {item.name} × {item.quantity} = ${orderItemTotal(item).toLocaleString()}
-                        </p>
+                        <div key={item.id}>
+                          <p>{item.name} × {item.quantity} = ${orderItemTotal(item).toLocaleString()}</p>
+                          {(item.packing || item.remarks) && (
+                            <p className="pl-2 text-[11px]">
+                              {[
+                                item.packing ? `包裝：${item.packing}` : "",
+                                item.remarks ? `備註：${item.remarks}` : "",
+                              ].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
+                        </div>
                       ))}
                     </div>
+                    {businessDetails.length > 0 && (
+                      <details className="rounded-md border border-border bg-muted/25 px-2.5 py-2 text-xs">
+                        <summary className="min-h-6 cursor-pointer font-medium text-foreground">
+                          業務詳情
+                        </summary>
+                        <dl className="mt-2 space-y-1.5">
+                          {businessDetails.map(([label, value]) => (
+                            <div key={label} className="grid grid-cols-[88px_minmax(0,1fr)] gap-2">
+                              <dt className="text-muted-foreground">{label}</dt>
+                              <dd className="whitespace-pre-wrap break-words text-foreground">{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </details>
+                    )}
                     <div className="flex justify-between items-center pt-1 border-t border-border">
                       <span className="text-xs text-muted-foreground">
                         {new Date(order.createdAt).toLocaleString("zh-HK")}

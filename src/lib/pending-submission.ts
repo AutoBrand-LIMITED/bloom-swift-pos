@@ -14,6 +14,53 @@ export interface PendingOrderSubmission {
 
 export const PENDING_SUBMISSION_KEY = "florist-pos-pending-odoo-submission-v1";
 
+const BUSINESS_FIELD_LABELS = {
+  customerEmail: "客戶電郵",
+  billingAddress: "帳單地址",
+  customerGroup: "客戶群組",
+  senderDoNumber: "送花人 DO 編號",
+  recipientDoNumber: "收花人 DO 編號",
+  sourceReference: "客戶參考／PO 編號",
+  department: "部門",
+  terms: "條款",
+} as const;
+
+type BusinessField = keyof typeof BUSINESS_FIELD_LABELS;
+
+export function firstAddedLegacyBusinessField(
+  pendingOrder: Order,
+  currentValues: Partial<Pick<Order, BusinessField>>,
+): string | null {
+  for (const [field, label] of Object.entries(BUSINESS_FIELD_LABELS) as [BusinessField, string][]) {
+    if (
+      !Object.prototype.hasOwnProperty.call(pendingOrder, field)
+      && (currentValues[field] || "").trim()
+    ) {
+      return label;
+    }
+  }
+  return null;
+}
+
+export function pendingOptionBindingsMatch(
+  pending: PendingOrderSubmission,
+  current: {
+    customerId?: number;
+    customerType: "personal" | "company";
+    companyName: string;
+  },
+): boolean {
+  const expectedCustomerType = pending.order.customerType
+    || pending.options.customerType
+    || "personal";
+  const expectedCompanyName = pending.order.companyName
+    || pending.options.companyName
+    || "";
+  return current.customerId === pending.options.customerId
+    && current.customerType === expectedCustomerType
+    && current.companyName === expectedCompanyName;
+}
+
 export function deliveryContractFieldsForSubmission(
   deliveryTimeMode: DeliveryTimeMode | undefined,
   deliverySlotId: number | undefined,

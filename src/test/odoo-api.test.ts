@@ -55,6 +55,9 @@ describe("odoo-api note contracts", () => {
       total_spent: null,
       history: [],
       tags: [],
+      customerType: "company",
+      companyName: "Alice Limited",
+      billingAddress: "1 Flower Market Road",
     }])));
     const { searchOdooCustomers } = await import("@/lib/odoo-api");
 
@@ -63,6 +66,9 @@ describe("odoo-api note contracts", () => {
     expect(customer).toMatchObject({
       odooPartnerId: 42,
       name: "Alice",
+      customerType: "company",
+      companyName: "Alice Limited",
+      billingAddress: "1 Flower Market Road",
       history: [],
     });
     expect(customer.historyCount).toBeUndefined();
@@ -150,7 +156,24 @@ describe("odoo-api note contracts", () => {
       customerName: "Chan Tai",
       senderName: "Director Lee",
       phone: "9123 4567",
-      items: [{ id: "line-1", name: "Bouquet", price: 500, quantity: 1 }],
+      customerType: "company",
+      companyName: "Chan Tai Limited",
+      customerEmail: "accounts@example.com",
+      billingAddress: "1 Flower Market Road",
+      customerGroup: "Corporate",
+      senderDoNumber: "SDO-100",
+      recipientDoNumber: "RDO-200",
+      sourceReference: "PO-300",
+      department: "Marketing",
+      terms: "Net 30",
+      items: [{
+        id: "line-1",
+        name: "Bouquet",
+        price: 500,
+        quantity: 1,
+        packing: "Gift box",
+        remarks: "White ribbon",
+      }],
       deliveryFee: 0,
       urgentFee: 0,
       subtotal: 500,
@@ -186,7 +209,11 @@ describe("odoo-api note contracts", () => {
       createdAt: "2026-07-14T10:00:00.000Z",
     };
 
-    await submitOdooOrder(order, { customerId: 42 });
+    await submitOdooOrder(order, {
+      customerId: 42,
+      customerType: "company",
+      companyName: "Chan Tai Limited",
+    });
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const payload = JSON.parse(String(init.body));
@@ -209,6 +236,22 @@ describe("odoo-api note contracts", () => {
       paymentIdempotencyKey: "744078bd-ae57-4639-af5a-11d8805654b1",
       deliveryTimeMode: "slot",
       deliverySlotId: 11,
+      customerType: "company",
+      companyName: "Chan Tai Limited",
+      customerEmail: "accounts@example.com",
+      billingAddress: "1 Flower Market Road",
+      customerGroup: "Corporate",
+      senderDoNumber: "SDO-100",
+      recipientDoNumber: "RDO-200",
+      sourceReference: "PO-300",
+      department: "Marketing",
+      terms: "Net 30",
+      items: [
+        expect.objectContaining({
+          packing: "Gift box",
+          remarks: "White ribbon",
+        }),
+      ],
     });
     expect(payload).not.toHaveProperty("notes");
     expect(payload).not.toHaveProperty("followUpDate");

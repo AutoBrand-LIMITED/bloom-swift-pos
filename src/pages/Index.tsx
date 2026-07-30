@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateAllDocuments, generateReceipt, printDocument } from "@/lib/print-utils";
 import CustomerSection from "@/components/pos/CustomerSection";
+import BusinessDetailsSection from "@/components/pos/BusinessDetailsSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
 import GiftCardSection from "@/components/pos/GiftCardSection";
@@ -18,9 +19,15 @@ import SalesIdSection from "@/components/pos/SalesIdSection";
 import type { DemoCustomer } from "@/data/demo-customers";
 import { buildPartnerNoteMutation } from "@/lib/customer-notes";
 import {
+  companyFieldsForCustomerType,
+  detachedCustomerProfile,
+} from "@/lib/customer-profile";
+import {
   deliveryContractFieldsForSubmission,
+  firstAddedLegacyBusinessField,
   isDeterministicSubmissionFailure,
   loadPendingSubmission,
+  pendingOptionBindingsMatch,
   submissionPayloadMatches,
   submitPersistedOrder,
   upgradeLegacyPendingDeliverySelection,
@@ -46,6 +53,7 @@ import {
 } from "@/lib/delivery-slots";
 import {
   validateCheckout,
+  validatePositiveOrderTotal,
   normalizePhoneNumber,
   type CheckoutErrors,
   type CheckoutField,
@@ -72,6 +80,14 @@ const Index = () => {
   const [senderName, setSenderName] = useState("");
   const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
   const [companyName, setCompanyName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [billingAddress, setBillingAddress] = useState("");
+  const [customerGroup, setCustomerGroup] = useState("");
+  const [senderDoNumber, setSenderDoNumber] = useState("");
+  const [recipientDoNumber, setRecipientDoNumber] = useState("");
+  const [sourceReference, setSourceReference] = useState("");
+  const [department, setDepartment] = useState("");
+  const [terms, setTerms] = useState("");
   const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({});
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
   const [confirmedNewCustomerPhone, setConfirmedNewCustomerPhone] = useState<string | null>(null);
@@ -272,6 +288,18 @@ const Index = () => {
     setSaveRecipientNote(false);
   }, [clearRecipientPersistenceBinding]);
 
+  const detachSelectedCustomerProfile = useCallback(() => {
+    const emptyProfile = detachedCustomerProfile();
+    setSelectedCustomer(null);
+    setCustomerEmail(emptyProfile.customerEmail);
+    setCustomerType(emptyProfile.customerType);
+    setCompanyName(emptyProfile.companyName);
+    setBillingAddress(emptyProfile.billingAddress);
+    setSenderContactDraft("");
+    setSaveSenderNote(false);
+    resetRecipientPersistence();
+  }, [resetRecipientPersistence]);
+
   const clearCheckoutErrors = useCallback((...fields: CheckoutField[]) => {
     setCheckoutErrors((current) => {
       if (!fields.some((field) => current[field])) return current;
@@ -287,6 +315,14 @@ const Index = () => {
     setSenderName("");
     setCustomerType("personal");
     setCompanyName("");
+    setCustomerEmail("");
+    setBillingAddress("");
+    setCustomerGroup("");
+    setSenderDoNumber("");
+    setRecipientDoNumber("");
+    setSourceReference("");
+    setDepartment("");
+    setTerms("");
     setCheckoutErrors({});
     setSelectedCustomer(null);
     setConfirmedNewCustomerPhone(null);
@@ -343,8 +379,16 @@ const Index = () => {
     setPhone(order.phone);
     setCustomerName(order.customerName);
     setSenderName(order.senderName ?? order.customerName ?? "");
-    setCustomerType(options.customerType || "personal");
-    setCompanyName(options.companyName || "");
+    setCustomerType(order.customerType || options.customerType || "personal");
+    setCompanyName(order.companyName || options.companyName || "");
+    setCustomerEmail(order.customerEmail || "");
+    setBillingAddress(order.billingAddress || "");
+    setCustomerGroup(order.customerGroup || "");
+    setSenderDoNumber(order.senderDoNumber || "");
+    setRecipientDoNumber(order.recipientDoNumber || "");
+    setSourceReference(order.sourceReference || "");
+    setDepartment(order.department || "");
+    setTerms(order.terms || "");
     setSelectedCustomer(options.customerId ? {
       id: `odoo-${options.customerId}`,
       name: order.customerName,
@@ -557,6 +601,19 @@ const Index = () => {
       toast.error("請選擇已同步到 Odoo 嘅負責員工");
       return;
     }
+    if (
+      pendingSubmission
+      && !pendingOptionBindingsMatch(pendingSubmission, {
+        customerId: selectedCustomer?.odooPartnerId,
+        customerType,
+        companyName,
+      })
+    ) {
+      toast.error(
+        "待確認訂單嘅客戶、客戶類型或公司名稱已改變；請還原原本資料，或先到 Odoo 核對訂單結果",
+      );
+      return;
+    }
     const deliveryAddress = [
       deliveryRegion,
       deliveryDistrict,
@@ -565,6 +622,18 @@ const Index = () => {
     ].filter(Boolean).join(" ");
     const validationErrors = validateCheckout({
       customerName,
+      customerType,
+      companyName,
+      customerEmail,
+      billingAddress,
+      allowLegacyMissingCompanyFields: Boolean(
+        pendingSubmission
+          && customerType === "company"
+          && (
+            !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "companyName")
+            || !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "billingAddress")
+          )
+      ),
       phone,
       selectedCustomerPhone: selectedCustomer?.phone,
       confirmedNewCustomerPhone,
@@ -588,6 +657,25 @@ const Index = () => {
       return;
     }
 
+    const addedLegacyBusinessField = pendingSubmission
+      ? firstAddedLegacyBusinessField(pendingSubmission.order, {
+          customerEmail,
+          billingAddress,
+          customerGroup,
+          senderDoNumber,
+          recipientDoNumber,
+          sourceReference,
+          department,
+          terms,
+        })
+      : null;
+    if (addedLegacyBusinessField) {
+      toast.error(
+        `舊格式待確認訂單唔可以新增「${addedLegacyBusinessField}」；請先到 Odoo 核對原訂單結果`,
+      );
+      return;
+    }
+
     if (items.length === 0) {
       toast.error("請至少加入一個項目");
       return;
@@ -604,8 +692,10 @@ const Index = () => {
       return;
     }
 
-    if (finalPrice === 0) {
-      toast.warning("價格為 $0，訂單仍會建立");
+    const totalError = validatePositiveOrderTotal(finalPrice);
+    if (totalError) {
+      toast.error(totalError);
+      return;
     }
 
     const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
@@ -659,11 +749,24 @@ const Index = () => {
     const preserveLegacySenderPayload = Boolean(
       pendingSubmission && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "senderName")
     );
+    const includePendingField = (field: keyof Order) => (
+      !pendingSubmission || Object.prototype.hasOwnProperty.call(pendingSubmission.order, field)
+    );
     const currentOrder: Order = {
       id: pendingSubmission?.order.id || checkoutId,
       salesId,
       operatorEmployeeId,
       customerName: customerName.trim(),
+      ...(includePendingField("customerType") ? { customerType } : {}),
+      ...(includePendingField("companyName") ? { companyName: companyName.trim() } : {}),
+      ...(includePendingField("customerEmail") ? { customerEmail: customerEmail.trim() } : {}),
+      ...(includePendingField("billingAddress") ? { billingAddress: billingAddress.trim() } : {}),
+      ...(includePendingField("customerGroup") ? { customerGroup: customerGroup.trim() } : {}),
+      ...(includePendingField("senderDoNumber") ? { senderDoNumber: senderDoNumber.trim() } : {}),
+      ...(includePendingField("recipientDoNumber") ? { recipientDoNumber: recipientDoNumber.trim() } : {}),
+      ...(includePendingField("sourceReference") ? { sourceReference: sourceReference.trim() } : {}),
+      ...(includePendingField("department") ? { department: department.trim() } : {}),
+      ...(includePendingField("terms") ? { terms: terms.trim() } : {}),
       ...(preserveLegacySenderPayload ? {} : { senderName: senderName.trim() }),
       phone: phone.trim(),
       items,
@@ -699,11 +802,13 @@ const Index = () => {
       recipientPartnerId,
       createdAt: pendingSubmission?.order.createdAt || new Date().toISOString(),
     };
-    const currentOptions = {
-      customerId: selectedCustomer?.odooPartnerId,
-      customerType,
-      companyName,
-    };
+    const currentOptions = pendingSubmission
+      ? pendingSubmission.options
+      : {
+          customerId: selectedCustomer?.odooPartnerId,
+          customerType,
+          companyName: companyName.trim(),
+        };
     const currentSubmission = {
       order: currentOrder,
       options: currentOptions,
@@ -711,6 +816,18 @@ const Index = () => {
     };
     let submission: PendingOrderSubmission = currentSubmission;
     if (pendingSubmission) {
+      const hasLegacyPendingBusinessFields = [
+        "customerType",
+        "companyName",
+        "customerEmail",
+        "billingAddress",
+        "customerGroup",
+        "senderDoNumber",
+        "recipientDoNumber",
+        "sourceReference",
+        "department",
+        "terms",
+      ].some((field) => !Object.prototype.hasOwnProperty.call(pendingSubmission.order, field));
       if (hasLegacyPendingDelivery) {
         try {
           submission = upgradeLegacyPendingDeliverySelection(
@@ -732,7 +849,11 @@ const Index = () => {
           return;
         }
       } else if (!submissionPayloadMatches(pendingSubmission, currentSubmission)) {
-        toast.error("已恢復嘅待確認訂單曾被修改；請還原原本內容後先重試");
+        toast.error(
+          hasLegacyPendingBusinessFields
+            ? "呢張舊格式待確認訂單唔可以修改；請保留原本內容重試，或先到 Odoo 核對訂單結果"
+            : "已恢復嘅待確認訂單曾被修改；請還原原本內容後先重試",
+        );
         return;
       } else {
         submission = pendingSubmission;
@@ -854,10 +975,7 @@ const Index = () => {
           <CustomerHistoryPanel
             customer={selectedCustomer}
             onClose={() => {
-              setSelectedCustomer(null);
-              setSenderContactDraft("");
-              setSaveSenderNote(false);
-              resetRecipientPersistence();
+              detachSelectedCustomerProfile();
             }}
             onUseAddress={(selection) => {
               const parsed = parseDeliveryAddress(selection.address);
@@ -911,6 +1029,8 @@ const Index = () => {
           senderName={senderName}
           customerType={customerType}
           companyName={companyName}
+          customerEmail={customerEmail}
+          billingAddress={billingAddress}
           onPhoneChange={(v) => {
             setPhone(v);
             clearCheckoutErrors("phone");
@@ -922,34 +1042,55 @@ const Index = () => {
               selectedCustomer
               && normalizedPhone !== normalizePhoneNumber(selectedCustomer.phone)
             ) {
-              setSelectedCustomer(null);
-              setSenderContactDraft("");
-              setSaveSenderNote(false);
-              resetRecipientPersistence();
+              detachSelectedCustomerProfile();
             }
           }}
           onNameChange={(value) => {
             setCustomerName(value);
             clearCheckoutErrors("customerName");
             if (selectedCustomer && value !== selectedCustomer.name) {
-              setSelectedCustomer(null);
-              setSenderContactDraft("");
-              setSaveSenderNote(false);
-              resetRecipientPersistence();
+              detachSelectedCustomerProfile();
             }
           }}
           onSenderNameChange={(value) => {
             setSenderName(value);
             clearCheckoutErrors("senderName");
           }}
-          onCustomerTypeChange={setCustomerType}
-          onCompanyNameChange={setCompanyName}
+          onCustomerTypeChange={(value) => {
+            const profile = companyFieldsForCustomerType(value, companyName, billingAddress);
+            setCustomerType(profile.customerType);
+            setCompanyName(profile.companyName);
+            setBillingAddress(profile.billingAddress);
+            clearCheckoutErrors("companyName", "billingAddress");
+          }}
+          onCompanyNameChange={(value) => {
+            setCompanyName(value);
+            clearCheckoutErrors("companyName");
+          }}
+          onCustomerEmailChange={(value) => {
+            setCustomerEmail(value);
+            clearCheckoutErrors("customerEmail");
+          }}
+          onBillingAddressChange={(value) => {
+            setBillingAddress(value);
+            clearCheckoutErrors("billingAddress");
+          }}
           onCustomerSelect={(c) => {
             setSelectedCustomer(c);
             setConfirmedNewCustomerPhone(null);
             setCustomerName(c.name);
             setPhone(c.phone);
-            clearCheckoutErrors("customerName", "phone");
+            setCustomerEmail(c.email || "");
+            setCustomerType(c.customerType || "personal");
+            setCompanyName(c.companyName || "");
+            setBillingAddress(c.billingAddress || "");
+            clearCheckoutErrors(
+              "customerName",
+              "phone",
+              "companyName",
+              "customerEmail",
+              "billingAddress",
+            );
             setSenderContactDraft(c.commentText || "");
             setSaveSenderNote(false);
             setNotesConflict(null);
@@ -958,6 +1099,9 @@ const Index = () => {
           phoneError={checkoutErrors.phone}
           customerNameError={checkoutErrors.customerName}
           senderNameError={checkoutErrors.senderName}
+          companyNameError={checkoutErrors.companyName}
+          customerEmailError={checkoutErrors.customerEmail}
+          billingAddressError={checkoutErrors.billingAddress}
           selectedCustomer={selectedCustomer}
           confirmedNewCustomerPhone={confirmedNewCustomerPhone}
           onConfirmNewCustomer={(normalizedPhone) => {
@@ -966,6 +1110,21 @@ const Index = () => {
             clearCheckoutErrors("phone");
           }}
           refreshKey={customerRefreshKey}
+        />
+
+        <BusinessDetailsSection
+          customerGroup={customerGroup}
+          senderDoNumber={senderDoNumber}
+          recipientDoNumber={recipientDoNumber}
+          sourceReference={sourceReference}
+          department={department}
+          terms={terms}
+          onCustomerGroupChange={setCustomerGroup}
+          onSenderDoNumberChange={setSenderDoNumber}
+          onRecipientDoNumberChange={setRecipientDoNumber}
+          onSourceReferenceChange={setSourceReference}
+          onDepartmentChange={setDepartment}
+          onTermsChange={setTerms}
         />
 
         <OrderItemsSection
@@ -1124,7 +1283,7 @@ const Index = () => {
           paymentOptionsError={paymentOptionsError}
           depositAmount={depositAmount}
           onDepositAmountChange={setDepositAmount}
-          priceWarning={finalPrice === 0 && items.length > 0}
+          priceWarning={finalPrice <= 0 && items.length > 0}
         />
 
           </>

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Phone, ChevronDown, Building2, UserRoundCheck, Hash } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { User, Phone, ChevronDown, Building2, UserRoundCheck, Hash, Mail, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DemoCustomer } from "@/data/demo-customers";
 import CustomerFlags from "@/components/pos/CustomerFlags";
@@ -18,15 +19,22 @@ interface CustomerSectionProps {
   senderName: string;
   customerType: CustomerType;
   companyName: string;
+  customerEmail: string;
+  billingAddress: string;
   onPhoneChange: (v: string) => void;
   onNameChange: (v: string) => void;
   onSenderNameChange: (v: string) => void;
   onCustomerTypeChange: (v: CustomerType) => void;
   onCompanyNameChange: (v: string) => void;
+  onCustomerEmailChange: (v: string) => void;
+  onBillingAddressChange: (v: string) => void;
   onCustomerSelect: (c: DemoCustomer) => void;
   phoneError?: string;
   customerNameError?: string;
   senderNameError?: string;
+  companyNameError?: string;
+  customerEmailError?: string;
+  billingAddressError?: string;
   selectedCustomer: DemoCustomer | null;
   confirmedNewCustomerPhone?: string | null;
   onConfirmNewCustomer?: (normalizedPhone: string) => void;
@@ -34,9 +42,11 @@ interface CustomerSectionProps {
 }
 
 const CustomerSection = ({
-  phone, customerName, senderName, customerType, companyName,
+  phone, customerName, senderName, customerType, companyName, customerEmail, billingAddress,
   onPhoneChange, onNameChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
-  onCustomerSelect, phoneError, customerNameError, senderNameError, selectedCustomer, refreshKey,
+  onCustomerEmailChange, onBillingAddressChange,
+  onCustomerSelect, phoneError, customerNameError, senderNameError,
+  companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
   confirmedNewCustomerPhone, onConfirmNewCustomer,
 }: CustomerSectionProps) => {
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
@@ -317,19 +327,45 @@ const CustomerSection = ({
         </div>
       </div>
 
-      {/* Company name */}
+      {/* Company billing identity */}
       {customerType === "company" && (
-        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-          <Label className="text-xs font-medium flex items-center gap-1">
-            <Building2 className="w-3.5 h-3.5" /> 公司名稱
-          </Label>
-          <Input
-            placeholder="輸入公司名稱"
-            value={companyName}
-            onChange={(e) => onCompanyNameChange(e.target.value)}
-            className="text-base"
-            maxLength={100}
-          />
+        <div className="grid grid-cols-1 gap-3 animate-in fade-in slide-in-from-top-2 duration-200 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="company-name" className="text-xs font-medium flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5" /> 公司名稱 <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="company-name"
+              placeholder="輸入公司名稱"
+              value={companyName}
+              onChange={(e) => onCompanyNameChange(e.target.value)}
+              className={`text-base ${companyNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
+              maxLength={200}
+              aria-invalid={Boolean(companyNameError)}
+              aria-describedby={companyNameError ? "company-name-error" : undefined}
+            />
+            {companyNameError && (
+              <p id="company-name-error" role="alert" className="text-xs text-destructive">{companyNameError}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="billing-address" className="text-xs font-medium flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5" /> 帳單地址 <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              id="billing-address"
+              placeholder="輸入公司帳單地址"
+              value={billingAddress}
+              onChange={(event) => onBillingAddressChange(event.target.value)}
+              className={`min-h-11 text-base ${billingAddressError ? "border-destructive ring-1 ring-destructive" : ""}`}
+              maxLength={2000}
+              aria-invalid={Boolean(billingAddressError)}
+              aria-describedby={billingAddressError ? "billing-address-error" : undefined}
+            />
+            {billingAddressError && (
+              <p id="billing-address-error" role="alert" className="text-xs text-destructive">{billingAddressError}</p>
+            )}
+          </div>
         </div>
       )}
       <div className="space-y-3" ref={lookupRef}>
@@ -453,6 +489,28 @@ const CustomerSection = ({
             )}
           </div>
         </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="customer-email" className="text-xs font-medium flex items-center gap-1.5">
+          <Mail className="h-3.5 w-3.5" />
+          客戶電郵
+        </Label>
+        <Input
+          id="customer-email"
+          type="email"
+          inputMode="email"
+          placeholder="例如：accounts@example.com"
+          value={customerEmail}
+          onChange={(event) => onCustomerEmailChange(event.target.value)}
+          className={`text-base ${customerEmailError ? "border-destructive ring-1 ring-destructive" : ""}`}
+          maxLength={254}
+          aria-invalid={Boolean(customerEmailError)}
+          aria-describedby={customerEmailError ? "customer-email-error" : undefined}
+        />
+        {customerEmailError && (
+          <p id="customer-email-error" role="alert" className="text-xs text-destructive">{customerEmailError}</p>
+        )}
       </div>
 
       <div className="space-y-1.5">

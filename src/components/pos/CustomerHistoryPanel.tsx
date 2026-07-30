@@ -439,6 +439,36 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                           {[h.senderDoNumber, h.recipientDoNumber].filter(Boolean).join(" / ")}
                         </p>
                       )}
+                      {h.customerEmail && (
+                        <p className="break-all">
+                          <span className="text-muted-foreground">客戶電郵：</span>{h.customerEmail}
+                        </p>
+                      )}
+                      {h.billingAddress && (
+                        <p className="break-words">
+                          <span className="text-muted-foreground">帳單地址：</span>{h.billingAddress}
+                        </p>
+                      )}
+                      {h.customerGroup && (
+                        <p className="break-words">
+                          <span className="text-muted-foreground">Customer Group：</span>{h.customerGroup}
+                        </p>
+                      )}
+                      {h.sourceReference && (
+                        <p className="break-words">
+                          <span className="text-muted-foreground">Reference：</span>{h.sourceReference}
+                        </p>
+                      )}
+                      {h.department && (
+                        <p className="break-words">
+                          <span className="text-muted-foreground">Department：</span>{h.department}
+                        </p>
+                      )}
+                      {h.terms && (
+                        <p className="whitespace-pre-wrap break-words">
+                          <span className="text-muted-foreground">Terms：</span>{h.terms}
+                        </p>
+                      )}
                       {h.senderNote && (
                         <p className="whitespace-pre-wrap break-words">
                           <span className="text-muted-foreground">送花人備註：</span>{h.senderNote}
@@ -472,6 +502,11 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                             <p className="text-[10px] text-muted-foreground mt-1">
                               {[line.itemCode, `Qty ${formatQuantity(line.quantity)}`, line.packing].filter(Boolean).join(" · ")}
                             </p>
+                            {line.remarks && (
+                              <p className="mt-1 whitespace-pre-wrap break-words text-[10px]">
+                                <span className="text-muted-foreground">Remarks：</span>{line.remarks}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>

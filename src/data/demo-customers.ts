@@ -7,6 +7,10 @@ export interface DemoCustomer {
   totalSpent?: number;
   odooPartnerId?: number;
   customerCode?: string;
+  email?: string;
+  customerType?: "personal" | "company";
+  companyName?: string;
+  billingAddress?: string;
   commentText?: string;
   tags?: CustomerTag[];
   writeDate?: string;
@@ -37,6 +41,12 @@ export interface PurchaseRecord {
   deliveryPerson?: string;
   senderDoNumber?: string;
   recipientDoNumber?: string;
+  customerEmail?: string;
+  billingAddress?: string;
+  customerGroup?: string;
+  sourceReference?: string;
+  department?: string;
+  terms?: string;
   dataStatus?: string;
   deliveryDetailsMissing?: boolean;
   shippingPartnerId?: number;
@@ -54,6 +64,7 @@ export interface PurchaseRecordLine {
   subtotal: number;
   itemCode?: string | null;
   packing?: string | null;
+  remarks?: string | null;
 }
 
 export const DEMO_CUSTOMERS: DemoCustomer[] = [];

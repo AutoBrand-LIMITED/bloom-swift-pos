@@ -16,6 +16,12 @@ vi.mock("@/lib/odoo-api", () => ({
 
 const noop = vi.fn();
 const selectCustomer = vi.fn();
+const emptyBusinessProps = {
+  customerEmail: "",
+  billingAddress: "",
+  onCustomerEmailChange: noop,
+  onBillingAddressChange: noop,
+};
 
 function Harness() {
   const [senderName, setSenderName] = useState("");
@@ -27,6 +33,7 @@ function Harness() {
       senderName={senderName}
       customerType="personal"
       companyName=""
+      {...emptyBusinessProps}
       onPhoneChange={noop}
       onNameChange={noop}
       onSenderNameChange={setSenderName}
@@ -50,6 +57,7 @@ function CustomerLookupHarness() {
       senderName=""
       customerType="personal"
       companyName=""
+      {...emptyBusinessProps}
       onPhoneChange={(value) => {
         setPhone(value);
         const normalized = normalizePhoneNumber(value);
@@ -95,6 +103,7 @@ describe("CustomerSection gift sender", () => {
         senderName=""
         customerType="personal"
         companyName=""
+        {...emptyBusinessProps}
         onPhoneChange={noop}
         onNameChange={noop}
         onSenderNameChange={noop}
@@ -132,6 +141,35 @@ describe("CustomerSection gift sender", () => {
       expect(screen.getByLabelText(/下單人／聯絡人/)).toHaveFocus();
     });
     expect(screen.queryByText(/系統未有此電話號碼的客戶/)).not.toBeInTheDocument();
+  });
+
+  it("shows required company billing fields and the email field", () => {
+    render(
+      <CustomerSection
+        phone="91234567"
+        customerName="Company Contact"
+        senderName="Company Contact"
+        customerType="company"
+        companyName=""
+        customerEmail="accounts@example.com"
+        billingAddress=""
+        onPhoneChange={noop}
+        onNameChange={noop}
+        onSenderNameChange={noop}
+        onCustomerTypeChange={noop}
+        onCompanyNameChange={noop}
+        onCustomerEmailChange={noop}
+        onBillingAddressChange={noop}
+        onCustomerSelect={noop}
+        companyNameError="公司客戶必須輸入公司名稱"
+        billingAddressError="公司客戶必須輸入帳單地址"
+        selectedCustomer={null}
+      />,
+    );
+
+    expect(screen.getByLabelText(/公司名稱/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/帳單地址/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/客戶電郵/)).toHaveValue("accounts@example.com");
   });
 
   it("does not offer new-customer confirmation when the Odoo search fails", async () => {

@@ -31,6 +31,23 @@ const customer: DemoCustomer = {
       recipientPhone: "61234567",
       shippingPartnerId: 84,
       recipientContactNote: "到達前先致電",
+      customerEmail: "accounts@example.com",
+      billingAddress: "香港中環花園道 1 號",
+      customerGroup: "Corporate",
+      senderDoNumber: "SDO-100",
+      recipientDoNumber: "RDO-200",
+      sourceReference: "PO-300",
+      department: "Marketing",
+      terms: "Net 30",
+      lines: [{
+        name: "玫瑰花束",
+        quantity: 1,
+        unitPrice: 680,
+        subtotal: 680,
+        itemCode: "ROSE-01",
+        packing: "禮盒",
+        remarks: "白色絲帶",
+      }],
     },
     {
       id: 2,
@@ -87,6 +104,13 @@ describe("CustomerHistoryPanel resizable history", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "詳情" })[0]);
     expect(screen.getByText("收花人長期備註：")).toBeVisible();
     expect(screen.getByText("到達前先致電")).toBeVisible();
+    expect(screen.getByText("accounts@example.com")).toBeVisible();
+    expect(screen.getByText("香港中環花園道 1 號")).toBeVisible();
+    expect(screen.getByText("Corporate")).toBeVisible();
+    expect(screen.getByText("PO-300")).toBeVisible();
+    expect(screen.getByText("Marketing")).toBeVisible();
+    expect(screen.getByText("Net 30")).toBeVisible();
+    expect(screen.getByText("白色絲帶")).toBeVisible();
   });
 
   it("keeps different recipients at the same address as separate choices", () => {

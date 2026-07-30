@@ -9,6 +9,9 @@ interface OdooPartner {
   phone: string | null;
   mobile: string | null;
   customerCode: string | null;
+  customerType?: "personal" | "company";
+  companyName?: string | null;
+  billingAddress?: string | null;
   history_count: number | null;
   total_spent: number | null;
   history: PurchaseRecord[];
@@ -358,8 +361,8 @@ export async function submitOdooOrder(
     body: JSON.stringify({
       ...orderPayload,
       customerId: options.customerId,
-      customerType: options.customerType,
-      companyName: options.companyName,
+      customerType: options.customerType ?? order.customerType,
+      companyName: options.companyName ?? order.companyName,
     }),
     signal,
   });
@@ -426,6 +429,10 @@ export async function searchOdooCustomers(
     odooPartnerId: p.id,
     name: p.name,
     phone: p.phone || p.mobile || "",
+    email: p.email || undefined,
+    customerType: p.customerType || "personal",
+    companyName: p.companyName || undefined,
+    billingAddress: p.billingAddress || undefined,
     customerCode: p.customerCode || undefined,
     history: p.history || [],
     historyCount: p.history_count ?? undefined,
