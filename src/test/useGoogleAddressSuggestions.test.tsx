@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   useGoogleAddressSuggestions,
 } from "@/hooks/useGoogleAddressSuggestions";
+import type {
+  GoogleAddressSelection,
+  PlainGoogleAddressComponent,
+} from "@/lib/hk-address";
 
 const googleMocks = vi.hoisted(() => ({
   loadGooglePlacesLibrary: vi.fn(),
@@ -25,9 +29,11 @@ const makePrediction = (
   formattedAddress = label,
   fetchFields = vi.fn().mockResolvedValue(undefined),
   mainText: string | null = label.split(",")[0],
+  addressComponents: PlainGoogleAddressComponent[] = [],
 ) => {
   const place = {
     formattedAddress,
+    addressComponents,
     fetchFields,
   };
   const prediction = {
@@ -44,7 +50,7 @@ interface HarnessProps {
   region?: string;
   district?: string;
   area?: string;
-  onAddressSelect?: (address: string) => void;
+  onAddressSelect?: (selection: GoogleAddressSelection) => void;
 }
 
 const Harness = ({
@@ -172,11 +178,30 @@ describe("useGoogleAddressSuggestions", () => {
     expect(screen.getByRole("button", { name: "巧運工業大廈" })).toBeVisible();
   });
 
-  it("fetches only the formatted address and preserves an omitted place name", async () => {
+  it("fetches the formatted address and components and emits the canonical hierarchy", async () => {
     const onAddressSelect = vi.fn();
     const selected = makePrediction(
       "巧運工業大廈",
       "觀塘駿業街66號",
+      undefined,
+      undefined,
+      [
+        {
+          longText: "香港",
+          shortText: "HK",
+          types: ["country"],
+        },
+        {
+          longText: "九龍",
+          shortText: "九龍",
+          types: ["administrative_area_level_1"],
+        },
+        {
+          longText: "觀塘",
+          shortText: "觀塘",
+          types: ["neighborhood"],
+        },
+      ],
     );
     googleMocks.fetchAutocompleteSuggestions.mockResolvedValue({
       suggestions: [{ placePrediction: selected.prediction }],
@@ -192,12 +217,88 @@ describe("useGoogleAddressSuggestions", () => {
     });
 
     expect(selected.fetchFields).toHaveBeenCalledWith({
-      fields: ["formattedAddress"],
+      fields: ["formattedAddress", "addressComponents"],
     });
     expect(onAddressSelect).toHaveBeenCalledOnce();
-    expect(onAddressSelect).toHaveBeenCalledWith(
-      "巧運工業大廈, 觀塘駿業街66號",
+    expect(onAddressSelect).toHaveBeenCalledWith({
+      address: "巧運工業大廈, 觀塘駿業街66號",
+      region: "九龍",
+      district: "觀塘區",
+      area: "觀塘",
+    });
+  });
+
+  it("emits a derived region for a district-only component", async () => {
+    const onAddressSelect = vi.fn();
+    const selected = makePrediction(
+      "觀塘工業中心",
+      "觀塘駿業街66號",
+      undefined,
+      undefined,
+      [{
+        longText: "觀塘區",
+        shortText: "觀塘區",
+        types: ["administrative_area_level_2"],
+      }],
     );
+    googleMocks.fetchAutocompleteSuggestions.mockResolvedValue({
+      suggestions: [{ placePrediction: selected.prediction }],
+    });
+    render(<Harness value="觀" onAddressSelect={onAddressSelect} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "觀塘工業中心" }));
+      await Promise.resolve();
+    });
+
+    expect(onAddressSelect).toHaveBeenCalledWith({
+      address: "觀塘工業中心, 觀塘駿業街66號",
+      region: "九龍",
+      district: "觀塘區",
+      area: "",
+    });
+  });
+
+  it("keeps unknown components unresolved instead of using street substrings", async () => {
+    const onAddressSelect = vi.fn();
+    const selected = makePrediction(
+      "大埔道大廈",
+      "九龍大埔道123號",
+      undefined,
+      undefined,
+      [
+        {
+          longText: "大埔道",
+          shortText: "大埔道",
+          types: ["route"],
+        },
+        {
+          longText: "香港",
+          shortText: "HK",
+          types: ["country"],
+        },
+      ],
+    );
+    googleMocks.fetchAutocompleteSuggestions.mockResolvedValue({
+      suggestions: [{ placePrediction: selected.prediction }],
+    });
+    render(<Harness value="大" onAddressSelect={onAddressSelect} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "大埔道大廈" }));
+      await Promise.resolve();
+    });
+
+    expect(onAddressSelect).toHaveBeenCalledWith({
+      address: "大埔道大廈, 九龍大埔道123號",
+      region: "",
+      district: "",
+      area: "",
+    });
   });
 
   it("does not duplicate a place name already in the formatted address", async () => {
@@ -220,12 +321,15 @@ describe("useGoogleAddressSuggestions", () => {
     });
 
     expect(selected.fetchFields).toHaveBeenCalledWith({
-      fields: ["formattedAddress"],
+      fields: ["formattedAddress", "addressComponents"],
     });
     expect(onAddressSelect).toHaveBeenCalledOnce();
-    expect(onAddressSelect).toHaveBeenCalledWith(
-      "巧運工業大廈, 觀塘駿業街66號",
-    );
+    expect(onAddressSelect).toHaveBeenCalledWith({
+      address: "巧運工業大廈, 觀塘駿業街66號",
+      region: "",
+      district: "",
+      area: "",
+    });
   });
 
   it("does not prepend the full suggestion label when mainText is unavailable", async () => {
@@ -259,7 +363,12 @@ describe("useGoogleAddressSuggestions", () => {
       }),
     ).not.toBeInTheDocument();
     expect(onAddressSelect).toHaveBeenCalledOnce();
-    expect(onAddressSelect).toHaveBeenCalledWith("觀塘駿業街66號");
+    expect(onAddressSelect).toHaveBeenCalledWith({
+      address: "觀塘駿業街66號",
+      region: "",
+      district: "",
+      area: "",
+    });
   });
 
   it("falls back safely when Google Places is unavailable", async () => {
@@ -274,6 +383,48 @@ describe("useGoogleAddressSuggestions", () => {
 
     expect(screen.getByTestId("status")).toHaveTextContent("unavailable");
     expect(screen.queryByRole("button", { name: "巧運工業大廈" })).not.toBeInTheDocument();
+  });
+
+  it("does not publish a selection when Place Details fails", async () => {
+    const onAddressSelect = vi.fn();
+    const selected = makePrediction(
+      "巧運工業大廈",
+      "觀塘駿業街66號",
+      vi.fn().mockRejectedValue(new Error("Place Details unavailable")),
+    );
+    googleMocks.fetchAutocompleteSuggestions.mockResolvedValue({
+      suggestions: [{ placePrediction: selected.prediction }],
+    });
+    render(<Harness value="巧" onAddressSelect={onAddressSelect} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "巧運工業大廈" }));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("status")).toHaveTextContent("unavailable");
+    expect(onAddressSelect).not.toHaveBeenCalled();
+  });
+
+  it("does not publish a selection without a formatted address", async () => {
+    const onAddressSelect = vi.fn();
+    const selected = makePrediction("巧運工業大廈", "   ");
+    googleMocks.fetchAutocompleteSuggestions.mockResolvedValue({
+      suggestions: [{ placePrediction: selected.prediction }],
+    });
+    render(<Harness value="巧" onAddressSelect={onAddressSelect} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "巧運工業大廈" }));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("status")).toHaveTextContent("unavailable");
+    expect(onAddressSelect).not.toHaveBeenCalled();
   });
 
   it("keeps an explicit selection when the suggestion list is dismissed", async () => {
@@ -302,9 +453,12 @@ describe("useGoogleAddressSuggestions", () => {
       await Promise.resolve();
     });
 
-    expect(onAddressSelect).toHaveBeenCalledWith(
-      "巧運工業大廈, 6 巧明街, 觀塘, 香港",
-    );
+    expect(onAddressSelect).toHaveBeenCalledWith({
+      address: "巧運工業大廈, 6 巧明街, 觀塘, 香港",
+      region: "",
+      district: "",
+      area: "",
+    });
   });
 
   it("does not apply a selected result after the address hierarchy changes", async () => {
@@ -362,7 +516,12 @@ describe("useGoogleAddressSuggestions", () => {
       fireEvent.click(screen.getByRole("button", { name: "巧" }));
       await Promise.resolve();
     });
-    expect(onAddressSelect).toHaveBeenCalledWith("巧");
+    expect(onAddressSelect).toHaveBeenCalledWith({
+      address: "巧",
+      region: "",
+      district: "",
+      area: "",
+    });
 
     googleMocks.fetchAutocompleteSuggestions.mockClear();
     rerender(<Harness value="巧運" onAddressSelect={onAddressSelect} />);

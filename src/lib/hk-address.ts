@@ -41,12 +41,200 @@ export interface ParsedDeliveryAddress {
   detail: string;
 }
 
+export interface AddressHierarchy {
+  region: string;
+  district: string;
+  area: string;
+}
+
+export interface PlainGoogleAddressComponent {
+  longText: string;
+  shortText: string;
+  types: readonly string[];
+}
+
+export interface GoogleAddressSelection extends AddressHierarchy {
+  address: string;
+}
+
 interface PrefixMatch {
   region: string;
   district: string;
   area: string;
   length: number;
 }
+
+interface CanonicalDistrict {
+  region: string;
+  district: string;
+}
+
+interface CanonicalArea extends CanonicalDistrict {
+  area: string;
+}
+
+const HIERARCHY_COMPONENT_TYPES = new Set([
+  "administrative_area_level_1",
+  "administrative_area_level_2",
+  "administrative_area_level_3",
+  "locality",
+  "neighborhood",
+  "postal_town",
+  "sublocality",
+  "sublocality_level_1",
+  "sublocality_level_2",
+  "sublocality_level_3",
+  "sublocality_level_4",
+  "sublocality_level_5",
+]);
+
+const normalizeCanonicalValue = (value: string) => (
+  value.normalize("NFKC").trim().replace(/\s+/g, "").toLocaleLowerCase("zh-HK")
+);
+
+const regionByNormalizedName = new Map<string, string>();
+const districtByNormalizedName = new Map<string, CanonicalDistrict>();
+const areaByNormalizedName = new Map<string, CanonicalArea>();
+
+Object.entries(HK_DISTRICTS).forEach(([region, districts]) => {
+  regionByNormalizedName.set(normalizeCanonicalValue(region), region);
+  Object.entries(districts).forEach(([district, areas]) => {
+    districtByNormalizedName.set(normalizeCanonicalValue(district), {
+      region,
+      district,
+    });
+    areas.forEach((area) => {
+      areaByNormalizedName.set(normalizeCanonicalValue(area), {
+        region,
+        district,
+        area,
+      });
+    });
+  });
+});
+
+const componentHasAnyType = (
+  component: PlainGoogleAddressComponent,
+  allowedTypes: ReadonlySet<string>,
+) => component.types.some((type) => allowedTypes.has(type));
+
+const componentCanonicalMatch = <T>(
+  component: PlainGoogleAddressComponent,
+  canonicalValues: ReadonlyMap<string, T>,
+): T | undefined => {
+  const values = [component.longText, component.shortText];
+  for (const value of values) {
+    const match = canonicalValues.get(normalizeCanonicalValue(value));
+    if (match) return match;
+  }
+  return undefined;
+};
+
+const firstComponentMatch = <T>(
+  components: readonly PlainGoogleAddressComponent[],
+  allowedTypes: ReadonlySet<string>,
+  canonicalValues: ReadonlyMap<string, T>,
+): T | undefined => {
+  for (const component of components) {
+    if (!componentHasAnyType(component, allowedTypes)) continue;
+    const match = componentCanonicalMatch(component, canonicalValues);
+    if (match) return match;
+  }
+  return undefined;
+};
+
+const canonicalHierarchyFromValues = (
+  hierarchy: AddressHierarchy,
+): AddressHierarchy => {
+  const area = areaByNormalizedName.get(normalizeCanonicalValue(hierarchy.area));
+  if (area) return area;
+
+  const district = districtByNormalizedName.get(
+    normalizeCanonicalValue(hierarchy.district),
+  );
+  if (district) return { ...district, area: "" };
+
+  const region = regionByNormalizedName.get(
+    normalizeCanonicalValue(hierarchy.region),
+  );
+  return { region: region || "", district: "", area: "" };
+};
+
+/**
+ * Resolves only exact canonical values carried by Google hierarchy components.
+ * Free-form street/building text is intentionally never inspected.
+ */
+export const resolveHongKongAddressHierarchy = (
+  components: readonly PlainGoogleAddressComponent[],
+): AddressHierarchy => {
+  const area = firstComponentMatch(
+    components,
+    HIERARCHY_COMPONENT_TYPES,
+    areaByNormalizedName,
+  );
+  if (area) return area;
+
+  const district = firstComponentMatch(
+    components,
+    HIERARCHY_COMPONENT_TYPES,
+    districtByNormalizedName,
+  );
+  if (district) return { ...district, area: "" };
+
+  const region = firstComponentMatch(
+    components,
+    HIERARCHY_COMPONENT_TYPES,
+    regionByNormalizedName,
+  );
+  return { region: region || "", district: "", area: "" };
+};
+
+/**
+ * Applies detected values while retaining only canonical manual children that
+ * remain valid under the resolved parent.
+ */
+export const mergeAddressHierarchy = (
+  detected: AddressHierarchy,
+  current: AddressHierarchy,
+): AddressHierarchy => {
+  const canonicalDetected = canonicalHierarchyFromValues(detected);
+  const currentRegion = regionByNormalizedName.get(
+    normalizeCanonicalValue(current.region),
+  ) || "";
+  const currentDistrictMatch = districtByNormalizedName.get(
+    normalizeCanonicalValue(current.district),
+  );
+  const currentDistrict = currentDistrictMatch?.region === currentRegion
+    ? currentDistrictMatch.district
+    : "";
+  const currentAreaMatch = areaByNormalizedName.get(
+    normalizeCanonicalValue(current.area),
+  );
+  const currentArea = currentAreaMatch?.region === currentRegion
+    && currentAreaMatch.district === currentDistrict
+    ? currentAreaMatch.area
+    : "";
+  const region = canonicalDetected.region || currentRegion;
+
+  const district = canonicalDetected.district
+    || (
+      currentDistrict
+      && currentRegion === region
+        ? currentDistrict
+        : ""
+    );
+
+  const area = canonicalDetected.area
+    || (
+      currentArea
+      && currentRegion === region
+      && currentDistrict === district
+        ? currentArea
+        : ""
+    );
+
+  return { region, district, area };
+};
 
 const normalizedTokens = (value: string) => value.trim().split(/\s+/).filter(Boolean);
 

@@ -3,6 +3,11 @@ import {
   composeGooglePlaceAddress,
   publicGoogleAddressQuery,
 } from "@/lib/google-address";
+import {
+  resolveHongKongAddressHierarchy,
+  type GoogleAddressSelection,
+  type PlainGoogleAddressComponent,
+} from "@/lib/hk-address";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export interface GoogleAddressSuggestion {
@@ -21,7 +26,7 @@ interface UseGoogleAddressSuggestionsOptions {
   district: string;
   area: string;
   enabled?: boolean;
-  onAddressSelect: (formattedAddress: string) => void;
+  onAddressSelect: (selection: GoogleAddressSelection) => void;
 }
 
 const DEBOUNCE_MS = 250;
@@ -149,19 +154,30 @@ export const useGoogleAddressSuggestions = ({
 
     try {
       const place = suggestion.prediction.toPlace();
-      await place.fetchFields({ fields: ["formattedAddress"] });
-      if (!mountedRef.current || selectionId !== selectionSequenceRef.current) return;
+      await place.fetchFields({
+        fields: ["formattedAddress", "addressComponents"],
+      });
       const formattedAddress = place.formattedAddress?.trim();
+      const addressComponents: PlainGoogleAddressComponent[] = (
+        place.addressComponents || []
+      ).map((component) => ({
+        longText: component.longText?.trim() || "",
+        shortText: component.shortText?.trim() || "",
+        types: [...component.types],
+      }));
+      if (!mountedRef.current || selectionId !== selectionSequenceRef.current) return;
       if (!formattedAddress) {
         setStatus("unavailable");
         return;
       }
 
+      const hierarchy = resolveHongKongAddressHierarchy(addressComponents);
       sessionTokenRef.current = undefined;
       setStatus("idle");
-      onAddressSelectRef.current(
-        composeGooglePlaceAddress(suggestion.placeName, formattedAddress),
-      );
+      onAddressSelectRef.current({
+        address: composeGooglePlaceAddress(suggestion.placeName, formattedAddress),
+        ...hierarchy,
+      });
     } catch {
       if (!mountedRef.current || selectionId !== selectionSequenceRef.current) return;
       setStatus("unavailable");

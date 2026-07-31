@@ -1194,12 +1194,11 @@ const Index = () => {
             clearCheckoutErrors("deliveryAddress");
             resetRecipientPersistence();
           }}
-          onGoogleAddressSelect={(value) => {
-            const parsed = parseDeliveryAddress(value);
-            setDeliveryRegion(parsed.region);
-            setDeliveryDistrict(parsed.district);
-            setDeliveryArea(parsed.area);
-            setDeliveryDetail(parsed.detail);
+          onGoogleAddressSelect={(selection) => {
+            setDeliveryRegion(selection.region);
+            setDeliveryDistrict(selection.district);
+            setDeliveryArea(selection.area);
+            setDeliveryDetail(selection.address);
             clearCheckoutErrors("deliveryAddress");
             resetRecipientPersistence();
           }}

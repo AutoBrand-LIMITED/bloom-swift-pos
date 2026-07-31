@@ -255,11 +255,186 @@ describe("DeliverySection delivery time controls", () => {
     const calls = addressHookMocks.useGoogleAddressSuggestions.mock.calls;
     const hookOptions = calls[calls.length - 1][0];
     act(() => {
-      hookOptions.onAddressSelect("九龍 觀塘區 觀塘 巧運工業大廈");
+      hookOptions.onAddressSelect({
+        address: "巧運工業大廈, 觀塘駿業街66號",
+        region: "九龍",
+        district: "觀塘區",
+        area: "觀塘",
+      });
     });
 
     expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
       expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it("forwards a complete Google hierarchy as one structured selection", () => {
+    const props = renderSection({
+      deliveryRegion: "香港島",
+      deliveryDistrict: "中西區",
+      deliveryArea: "中環",
+      deliveryDetail: "巧",
+    });
+    const calls = addressHookMocks.useGoogleAddressSuggestions.mock.calls;
+    const hookOptions = calls[calls.length - 1][0];
+
+    act(() => {
+      hookOptions.onAddressSelect({
+        address: "巧運工業大廈, 觀塘駿業街66號",
+        region: "九龍",
+        district: "觀塘區",
+        area: "觀塘",
+      });
+    });
+
+    expect(props.onGoogleAddressSelect).toHaveBeenCalledOnce();
+    expect(props.onGoogleAddressSelect).toHaveBeenCalledWith({
+      address: "巧運工業大廈, 觀塘駿業街66號",
+      region: "九龍",
+      district: "觀塘區",
+      area: "觀塘",
+    });
+  });
+
+  it("retains a compatible manual area for a district-only Google result", () => {
+    const props = renderSection({
+      deliveryRegion: "九龍",
+      deliveryDistrict: "觀塘區",
+      deliveryArea: "九龍灣",
+      deliveryDetail: "巧",
+    });
+    const calls = addressHookMocks.useGoogleAddressSuggestions.mock.calls;
+    const hookOptions = calls[calls.length - 1][0];
+
+    act(() => {
+      hookOptions.onAddressSelect({
+        address: "巧運工業大廈, 觀塘駿業街66號",
+        region: "九龍",
+        district: "觀塘區",
+        area: "",
+      });
+    });
+
+    expect(props.onGoogleAddressSelect).toHaveBeenCalledWith({
+      address: "巧運工業大廈, 觀塘駿業街66號",
+      region: "九龍",
+      district: "觀塘區",
+      area: "九龍灣",
+    });
+  });
+
+  it("clears incompatible stale children for a partial Google result", () => {
+    const props = renderSection({
+      deliveryRegion: "香港島",
+      deliveryDistrict: "中西區",
+      deliveryArea: "中環",
+      deliveryDetail: "巧",
+    });
+    const calls = addressHookMocks.useGoogleAddressSuggestions.mock.calls;
+    const hookOptions = calls[calls.length - 1][0];
+
+    act(() => {
+      hookOptions.onAddressSelect({
+        address: "觀塘駿業街66號",
+        region: "九龍",
+        district: "觀塘區",
+        area: "",
+      });
+    });
+
+    expect(props.onGoogleAddressSelect).toHaveBeenCalledWith({
+      address: "觀塘駿業街66號",
+      region: "九龍",
+      district: "觀塘區",
+      area: "",
+    });
+  });
+
+  it("retains valid manual controls when Google components are unresolved", () => {
+    const props = renderSection({
+      deliveryRegion: "九龍",
+      deliveryDistrict: "觀塘區",
+      deliveryArea: "觀塘",
+      deliveryDetail: "巧",
+    });
+    const calls = addressHookMocks.useGoogleAddressSuggestions.mock.calls;
+    const hookOptions = calls[calls.length - 1][0];
+
+    act(() => {
+      hookOptions.onAddressSelect({
+        address: "觀塘駿業街66號",
+        region: "",
+        district: "",
+        area: "",
+      });
+    });
+
+    expect(props.onGoogleAddressSelect).toHaveBeenCalledWith({
+      address: "觀塘駿業街66號",
+      region: "九龍",
+      district: "觀塘區",
+      area: "觀塘",
+    });
+  });
+
+  it("preserves the legacy recognised-prefix fallback when components are unresolved", () => {
+    const props = renderSection({
+      deliveryRegion: "",
+      deliveryDistrict: "",
+      deliveryArea: "",
+      deliveryDetail: "巧",
+    });
+    const calls = addressHookMocks.useGoogleAddressSuggestions.mock.calls;
+    const hookOptions = calls[calls.length - 1][0];
+
+    act(() => {
+      hookOptions.onAddressSelect({
+        address: "九龍 觀塘區 觀塘 巧運工業大廈",
+        region: "",
+        district: "",
+        area: "",
+      });
+    });
+
+    expect(props.onGoogleAddressSelect).toHaveBeenCalledWith({
+      address: "巧運工業大廈",
+      region: "九龍",
+      district: "觀塘區",
+      area: "觀塘",
+    });
+  });
+
+  it("authorizes the map signature calculated from the merged hierarchy", () => {
+    const props = renderSectionProps({
+      deliveryRegion: "九龍",
+      deliveryDistrict: "觀塘區",
+      deliveryArea: "九龍灣",
+      deliveryDetail: "巧",
+    });
+    const { rerender } = render(<DeliverySection {...props} />);
+    const calls = addressHookMocks.useGoogleAddressSuggestions.mock.calls;
+    const hookOptions = calls[calls.length - 1][0];
+
+    act(() => {
+      hookOptions.onAddressSelect({
+        address: "巧運工業大廈, 觀塘駿業街66號",
+        region: "九龍",
+        district: "觀塘區",
+        area: "",
+      });
+    });
+    rerender(<DeliverySection
+      {...props}
+      deliveryDetail="巧運工業大廈, 觀塘駿業街66號"
+    />);
+
+    const map = screen.getByTitle("Google Map");
+    expect(map).toBeVisible();
+    expect(map).toHaveAttribute(
+      "src",
+      `https://www.google.com/maps?q=${encodeURIComponent(
+        "九龍 觀塘區 九龍灣 巧運工業大廈, 觀塘駿業街66號 香港",
+      )}&output=embed`,
     );
   });
 

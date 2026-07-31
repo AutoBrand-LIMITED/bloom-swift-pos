@@ -11,7 +11,12 @@ import {
   type FrozenDeliverySlotSelection,
 } from "@/lib/delivery-slots";
 import type { DeliverySlot } from "@/lib/odoo-api";
-import { HK_DISTRICTS, parseDeliveryAddress } from "@/lib/hk-address";
+import {
+  HK_DISTRICTS,
+  mergeAddressHierarchy,
+  parseDeliveryAddress,
+  type GoogleAddressSelection,
+} from "@/lib/hk-address";
 import type { DeliveryTimeMode } from "@/types/order";
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
@@ -59,7 +64,7 @@ interface DeliverySectionProps {
   onDistrictChange: (v: string) => void;
   onAreaChange: (v: string) => void;
   onDetailChange: (v: string) => void;
-  onGoogleAddressSelect: (v: string) => void;
+  onGoogleAddressSelect: (selection: GoogleAddressSelection) => void;
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
   onDeliveryPersonChange: (v: string) => void;
@@ -111,17 +116,30 @@ const DeliverySection = ({
     district: deliveryDistrict,
     area: deliveryArea,
     enabled: addressInputFocused && addressAutocompleteDirty && !addressCompositionActive,
-    onAddressSelect: (address) => {
-      const parsed = parseDeliveryAddress(address);
+    onAddressSelect: (selection) => {
+      const parsed = parseDeliveryAddress(selection.address);
+      const hierarchy = mergeAddressHierarchy({
+        region: selection.region || parsed.region,
+        district: selection.district || parsed.district,
+        area: selection.area || parsed.area,
+      }, {
+        region: deliveryRegion,
+        district: deliveryDistrict,
+        area: deliveryArea,
+      });
+      const address = parsed.region ? parsed.detail : selection.address;
       authorizedAddressSignatureRef.current = JSON.stringify([
-        parsed.region,
-        parsed.district,
-        parsed.area,
-        parsed.detail,
+        hierarchy.region,
+        hierarchy.district,
+        hierarchy.area,
+        address,
       ]);
       setAddressAutocompleteDirty(false);
       setAuthorizedMapSignature(authorizedAddressSignatureRef.current);
-      onGoogleAddressSelect(address);
+      onGoogleAddressSelect({
+        address,
+        ...hierarchy,
+      });
     },
   });
   const selectedSlot = findDeliverySlot(deliverySlots, deliverySlotId);
