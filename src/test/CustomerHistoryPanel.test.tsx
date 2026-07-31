@@ -81,6 +81,7 @@ describe("CustomerHistoryPanel resizable history", () => {
     expect(screen.getByRole("separator", {
       name: "上下拖拉以調整客戶資料與購買記錄高度",
     })).toBeVisible();
+    expect(screen.getByRole("button", { name: "關閉客戶記錄" })).toBeVisible();
     expect(screen.getByRole("button", {
       name: "使用過往地址 中環皇后大道中 1 號",
     })).toBeVisible();

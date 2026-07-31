@@ -12,7 +12,7 @@ import DeliverySection from "@/components/pos/DeliverySection";
 import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
-import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
+import CustomerHistoryDock from "@/components/pos/CustomerHistoryDock";
 import OrderNotesSection, { type NotesConflictTarget } from "@/components/pos/OrderNotesSection";
 import type { DeliveryTimeMode, Order, OrderItem, PaymentStatus } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
@@ -972,11 +972,9 @@ const Index = () => {
       <div className="flex flex-1">
         {/* Left: Customer history panel */}
         {hasSalesperson && selectedCustomer && (
-          <CustomerHistoryPanel
+          <CustomerHistoryDock
+            key={selectedCustomer.id}
             customer={selectedCustomer}
-            onClose={() => {
-              detachSelectedCustomerProfile();
-            }}
             onUseAddress={(selection) => {
               const parsed = parseDeliveryAddress(selection.address);
               setDeliveryRegion(parsed.region);

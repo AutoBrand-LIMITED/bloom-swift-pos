@@ -145,7 +145,14 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
           <History className="w-4 h-4 text-primary" />
           客戶記錄
         </h3>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11"
+          aria-label="關閉客戶記錄"
+          title="關閉客戶記錄"
+          onClick={onClose}
+        >
           <X className="w-4 h-4" />
         </Button>
       </div>
