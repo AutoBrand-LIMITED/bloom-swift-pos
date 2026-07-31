@@ -1,8 +1,19 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import DeliverySection from "@/components/pos/DeliverySection";
 import type { DeliverySlot } from "@/lib/odoo-api";
+
+const addressHookMocks = vi.hoisted(() => ({
+  useGoogleAddressSuggestions: vi.fn(),
+  clearSuggestions: vi.fn(),
+  refreshSuggestions: vi.fn(),
+  selectSuggestion: vi.fn(),
+}));
+
+vi.mock("@/hooks/useGoogleAddressSuggestions", () => ({
+  useGoogleAddressSuggestions: addressHookMocks.useGoogleAddressSuggestions,
+}));
 
 const slots: DeliverySlot[] = [
   { id: 11, displayLabel: "上午 09:00-13:00", startTime: "09:00", endTime: "13:00" },
@@ -24,7 +35,6 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     deliveryDistrict: "",
     deliveryArea: "",
     deliveryDetail: "",
-    googleAddressResetRevision: 0,
     recipientName: "",
     recipientPhone: "",
     deliveryPerson: "",
@@ -50,6 +60,17 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
 }
 
 describe("DeliverySection delivery time controls", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    addressHookMocks.useGoogleAddressSuggestions.mockReturnValue({
+      suggestions: [],
+      status: "idle",
+      clearSuggestions: addressHookMocks.clearSuggestions,
+      refreshSuggestions: addressHookMocks.refreshSuggestions,
+      selectSuggestion: addressHookMocks.selectSuggestion,
+    });
+  });
+
   it("renders backend slots as touch choices and returns the selected slot", () => {
     const props = renderSection({ deliveryTimeMode: "slot", deliverySlotId: 11 });
 
@@ -150,14 +171,180 @@ describe("DeliverySection delivery time controls", () => {
     expect(screen.getAllByRole("alert")).toHaveLength(5);
   });
 
+  it("uses the existing detail field as the only Google address input", () => {
+    const props = renderSection();
+    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+
+    expect(screen.queryByLabelText("Google 地址搜尋")).not.toBeInTheDocument();
+    expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
+    fireEvent.focus(input);
+    expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
+    fireEvent.change(input, { target: { value: "巧" } });
+
+    expect(props.onDetailChange).toHaveBeenCalledWith("巧");
+    expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: true }),
+    );
+  });
+
+  it("does not search a programmatically populated address until the user edits it", () => {
+    const { rerender } = render(
+      <DeliverySection {...renderSectionProps({ deliveryDetail: "" })} />,
+    );
+    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "巧" } });
+    expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: true }),
+    );
+
+    rerender(
+      <DeliverySection {...renderSectionProps({
+        deliveryDetail: "巧運工業大廈, 6 巧明街, 觀塘, 香港",
+      })} />,
+    );
+    expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
+    expect(screen.queryByTitle("Google Map")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /顯示 Google 地圖/ }));
+    expect(screen.getByTitle("Google Map")).toBeVisible();
+  });
+
+  it("resets manual-search intent when only the address hierarchy changes", () => {
+    const { rerender } = render(
+      <DeliverySection {...renderSectionProps({ deliveryDetail: "" })} />,
+    );
+    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "巧" } });
+
+    rerender(
+      <DeliverySection {...renderSectionProps({ deliveryDetail: "巧" })} />,
+    );
+    expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: true }),
+    );
+
+    rerender(
+      <DeliverySection {...renderSectionProps({
+        deliveryRegion: "九龍",
+        deliveryDistrict: "觀塘區",
+        deliveryArea: "觀塘",
+        deliveryDetail: "巧",
+      })} />,
+    );
+    expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it("stops autocomplete immediately after a Google suggestion is selected", () => {
+    renderSection({ deliveryDetail: "巧" });
+    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "巧運" } });
+    expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: true }),
+    );
+
+    const calls = addressHookMocks.useGoogleAddressSuggestions.mock.calls;
+    const hookOptions = calls[calls.length - 1][0];
+    act(() => {
+      hookOptions.onAddressSelect("九龍 觀塘區 觀塘 巧運工業大廈");
+    });
+
+    expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it("never renders a map for a replacement address before fresh authorization", () => {
+    const { rerender } = render(
+      <DeliverySection {...renderSectionProps({ deliveryDetail: "舊地址" })} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /顯示 Google 地圖/ }));
+    expect(screen.getByTitle("Google Map")).toBeVisible();
+
+    rerender(
+      <DeliverySection {...renderSectionProps({ deliveryDetail: "新地址" })} />,
+    );
+
+    expect(screen.queryByTitle("Google Map")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /顯示 Google 地圖/ })).toBeVisible();
+  });
+
+  it("shows Google suggestions directly below the detail field and selects one", () => {
+    const suggestion = {
+      label: "巧運工業大廈, 6 巧明街, 觀塘, 香港",
+      mainText: "巧運工業大廈",
+      secondaryText: "6 巧明街, 觀塘, 香港",
+      prediction: {},
+    };
+    addressHookMocks.useGoogleAddressSuggestions.mockReturnValue({
+      suggestions: [suggestion],
+      status: "ready",
+      clearSuggestions: addressHookMocks.clearSuggestions,
+      refreshSuggestions: addressHookMocks.refreshSuggestions,
+      selectSuggestion: addressHookMocks.selectSuggestion,
+    });
+    renderSection({ deliveryDetail: "巧" });
+
+    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    const option = screen.getByRole("option", { name: /巧運工業大廈/ });
+    expect(input.parentElement).toContainElement(screen.getByRole("listbox", { name: "Google 地址建議" }));
+
+    fireEvent.click(option);
+    expect(addressHookMocks.selectSuggestion).toHaveBeenCalledWith(suggestion);
+  });
+
+  it("supports keyboard selection and dismissing the suggestion list", () => {
+    const suggestion = {
+      label: "巧運工業大廈, 6 巧明街, 觀塘, 香港",
+      mainText: "巧運工業大廈",
+      secondaryText: "6 巧明街, 觀塘, 香港",
+      prediction: {},
+    };
+    addressHookMocks.useGoogleAddressSuggestions.mockReturnValue({
+      suggestions: [suggestion],
+      status: "ready",
+      clearSuggestions: addressHookMocks.clearSuggestions,
+      refreshSuggestions: addressHookMocks.refreshSuggestions,
+      selectSuggestion: addressHookMocks.selectSuggestion,
+    });
+    renderSection({ deliveryDetail: "巧" });
+    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(addressHookMocks.selectSuggestion).toHaveBeenCalledWith(suggestion);
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(addressHookMocks.clearSuggestions).toHaveBeenCalledWith(true);
+
+    fireEvent.keyDown(input, { key: "Tab" });
+    expect(addressHookMocks.clearSuggestions).toHaveBeenLastCalledWith(true);
+  });
+
   it("keeps all manual address controls visible when Google is unavailable", () => {
+    addressHookMocks.useGoogleAddressSuggestions.mockReturnValue({
+      suggestions: [],
+      status: "unavailable",
+      clearSuggestions: addressHookMocks.clearSuggestions,
+      refreshSuggestions: addressHookMocks.refreshSuggestions,
+      selectSuggestion: addressHookMocks.selectSuggestion,
+    });
     renderSection();
 
-    expect(screen.getByText("Google 地址搜尋暫時不可用，請使用下方手動地址欄。")).toBeVisible();
+    expect(screen.getByText("Google 地址建議暫時不可用；你可以繼續手動輸入。")).toBeVisible();
     expect(screen.getByRole("combobox", { name: "送貨地區" })).toBeEnabled();
     expect(screen.getByRole("combobox", { name: "送貨分區" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "送貨地點" })).toBeDisabled();
-    expect(screen.getByPlaceholderText("詳細地址（大廈名 / 樓層 / 室）")).toBeEnabled();
+    expect(screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）")).toBeEnabled();
   });
 });
 
@@ -178,7 +365,6 @@ function renderSectionProps(
     deliveryDistrict: "",
     deliveryArea: "",
     deliveryDetail: "",
-    googleAddressResetRevision: 0,
     recipientName: "",
     recipientPhone: "",
     deliveryPerson: "",

@@ -1,19 +1,20 @@
 import { Button } from "@/components/ui/button";
-import GooglePlaceAutocomplete from "@/components/pos/GooglePlaceAutocomplete";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useGoogleAddressSuggestions } from "@/hooks/useGoogleAddressSuggestions";
+import { publicGoogleAddressQuery } from "@/lib/google-address";
 import {
   deliverySlotSnapshot,
   findDeliverySlot,
   type FrozenDeliverySlotSelection,
 } from "@/lib/delivery-slots";
 import type { DeliverySlot } from "@/lib/odoo-api";
-import { HK_DISTRICTS } from "@/lib/hk-address";
+import { HK_DISTRICTS, parseDeliveryAddress } from "@/lib/hk-address";
 import type { DeliveryTimeMode } from "@/types/order";
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
-import type { KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
   Calendar,
@@ -45,7 +46,6 @@ interface DeliverySectionProps {
   deliveryDistrict: string;
   deliveryArea: string;
   deliveryDetail: string;
-  googleAddressResetRevision: number;
   recipientName: string;
   recipientPhone: string;
   deliveryPerson: string;
@@ -73,7 +73,6 @@ const DeliverySection = ({
   deliveryDateError, deliveryAddressError, recipientNameError, recipientPhoneError,
   legacyDeliveryTime,
   deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
-  googleAddressResetRevision,
   recipientName, recipientPhone, deliveryPerson, failedDeliveryAction,
   onDateChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect, onRetryDeliverySlots,
   onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
@@ -85,6 +84,46 @@ const DeliverySection = ({
   const areas = deliveryRegion && deliveryDistrict
     ? HK_DISTRICTS[deliveryRegion]?.[deliveryDistrict] || []
     : [];
+  const currentAddressSignature = JSON.stringify([
+    deliveryRegion,
+    deliveryDistrict,
+    deliveryArea,
+    deliveryDetail,
+  ]);
+  const addressListboxId = useId();
+  const [activeAddressSuggestion, setActiveAddressSuggestion] = useState(-1);
+  const [addressInputFocused, setAddressInputFocused] = useState(false);
+  const [addressCompositionActive, setAddressCompositionActive] = useState(false);
+  const [addressAutocompleteDirty, setAddressAutocompleteDirty] = useState(false);
+  const [authorizedMapSignature, setAuthorizedMapSignature] = useState<string | null>(null);
+  const lastManualAddressSignatureRef = useRef<string | null>(null);
+  const authorizedAddressSignatureRef = useRef<string | null>(null);
+  const previousAddressSignatureRef = useRef(currentAddressSignature);
+  const {
+    suggestions: addressSuggestions,
+    status: addressSuggestionStatus,
+    clearSuggestions: clearAddressSuggestions,
+    refreshSuggestions: refreshAddressSuggestions,
+    selectSuggestion: selectAddressSuggestion,
+  } = useGoogleAddressSuggestions({
+    value: deliveryDetail,
+    region: deliveryRegion,
+    district: deliveryDistrict,
+    area: deliveryArea,
+    enabled: addressInputFocused && addressAutocompleteDirty && !addressCompositionActive,
+    onAddressSelect: (address) => {
+      const parsed = parseDeliveryAddress(address);
+      authorizedAddressSignatureRef.current = JSON.stringify([
+        parsed.region,
+        parsed.district,
+        parsed.area,
+        parsed.detail,
+      ]);
+      setAddressAutocompleteDirty(false);
+      setAuthorizedMapSignature(authorizedAddressSignatureRef.current);
+      onGoogleAddressSelect(address);
+    },
+  });
   const selectedSlot = findDeliverySlot(deliverySlots, deliverySlotId);
   const frozenSelectedSnapshot = frozenSlotSelection
     && frozenSlotSelection.slotId === deliverySlotId
@@ -128,12 +167,74 @@ const DeliverySection = ({
     onAreaChange("");
   };
 
+  useEffect(() => {
+    setActiveAddressSuggestion(-1);
+  }, [addressSuggestions]);
+
+  useEffect(() => {
+    const signature = currentAddressSignature;
+    if (previousAddressSignatureRef.current === signature) return;
+    previousAddressSignatureRef.current = signature;
+
+    if (lastManualAddressSignatureRef.current === signature) {
+      lastManualAddressSignatureRef.current = null;
+      return;
+    }
+
+    if (authorizedAddressSignatureRef.current === signature) {
+      authorizedAddressSignatureRef.current = null;
+      setAddressAutocompleteDirty(false);
+      return;
+    }
+
+    authorizedAddressSignatureRef.current = null;
+    setAddressAutocompleteDirty(false);
+    setAuthorizedMapSignature(null);
+    clearAddressSuggestions(true);
+  }, [clearAddressSuggestions, currentAddressSignature]);
+
+  const handleAddressKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown" && addressSuggestions.length > 0) {
+      event.preventDefault();
+      setActiveAddressSuggestion((current) => (
+        current < addressSuggestions.length - 1 ? current + 1 : 0
+      ));
+      return;
+    }
+    if (event.key === "ArrowUp" && addressSuggestions.length > 0) {
+      event.preventDefault();
+      setActiveAddressSuggestion((current) => (
+        current > 0 ? current - 1 : addressSuggestions.length - 1
+      ));
+      return;
+    }
+    if (
+      event.key === "Enter"
+      && activeAddressSuggestion >= 0
+      && addressSuggestions[activeAddressSuggestion]
+    ) {
+      event.preventDefault();
+      void selectAddressSuggestion(addressSuggestions[activeAddressSuggestion]);
+      return;
+    }
+    if (event.key === "Escape") {
+      clearAddressSuggestions(true);
+      setActiveAddressSuggestion(-1);
+      return;
+    }
+    if (event.key === "Tab") {
+      clearAddressSuggestions(true);
+      setActiveAddressSuggestion(-1);
+    }
+  };
+
   // Build full address string for display
   const fullAddress = [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail]
     .filter(Boolean)
     .join(" ");
 
-  const mapQuery = encodeURIComponent(fullAddress + " 香港");
+  const publicMapAddress = publicGoogleAddressQuery(fullAddress);
+  const mapQuery = encodeURIComponent(publicMapAddress + " 香港");
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -304,10 +405,6 @@ const DeliverySection = ({
         <Label htmlFor="delivery-detail" className="text-xs">
           送貨地址 <span className="text-destructive">*</span>
         </Label>
-        <GooglePlaceAutocomplete
-          onAddressSelect={onGoogleAddressSelect}
-          resetRevision={googleAddressResetRevision}
-        />
         <div className="grid grid-cols-3 gap-2">
           <Select value={deliveryRegion} onValueChange={handleRegionChange}>
             <SelectTrigger className="text-sm" aria-label="送貨地區">
@@ -342,16 +439,108 @@ const DeliverySection = ({
             </SelectContent>
           </Select>
         </div>
-        <Input
-          id="delivery-detail"
-          placeholder="詳細地址（大廈名 / 樓層 / 室）"
-          value={deliveryDetail}
-          onChange={(e) => onDetailChange(e.target.value)}
-          className={`text-sm ${deliveryAddressError ? "border-destructive ring-1 ring-destructive" : ""}`}
-          maxLength={200}
-          aria-invalid={Boolean(deliveryAddressError)}
-          aria-describedby={deliveryAddressError ? "delivery-address-error" : undefined}
-        />
+        <div className="relative">
+          <Input
+            id="delivery-detail"
+            placeholder="詳細地址（輸入即顯示 Google 建議）"
+            value={deliveryDetail}
+            onChange={(event) => {
+              lastManualAddressSignatureRef.current = JSON.stringify([
+                deliveryRegion,
+                deliveryDistrict,
+                deliveryArea,
+                event.target.value,
+              ]);
+              setAddressAutocompleteDirty(true);
+              setAuthorizedMapSignature(lastManualAddressSignatureRef.current);
+              onDetailChange(event.target.value);
+            }}
+            onKeyDown={handleAddressKeyDown}
+            onFocus={() => {
+              setAddressInputFocused(true);
+              refreshAddressSuggestions();
+            }}
+            onBlur={() => {
+              setAddressInputFocused(false);
+              clearAddressSuggestions(true);
+            }}
+            onCompositionStart={() => {
+              setAddressCompositionActive(true);
+              clearAddressSuggestions();
+            }}
+            onCompositionEnd={() => setAddressCompositionActive(false)}
+            className={`min-h-11 text-sm ${deliveryAddressError ? "border-destructive ring-1 ring-destructive" : ""}`}
+            maxLength={200}
+            autoComplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={addressSuggestions.length > 0}
+            aria-controls={addressListboxId}
+            aria-activedescendant={
+              activeAddressSuggestion >= 0
+                ? `${addressListboxId}-option-${activeAddressSuggestion}`
+                : undefined
+            }
+            aria-invalid={Boolean(deliveryAddressError)}
+            aria-describedby={deliveryAddressError ? "delivery-address-error" : undefined}
+          />
+          {addressSuggestions.length > 0 && (
+            <div
+              id={addressListboxId}
+              role="listbox"
+              aria-label="Google 地址建議"
+              className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+            >
+              {addressSuggestions.map((suggestion, index) => (
+                <button
+                  key={`${suggestion.label}-${index}`}
+                  id={`${addressListboxId}-option-${index}`}
+                  type="button"
+                  role="option"
+                  aria-selected={activeAddressSuggestion === index}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActiveAddressSuggestion(index)}
+                  onClick={() => void selectAddressSuggestion(suggestion)}
+                  className={`flex min-h-11 w-full touch-manipulation flex-col items-start px-3 py-2 text-left text-sm ${
+                    activeAddressSuggestion === index
+                      ? "bg-accent text-accent-foreground"
+                      : "hover:bg-accent/60"
+                  }`}
+                >
+                  <span className="font-medium">{suggestion.mainText}</span>
+                  {suggestion.secondaryText && (
+                    <span className="text-xs text-muted-foreground">
+                      {suggestion.secondaryText}
+                    </span>
+                  )}
+                </button>
+              ))}
+              <div className="flex justify-end border-t border-border px-3 py-1.5">
+                <img
+                  src="https://maps.gstatic.com/mapfiles/api-3/images/powered-by-google-on-white3.png"
+                  alt="Google"
+                  className="h-4 w-auto"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        {addressSuggestionStatus === "loading" && (
+          <p role="status" className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+            正在搜尋 Google 地址...
+          </p>
+        )}
+        {addressSuggestionStatus === "empty" && (
+          <p role="status" className="text-xs text-muted-foreground">
+            搵唔到 Google 地址；你可以繼續手動輸入。
+          </p>
+        )}
+        {addressSuggestionStatus === "unavailable" && (
+          <p role="status" className="text-xs text-muted-foreground">
+            Google 地址建議暫時不可用；你可以繼續手動輸入。
+          </p>
+        )}
         {deliveryAddressError && (
           <p id="delivery-address-error" role="alert" className="text-xs font-medium text-destructive">
             {deliveryAddressError}
@@ -362,7 +551,19 @@ const DeliverySection = ({
             📍 {fullAddress}
           </p>
         )}
-        {fullAddress.length > 2 && (
+        {publicMapAddress.length > 2 && authorizedMapSignature !== currentAddressSignature && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-11 gap-2"
+            onClick={() => setAuthorizedMapSignature(currentAddressSignature)}
+          >
+            <MapPin className="h-4 w-4" />
+            顯示 Google 地圖
+          </Button>
+        )}
+        {publicMapAddress.length > 2 && authorizedMapSignature === currentAddressSignature && (
           <div className="rounded-lg overflow-hidden border border-border mt-2">
             <iframe
               title="Google Map"
