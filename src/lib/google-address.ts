@@ -5,6 +5,64 @@ const TRAILING_PRIVATE_FRAGMENT = /\s+(?:[a-z]\d{0,3}|\d{1,3})$/iu;
 const PUBLIC_TERMINAL_IDENTIFIER =
   /\b(?:tower|block|phase|house)(?:\s+no\.?)?\s+(?:[a-z]\d{0,3}|\d{1,3})$/iu;
 
+const ADDRESS_COMPARISON_SEPARATOR =
+  /[\s,，、;；:：.．·・'’"“”()[\]{}（）\-‐‑‒–—―_/／\\]+/gu;
+const CJK_CHARACTER =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+const ADDRESS_WORD = /[\p{L}\p{N}]+/gu;
+const INTRA_WORD_PUNCTUATION =
+  /([\p{L}\p{N}])['’ʼ.．](?=[\p{L}\p{N}])/gu;
+
+const normalizeAddressForComparison = (value: string) =>
+  value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(ADDRESS_COMPARISON_SEPARATOR, "");
+
+const addressWords = (value: string) =>
+  value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(INTRA_WORD_PUNCTUATION, "$1")
+    .match(ADDRESS_WORD) ?? [];
+
+const containsWordSequence = (address: string[], name: string[]) =>
+  name.length > 0 &&
+  address.some((_, start) =>
+    name.every((word, offset) => address[start + offset] === word),
+  );
+
+/**
+ * Preserves the selected Google prediction name when Place Details returns
+ * only a street address, while avoiding a duplicate name already in it.
+ */
+export const composeGooglePlaceAddress = (
+  placeName: string,
+  formattedAddress: string,
+) => {
+  const trimmedPlaceName = placeName.trim();
+  const trimmedFormattedAddress = formattedAddress.trim();
+  if (!trimmedPlaceName) return trimmedFormattedAddress;
+  if (!trimmedFormattedAddress) return trimmedPlaceName;
+
+  const normalizedPlaceName = normalizeAddressForComparison(trimmedPlaceName);
+  const normalizedFormattedAddress = normalizeAddressForComparison(
+    trimmedFormattedAddress,
+  );
+  const containsPlaceName = CJK_CHARACTER.test(trimmedPlaceName)
+    ? normalizedPlaceName &&
+      normalizedFormattedAddress.includes(normalizedPlaceName)
+    : containsWordSequence(
+        addressWords(trimmedFormattedAddress),
+        addressWords(trimmedPlaceName),
+      );
+  if (containsPlaceName) {
+    return trimmedFormattedAddress;
+  }
+
+  return `${trimmedPlaceName}, ${trimmedFormattedAddress}`;
+};
+
 /**
  * Keeps Google queries at street/building granularity. Floor, room and shop
  * details stay in the POS value and are not sent to Google services.

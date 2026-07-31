@@ -1,6 +1,63 @@
 import { describe, expect, it } from "vitest";
 
-import { publicGoogleAddressQuery } from "@/lib/google-address";
+import {
+  composeGooglePlaceAddress,
+  publicGoogleAddressQuery,
+} from "@/lib/google-address";
+
+describe("composeGooglePlaceAddress", () => {
+  it("preserves the selected place name when the formatted address omits it", () => {
+    expect(
+      composeGooglePlaceAddress("巧運工業大廈", "觀塘駿業街66號"),
+    ).toBe("巧運工業大廈, 觀塘駿業街66號");
+  });
+
+  it("does not duplicate a place name already in the formatted address", () => {
+    expect(
+      composeGooglePlaceAddress(
+        "巧運工業大廈",
+        "巧運工業大廈, 觀塘駿業街66號",
+      ),
+    ).toBe("巧運工業大廈, 觀塘駿業街66號");
+  });
+
+  it("recognizes normalized Unicode, case, spacing, and separators", () => {
+    expect(
+      composeGooglePlaceAddress(
+        "ＬＵＣＫＹ　ＩＮＤＵＳＴＲＩＡＬ－ＢＵＩＬＤＩＮＧ",
+        "Lucky Industrial Building, 66 Tsun Yip Street",
+      ),
+    ).toBe("Lucky Industrial Building, 66 Tsun Yip Street");
+  });
+
+  it("does not treat a Latin substring as the complete place name", () => {
+    expect(composeGooglePlaceAddress("One", "Stone Street")).toBe(
+      "One, Stone Street",
+    );
+  });
+
+  it("ignores apostrophes and periods that join Latin address words", () => {
+    expect(
+      composeGooglePlaceAddress(
+        "King's Place",
+        "Kings Place, St.John's Road",
+      ),
+    ).toBe("Kings Place, St.John's Road");
+  });
+
+  it.each([
+    ["", " 觀塘駿業街66號 ", "觀塘駿業街66號"],
+    [" 巧運工業大廈 ", "", "巧運工業大廈"],
+    [" ", " ", ""],
+  ])(
+    "returns the non-empty trimmed value when either input is blank",
+    (placeName, formattedAddress, expected) => {
+      expect(composeGooglePlaceAddress(placeName, formattedAddress)).toBe(
+        expected,
+      );
+    },
+  );
+});
 
 describe("publicGoogleAddressQuery", () => {
   it.each([

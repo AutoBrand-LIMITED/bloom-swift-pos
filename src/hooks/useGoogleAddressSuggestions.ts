@@ -1,10 +1,14 @@
 import { loadGooglePlacesLibrary } from "@/lib/google-maps";
-import { publicGoogleAddressQuery } from "@/lib/google-address";
+import {
+  composeGooglePlaceAddress,
+  publicGoogleAddressQuery,
+} from "@/lib/google-address";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export interface GoogleAddressSuggestion {
   label: string;
   mainText: string;
+  placeName: string;
   secondaryText: string;
   prediction: google.maps.places.PlacePrediction;
 }
@@ -106,10 +110,13 @@ export const useGoogleAddressSuggestions = ({
           const nextSuggestions = response.suggestions.flatMap((suggestion) => {
             const prediction = suggestion.placePrediction;
             if (!prediction) return [];
+            const label = prediction.text.toString();
+            const placeName = prediction.mainText?.toString() || "";
             return [{
               prediction,
-              label: prediction.text.toString(),
-              mainText: prediction.mainText?.toString() || prediction.text.toString(),
+              label,
+              mainText: placeName || label,
+              placeName,
               secondaryText: prediction.secondaryText?.toString() || "",
             }];
           });
@@ -152,7 +159,9 @@ export const useGoogleAddressSuggestions = ({
 
       sessionTokenRef.current = undefined;
       setStatus("idle");
-      onAddressSelectRef.current(formattedAddress);
+      onAddressSelectRef.current(
+        composeGooglePlaceAddress(suggestion.placeName, formattedAddress),
+      );
     } catch {
       if (!mountedRef.current || selectionId !== selectionSequenceRef.current) return;
       setStatus("unavailable");

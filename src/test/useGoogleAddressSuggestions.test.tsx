@@ -24,6 +24,7 @@ const makePrediction = (
   label: string,
   formattedAddress = label,
   fetchFields = vi.fn().mockResolvedValue(undefined),
+  mainText: string | null = label.split(",")[0],
 ) => {
   const place = {
     formattedAddress,
@@ -31,7 +32,7 @@ const makePrediction = (
   };
   const prediction = {
     text: { toString: () => label },
-    mainText: { toString: () => label.split(",")[0] },
+    mainText: mainText === null ? null : { toString: () => mainText },
     secondaryText: { toString: () => label.split(",").slice(1).join(",").trim() },
     toPlace: () => place,
   };
@@ -78,7 +79,7 @@ const Harness = ({
           key={suggestion.label}
           onClick={() => void selectSuggestion(suggestion)}
         >
-          {suggestion.label}
+          {suggestion.mainText}
         </button>
       ))}
     </div>
@@ -171,11 +172,11 @@ describe("useGoogleAddressSuggestions", () => {
     expect(screen.getByRole("button", { name: "巧運工業大廈" })).toBeVisible();
   });
 
-  it("fetches only the formatted address and returns it after selection", async () => {
+  it("fetches only the formatted address and preserves an omitted place name", async () => {
     const onAddressSelect = vi.fn();
     const selected = makePrediction(
       "巧運工業大廈",
-      "巧運工業大廈, 6 巧明街, 觀塘, 香港",
+      "觀塘駿業街66號",
     );
     googleMocks.fetchAutocompleteSuggestions.mockResolvedValue({
       suggestions: [{ placePrediction: selected.prediction }],
@@ -193,9 +194,72 @@ describe("useGoogleAddressSuggestions", () => {
     expect(selected.fetchFields).toHaveBeenCalledWith({
       fields: ["formattedAddress"],
     });
+    expect(onAddressSelect).toHaveBeenCalledOnce();
     expect(onAddressSelect).toHaveBeenCalledWith(
-      "巧運工業大廈, 6 巧明街, 觀塘, 香港",
+      "巧運工業大廈, 觀塘駿業街66號",
     );
+  });
+
+  it("does not duplicate a place name already in the formatted address", async () => {
+    const onAddressSelect = vi.fn();
+    const selected = makePrediction(
+      "巧運工業大廈",
+      "巧運工業大廈, 觀塘駿業街66號",
+    );
+    googleMocks.fetchAutocompleteSuggestions.mockResolvedValue({
+      suggestions: [{ placePrediction: selected.prediction }],
+    });
+    render(<Harness value="巧" onAddressSelect={onAddressSelect} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "巧運工業大廈" }));
+      await Promise.resolve();
+    });
+
+    expect(selected.fetchFields).toHaveBeenCalledWith({
+      fields: ["formattedAddress"],
+    });
+    expect(onAddressSelect).toHaveBeenCalledOnce();
+    expect(onAddressSelect).toHaveBeenCalledWith(
+      "巧運工業大廈, 觀塘駿業街66號",
+    );
+  });
+
+  it("does not prepend the full suggestion label when mainText is unavailable", async () => {
+    const onAddressSelect = vi.fn();
+    const selected = makePrediction(
+      "巧運工業大廈, 觀塘駿業街",
+      "觀塘駿業街66號",
+      vi.fn().mockResolvedValue(undefined),
+      null,
+    );
+    googleMocks.fetchAutocompleteSuggestions.mockResolvedValue({
+      suggestions: [{ placePrediction: selected.prediction }],
+    });
+    render(<Harness value="巧" onAddressSelect={onAddressSelect} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "巧運工業大廈, 觀塘駿業街",
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.queryByRole("button", {
+        name: "巧運工業大廈, 觀塘駿業街",
+      }),
+    ).not.toBeInTheDocument();
+    expect(onAddressSelect).toHaveBeenCalledOnce();
+    expect(onAddressSelect).toHaveBeenCalledWith("觀塘駿業街66號");
   });
 
   it("falls back safely when Google Places is unavailable", async () => {
