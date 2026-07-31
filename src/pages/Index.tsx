@@ -60,6 +60,7 @@ import {
 } from "@/lib/checkout-validation";
 import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pricing";
 import { parseDeliveryAddress } from "@/lib/hk-address";
+import { checkoutBarLeftOffset } from "@/lib/pos-layout";
 import {
   hongKongBusinessDate,
   loadUnsyncedOrders,
@@ -90,6 +91,7 @@ const Index = () => {
   const [terms, setTerms] = useState("");
   const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({});
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
+  const [customerHistoryOpen, setCustomerHistoryOpen] = useState(true);
   const [confirmedNewCustomerPhone, setConfirmedNewCustomerPhone] = useState<string | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
 
@@ -975,6 +977,7 @@ const Index = () => {
           <CustomerHistoryDock
             key={selectedCustomer.id}
             customer={selectedCustomer}
+            onOpenChange={setCustomerHistoryOpen}
             onUseAddress={(selection) => {
               const parsed = parseDeliveryAddress(selection.address);
               setDeliveryRegion(parsed.region);
@@ -1304,7 +1307,7 @@ const Index = () => {
       {/* Sticky submit */}
       {hasSalesperson && <div
         className="fixed bottom-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border transition-[left]"
-        style={{ left: selectedCustomer ? "min(360px, 85vw)" : 0 }}
+        style={{ left: checkoutBarLeftOffset(Boolean(selectedCustomer), customerHistoryOpen) }}
       >
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="text-right">

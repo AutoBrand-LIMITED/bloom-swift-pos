@@ -27,16 +27,26 @@ const customer: DemoCustomer = {
 
 describe("CustomerHistoryDock", () => {
   it("closes the panel without losing the selected customer and reopens it from the left rail", () => {
-    render(<CustomerHistoryDock customer={customer} />);
+    const onOpenChange = vi.fn();
+    render(
+      <CustomerHistoryDock
+        customer={customer}
+        onOpenChange={onOpenChange}
+      />,
+    );
+
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
 
     fireEvent.click(screen.getByRole("button", { name: "關閉客戶記錄" }));
 
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
     expect(screen.queryByRole("region", { name: "Jay 客戶記錄面板" })).not.toBeInTheDocument();
     const reopen = screen.getByRole("button", { name: "打開 Jay 客戶記錄" });
     expect(reopen).toBeVisible();
 
     fireEvent.click(reopen);
 
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
     expect(screen.getByRole("region", { name: "Jay 客戶記錄面板" })).toBeVisible();
   });
 

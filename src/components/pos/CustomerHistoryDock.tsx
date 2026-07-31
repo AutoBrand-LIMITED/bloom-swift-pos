@@ -8,24 +8,32 @@ import type { DeliveryAddressSelection } from "@/lib/hk-address";
 
 interface CustomerHistoryDockProps {
   customer: DemoCustomer;
+  onOpenChange?: (open: boolean) => void;
   onUseAddress?: (selection: DeliveryAddressSelection) => void;
 }
 
 const CustomerHistoryDock = ({
   customer,
+  onOpenChange,
   onUseAddress,
 }: CustomerHistoryDockProps) => {
   const [open, setOpen] = useState(true);
 
   useEffect(() => {
     setOpen(true);
-  }, [customer.id]);
+    onOpenChange?.(true);
+  }, [customer.id, onOpenChange]);
+
+  const setDockOpen = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  };
 
   if (open) {
     return (
       <CustomerHistoryPanel
         customer={customer}
-        onClose={() => setOpen(false)}
+        onClose={() => setDockOpen(false)}
         onUseAddress={onUseAddress}
       />
     );
@@ -42,7 +50,7 @@ const CustomerHistoryDock = ({
         className="h-auto min-h-11 w-11 flex-col gap-2 px-1 py-3 text-xs"
         aria-label={`打開 ${customer.name} 客戶記錄`}
         title="打開客戶記錄"
-        onClick={() => setOpen(true)}
+        onClick={() => setDockOpen(true)}
       >
         <PanelLeftOpen className="h-4 w-4" />
         <span className="[writing-mode:vertical-rl] tracking-widest">
