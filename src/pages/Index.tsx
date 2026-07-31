@@ -131,6 +131,7 @@ const Index = () => {
   const [deliveryDistrict, setDeliveryDistrict] = useState("");
   const [deliveryArea, setDeliveryArea] = useState("");
   const [deliveryDetail, setDeliveryDetail] = useState("");
+  const [googleAddressResetRevision, setGoogleAddressResetRevision] = useState(0);
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryPerson, setDeliveryPerson] = useState("");
@@ -348,6 +349,7 @@ const Index = () => {
     setDeliveryDistrict("");
     setDeliveryArea("");
     setDeliveryDetail("");
+    setGoogleAddressResetRevision((revision) => revision + 1);
     setRecipientName("");
     setRecipientPhone("");
     setDeliveryPerson("");
@@ -983,6 +985,7 @@ const Index = () => {
               setDeliveryDistrict(parsed.district);
               setDeliveryArea(parsed.area);
               setDeliveryDetail(parsed.detail);
+              setGoogleAddressResetRevision((revision) => revision + 1);
               setRecipientName(selection.recipientName || "");
               setRecipientPhone(selection.recipientPhone || "");
               setRecipientPartnerId(selection.shippingPartnerId);
@@ -1165,6 +1168,7 @@ const Index = () => {
           deliveryDistrict={deliveryDistrict}
           deliveryArea={deliveryArea}
           deliveryDetail={deliveryDetail}
+          googleAddressResetRevision={googleAddressResetRevision}
           recipientName={recipientName}
           recipientPhone={recipientPhone}
           deliveryPerson={deliveryPerson}
@@ -1191,6 +1195,16 @@ const Index = () => {
           }}
           onAreaChange={(value) => {
             setDeliveryArea(value);
+            clearCheckoutErrors("deliveryAddress");
+            resetRecipientPersistence();
+          }}
+          onGoogleAddressSelect={(value) => {
+            const parsed = parseDeliveryAddress(value);
+            setDeliveryRegion(parsed.region);
+            setDeliveryDistrict(parsed.district);
+            setDeliveryArea(parsed.area);
+            setDeliveryDetail(parsed.detail);
+            setGoogleAddressResetRevision((revision) => revision + 1);
             clearCheckoutErrors("deliveryAddress");
             resetRecipientPersistence();
           }}

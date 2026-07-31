@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import GooglePlaceAutocomplete from "@/components/pos/GooglePlaceAutocomplete";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup } from "@/components/ui/radio-group";
@@ -44,6 +45,7 @@ interface DeliverySectionProps {
   deliveryDistrict: string;
   deliveryArea: string;
   deliveryDetail: string;
+  googleAddressResetRevision: number;
   recipientName: string;
   recipientPhone: string;
   deliveryPerson: string;
@@ -57,6 +59,7 @@ interface DeliverySectionProps {
   onDistrictChange: (v: string) => void;
   onAreaChange: (v: string) => void;
   onDetailChange: (v: string) => void;
+  onGoogleAddressSelect: (v: string) => void;
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
   onDeliveryPersonChange: (v: string) => void;
@@ -70,9 +73,11 @@ const DeliverySection = ({
   deliveryDateError, deliveryAddressError, recipientNameError, recipientPhoneError,
   legacyDeliveryTime,
   deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
+  googleAddressResetRevision,
   recipientName, recipientPhone, deliveryPerson, failedDeliveryAction,
   onDateChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect, onRetryDeliverySlots,
   onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
+  onGoogleAddressSelect,
   onRecipientNameChange, onRecipientPhoneChange, onDeliveryPersonChange,
   onFailedDeliveryActionChange,
 }: DeliverySectionProps) => {
@@ -299,6 +304,10 @@ const DeliverySection = ({
         <Label htmlFor="delivery-detail" className="text-xs">
           送貨地址 <span className="text-destructive">*</span>
         </Label>
+        <GooglePlaceAutocomplete
+          onAddressSelect={onGoogleAddressSelect}
+          resetRevision={googleAddressResetRevision}
+        />
         <div className="grid grid-cols-3 gap-2">
           <Select value={deliveryRegion} onValueChange={handleRegionChange}>
             <SelectTrigger className="text-sm" aria-label="送貨地區">

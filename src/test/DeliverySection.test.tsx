@@ -24,6 +24,7 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     deliveryDistrict: "",
     deliveryArea: "",
     deliveryDetail: "",
+    googleAddressResetRevision: 0,
     recipientName: "",
     recipientPhone: "",
     deliveryPerson: "",
@@ -37,6 +38,7 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     onDistrictChange: vi.fn(),
     onAreaChange: vi.fn(),
     onDetailChange: vi.fn(),
+    onGoogleAddressSelect: vi.fn(),
     onRecipientNameChange: vi.fn(),
     onRecipientPhoneChange: vi.fn(),
     onDeliveryPersonChange: vi.fn(),
@@ -147,6 +149,16 @@ describe("DeliverySection delivery time controls", () => {
     expect(screen.getByLabelText(/收貨人電話/)).toHaveAttribute("aria-invalid", "true");
     expect(screen.getAllByRole("alert")).toHaveLength(5);
   });
+
+  it("keeps all manual address controls visible when Google is unavailable", () => {
+    renderSection();
+
+    expect(screen.getByText("Google 地址搜尋暫時不可用，請使用下方手動地址欄。")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "送貨地區" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "送貨分區" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "送貨地點" })).toBeDisabled();
+    expect(screen.getByPlaceholderText("詳細地址（大廈名 / 樓層 / 室）")).toBeEnabled();
+  });
 });
 
 function renderSectionProps(
@@ -166,6 +178,7 @@ function renderSectionProps(
     deliveryDistrict: "",
     deliveryArea: "",
     deliveryDetail: "",
+    googleAddressResetRevision: 0,
     recipientName: "",
     recipientPhone: "",
     deliveryPerson: "",
@@ -179,6 +192,7 @@ function renderSectionProps(
     onDistrictChange: vi.fn(),
     onAreaChange: vi.fn(),
     onDetailChange: vi.fn(),
+    onGoogleAddressSelect: vi.fn(),
     onRecipientNameChange: vi.fn(),
     onRecipientPhoneChange: vi.fn(),
     onDeliveryPersonChange: vi.fn(),
