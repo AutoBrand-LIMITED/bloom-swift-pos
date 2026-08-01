@@ -2,6 +2,18 @@ const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
 const SESSION_KEY = "anglo-chinese-florist-pos-session";
 export const POS_AUTH_EXPIRED_EVENT = "pos-auth-expired";
 
+export interface PosEmployeeIdentity {
+  id: number;
+  name: string;
+  login: string;
+  salesLabel: string;
+}
+
+interface PosSessionResponse {
+  authenticated: boolean;
+  employee: PosEmployeeIdentity;
+}
+
 export const posAuthRequired = Boolean(BACKEND_URL)
   && import.meta.env.VITE_POS_AUTH_ENABLED !== "false";
 
@@ -13,21 +25,31 @@ export function clearPosSession(): void {
   window.sessionStorage.removeItem(SESSION_KEY);
 }
 
-export async function loginToPos(password: string): Promise<void> {
+export async function loginToPos(
+  login: string,
+  password: string,
+): Promise<PosEmployeeIdentity> {
   if (!BACKEND_URL) throw new Error("Odoo backend is not configured");
-  const response = await fetch(`${BACKEND_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ login, password }),
+    });
+  } catch {
+    throw new Error("暫時未能連接登入服務，請稍後再試。");
+  }
   const body = await response.json().catch(() => null) as {
     accessToken?: string;
+    employee?: PosEmployeeIdentity;
     detail?: string;
   } | null;
-  if (!response.ok || !body?.accessToken) {
+  if (!response.ok || !body?.accessToken || !body.employee) {
     throw new Error(body?.detail || `登入失敗：${response.status}`);
   }
   window.sessionStorage.setItem(SESSION_KEY, body.accessToken);
+  return body.employee;
 }
 
 export async function authenticatedFetch(
@@ -50,9 +72,13 @@ export async function authenticatedFetch(
   return response;
 }
 
-export async function validatePosSession(signal?: AbortSignal): Promise<boolean> {
-  if (!posAuthRequired) return true;
-  if (!getPosSession()) return false;
+export async function validatePosSession(
+  signal?: AbortSignal,
+): Promise<PosEmployeeIdentity | null> {
+  if (!posAuthRequired) return null;
+  if (!getPosSession()) return null;
   const response = await authenticatedFetch(`${BACKEND_URL}/auth/session`, { signal });
-  return response.ok;
+  if (!response.ok) return null;
+  const body = await response.json().catch(() => null) as PosSessionResponse | null;
+  return body?.authenticated && body.employee ? body.employee : null;
 }
