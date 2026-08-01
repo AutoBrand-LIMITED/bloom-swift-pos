@@ -35,6 +35,9 @@ const normalizeLegacyOrder = (order: Order): Order => ({
   senderNote: order.senderNote ?? "",
   deliveryNote: order.deliveryNote ?? "",
   internalNote: order.internalNote ?? order.notes ?? "",
+  recipientType: order.recipientType
+    ?? (order.recipientCompanyName?.trim() ? "company" : "personal"),
+  recipientCompanyName: order.recipientCompanyName ?? "",
 });
 
 const localIdentity = (order: Order) => order.id;

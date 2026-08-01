@@ -92,6 +92,7 @@ describe("CustomerHistoryPanel resizable history", () => {
     }));
     expect(onUseAddress).toHaveBeenCalledWith({
       address: "中環皇后大道中 1 號",
+      recipientType: "personal",
       recipientName: "陳小姐",
       recipientPhone: "61234567",
       shippingPartnerId: 84,
@@ -149,10 +150,55 @@ describe("CustomerHistoryPanel resizable history", () => {
     fireEvent.click(choices[1]);
     expect(onUseAddress).toHaveBeenCalledWith({
       address: "中環同一大廈",
+      recipientType: "personal",
       recipientName: "李先生",
       recipientPhone: "62345678",
       shippingPartnerId: undefined,
     });
+  });
+
+  it("keeps company and personal recipients separate and reuses the company snapshot", () => {
+    const onUseAddress = vi.fn();
+    const mixedRecipientCustomer: DemoCustomer = {
+      ...customer,
+      history: [
+        {
+          ...customer.history[0],
+          shippingPartnerId: undefined,
+          deliveryAddress: "中環同一大廈",
+          recipientType: "company",
+          recipientCompanyName: "Recipient Limited",
+          recipientName: "陳小姐",
+        },
+        {
+          ...customer.history[0],
+          id: 3,
+          shippingPartnerId: undefined,
+          deliveryAddress: "中環同一大廈",
+          recipientType: "personal",
+          recipientCompanyName: undefined,
+          recipientName: "陳小姐",
+        },
+      ],
+    };
+
+    render(
+      <CustomerHistoryPanel
+        customer={mixedRecipientCustomer}
+        onClose={vi.fn()}
+        onUseAddress={onUseAddress}
+      />,
+    );
+
+    const choices = screen.getAllByRole("button", { name: "使用過往地址 中環同一大廈" });
+    expect(choices).toHaveLength(2);
+    expect(screen.getByText("公司：Recipient Limited")).toBeVisible();
+    fireEvent.click(choices[0]);
+    expect(onUseAddress).toHaveBeenCalledWith(expect.objectContaining({
+      recipientType: "company",
+      recipientCompanyName: "Recipient Limited",
+      recipientName: "陳小姐",
+    }));
   });
 
   it("shows an explicit unavailable state and retries Odoo history", async () => {

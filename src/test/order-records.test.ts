@@ -107,6 +107,23 @@ describe("order record sources", () => {
     expect(localStorage.getItem(LEGACY_ORDERS_KEY)).toBeNull();
   });
 
+  it("derives a safe recipient type for legacy local records", () => {
+    localStorage.setItem(UNSYNCED_ORDERS_KEY, JSON.stringify([
+      order("legacy-personal"),
+      order("legacy-company", { recipientCompanyName: "Recipient Limited" }),
+    ]));
+
+    const loaded = loadUnsyncedOrders();
+    expect(loaded.find(({ id }) => id === "legacy-personal")).toMatchObject({
+      recipientType: "personal",
+      recipientCompanyName: "",
+    });
+    expect(loaded.find(({ id }) => id === "legacy-company")).toMatchObject({
+      recipientType: "company",
+      recipientCompanyName: "Recipient Limited",
+    });
+  });
+
   it("isolates malformed legacy storage", () => {
     localStorage.setItem(LEGACY_ORDERS_KEY, "not-json");
     expect(loadUnsyncedOrders()).toEqual([]);

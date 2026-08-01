@@ -1,4 +1,4 @@
-import type { DeliveryTimeMode, Order } from "@/types/order";
+import type { DeliveryTimeMode, Order, RecipientType } from "@/types/order";
 import type { PosEmployeeIdentity } from "@/lib/pos-auth";
 
 export interface PendingSubmissionOptions {
@@ -21,6 +21,19 @@ export function pendingSubmissionBelongsToEmployee(
 ): boolean {
   return pending.order.operatorEmployeeId !== undefined
     && pending.order.operatorEmployeeId === employee.id;
+}
+
+export function pendingSubmissionForEmployee(
+  pending: PendingOrderSubmission | null,
+  employee: PosEmployeeIdentity | null,
+  authRequired = true,
+): PendingOrderSubmission | null {
+  if (!pending) return null;
+  if (!authRequired) return pending;
+  if (!employee || !pendingSubmissionBelongsToEmployee(pending, employee)) {
+    return null;
+  }
+  return pending;
 }
 
 export function employeeSnapshotForSubmission(
@@ -82,6 +95,20 @@ export function pendingOptionBindingsMatch(
   return current.customerId === pending.options.customerId
     && current.customerType === expectedCustomerType
     && current.companyName === expectedCompanyName;
+}
+
+export function pendingRecipientBindingsMatch(
+  pending: PendingOrderSubmission,
+  current: {
+    recipientType: RecipientType;
+    recipientCompanyName: string;
+  },
+): boolean {
+  const expectedCompanyName = pending.order.recipientCompanyName || "";
+  const expectedRecipientType = pending.order.recipientType
+    || (expectedCompanyName.trim() ? "company" : "personal");
+  return current.recipientType === expectedRecipientType
+    && current.recipientCompanyName === expectedCompanyName;
 }
 
 export function deliveryContractFieldsForSubmission(
@@ -149,10 +176,14 @@ export function clearPendingSubmission(expected?: string | PendingOrderSubmissio
 
 export function discardPendingSubmissionAfterOdooReview(
   pending: PendingOrderSubmission,
-  employee: PosEmployeeIdentity,
+  employee: PosEmployeeIdentity | null,
   confirmed: boolean,
+  authRequired = true,
 ): boolean {
-  if (!pendingSubmissionBelongsToEmployee(pending, employee)) {
+  if (
+    authRequired
+    && (!employee || !pendingSubmissionBelongsToEmployee(pending, employee))
+  ) {
     throw new Error("只有原本落單員工先可以移除呢張本機待確認資料");
   }
   if (!confirmed) {

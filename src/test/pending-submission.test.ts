@@ -8,7 +8,9 @@ import {
   firstAddedLegacyBusinessField,
   loadPendingSubmission,
   pendingOptionBindingsMatch,
+  pendingRecipientBindingsMatch,
   pendingSubmissionBelongsToEmployee,
+  pendingSubmissionForEmployee,
   PENDING_SUBMISSION_KEY,
   savePendingSubmission,
   submissionPayloadMatches,
@@ -129,6 +131,32 @@ describe("pending Odoo submission", () => {
     })).toBe(false);
   });
 
+  it("exposes a pending order for hydration and history only to its owning employee", () => {
+    const pending = buildSubmission();
+    pending.order.recipientType = "company";
+    pending.order.recipientCompanyName = "Private Recipient Limited";
+    pending.order.recipientName = "Private Contact";
+    pending.order.recipientPhone = "61234567";
+    pending.order.deliveryAddress = "Private delivery address";
+    const owner = {
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "AC02 — Elma",
+    };
+    const otherEmployee = {
+      id: 96,
+      name: "Another Cashier",
+      login: "cashier-96",
+      salesLabel: "AC03 — Another Cashier",
+    };
+
+    expect(pendingSubmissionForEmployee(pending, owner)).toBe(pending);
+    expect(pendingSubmissionForEmployee(pending, otherEmployee)).toBeNull();
+    expect(pendingSubmissionForEmployee(pending, null)).toBeNull();
+    expect(pendingSubmissionForEmployee(pending, null, false)).toBe(pending);
+  });
+
   it("requires explicit confirmation before discarding only the local pending record", () => {
     const pending = buildSubmission();
     savePendingSubmission(pending);
@@ -157,6 +185,19 @@ describe("pending Odoo submission", () => {
       salesLabel: "AC03 — Another Cashier",
     }, true)).toThrow("原本落單員工");
     expect(loadPendingSubmission()).toEqual(pending);
+  });
+
+  it("allows confirmed local cleanup when POS authentication is disabled", () => {
+    const pending = buildSubmission();
+    savePendingSubmission(pending);
+
+    expect(discardPendingSubmissionAfterOdooReview(
+      pending,
+      null,
+      true,
+      false,
+    )).toBe(true);
+    expect(loadPendingSubmission()).toBeNull();
   });
 
   it("keeps the original employee snapshot byte-stable for a same-ID retry", () => {
@@ -366,6 +407,30 @@ describe("pending Odoo submission", () => {
       customerId: 84,
       customerType: "company",
       companyName: "  Reload Test Limited  ",
+    })).toBe(false);
+  });
+
+  it("locks recipient type and company identity while defaulting legacy retries to personal", () => {
+    const legacy = buildSubmission();
+    expect(pendingRecipientBindingsMatch(legacy, {
+      recipientType: "personal",
+      recipientCompanyName: "",
+    })).toBe(true);
+    expect(pendingRecipientBindingsMatch(legacy, {
+      recipientType: "company",
+      recipientCompanyName: "Recipient Limited",
+    })).toBe(false);
+
+    const company = buildSubmission();
+    company.order.recipientType = "company";
+    company.order.recipientCompanyName = "Recipient Limited";
+    expect(pendingRecipientBindingsMatch(company, {
+      recipientType: "company",
+      recipientCompanyName: "Recipient Limited",
+    })).toBe(true);
+    expect(pendingRecipientBindingsMatch(company, {
+      recipientType: "company",
+      recipientCompanyName: "Edited Limited",
     })).toBe(false);
   });
 

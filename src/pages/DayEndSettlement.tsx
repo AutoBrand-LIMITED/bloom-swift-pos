@@ -255,6 +255,9 @@ const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
             <TableCell className="text-right font-mono">{formatDayEndMoney(order.saleTotal)}</TableCell>
             <TableCell className="text-right font-mono">{formatDayEndMoney(order.receivedToday)}</TableCell>
             <TableCell>
+              {order.recipientCompanyName && (
+                <div>{order.recipientCompanyName}</div>
+              )}
               <div>{order.recipientName || "-"}</div>
               <div className="text-xs text-muted-foreground">{order.recipientPhone || ""}</div>
             </TableCell>
