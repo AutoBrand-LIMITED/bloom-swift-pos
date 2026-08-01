@@ -17,11 +17,12 @@ import {
   parseDeliveryAddress,
   type GoogleAddressSelection,
 } from "@/lib/hk-address";
-import type { DeliveryTimeMode } from "@/types/order";
+import type { DeliveryTimeMode, RecipientType } from "@/types/order";
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
+  Building2,
   Calendar,
   CircleDollarSign,
   Clock,
@@ -45,12 +46,15 @@ interface DeliverySectionProps {
   deliveryDateError?: string;
   deliveryAddressError?: string;
   recipientNameError?: string;
+  recipientCompanyNameError?: string;
   recipientPhoneError?: string;
   legacyDeliveryTime: boolean;
   deliveryRegion: string;
   deliveryDistrict: string;
   deliveryArea: string;
   deliveryDetail: string;
+  recipientType: RecipientType;
+  recipientCompanyName: string;
   recipientName: string;
   recipientPhone: string;
   deliveryPerson: string;
@@ -65,6 +69,8 @@ interface DeliverySectionProps {
   onAreaChange: (v: string) => void;
   onDetailChange: (v: string) => void;
   onGoogleAddressSelect: (selection: GoogleAddressSelection) => void;
+  onRecipientTypeChange: (v: RecipientType) => void;
+  onRecipientCompanyNameChange: (v: string) => void;
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
   onDeliveryPersonChange: (v: string) => void;
@@ -75,13 +81,16 @@ const DeliverySection = ({
   deliveryDate, deliveryTime, deliveryTimeMode, deliverySlotId,
   frozenSlotSelection,
   deliverySlots, deliverySlotsLoading, deliverySlotsError, deliveryTimeError,
-  deliveryDateError, deliveryAddressError, recipientNameError, recipientPhoneError,
+  deliveryDateError, deliveryAddressError, recipientNameError, recipientCompanyNameError,
+  recipientPhoneError,
   legacyDeliveryTime,
   deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
-  recipientName, recipientPhone, deliveryPerson, failedDeliveryAction,
+  recipientType, recipientCompanyName, recipientName, recipientPhone,
+  deliveryPerson, failedDeliveryAction,
   onDateChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect, onRetryDeliverySlots,
   onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
   onGoogleAddressSelect,
+  onRecipientTypeChange, onRecipientCompanyNameChange,
   onRecipientNameChange, onRecipientPhoneChange, onDeliveryPersonChange,
   onFailedDeliveryActionChange,
 }: DeliverySectionProps) => {
@@ -597,10 +606,64 @@ const DeliverySection = ({
       </div>
 
       {/* Recipient info */}
-      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
-        <div className="space-y-1">
+      <div className="space-y-3 border-t border-border pt-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">收貨人類型</Label>
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="收貨人類型">
+            <Button
+              type="button"
+              variant="outline"
+              aria-pressed={recipientType === "personal"}
+              className={`min-h-11 touch-manipulation ${
+                recipientType === "personal" ? "border-primary bg-primary/10 text-primary" : ""
+              }`}
+              onClick={() => onRecipientTypeChange("personal")}
+            >
+              <User className="mr-1.5 h-4 w-4" /> 個人
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              aria-pressed={recipientType === "company"}
+              className={`min-h-11 touch-manipulation ${
+                recipientType === "company" ? "border-primary bg-primary/10 text-primary" : ""
+              }`}
+              onClick={() => onRecipientTypeChange("company")}
+            >
+              <Building2 className="mr-1.5 h-4 w-4" /> 公司
+            </Button>
+          </div>
+        </div>
+
+        {recipientType === "company" && (
+          <div className="space-y-1">
+            <Label htmlFor="recipient-company-name" className="flex items-center gap-1 text-xs">
+              <Building2 className="h-3.5 w-3.5" /> 收貨公司名稱
+              <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="recipient-company-name"
+              placeholder="輸入收貨公司名稱"
+              value={recipientCompanyName}
+              onChange={(e) => onRecipientCompanyNameChange(e.target.value)}
+              className={`text-sm ${recipientCompanyNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
+              maxLength={200}
+              required
+              aria-invalid={Boolean(recipientCompanyNameError)}
+              aria-describedby={recipientCompanyNameError ? "recipient-company-name-error" : undefined}
+            />
+            {recipientCompanyNameError && (
+              <p id="recipient-company-name-error" role="alert" className="text-xs font-medium text-destructive">
+                {recipientCompanyNameError}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
           <Label htmlFor="recipient-name" className="text-xs flex items-center gap-1">
-            <User className="w-3.5 h-3.5" /> 收貨人姓名
+            <User className="w-3.5 h-3.5" /> 收貨人姓名／聯絡人姓名
             <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -610,6 +673,7 @@ const DeliverySection = ({
             onChange={(e) => onRecipientNameChange(e.target.value)}
             className={`text-sm ${recipientNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
             maxLength={100}
+            required
             aria-invalid={Boolean(recipientNameError)}
             aria-describedby={recipientNameError ? "recipient-name-error" : undefined}
           />
@@ -618,8 +682,8 @@ const DeliverySection = ({
               {recipientNameError}
             </p>
           )}
-        </div>
-        <div className="space-y-1">
+          </div>
+          <div className="space-y-1">
           <Label htmlFor="recipient-phone" className="text-xs">
             收貨人電話 <span className="text-destructive">*</span>
           </Label>
@@ -630,6 +694,7 @@ const DeliverySection = ({
             onChange={(e) => onRecipientPhoneChange(e.target.value)}
             className={`text-sm font-mono ${recipientPhoneError ? "border-destructive ring-1 ring-destructive" : ""}`}
             maxLength={30}
+            required
             aria-invalid={Boolean(recipientPhoneError)}
             aria-describedby={recipientPhoneError ? "recipient-phone-error" : undefined}
           />
@@ -638,6 +703,7 @@ const DeliverySection = ({
               {recipientPhoneError}
             </p>
           )}
+          </div>
         </div>
       </div>
 

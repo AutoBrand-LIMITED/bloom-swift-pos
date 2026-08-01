@@ -29,6 +29,8 @@ export const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
 
 export interface DeliveryAddressSelection {
   address: string;
+  recipientType?: "personal" | "company";
+  recipientCompanyName?: string;
   recipientName?: string;
   recipientPhone?: string;
   shippingPartnerId?: number;

@@ -33,6 +33,8 @@ export interface PurchaseRecord {
   status: "paid" | "unpaid";
   deliveryDate?: string;
   deliveryAddress?: string;
+  recipientType?: "personal" | "company";
+  recipientCompanyName?: string;
   recipientName?: string;
   recipientPhone?: string;
   customerName?: string;

@@ -35,6 +35,8 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     deliveryDistrict: "",
     deliveryArea: "",
     deliveryDetail: "",
+    recipientType: "personal",
+    recipientCompanyName: "",
     recipientName: "",
     recipientPhone: "",
     deliveryPerson: "",
@@ -49,6 +51,8 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     onAreaChange: vi.fn(),
     onDetailChange: vi.fn(),
     onGoogleAddressSelect: vi.fn(),
+    onRecipientTypeChange: vi.fn(),
+    onRecipientCompanyNameChange: vi.fn(),
     onRecipientNameChange: vi.fn(),
     onRecipientPhoneChange: vi.fn(),
     onDeliveryPersonChange: vi.fn(),
@@ -78,6 +82,22 @@ describe("DeliverySection delivery time controls", () => {
     fireEvent.click(screen.getByRole("radio", { name: "下午 13:00-18:00" }));
 
     expect(props.onSlotChange).toHaveBeenCalledWith(slots[1]);
+  });
+
+  it("toggles company recipient details while keeping the contact required", () => {
+    const props = renderSection({
+      recipientType: "company",
+      recipientCompanyName: "Company Recipient Limited",
+      recipientCompanyNameError: "公司收貨人必須輸入公司名稱",
+    });
+
+    expect(screen.getByRole("button", { name: /公司/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText(/收貨公司名稱/)).toHaveValue("Company Recipient Limited");
+    expect(screen.getByLabelText(/收貨公司名稱/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/聯絡人姓名/)).toBeRequired();
+
+    fireEvent.click(screen.getByRole("button", { name: /個人/ }));
+    expect(props.onRecipientTypeChange).toHaveBeenCalledWith("personal");
   });
 
   it("uses roving focus and arrow keys to select the next delivery choice", async () => {
@@ -540,6 +560,8 @@ function renderSectionProps(
     deliveryDistrict: "",
     deliveryArea: "",
     deliveryDetail: "",
+    recipientType: "personal",
+    recipientCompanyName: "",
     recipientName: "",
     recipientPhone: "",
     deliveryPerson: "",
@@ -554,6 +576,8 @@ function renderSectionProps(
     onAreaChange: vi.fn(),
     onDetailChange: vi.fn(),
     onGoogleAddressSelect: vi.fn(),
+    onRecipientTypeChange: vi.fn(),
+    onRecipientCompanyNameChange: vi.fn(),
     onRecipientNameChange: vi.fn(),
     onRecipientPhoneChange: vi.fn(),
     onDeliveryPersonChange: vi.fn(),

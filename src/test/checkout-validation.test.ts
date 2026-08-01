@@ -20,6 +20,8 @@ const validCheckout = {
   billingAddress: "",
   phone: "9123 4567",
   senderName: "陳小姐",
+  recipientType: "personal" as const,
+  recipientCompanyName: "",
   recipientName: "李先生",
   recipientPhone: "+853 6123-4567",
   deliveryAddress: "香港 中環 皇后大道中 1 號",
@@ -121,6 +123,29 @@ describe("checkout required-field validation", () => {
       ...validCheckout,
       customerEmail: "not-an-email",
     }).customerEmail).toBe("請輸入有效電郵地址");
+  });
+
+  it("requires a company name and contact for company recipients", () => {
+    const missingCompany = validateCheckout({
+      ...validCheckout,
+      recipientType: "company",
+      recipientCompanyName: " ",
+    });
+    expect(missingCompany.recipientCompanyName).toBe("公司收貨人必須輸入公司名稱");
+
+    const missingContact = validateCheckout({
+      ...validCheckout,
+      recipientType: "company",
+      recipientCompanyName: "Company Recipient Limited",
+      recipientName: " ",
+    });
+    expect(missingContact.recipientName).toBe("請輸入收花人姓名");
+
+    expect(validateCheckout({
+      ...validCheckout,
+      recipientType: "company",
+      recipientCompanyName: "Company Recipient Limited",
+    })).toEqual({});
   });
 
   it("allows only a restored legacy company snapshot to replay without new company fields", () => {

@@ -46,6 +46,9 @@ export function extractCustomersFromOrders(orders: Order[]): DemoCustomer[] {
       total: order.finalPrice,
       status: order.paymentStatus === "unpaid" ? "unpaid" : "paid",
       deliveryAddress: order.deliveryAddress || "",
+      recipientType: order.recipientType
+        || (order.recipientCompanyName?.trim() ? "company" : "personal"),
+      recipientCompanyName: order.recipientCompanyName || "",
       recipientName: order.recipientName || "",
       recipientPhone: order.recipientPhone || "",
       customerName: order.customerName || "",

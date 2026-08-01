@@ -3,7 +3,7 @@ import {
   type FrozenDeliverySlotSelection,
 } from "@/lib/delivery-slots";
 import type { DeliverySlot } from "@/lib/odoo-api";
-import type { DeliveryTimeMode } from "@/types/order";
+import type { DeliveryTimeMode, RecipientType } from "@/types/order";
 
 export type CheckoutField =
   | "customerName"
@@ -12,6 +12,7 @@ export type CheckoutField =
   | "companyName"
   | "customerEmail"
   | "billingAddress"
+  | "recipientCompanyName"
   | "recipientName"
   | "recipientPhone"
   | "deliveryAddress"
@@ -33,6 +34,8 @@ interface CheckoutValidationInput {
   restoredPendingSubmission?: boolean;
   requiresCustomerResolution?: boolean;
   senderName: string;
+  recipientType: RecipientType;
+  recipientCompanyName: string;
   recipientName: string;
   recipientPhone: string;
   deliveryAddress: string;
@@ -101,6 +104,9 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
     errors.phone = "請先搜尋並選擇現有客戶，或確認新增客戶";
   }
   if (!input.senderName.trim()) errors.senderName = "請輸入送花人名稱";
+  if (input.recipientType === "company" && !input.recipientCompanyName.trim()) {
+    errors.recipientCompanyName = "公司收貨人必須輸入公司名稱";
+  }
   if (!input.recipientName.trim()) errors.recipientName = "請輸入收花人姓名";
   if (!input.recipientPhone.trim()) {
     errors.recipientPhone = "請輸入收花人電話";
