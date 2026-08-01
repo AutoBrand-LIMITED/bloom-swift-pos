@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Calculator, ClipboardList, RotateCcw } from "lucide-react";
+import { Calculator, ClipboardList, LogOut, RotateCcw, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import { generateAllDocuments, generateReceipt, printDocument } from "@/lib/print-utils";
@@ -16,6 +16,7 @@ import CustomerHistoryDock from "@/components/pos/CustomerHistoryDock";
 import OrderNotesSection, { type NotesConflictTarget } from "@/components/pos/OrderNotesSection";
 import type { DeliveryTimeMode, Order, OrderItem, PaymentStatus } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
+import { usePosAuth } from "@/components/auth/PosAuthContext";
 import type { DemoCustomer } from "@/data/demo-customers";
 import { buildPartnerNoteMutation } from "@/lib/customer-notes";
 import {
@@ -23,11 +24,14 @@ import {
   detachedCustomerProfile,
 } from "@/lib/customer-profile";
 import {
+  discardPendingSubmissionAfterOdooReview,
   deliveryContractFieldsForSubmission,
+  employeeSnapshotForSubmission,
   firstAddedLegacyBusinessField,
   isDeterministicSubmissionFailure,
   loadPendingSubmission,
   pendingOptionBindingsMatch,
+  pendingSubmissionBelongsToEmployee,
   submissionPayloadMatches,
   submitPersistedOrder,
   upgradeLegacyPendingDeliverySelection,
@@ -71,6 +75,7 @@ import {
 
 const Index = () => {
   const navigate = useNavigate();
+  const { employee, logout } = usePosAuth();
   const [pendingSubmission, setPendingSubmission] = useState<PendingOrderSubmission | null>(
     loadPendingSubmission,
   );
@@ -156,8 +161,8 @@ const Index = () => {
   const [paymentOptions, setPaymentOptions] = useState<AccountingPaymentOption[]>([]);
   const [paymentOptionsLoading, setPaymentOptionsLoading] = useState(false);
   const [paymentOptionsError, setPaymentOptionsError] = useState<string | null>(null);
-  const [salesId, setSalesId] = useState("");
-  const [operatorEmployeeId, setOperatorEmployeeId] = useState<number | undefined>();
+  const [salesId, setSalesId] = useState(employee?.salesLabel || "");
+  const [operatorEmployeeId, setOperatorEmployeeId] = useState<number | undefined>(employee?.id);
   const [priceOverridden, setPriceOverridden] = useState(false);
   const [manualPrice, setManualPrice] = useState<number | null>(null);
 
@@ -213,6 +218,11 @@ const Index = () => {
 
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
   const hasSalesperson = salesId.trim().length > 0;
+  const pendingOwnershipMismatch = Boolean(
+    pendingSubmission
+      && employee
+      && !pendingSubmissionBelongsToEmployee(pendingSubmission, employee),
+  );
   const frozenDeliverySlotSelection = pendingSubmission?.order.deliveryTimeMode === "slot"
     && pendingSubmission.order.deliverySlotId !== undefined
     ? {
@@ -225,6 +235,12 @@ const Index = () => {
       && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "deliveryTimeMode")
       && !Object.prototype.hasOwnProperty.call(pendingSubmission.order, "deliverySlotId"),
   );
+
+  useEffect(() => {
+    if (!employee) return;
+    setSalesId(employee.salesLabel);
+    setOperatorEmployeeId(employee.id);
+  }, [employee]);
 
   useEffect(() => {
     if (!hasOdooBackend) return;
@@ -375,6 +391,25 @@ const Index = () => {
     resetOrderForm();
   }, [pendingSubmission, resetOrderForm]);
 
+  const handleDiscardPending = useCallback(() => {
+    if (!pendingSubmission || !employee) return;
+    if (!pendingSubmissionBelongsToEmployee(pendingSubmission, employee)) {
+      toast.error("只有原本落單員工先可以移除呢張本機待確認資料");
+      return;
+    }
+    const confirmed = window.confirm(
+      "請先到 Odoo 用訂單編號核對是否已成功建立。\n\n繼續只會移除這部瀏覽器的本機待確認資料，不會刪除或修改 Odoo 內任何訂單。確定繼續？",
+    );
+    if (!confirmed) return;
+    if (!discardPendingSubmissionAfterOdooReview(pendingSubmission, employee, true)) {
+      toast.error("本機待確認資料已改變，請重新載入後再核對");
+      return;
+    }
+    setPendingSubmission(null);
+    resetOrderForm();
+    toast.success("已移除本機待確認資料；Odoo 訂單沒有被刪除或修改。");
+  }, [employee, pendingSubmission, resetOrderForm]);
+
   useEffect(() => {
     if (!restoredPendingSubmission) return;
     const { order, options } = restoredPendingSubmission;
@@ -429,10 +464,12 @@ const Index = () => {
     setCheckoutId(order.id);
     setPriceOverridden(order.priceOverridden);
     setManualPrice(order.priceOverridden ? order.finalPrice : null);
-    setSalesId(order.salesId);
-    setOperatorEmployeeId(order.operatorEmployeeId);
+    if (!employee) {
+      setSalesId(order.salesId);
+      setOperatorEmployeeId(order.operatorEmployeeId);
+    }
     toast.info("已恢復尚未確認嘅 Odoo 訂單，重試會沿用原本嘅訂單編號");
-  }, [restoredPendingSubmission]);
+  }, [employee, restoredPendingSubmission]);
 
   const handleDeliverySlotChange = (slot: DeliverySlot) => {
     const snapshot = deliverySlotSnapshot(slot);
@@ -591,6 +628,12 @@ const Index = () => {
     if (!hasOdooBackend && !allowLocalOnlyOrders) {
       toast.error("未連接 Odoo backend，訂單未建立。請先恢復 backend 連線後再試。", {
         duration: 8000,
+      });
+      return;
+    }
+    if (pendingSubmission && employee && pendingOwnershipMismatch) {
+      toast.error("這張待確認訂單屬於另一位或未知員工；請由原本員工重新登入後再重試。", {
+        duration: 9000,
       });
       return;
     }
@@ -754,10 +797,14 @@ const Index = () => {
     const includePendingField = (field: keyof Order) => (
       !pendingSubmission || Object.prototype.hasOwnProperty.call(pendingSubmission.order, field)
     );
+    const submissionEmployee = employeeSnapshotForSubmission(
+      pendingSubmission,
+      employee,
+      { salesId, operatorEmployeeId },
+    );
     const currentOrder: Order = {
       id: pendingSubmission?.order.id || checkoutId,
-      salesId,
-      operatorEmployeeId,
+      ...submissionEmployee,
       customerName: customerName.trim(),
       ...(includePendingField("customerType") ? { customerType } : {}),
       ...(includePendingField("companyName") ? { companyName: companyName.trim() } : {}),
@@ -951,6 +998,12 @@ const Index = () => {
             />
           </h1>
           <div className="flex w-full items-center justify-end gap-1 overflow-x-auto sm:w-auto sm:gap-2">
+            {employee && (
+              <div className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 text-xs">
+                <UserRound className="h-4 w-4" aria-hidden="true" />
+                <span className="max-w-40 truncate" title={employee.salesLabel}>{employee.name}</span>
+              </div>
+            )}
             <CsvImportButton onCustomersUpdated={() => setCustomerRefreshKey((k) => k + 1)} />
             <Button variant="ghost" size="sm" onClick={() => navigate("/day-end")} className="gap-1.5 text-xs">
               <Calculator className="w-3.5 h-3.5" /> 日結
@@ -966,6 +1019,17 @@ const Index = () => {
             >
               <ClipboardList className="w-3.5 h-3.5" /> 訂單記錄
             </Button>
+            {employee && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="min-h-11 gap-1.5 text-xs touch-manipulation"
+                aria-label={`登出 ${employee.name}`}
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" /> 登出
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -1000,11 +1064,37 @@ const Index = () => {
         <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
         <SalesIdSection
           salesId={salesId}
+          employee={employee}
           onSalespersonChange={(label, employeeId) => {
             setSalesId(label);
             setOperatorEmployeeId(employeeId);
           }}
         />
+
+        {pendingOwnershipMismatch && (
+          <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive">
+            <p>
+              這張未確認訂單並不屬於目前登入員工，系統不會自動轉名或容許移除。請登出後由原本員工重新登入；如無法辨認原員工，請由管理員到 Odoo 核對。
+            </p>
+          </div>
+        )}
+
+        {pendingSubmission && !pendingOwnershipMismatch && (
+          <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            <p>
+              系統已恢復一張屬於目前員工的未確認訂單，請保留原本資料重試。如確認 Odoo 沒有需要保留或重試的訂單，可核對後只移除這部瀏覽器的待確認資料。
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDiscardPending}
+              className="border-amber-400 bg-white text-amber-950 hover:bg-amber-100"
+            >
+              核對 Odoo 後移除本機資料
+            </Button>
+          </div>
+        )}
 
         {hasSalesperson ? (
           <>

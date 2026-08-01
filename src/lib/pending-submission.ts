@@ -1,4 +1,5 @@
 import type { DeliveryTimeMode, Order } from "@/types/order";
+import type { PosEmployeeIdentity } from "@/lib/pos-auth";
 
 export interface PendingSubmissionOptions {
   customerId?: number;
@@ -13,6 +14,28 @@ export interface PendingOrderSubmission {
 }
 
 export const PENDING_SUBMISSION_KEY = "florist-pos-pending-odoo-submission-v1";
+
+export function pendingSubmissionBelongsToEmployee(
+  pending: PendingOrderSubmission,
+  employee: PosEmployeeIdentity,
+): boolean {
+  return pending.order.operatorEmployeeId !== undefined
+    && pending.order.operatorEmployeeId === employee.id;
+}
+
+export function employeeSnapshotForSubmission(
+  pending: PendingOrderSubmission | null,
+  employee: PosEmployeeIdentity | null,
+  current: Pick<Order, "salesId" | "operatorEmployeeId">,
+): Pick<Order, "salesId" | "operatorEmployeeId"> {
+  if (pending && employee && pendingSubmissionBelongsToEmployee(pending, employee)) {
+    return {
+      salesId: pending.order.salesId,
+      operatorEmployeeId: pending.order.operatorEmployeeId,
+    };
+  }
+  return current;
+}
 
 const BUSINESS_FIELD_LABELS = {
   customerEmail: "客戶電郵",
@@ -122,6 +145,20 @@ export function clearPendingSubmission(expected?: string | PendingOrderSubmissio
   }
   localStorage.removeItem(PENDING_SUBMISSION_KEY);
   return true;
+}
+
+export function discardPendingSubmissionAfterOdooReview(
+  pending: PendingOrderSubmission,
+  employee: PosEmployeeIdentity,
+  confirmed: boolean,
+): boolean {
+  if (!pendingSubmissionBelongsToEmployee(pending, employee)) {
+    throw new Error("只有原本落單員工先可以移除呢張本機待確認資料");
+  }
+  if (!confirmed) {
+    throw new Error("必須先確認已到 Odoo 核對訂單，才可移除本機待確認資料");
+  }
+  return clearPendingSubmission(pending);
 }
 
 export function submissionPayloadMatches(

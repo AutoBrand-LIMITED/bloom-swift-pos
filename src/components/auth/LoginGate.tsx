@@ -4,10 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   POS_AUTH_EXPIRED_EVENT,
+  clearPosSession,
   loginToPos,
   posAuthRequired,
+  type PosEmployeeIdentity,
   validatePosSession,
 } from "@/lib/pos-auth";
+import { PosAuthContext } from "@/components/auth/PosAuthContext";
 
 interface LoginGateProps {
   children: ReactNode;
@@ -16,6 +19,8 @@ interface LoginGateProps {
 const LoginGate = ({ children }: LoginGateProps) => {
   const [checking, setChecking] = useState(posAuthRequired);
   const [authenticated, setAuthenticated] = useState(!posAuthRequired);
+  const [employee, setEmployee] = useState<PosEmployeeIdentity | null>(null);
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -24,11 +29,19 @@ const LoginGate = ({ children }: LoginGateProps) => {
     if (!posAuthRequired) return;
     const controller = new AbortController();
     validatePosSession(controller.signal)
-      .then(setAuthenticated)
-      .catch(() => setAuthenticated(false))
+      .then((restoredEmployee) => {
+        setEmployee(restoredEmployee);
+        setAuthenticated(Boolean(restoredEmployee));
+      })
+      .catch(() => {
+        setEmployee(null);
+        setAuthenticated(false);
+      })
       .finally(() => setChecking(false));
     const expire = () => {
       setAuthenticated(false);
+      setEmployee(null);
+      setLogin("");
       setPassword("");
       setError("登入已過期，請重新登入。");
     };
@@ -41,11 +54,12 @@ const LoginGate = ({ children }: LoginGateProps) => {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!password || submitting) return;
+    if (!login.trim() || !password || submitting) return;
     setSubmitting(true);
     setError("");
     try {
-      await loginToPos(password);
+      const authenticatedEmployee = await loginToPos(login.trim(), password);
+      setEmployee(authenticatedEmployee);
       setPassword("");
       setAuthenticated(true);
     } catch (loginError) {
@@ -77,21 +91,38 @@ const LoginGate = ({ children }: LoginGateProps) => {
           />
           <h1 className="text-center text-2xl font-semibold">中西花店 POS</h1>
           <p className="mt-2 text-center text-sm text-muted-foreground">員工登入</p>
-          <label htmlFor="pos-password" className="mt-7 block text-sm font-medium">
+          <label htmlFor="pos-login" className="mt-7 block text-sm font-medium">
+            員工登入代號
+          </label>
+          <Input
+            id="pos-login"
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoFocus
+            className="mt-2 h-12"
+            value={login}
+            onChange={(event) => setLogin(event.target.value)}
+            disabled={submitting}
+          />
+          <label htmlFor="pos-password" className="mt-5 block text-sm font-medium">
             POS 密碼
           </label>
           <Input
             id="pos-password"
             type="password"
             autoComplete="current-password"
-            autoFocus
             className="mt-2 h-12"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             disabled={submitting}
           />
           {error && <p className="mt-3 text-sm text-destructive" role="alert">{error}</p>}
-          <Button type="submit" className="mt-6 h-12 w-full" disabled={!password || submitting}>
+          <Button
+            type="submit"
+            className="mt-6 h-12 w-full touch-manipulation"
+            disabled={!login.trim() || !password || submitting}
+          >
             {submitting ? <LoaderCircle className="animate-spin" /> : <LogIn />}
             {submitting ? "登入中" : "登入"}
           </Button>
@@ -100,7 +131,20 @@ const LoginGate = ({ children }: LoginGateProps) => {
     );
   }
 
-  return children;
+  const logout = () => {
+    clearPosSession();
+    setEmployee(null);
+    setAuthenticated(false);
+    setLogin("");
+    setPassword("");
+    setError("");
+  };
+
+  return (
+    <PosAuthContext.Provider value={{ employee, logout }}>
+      {children}
+    </PosAuthContext.Provider>
+  );
 };
 
 export default LoginGate;
