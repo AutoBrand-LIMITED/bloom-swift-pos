@@ -45,4 +45,39 @@ describe("OrderItemsSection legacy line snapshots", () => {
       expect.objectContaining({ id: "line-1", remarks: "白色絲帶" }),
     ]);
   });
+
+  it("keeps the optional customer budget collapsed until staff opens it", () => {
+    const onBudgetChange = vi.fn();
+
+    render(
+      <OrderItemsSection
+        items={[]}
+        onItemsChange={vi.fn()}
+        deliveryFee={0}
+        urgentFee={0}
+        onDeliveryFeeChange={vi.fn()}
+        onUrgentFeeChange={vi.fn()}
+        onCustomOrderSummary={vi.fn()}
+        budget={1000}
+        onBudgetChange={onBudgetChange}
+        subtotal={680}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: /客人預算/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("預算金額")).not.toBeInTheDocument();
+    expect(screen.getByText("$1,000")).toBeVisible();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("預算金額")).toHaveValue(1000);
+    expect(screen.getByText("剩餘 $320")).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText("預算金額"), {
+      target: { value: "1200" },
+    });
+    expect(onBudgetChange).toHaveBeenCalledWith(1200);
+  });
 });

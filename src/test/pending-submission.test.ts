@@ -2,10 +2,15 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   clearPendingSubmission,
+  discardPendingSubmissionAfterOdooReview,
   deliveryContractFieldsForSubmission,
+  employeeSnapshotForSubmission,
   firstAddedLegacyBusinessField,
   loadPendingSubmission,
   pendingOptionBindingsMatch,
+  pendingRecipientBindingsMatch,
+  pendingSubmissionBelongsToEmployee,
+  pendingSubmissionForEmployee,
   PENDING_SUBMISSION_KEY,
   savePendingSubmission,
   submissionPayloadMatches,
@@ -98,6 +103,124 @@ describe("pending Odoo submission", () => {
       submission.order.paymentIdempotencyKey,
     );
     expect(restoredAfterReload?.order).toEqual(submission.order);
+  });
+
+  it("uses immutable employee ID ownership even if the display label changes", () => {
+    const pending = buildSubmission();
+    pending.order.salesId = "AC02 — Elma";
+
+    expect(pendingSubmissionBelongsToEmployee(pending, {
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "NEW-CODE — Elma Chan",
+    })).toBe(true);
+    expect(pendingSubmissionBelongsToEmployee(pending, {
+      id: 96,
+      name: "Another Cashier",
+      login: "cashier-96",
+      salesLabel: "odoo-96 — Another Cashier",
+    })).toBe(false);
+
+    delete pending.order.operatorEmployeeId;
+    expect(pendingSubmissionBelongsToEmployee(pending, {
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "AC02 — Elma",
+    })).toBe(false);
+  });
+
+  it("exposes a pending order for hydration and history only to its owning employee", () => {
+    const pending = buildSubmission();
+    pending.order.recipientType = "company";
+    pending.order.recipientCompanyName = "Private Recipient Limited";
+    pending.order.recipientName = "Private Contact";
+    pending.order.recipientPhone = "61234567";
+    pending.order.deliveryAddress = "Private delivery address";
+    const owner = {
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "AC02 — Elma",
+    };
+    const otherEmployee = {
+      id: 96,
+      name: "Another Cashier",
+      login: "cashier-96",
+      salesLabel: "AC03 — Another Cashier",
+    };
+
+    expect(pendingSubmissionForEmployee(pending, owner)).toBe(pending);
+    expect(pendingSubmissionForEmployee(pending, otherEmployee)).toBeNull();
+    expect(pendingSubmissionForEmployee(pending, null)).toBeNull();
+    expect(pendingSubmissionForEmployee(pending, null, false)).toBe(pending);
+  });
+
+  it("requires explicit confirmation before discarding only the local pending record", () => {
+    const pending = buildSubmission();
+    savePendingSubmission(pending);
+
+    const employee = {
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "NEW-CODE — Elma Chan",
+    };
+
+    expect(() => discardPendingSubmissionAfterOdooReview(pending, employee, false)).toThrow("必須先確認");
+    expect(loadPendingSubmission()).toEqual(pending);
+    expect(discardPendingSubmissionAfterOdooReview(pending, employee, true)).toBe(true);
+    expect(loadPendingSubmission()).toBeNull();
+  });
+
+  it("does not let another employee discard a pending submission", () => {
+    const pending = buildSubmission();
+    savePendingSubmission(pending);
+
+    expect(() => discardPendingSubmissionAfterOdooReview(pending, {
+      id: 96,
+      name: "Another Cashier",
+      login: "cashier-96",
+      salesLabel: "AC03 — Another Cashier",
+    }, true)).toThrow("原本落單員工");
+    expect(loadPendingSubmission()).toEqual(pending);
+  });
+
+  it("allows confirmed local cleanup when POS authentication is disabled", () => {
+    const pending = buildSubmission();
+    savePendingSubmission(pending);
+
+    expect(discardPendingSubmissionAfterOdooReview(
+      pending,
+      null,
+      true,
+      false,
+    )).toBe(true);
+    expect(loadPendingSubmission()).toBeNull();
+  });
+
+  it("keeps the original employee snapshot byte-stable for a same-ID retry", () => {
+    const pending = buildSubmission();
+    const snapshot = employeeSnapshotForSubmission(pending, {
+      id: 95,
+      name: "Elma Chan",
+      login: "elma",
+      salesLabel: "NEW-CODE — Elma Chan",
+    }, {
+      salesId: "NEW-CODE — Elma Chan",
+      operatorEmployeeId: 95,
+    });
+    const retry = {
+      ...pending,
+      order: { ...pending.order, ...snapshot },
+    };
+
+    expect(snapshot).toEqual({
+      salesId: "ACCOUNT - AC02 - Elma",
+      operatorEmployeeId: 95,
+    });
+    expect(submissionPayloadMatches(pending, retry)).toBe(true);
   });
 
   it("clears the envelope only after a confirmed response", async () => {
@@ -284,6 +407,30 @@ describe("pending Odoo submission", () => {
       customerId: 84,
       customerType: "company",
       companyName: "  Reload Test Limited  ",
+    })).toBe(false);
+  });
+
+  it("locks recipient type and company identity while defaulting legacy retries to personal", () => {
+    const legacy = buildSubmission();
+    expect(pendingRecipientBindingsMatch(legacy, {
+      recipientType: "personal",
+      recipientCompanyName: "",
+    })).toBe(true);
+    expect(pendingRecipientBindingsMatch(legacy, {
+      recipientType: "company",
+      recipientCompanyName: "Recipient Limited",
+    })).toBe(false);
+
+    const company = buildSubmission();
+    company.order.recipientType = "company";
+    company.order.recipientCompanyName = "Recipient Limited";
+    expect(pendingRecipientBindingsMatch(company, {
+      recipientType: "company",
+      recipientCompanyName: "Recipient Limited",
+    })).toBe(true);
+    expect(pendingRecipientBindingsMatch(company, {
+      recipientType: "company",
+      recipientCompanyName: "Edited Limited",
     })).toBe(false);
   });
 

@@ -96,6 +96,8 @@ const OrderHistory = ({
                   : order.deliveryTime || "未指定時段";
                 const businessDetails = [
                   ["公司名稱", order.companyName],
+                  ["收貨公司", order.recipientCompanyName],
+                  ["收花聯絡人", order.recipientName],
                   ["客戶電郵", order.customerEmail],
                   ["帳單地址", order.billingAddress],
                   ["客戶群組", order.customerGroup],

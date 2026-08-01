@@ -18,6 +18,7 @@ export interface OrderItem {
 
 export type PaymentStatus = "unpaid" | "paid" | "deposit";
 export type DeliveryTimeMode = "slot" | "specified";
+export type RecipientType = "personal" | "company";
 
 export interface PartnerNoteMutation {
   commentText: string;
@@ -61,6 +62,8 @@ export interface Order {
   /** Human-readable snapshot retained even if the configured slot changes later. */
   deliveryTime: string;
   deliveryAddress: string;
+  recipientType?: RecipientType;
+  recipientCompanyName?: string;
   recipientName: string;
   recipientPhone: string;
   deliveryPerson: string;

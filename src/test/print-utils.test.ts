@@ -84,6 +84,26 @@ describe("print layout contract", () => {
     expect(html).not.toContain("Driver A");
   });
 
+  it("prints company and contact separately without blank company labels", () => {
+    const companyDelivery = generateDeliveryNote(orderFixture({
+      recipientType: "company",
+      recipientCompanyName: "RECIPIENT LIMITED",
+      recipientName: "CONTACT PERSON",
+    }));
+    const companyPicking = generatePickingList(orderFixture({
+      recipientType: "company",
+      recipientCompanyName: "RECIPIENT LIMITED",
+      recipientName: "CONTACT PERSON",
+    }));
+    const personalDelivery = generateDeliveryNote(orderFixture());
+
+    expect(companyDelivery).toContain("收貨公司");
+    expect(companyDelivery).toContain("RECIPIENT LIMITED");
+    expect(companyDelivery).toContain("CONTACT PERSON");
+    expect(companyPicking).toContain("RECIPIENT LIMITED");
+    expect(personalDelivery).not.toContain("收貨公司");
+  });
+
   it("renders the complete delivery-note document hierarchy", () => {
     const html = generateDeliveryNote(orderFixture());
 

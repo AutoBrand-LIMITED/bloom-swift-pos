@@ -30,6 +30,8 @@ const normalizeIdentityPart = (value?: string) =>
 const samePastAddressIdentity = (
   entry: {
     address: string;
+    recipientType?: "personal" | "company";
+    recipientCompanyName?: string;
     recipientName?: string;
     recipientPhone?: string;
     shippingPartnerId?: number;
@@ -38,6 +40,15 @@ const samePastAddressIdentity = (
   address: string,
 ) => {
   if (normalizeIdentityPart(entry.address) !== normalizeIdentityPart(address)) return false;
+  const historyCompanyName = normalizeIdentityPart(history.recipientCompanyName);
+  const historyRecipientType = history.recipientType
+    || (historyCompanyName ? "company" : "personal");
+  const entryRecipientType = entry.recipientType
+    || (normalizeIdentityPart(entry.recipientCompanyName) ? "company" : "personal");
+  if (entryRecipientType !== historyRecipientType) return false;
+  if (
+    normalizeIdentityPart(entry.recipientCompanyName) !== historyCompanyName
+  ) return false;
   if (entry.shippingPartnerId || history.shippingPartnerId) {
     return Boolean(
       entry.shippingPartnerId
@@ -107,6 +118,8 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
     if (!displayCustomer) return [];
     const addrs: {
       address: string;
+      recipientType?: "personal" | "company";
+      recipientCompanyName?: string;
       recipientName?: string;
       recipientPhone?: string;
       shippingPartnerId?: number;
@@ -118,12 +131,17 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
       if (!addr) continue;
       const existing = addrs.find((entry) => samePastAddressIdentity(entry, h, addr));
       if (existing) {
+        existing.recipientType ||= h.recipientType;
+        existing.recipientCompanyName ||= h.recipientCompanyName;
         existing.recipientName ||= h.recipientName;
         existing.recipientPhone ||= h.recipientPhone;
         existing.recipientContactNote ||= h.recipientContactNote;
       } else {
         addrs.push({
           address: addr,
+          recipientType: h.recipientType
+            || (h.recipientCompanyName?.trim() ? "company" : "personal"),
+          recipientCompanyName: h.recipientCompanyName,
           recipientName: h.recipientName,
           recipientPhone: h.recipientPhone,
           shippingPartnerId: h.shippingPartnerId,
@@ -145,7 +163,14 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
           <History className="w-4 h-4 text-primary" />
           客戶記錄
         </h3>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11"
+          aria-label="關閉客戶記錄"
+          title="關閉客戶記錄"
+          onClick={onClose}
+        >
           <X className="w-4 h-4" />
         </Button>
       </div>
@@ -233,6 +258,10 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                       aria-label={`使用過往地址 ${a.address}`}
                       onClick={() => onUseAddress?.({
                         address: a.address,
+                        recipientType: a.recipientType,
+                        ...(a.recipientCompanyName
+                          ? { recipientCompanyName: a.recipientCompanyName }
+                          : {}),
                         recipientName: a.recipientName,
                         recipientPhone: a.recipientPhone,
                         shippingPartnerId: a.shippingPartnerId,
@@ -240,6 +269,11 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                       className="w-full text-left rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 p-2 transition-colors group"
                     >
                       <p className="text-xs leading-relaxed">{a.address}</p>
+                      {a.recipientCompanyName && (
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          公司：{a.recipientCompanyName}
+                        </p>
+                      )}
                       {a.recipientName && (
                         <p className="text-[10px] text-muted-foreground mt-0.5">收貨人：{a.recipientName}</p>
                       )}
@@ -351,7 +385,9 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                   <p className="flex items-start gap-1.5">
                     <User className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                     <span className="break-words">
-                      收花人：{h.recipientName || "未有資料"}
+                      {h.recipientCompanyName
+                        ? `收貨公司：${h.recipientCompanyName} · 聯絡人：${h.recipientName || "未有資料"}`
+                        : `收花人：${h.recipientName || "未有資料"}`}
                     </span>
                   </p>
                   <p className="flex items-start gap-1.5">
@@ -401,6 +437,11 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                         className="min-h-9 min-w-11 px-2 text-[11px]"
                         onClick={() => onUseAddress?.({
                           address: h.deliveryAddress!,
+                          recipientType: h.recipientType
+                            || (h.recipientCompanyName?.trim() ? "company" : "personal"),
+                          ...(h.recipientCompanyName
+                            ? { recipientCompanyName: h.recipientCompanyName }
+                            : {}),
                           recipientName: h.recipientName,
                           recipientPhone: h.recipientPhone,
                           shippingPartnerId: h.shippingPartnerId,
@@ -428,6 +469,9 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                       <p><span className="text-muted-foreground">Invoice：</span>{h.invoiceNumber ?? "未有資料"}</p>
                       <p><span className="text-muted-foreground">下單／付款人：</span>{h.customerName || displayCustomer.name || "未有資料"}</p>
                       <p><span className="text-muted-foreground">送花人：</span>{h.senderName || h.customerName || displayCustomer.name || "未有資料"}</p>
+                      {h.recipientCompanyName && (
+                        <p><span className="text-muted-foreground">收貨公司：</span>{h.recipientCompanyName}</p>
+                      )}
                       <p><span className="text-muted-foreground">收花人：</span>{h.recipientName || "未有資料"}</p>
                       <p><span className="text-muted-foreground">收花電話：</span>{h.recipientPhone || "未有資料"}</p>
                       <p className="break-words"><span className="text-muted-foreground">送貨地址：</span>{h.deliveryAddress || "未有資料"}</p>

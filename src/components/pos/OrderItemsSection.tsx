@@ -19,6 +19,8 @@ import {
   Minimize2,
   GripHorizontal,
   Settings2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import ProductManagementDialog from "@/components/pos/ProductManagementDialog";
@@ -68,6 +70,7 @@ const OrderItemsSection = ({
   const [catalogExpanded, setCatalogExpanded] = useState(false);
   const [catalogHeight, setCatalogHeight] = useState(480);
   const [productManagerOpen, setProductManagerOpen] = useState(false);
+  const [budgetExpanded, setBudgetExpanded] = useState(false);
 
   const loadCatalog = useCallback(async (signal?: AbortSignal) => {
     if (!hasOdooBackend) return;
@@ -208,36 +211,58 @@ const OrderItemsSection = ({
       />
 
       {/* Budget */}
-      <div className="space-y-2 rounded-lg bg-secondary/50 p-3">
-        <div className="flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-primary" />
-          <Label className="text-xs font-medium">客人預算</Label>
-          <div className="flex items-center gap-1 ml-auto">
-            <span className="text-xs text-muted-foreground">$</span>
-            <Input
-              type="number"
-              value={budget || ""}
-              onChange={(e) => onBudgetChange(parseFloat(e.target.value) || 0)}
-              placeholder="輸入預算"
-              className="w-28 h-8 text-sm font-mono text-right bg-card"
-              min={0}
-            />
-          </div>
-        </div>
-        {budget > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">已用 ${subtotal.toLocaleString()}</span>
-              <span className={`font-mono font-medium ${budget - subtotal < 0 ? "text-destructive" : "text-primary"}`}>
-                {budget - subtotal >= 0
-                  ? `剩餘 $${(budget - subtotal).toLocaleString()}`
-                  : `超出 $${(subtotal - budget).toLocaleString()}`}
-              </span>
+      <div className="rounded-lg border border-border bg-secondary/30">
+        <button
+          type="button"
+          className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left"
+          aria-expanded={budgetExpanded}
+          aria-controls="customer-budget-content"
+          onClick={() => setBudgetExpanded((expanded) => !expanded)}
+        >
+          <Wallet className="h-4 w-4 text-primary" />
+          <span className="text-xs font-medium">客人預算</span>
+          <span className="ml-auto font-mono text-xs text-muted-foreground">
+            {budget > 0 ? `$${budget.toLocaleString()}` : "未設定"}
+          </span>
+          {budgetExpanded ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+        {budgetExpanded && (
+          <div id="customer-budget-content" className="space-y-2 border-t border-border px-3 py-3">
+            <div className="flex items-center justify-end gap-1">
+              <Label htmlFor="customer-budget" className="mr-auto text-xs text-muted-foreground">
+                預算金額
+              </Label>
+              <span className="text-xs text-muted-foreground">$</span>
+              <Input
+                id="customer-budget"
+                type="number"
+                value={budget || ""}
+                onChange={(e) => onBudgetChange(parseFloat(e.target.value) || 0)}
+                placeholder="輸入預算"
+                className="h-9 w-32 bg-card text-right font-mono text-sm"
+                min={0}
+              />
             </div>
-            <Progress
-              value={Math.min((subtotal / budget) * 100, 100)}
-              className={`h-2 ${subtotal > budget ? "[&>div]:bg-destructive" : "[&>div]:bg-primary"}`}
-            />
+            {budget > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">已用 ${subtotal.toLocaleString()}</span>
+                  <span className={`font-mono font-medium ${budget - subtotal < 0 ? "text-destructive" : "text-primary"}`}>
+                    {budget - subtotal >= 0
+                      ? `剩餘 $${(budget - subtotal).toLocaleString()}`
+                      : `超出 $${(subtotal - budget).toLocaleString()}`}
+                  </span>
+                </div>
+                <Progress
+                  value={Math.min((subtotal / budget) * 100, 100)}
+                  className={`h-2 ${subtotal > budget ? "[&>div]:bg-destructive" : "[&>div]:bg-primary"}`}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

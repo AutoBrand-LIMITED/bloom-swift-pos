@@ -180,6 +180,8 @@ export interface DayEndOrderRow {
   balanceAmount: number;
   remarks: string | null;
   deliveryDate: string | null;
+  recipientType: "personal" | "company";
+  recipientCompanyName: string | null;
   recipientName: string | null;
   recipientPhone: string | null;
   deliveryAddress: string | null;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, Calculator, Printer, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Calculator, LogOut, Printer, RefreshCw, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDayEndMoney } from "@/lib/day-end";
 import { getDayEndSummary, hasOdooBackend, type DayEndOrderRow, type DayEndPaymentBucket, type DayEndSummary } from "@/lib/odoo-api";
+import { usePosAuth } from "@/components/auth/PosAuthContext";
 
 const todayString = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Hong_Kong" });
 const initialDateString = () => new URLSearchParams(window.location.search).get("date") || todayString();
@@ -20,6 +21,7 @@ const statusLabel: Record<string, string> = {
 
 const DayEndSettlement = () => {
   const navigate = useNavigate();
+  const { employee, logout } = usePosAuth();
   const [date, setDate] = useState(initialDateString);
   const [summary, setSummary] = useState<DayEndSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -69,6 +71,12 @@ const DayEndSettlement = () => {
             </div>
           </div>
           <div className="day-end-controls flex flex-wrap items-center gap-2">
+            {employee && (
+              <div className="flex min-h-11 items-center gap-1.5 rounded-md border bg-background px-3 text-xs">
+                <UserRound className="h-4 w-4" aria-hidden="true" />
+                <span>{employee.name}</span>
+              </div>
+            )}
             <Input
               aria-label="日結日期"
               type="date"
@@ -85,6 +93,17 @@ const DayEndSettlement = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-1.5">
               <ArrowLeft className="w-3.5 h-3.5" /> 返回 POS
             </Button>
+            {employee && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="min-h-11 gap-1.5 touch-manipulation"
+                aria-label={`登出 ${employee.name}`}
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" /> 登出
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -236,6 +255,9 @@ const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
             <TableCell className="text-right font-mono">{formatDayEndMoney(order.saleTotal)}</TableCell>
             <TableCell className="text-right font-mono">{formatDayEndMoney(order.receivedToday)}</TableCell>
             <TableCell>
+              {order.recipientCompanyName && (
+                <div>{order.recipientCompanyName}</div>
+              )}
               <div>{order.recipientName || "-"}</div>
               <div className="text-xs text-muted-foreground">{order.recipientPhone || ""}</div>
             </TableCell>

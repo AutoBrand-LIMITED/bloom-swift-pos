@@ -283,10 +283,14 @@ function receiptNotes(title: string, englishTitle: string, value: unknown): stri
 }
 
 function pickingDeliveryInfo(order: Order): string {
+  const recipientCompanyRow = order.recipientCompanyName?.trim()
+    ? `<div><span class="label">收貨公司</span>${displayValue(order.recipientCompanyName)}</div>`
+    : "";
   return `
     <div class="pick-delivery-grid" data-document-section="delivery-details">
       <div><span class="label">送貨日期</span>${displayValue(order.deliveryDate)}</div>
       <div><span class="label">送貨時間</span>${displayValue(deliveryTimeLabel(order))}</div>
+      ${recipientCompanyRow}
       <div><span class="label">收貨人</span>${displayValue(order.recipientName)}</div>
       <div><span class="label">收貨人電話</span>${displayValue(order.recipientPhone)}</div>
       <div class="wide"><span class="label">地址</span>${displayValue(order.deliveryAddress)}</div>
@@ -371,6 +375,9 @@ export function generateDeliveryNote(order: Order): string {
         <section class="recipient-block" data-delivery-column="recipient">
           <h2 class="block-title">收貨資料 / RECIPIENT</h2>
           ${fieldRows([
+            ...(order.recipientCompanyName?.trim()
+              ? [["收貨公司", order.recipientCompanyName] as [string, unknown]]
+              : []),
             ["收貨人", order.recipientName],
             ["收貨人電話", order.recipientPhone],
             ["送貨地址", order.deliveryAddress],
@@ -411,6 +418,7 @@ export function generatePickingList(order: Order): string {
   const estimatedDetailLines = Math.ceil(order.deliveryAddress.length / 100)
     + Math.ceil(order.deliveryNote.length / 100)
     + Math.ceil(deliveryTimeLabel(order).length / 40)
+    + Math.ceil((order.recipientCompanyName?.length || 0) / 50)
     + Math.ceil(order.recipientName.length / 50);
   const hasDiscountRows = order.items.some(
     (item) => normalizeDiscountPercent(item.discountPercent) > 0,
