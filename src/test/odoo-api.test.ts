@@ -331,4 +331,36 @@ describe("odoo-api note contracts", () => {
       expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
     );
   });
+
+  it("searches Odoo orders across dates with an encoded query", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      generatedAt: "2026-08-01T22:00:00+08:00",
+      truncated: false,
+      orders: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooOrderRecords } = await import("@/lib/odoo-api");
+
+    await expect(searchOdooOrderRecords(" accounts+hk@example.com ")).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders?q=accounts%2Bhk%40example.com",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
+  it("does not call the backend for a one-character order query", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooOrderRecords } = await import("@/lib/odoo-api");
+
+    await expect(searchOdooOrderRecords("A")).resolves.toEqual({
+      generatedAt: "",
+      truncated: false,
+      orders: [],
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

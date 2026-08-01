@@ -55,6 +55,31 @@ const isRecoverable = (order: Order, now = Date.now()) => {
     && now - createdAt <= UNSYNCED_ORDER_MAX_AGE_MS;
 };
 
+export const orderMatchesSearch = (order: Order, query: string): boolean => {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) return true;
+  const values = [
+    order.odooOrderName,
+    order.id,
+    order.customerName,
+    order.senderName,
+    order.phone,
+    order.customerEmail,
+    order.billingAddress,
+    order.deliveryAddress,
+    order.recipientCompanyName,
+    order.recipientName,
+    order.recipientPhone,
+  ];
+  if (values.some((value) => value?.toLocaleLowerCase().includes(normalizedQuery))) return true;
+
+  const queryDigits = normalizedQuery.replace(/\D/g, "");
+  if (queryDigits.length < 4) return false;
+  return [order.phone, order.recipientPhone].some((value) => (
+    value?.replace(/\D/g, "").includes(queryDigits)
+  ));
+};
+
 export const saveUnsyncedOrders = (orders: Order[]): void => {
   localStorage.setItem(UNSYNCED_ORDERS_KEY, JSON.stringify(orders));
 };

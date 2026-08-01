@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertCircle, CalendarDays, ClipboardList, LoaderCircle, RefreshCw, X } from "lucide-react";
+import { AlertCircle, CalendarDays, ClipboardList, LoaderCircle, RefreshCw, Search, X } from "lucide-react";
 import PrintButtons from "@/components/pos/PrintButtons";
 import type { PaymentStatus } from "@/types/order";
 import { orderItemTotal } from "@/lib/order-pricing";
@@ -11,6 +12,8 @@ interface OrderHistoryProps {
   orders: OrderRecordView[];
   open: boolean;
   onClose: () => void;
+  searchQuery?: string;
+  onSearchQueryChange?: (value: string) => void;
   loading?: boolean;
   loaded?: boolean;
   error?: string | null;
@@ -29,6 +32,8 @@ const OrderHistory = ({
   orders,
   open,
   onClose,
+  searchQuery = "",
+  onSearchQueryChange,
   loading = false,
   loaded = true,
   error,
@@ -37,6 +42,9 @@ const OrderHistory = ({
   onRetry,
 }: OrderHistoryProps) => {
   if (!open) return null;
+  const normalizedSearch = searchQuery.trim();
+  const searchNeedsMoreInput = normalizedSearch.length > 0 && normalizedSearch.length < 2;
+  const searchActive = normalizedSearch.length >= 2;
 
   return (
     <div className="fixed inset-0 z-50 bg-foreground/40 flex justify-end" onClick={onClose}>
@@ -53,19 +61,57 @@ const OrderHistory = ({
             <X className="w-5 h-5" />
           </Button>
         </div>
-        <ScrollArea className="h-[calc(100vh-65px)]">
+        <div className="space-y-1.5 border-b border-border p-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              aria-label="搜尋訂單"
+              value={searchQuery}
+              onChange={(event) => onSearchQueryChange?.(event.target.value)}
+              placeholder="搜尋電郵、電話、下單人、地址或收貨人"
+              className="min-h-11 pl-9 pr-11 text-sm"
+              maxLength={200}
+              autoComplete="off"
+            />
+            {searchQuery && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="清除訂單搜尋"
+                className="absolute right-0 top-0 min-h-11 min-w-11"
+                onClick={() => onSearchQueryChange?.("")}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {searchNeedsMoreInput
+              ? "請輸入至少 2 個字元"
+              : searchActive
+                ? `跨日期搜尋結果：${orders.length} 筆`
+                : "留空會顯示今日訂單；搜尋會跨日期查找。"}
+          </p>
+        </div>
+        <ScrollArea className="h-[calc(100vh-145px)]">
           {(loading || error || truncated) && (
             <div className="border-b border-border p-3 space-y-2">
               {loading && (
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <LoaderCircle className="h-4 w-4 animate-spin" /> 正在從 Odoo 載入訂單記錄
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  {searchActive ? "正在 Odoo 搜尋訂單" : "正在從 Odoo 載入今日訂單記錄"}
                 </p>
               )}
               {error && (
                 <div role="alert" className="flex items-start justify-between gap-3 text-xs text-destructive">
                   <p className="flex items-start gap-1.5">
                     <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    {stale ? "Odoo 更新失敗，暫時顯示上次成功載入嘅資料。" : "未能從 Odoo 載入完整訂單記錄。"}
+                    {stale
+                      ? "Odoo 更新失敗，暫時顯示上次成功載入嘅資料。"
+                      : searchActive
+                        ? "未能完成 Odoo 訂單搜尋。"
+                        : "未能從 Odoo 載入完整訂單記錄。"}
                   </p>
                   {onRetry && (
                     <Button variant="outline" size="sm" className="min-h-9 shrink-0 gap-1" onClick={onRetry}>
@@ -75,7 +121,11 @@ const OrderHistory = ({
                 </div>
               )}
               {truncated && (
-                <p className="text-xs text-amber-700">當日訂單超過顯示上限，完整記錄請到 Odoo 查看。</p>
+                <p className="text-xs text-amber-700">
+                  {searchActive
+                    ? "搜尋結果超過顯示上限，請輸入更完整資料收窄結果。"
+                    : "當日訂單超過顯示上限，完整記錄請到 Odoo 查看。"}
+                </p>
               )}
             </div>
           )}
@@ -86,7 +136,13 @@ const OrderHistory = ({
               </p>
             )
           ) : orders.length === 0 ? (
-            <p className="text-center text-muted-foreground p-8">暫無訂單</p>
+            <p className="text-center text-muted-foreground p-8">
+              {searchNeedsMoreInput
+                ? "請輸入至少 2 個字元開始搜尋"
+                : searchActive
+                  ? "未找到符合資料的訂單"
+                  : "今日暫無訂單"}
+            </p>
           ) : (
             <div className="p-4 space-y-3">
               {orders.map((order) => {
@@ -96,8 +152,11 @@ const OrderHistory = ({
                   : order.deliveryTime || "未指定時段";
                 const businessDetails = [
                   ["公司名稱", order.companyName],
+                  ["送花人", order.senderName],
                   ["收貨公司", order.recipientCompanyName],
                   ["收花聯絡人", order.recipientName],
+                  ["收花電話", order.recipientPhone],
+                  ["送貨地址", order.deliveryAddress],
                   ["客戶電郵", order.customerEmail],
                   ["帳單地址", order.billingAddress],
                   ["客戶群組", order.customerGroup],
