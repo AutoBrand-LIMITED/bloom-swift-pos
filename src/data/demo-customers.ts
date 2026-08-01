@@ -14,6 +14,12 @@ export interface DemoCustomer {
   commentText?: string;
   tags?: CustomerTag[];
   writeDate?: string;
+  recipientMatch?: RecipientSearchMatch;
+}
+
+export interface RecipientSearchMatch {
+  name?: string;
+  phone?: string;
 }
 
 export interface CustomerTag {

@@ -58,6 +58,10 @@ describe("odoo-api note contracts", () => {
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
+      recipientMatch: {
+        name: "Mary Wong",
+        phone: "6111 1111",
+      },
     }])));
     const { searchOdooCustomers } = await import("@/lib/odoo-api");
 
@@ -69,6 +73,10 @@ describe("odoo-api note contracts", () => {
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
+      recipientMatch: {
+        name: "Mary Wong",
+        phone: "6111 1111",
+      },
       history: [],
     });
     expect(customer.historyCount).toBeUndefined();

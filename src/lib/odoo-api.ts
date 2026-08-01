@@ -12,6 +12,10 @@ interface OdooPartner {
   customerType?: "personal" | "company";
   companyName?: string | null;
   billingAddress?: string | null;
+  recipientMatch?: {
+    name: string | null;
+    phone: string | null;
+  } | null;
   history_count: number | null;
   total_spent: number | null;
   history: PurchaseRecord[];
@@ -442,6 +446,12 @@ export async function searchOdooCustomers(
     commentText: p.commentText || "",
     tags: p.tags || [],
     writeDate: p.writeDate || undefined,
+    recipientMatch: p.recipientMatch
+      ? {
+          name: p.recipientMatch.name || undefined,
+          phone: p.recipientMatch.phone || undefined,
+        }
+      : undefined,
   }));
 }
 
