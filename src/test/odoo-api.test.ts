@@ -116,6 +116,28 @@ describe("odoo-api note contracts", () => {
     });
   });
 
+  it("searches historical recipients from a single phone digit", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const suggestions = [{
+      id: 90,
+      recipientType: "personal",
+      recipientCompanyName: null,
+      recipientName: "Ms Gift",
+      recipientPhone: "6123 4567",
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      shippingPartnerId: 45,
+    }];
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(suggestions));
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooRecipients } = await import("@/lib/odoo-api");
+
+    await expect(searchOdooRecipients("6")).resolves.toEqual(suggestions);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/recipients?q=6",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
   it("raises a typed conflict error with the latest Odoo partner record", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const current = {

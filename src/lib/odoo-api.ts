@@ -67,6 +67,16 @@ export interface DeliverySlot {
   endTime: string;
 }
 
+export interface RecipientSuggestion {
+  id: number;
+  recipientType: "personal" | "company";
+  recipientCompanyName: string | null;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  deliveryAddress: string | null;
+  shippingPartnerId: number | null;
+}
+
 export interface PartnerNoteRecord {
   partnerId: number;
   commentText: string;
@@ -453,6 +463,27 @@ export async function searchOdooCustomers(
         }
       : undefined,
   }));
+}
+
+export async function searchOdooRecipients(
+  query: string,
+  signal?: AbortSignal,
+): Promise<RecipientSuggestion[]> {
+  const trimmed = query.trim();
+  if (!BACKEND_URL || !trimmed) return [];
+
+  const params = new URLSearchParams({ q: trimmed });
+  const res = await authenticatedFetch(`${BACKEND_URL}/recipients?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<RecipientSuggestion[]>(
+      res,
+      `Odoo recipient search failed: ${res.status}`,
+    );
+  }
+  return (await res.json()) as RecipientSuggestion[];
 }
 
 export async function getOdooPartnerNotes(
