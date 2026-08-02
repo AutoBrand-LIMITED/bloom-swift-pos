@@ -79,9 +79,12 @@ interface DeliverySectionProps {
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
   onRecipientSuggestionSelect: (suggestion: RecipientSuggestion) => void;
+  onRecipientAndCustomerSuggestionSelect: (suggestion: RecipientSuggestion) => void;
   onDeliveryPersonChange: (v: string) => void;
   onFailedDeliveryActionChange: (v: string) => void;
 }
+
+const RECIPIENT_SUGGESTION_CACHE_LIMIT = 100;
 
 const DeliverySection = ({
   deliveryDate, deliveryTime, deliveryTimeMode, deliverySlotId,
@@ -98,6 +101,7 @@ const DeliverySection = ({
   onGoogleAddressSelect,
   onRecipientTypeChange, onRecipientCompanyNameChange,
   onRecipientNameChange, onRecipientPhoneChange, onRecipientSuggestionSelect,
+  onRecipientAndCustomerSuggestionSelect,
   onDeliveryPersonChange,
   onFailedDeliveryActionChange,
 }: DeliverySectionProps) => {
@@ -132,6 +136,7 @@ const DeliverySection = ({
   const previousAddressSignatureRef = useRef(currentAddressSignature);
   const recipientLookupRef = useRef<HTMLDivElement>(null);
   const recipientSearchRequestRef = useRef(0);
+  const recipientSuggestionCacheRef = useRef(new Map<string, RecipientSuggestion[]>());
   const {
     suggestions: addressSuggestions,
     status: addressSuggestionStatus,
@@ -213,7 +218,7 @@ const DeliverySection = ({
   useEffect(() => {
     const timer = window.setTimeout(
       () => setDebouncedRecipientQuery(activeRecipientQuery),
-      250,
+      150,
     );
     return () => window.clearTimeout(timer);
   }, [activeRecipientQuery]);
@@ -229,6 +234,16 @@ const DeliverySection = ({
       return;
     }
 
+    const cacheKey = query.toLocaleLowerCase();
+    const cached = recipientSuggestionCacheRef.current.get(cacheKey);
+    if (cached) {
+      setRecipientSuggestions(cached);
+      setRecipientSuggestionsLoading(false);
+      setRecipientSuggestionsError(null);
+      setCompletedRecipientSearch({ field, query });
+      return;
+    }
+
     const controller = new AbortController();
     const requestId = recipientSearchRequestRef.current + 1;
     recipientSearchRequestRef.current = requestId;
@@ -239,6 +254,11 @@ const DeliverySection = ({
     searchOdooRecipients(query, controller.signal)
       .then((suggestions) => {
         if (controller.signal.aborted || recipientSearchRequestRef.current !== requestId) return;
+        if (recipientSuggestionCacheRef.current.size >= RECIPIENT_SUGGESTION_CACHE_LIMIT) {
+          const oldestKey = recipientSuggestionCacheRef.current.keys().next().value;
+          if (oldestKey) recipientSuggestionCacheRef.current.delete(oldestKey);
+        }
+        recipientSuggestionCacheRef.current.set(cacheKey, suggestions);
         setRecipientSuggestions(suggestions);
         setCompletedRecipientSearch({ field, query });
       })
@@ -355,6 +375,35 @@ const DeliverySection = ({
 
   const publicMapAddress = publicGoogleAddressQuery(fullAddress);
   const mapQuery = encodeURIComponent(publicMapAddress + " 香港");
+  const recipientSuggestionContent = (
+    suggestion: RecipientSuggestion,
+    actionLabel?: string,
+  ) => (
+    <>
+      <span className="block text-sm font-medium">
+        {[suggestion.recipientCompanyName, suggestion.recipientName]
+          .filter(Boolean)
+          .join(" · ") || "未有姓名"}
+      </span>
+      <span className="block text-xs font-mono text-muted-foreground">
+        {suggestion.recipientPhone || "未有電話"}
+      </span>
+      {suggestion.deliveryAddress && (
+        <span className="mt-1 block text-xs text-muted-foreground">
+          {suggestion.deliveryAddress}
+        </span>
+      )}
+      {suggestion.orderingCustomerName && (
+        <span className="mt-1 block text-[11px] font-medium text-primary">
+          下單人：{suggestion.orderingCustomerName}
+          {suggestion.orderingCustomerPhone ? ` · ${suggestion.orderingCustomerPhone}` : ""}
+        </span>
+      )}
+      {actionLabel && (
+        <span className="mt-1 block text-[10px] font-medium text-primary">{actionLabel}</span>
+      )}
+    </>
+  );
   const recipientDropdown = (field: "name" | "phone") => {
     if (recipientLookupField !== field) return null;
     return (
@@ -378,33 +427,43 @@ const DeliverySection = ({
           </p>
         ) : (
           visibleRecipientSuggestions.map((suggestion) => (
-            <button
-              key={suggestion.id}
-              type="button"
-              role="option"
-              aria-selected="false"
-              className="min-h-11 w-full border-b border-border px-3 py-2.5 text-left last:border-0 hover:bg-accent/50"
-              onClick={() => {
-                onRecipientSuggestionSelect(suggestion);
-                setRecipientLookupField(null);
-                setRecipientSuggestions([]);
-                setCompletedRecipientSearch(null);
-              }}
-            >
-              <span className="block text-sm font-medium">
-                {[suggestion.recipientCompanyName, suggestion.recipientName]
-                  .filter(Boolean)
-                  .join(" · ") || "未有姓名"}
-              </span>
-              <span className="block text-xs font-mono text-muted-foreground">
-                {suggestion.recipientPhone || "未有電話"}
-              </span>
-              {suggestion.deliveryAddress && (
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  {suggestion.deliveryAddress}
-                </span>
+            <div key={suggestion.id} className="border-b border-border last:border-0">
+              <button
+                type="button"
+                role="option"
+                aria-selected="false"
+                className="min-h-11 w-full px-3 py-2.5 text-left hover:bg-accent/50 touch-manipulation"
+                onClick={() => {
+                  if (suggestion.orderingCustomerId) {
+                    onRecipientAndCustomerSuggestionSelect(suggestion);
+                  } else {
+                    onRecipientSuggestionSelect(suggestion);
+                  }
+                  setRecipientLookupField(null);
+                  setRecipientSuggestions([]);
+                  setCompletedRecipientSearch(null);
+                }}
+              >
+                {recipientSuggestionContent(
+                  suggestion,
+                  suggestion.orderingCustomerId ? "一鍵套用收貨人＋下單人" : undefined,
+                )}
+              </button>
+              {suggestion.orderingCustomerId && (
+                <button
+                  type="button"
+                  className="min-h-11 w-full border-t border-border/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground hover:bg-accent/30 touch-manipulation"
+                  onClick={() => {
+                    onRecipientSuggestionSelect(suggestion);
+                    setRecipientLookupField(null);
+                    setRecipientSuggestions([]);
+                    setCompletedRecipientSearch(null);
+                  }}
+                >
+                  只套用收貨人
+                </button>
               )}
-            </button>
+            </div>
           ))
         )}
       </div>

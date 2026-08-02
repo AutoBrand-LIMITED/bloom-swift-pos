@@ -16,6 +16,7 @@ vi.mock("@/lib/odoo-api", () => ({
 
 const noop = vi.fn();
 const selectCustomer = vi.fn();
+const selectCustomerAndRecipient = vi.fn();
 const emptyBusinessProps = {
   customerEmail: "",
   billingAddress: "",
@@ -40,6 +41,7 @@ function Harness() {
       onCustomerTypeChange={noop}
       onCompanyNameChange={noop}
       onCustomerSelect={selectCustomer}
+      onCustomerAndRecipientSelect={selectCustomerAndRecipient}
       selectedCustomer={null}
     />
   );
@@ -70,6 +72,7 @@ function CustomerLookupHarness() {
       onCustomerTypeChange={noop}
       onCompanyNameChange={noop}
       onCustomerSelect={selectCustomer}
+      onCustomerAndRecipientSelect={selectCustomerAndRecipient}
       selectedCustomer={null}
       confirmedNewCustomerPhone={confirmedPhone}
       onConfirmNewCustomer={setConfirmedPhone}
@@ -81,6 +84,7 @@ describe("CustomerSection gift sender", () => {
   beforeEach(() => {
     searchOdooCustomers.mockReset();
     selectCustomer.mockReset();
+    selectCustomerAndRecipient.mockReset();
   });
 
   it("keeps the ordering customer and gift sender as separate inputs", () => {
@@ -110,6 +114,7 @@ describe("CustomerSection gift sender", () => {
         onCustomerTypeChange={noop}
         onCompanyNameChange={noop}
         onCustomerSelect={noop}
+        onCustomerAndRecipientSelect={noop}
         phoneError="請輸入下單人電話"
         customerNameError="請輸入下單人／聯絡人名稱"
         senderNameError="請輸入送花人名稱"
@@ -161,6 +166,7 @@ describe("CustomerSection gift sender", () => {
         onCustomerEmailChange={noop}
         onBillingAddressChange={noop}
         onCustomerSelect={noop}
+        onCustomerAndRecipientSelect={noop}
         companyNameError="公司客戶必須輸入公司名稱"
         billingAddressError="公司客戶必須輸入帳單地址"
         selectedCustomer={null}
@@ -239,7 +245,7 @@ describe("CustomerSection gift sender", () => {
     }));
   });
 
-  it("shows shared recipient matches as distinct ordering customers and selects the partner only", async () => {
+  it("offers matching actions for a linked ordering customer and recipient", async () => {
     searchOdooCustomers.mockResolvedValue([
       {
         id: "odoo-41",
@@ -247,7 +253,13 @@ describe("CustomerSection gift sender", () => {
         name: "Customer One",
         phone: "91234567",
         history: [],
-        recipientMatch: { name: "Mary Wong", phone: "6111 1111" },
+        recipientMatch: {
+          name: "Mary Wong",
+          phone: "6111 1111",
+          resolved: true,
+          deliveryAddress: "九龍觀塘巧明街 6 號",
+          shippingPartnerId: 45,
+        },
       },
       {
         id: "odoo-42",
@@ -255,7 +267,7 @@ describe("CustomerSection gift sender", () => {
         name: "Customer Two",
         phone: "92345678",
         history: [],
-        recipientMatch: { name: "Mary Wong", phone: "6111 1111" },
+        recipientMatch: { name: "Mary Wong", phone: "6111 1111", resolved: true },
       },
     ]);
     render(<CustomerLookupHarness />);
@@ -273,13 +285,16 @@ describe("CustomerSection gift sender", () => {
       "general",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Customer Two/ }));
-    expect(selectCustomer).toHaveBeenCalledWith(expect.objectContaining({
+    fireEvent.click(screen.getAllByRole("button", { name: /Customer Two/ })[0]);
+    expect(selectCustomerAndRecipient).toHaveBeenCalledWith(expect.objectContaining({
       odooPartnerId: 42,
       name: "Customer Two",
       phone: "92345678",
+    }), expect.objectContaining({
+      name: "Mary Wong",
+      phone: "6111 1111",
     }));
-    expect(selectCustomer.mock.calls[0][0]).not.toHaveProperty("recipientMatch");
+    expect(selectCustomerAndRecipient.mock.calls[0][0]).not.toHaveProperty("recipientMatch");
   });
 
   it("shows Customer ID no-result only after a successful search without offering creation", async () => {
