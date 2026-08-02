@@ -29,6 +29,10 @@ interface CustomerSectionProps {
   onCustomerEmailChange: (v: string) => void;
   onBillingAddressChange: (v: string) => void;
   onCustomerSelect: (c: DemoCustomer) => void;
+  onCustomerAndRecipientSelect: (
+    customer: DemoCustomer,
+    recipient: NonNullable<DemoCustomer["recipientMatch"]>,
+  ) => void;
   phoneError?: string;
   customerNameError?: string;
   senderNameError?: string;
@@ -45,7 +49,8 @@ const CustomerSection = ({
   phone, customerName, senderName, customerType, companyName, customerEmail, billingAddress,
   onPhoneChange, onNameChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
   onCustomerEmailChange, onBillingAddressChange,
-  onCustomerSelect, phoneError, customerNameError, senderNameError,
+  onCustomerSelect, onCustomerAndRecipientSelect,
+  phoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
   confirmedNewCustomerPhone, onConfirmNewCustomer,
 }: CustomerSectionProps) => {
@@ -217,6 +222,57 @@ const CustomerSection = ({
     setSearch("");
   };
 
+  const handleSelectWithRecipient = (c: DemoCustomer) => {
+    if (!c.recipientMatch) {
+      handleSelect(c);
+      return;
+    }
+    const customer = { ...c };
+    const recipient = customer.recipientMatch;
+    delete customer.recipientMatch;
+    onCustomerAndRecipientSelect(customer, recipient);
+    setActiveDropdown(null);
+    setSearch("");
+  };
+
+  const customerOptionContent = (c: DemoCustomer, actionLabel?: string) => (
+    <>
+      <div className="min-w-0">
+        {c.customerCode && (
+          <p className="text-[10px] font-mono text-primary break-all">
+            客戶編號：{c.customerCode}
+          </p>
+        )}
+        <span className="text-sm font-medium">{c.name}</span>
+        <span className="text-xs text-muted-foreground ml-2 font-mono break-all">
+          {c.phone || "沒有電話"}
+        </span>
+        {c.recipientMatch && (
+          <p className="mt-1 text-[11px] text-primary">
+            配對收件人：
+            {[c.recipientMatch.companyName, c.recipientMatch.name, c.recipientMatch.phone]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        )}
+        <CustomerFlags tags={c.tags} className="mt-1" />
+        {c.commentText?.trim() && (
+          <p className="mt-1 line-clamp-1 text-[10px] text-muted-foreground">
+            長期備註：{c.commentText}
+          </p>
+        )}
+        {actionLabel && (
+          <p className="mt-1 text-[10px] font-medium text-primary">{actionLabel}</p>
+        )}
+      </div>
+      <span className="text-[10px] text-muted-foreground shrink-0">
+        {c.odooPartnerId && c.historyCount == null
+          ? "選擇後載入"
+          : `${c.historyCount ?? c.history.length} 筆記錄`}
+      </span>
+    </>
+  );
+
   const customerDropdown = (source: CustomerLookupSource) => activeDropdown === source && (
     <div className={`absolute z-50 top-full mt-1 sm:w-[calc(200%+0.75rem)] bg-card border border-border rounded-lg shadow-lg overflow-hidden ${
       source === "name"
@@ -263,42 +319,40 @@ const CustomerSection = ({
               Odoo 搜尋暫時不可用，以下顯示本機記錄
             </p>
           )}
-          {customerOptions.map((c) => (
+          {customerOptions.map((c) => c.recipientMatch?.resolved ? (
+            <div key={c.id} className="border-b border-border last:border-0">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleSelectWithRecipient(c);
+                }}
+                className="min-h-11 w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-accent/50 transition-colors touch-manipulation"
+              >
+                {customerOptionContent(c, "一鍵套用下單人＋收貨人")}
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleSelect(c);
+                }}
+                className="min-h-11 w-full border-t border-border/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground hover:bg-accent/30 touch-manipulation"
+              >
+                只套用下單人
+              </button>
+            </div>
+          ) : (
             <button
               key={c.id}
-              onClick={(e) => { e.stopPropagation(); handleSelect(c); }}
-              className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-accent/50 transition-colors border-b border-border last:border-0"
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleSelect(c);
+              }}
+              className="min-h-11 w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-accent/50 transition-colors border-b border-border last:border-0 touch-manipulation"
             >
-              <div className="min-w-0">
-                {c.customerCode && (
-                  <p className="text-[10px] font-mono text-primary break-all">
-                    客戶編號：{c.customerCode}
-                  </p>
-                )}
-                <span className="text-sm font-medium">{c.name}</span>
-                <span className="text-xs text-muted-foreground ml-2 font-mono break-all">
-                  {c.phone || "沒有電話"}
-                </span>
-                {c.recipientMatch && (
-                  <p className="mt-1 text-[11px] text-primary">
-                    配對收件人：
-                    {[c.recipientMatch.name, c.recipientMatch.phone]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                )}
-                <CustomerFlags tags={c.tags} className="mt-1" />
-                {c.commentText?.trim() && (
-                  <p className="mt-1 line-clamp-1 text-[10px] text-muted-foreground">
-                    長期備註：{c.commentText}
-                  </p>
-                )}
-              </div>
-              <span className="text-[10px] text-muted-foreground shrink-0">
-                {c.odooPartnerId && c.historyCount == null
-                  ? "選擇後載入"
-                  : `${c.historyCount ?? c.history.length} 筆記錄`}
-              </span>
+              {customerOptionContent(c)}
             </button>
           ))}
         </div>

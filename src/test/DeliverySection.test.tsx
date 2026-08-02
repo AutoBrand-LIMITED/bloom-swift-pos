@@ -63,6 +63,7 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     onRecipientNameChange: vi.fn(),
     onRecipientPhoneChange: vi.fn(),
     onRecipientSuggestionSelect: vi.fn(),
+    onRecipientAndCustomerSuggestionSelect: vi.fn(),
     onDeliveryPersonChange: vi.fn(),
     onFailedDeliveryActionChange: vi.fn(),
     ...overrides,
@@ -118,6 +119,11 @@ describe("DeliverySection delivery time controls", () => {
       recipientPhone: "6123 4567",
       deliveryAddress: "九龍觀塘巧明街 6 號",
       shippingPartnerId: 45,
+      orderingCustomerId: null,
+      orderingCustomerName: null,
+      orderingCustomerPhone: null,
+      orderingCustomerEmail: null,
+      orderingCustomerBillingAddress: null,
     };
     recipientSearchMocks.searchOdooRecipients.mockResolvedValue([suggestion]);
     const props = renderSection({
@@ -136,6 +142,42 @@ describe("DeliverySection delivery time controls", () => {
     );
     fireEvent.click(screen.getByRole("option", { name: /Ms Gift/ }));
     expect(props.onRecipientSuggestionSelect).toHaveBeenCalledWith(suggestion);
+  });
+
+  it("shows the linked ordering customer and supports combined or recipient-only apply", async () => {
+    const suggestion = {
+      id: 91,
+      recipientType: "personal" as const,
+      recipientCompanyName: null,
+      recipientName: "Jay Ng",
+      recipientPhone: "67610707",
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      shippingPartnerId: 46,
+      orderingCustomerId: 42,
+      orderingCustomerName: "Secretary Chan",
+      orderingCustomerPhone: "91234567",
+      orderingCustomerEmail: "accounts@example.com",
+      orderingCustomerBillingAddress: "Central",
+    };
+    recipientSearchMocks.searchOdooRecipients.mockResolvedValue([suggestion]);
+    const props = renderSection({ recipientPhone: "6761" });
+    const phoneInput = screen.getByLabelText(/收貨人電話/);
+
+    fireEvent.focus(phoneInput);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+
+    expect(screen.getByText("下單人：Secretary Chan · 91234567")).toBeVisible();
+    fireEvent.click(screen.getByRole("option", { name: /Jay Ng/ }));
+    expect(props.onRecipientAndCustomerSuggestionSelect).toHaveBeenCalledWith(suggestion);
+    expect(props.onRecipientSuggestionSelect).not.toHaveBeenCalled();
+
+    fireEvent.focus(phoneInput);
+    expect(await screen.findByRole("button", { name: "只套用收貨人" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "只套用收貨人" }));
+    expect(props.onRecipientSuggestionSelect).toHaveBeenCalledWith(suggestion);
+    expect(recipientSearchMocks.searchOdooRecipients).toHaveBeenCalledTimes(1);
   });
 
   it("uses roving focus and arrow keys to select the next delivery choice", async () => {
@@ -619,6 +661,7 @@ function renderSectionProps(
     onRecipientNameChange: vi.fn(),
     onRecipientPhoneChange: vi.fn(),
     onRecipientSuggestionSelect: vi.fn(),
+    onRecipientAndCustomerSuggestionSelect: vi.fn(),
     onDeliveryPersonChange: vi.fn(),
     onFailedDeliveryActionChange: vi.fn(),
     ...overrides,

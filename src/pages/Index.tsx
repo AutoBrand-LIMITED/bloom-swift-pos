@@ -48,6 +48,7 @@ import {
 } from "@/lib/pending-submission";
 import {
   getDeliverySlots,
+  getOdooCustomer,
   getOdooPartnerNotes,
   getOdooOrderRecords,
   searchOdooOrderRecords,
@@ -60,6 +61,7 @@ import {
   type AccountingPaymentOption,
   type DeliverySlot,
   type PartnerNoteRecord,
+  type RecipientSuggestion,
 } from "@/lib/odoo-api";
 import {
   DEMO_DELIVERY_SLOTS,
@@ -83,6 +85,16 @@ import {
   removeSyncedLocalOrders,
   saveUnsyncedOrders,
 } from "@/lib/order-records";
+
+type RecipientSelectionDetails = Pick<
+  RecipientSuggestion,
+  | "recipientType"
+  | "recipientCompanyName"
+  | "recipientName"
+  | "recipientPhone"
+  | "deliveryAddress"
+  | "shippingPartnerId"
+>;
 
 const Index = () => {
   const navigate = useNavigate();
@@ -120,6 +132,7 @@ const Index = () => {
   const [customerHistoryOpen, setCustomerHistoryOpen] = useState(true);
   const [confirmedNewCustomerPhone, setConfirmedNewCustomerPhone] = useState<string | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
+  const linkedPartySelectionRequestRef = useRef(0);
 
   // Items
   const [budget, setBudget] = useState(0);
@@ -393,6 +406,97 @@ const Index = () => {
       return next;
     });
   }, []);
+
+  const applyCustomerSelection = useCallback((customer: DemoCustomer) => {
+    setSelectedCustomer(customer);
+    setConfirmedNewCustomerPhone(null);
+    setCustomerName(customer.name);
+    setPhone(customer.phone);
+    setCustomerEmail(customer.email || "");
+    setCustomerType(customer.customerType || "personal");
+    setCompanyName(customer.companyName || "");
+    setBillingAddress(customer.billingAddress || "");
+    clearCheckoutErrors(
+      "customerName",
+      "phone",
+      "companyName",
+      "customerEmail",
+      "billingAddress",
+    );
+    setSenderContactDraft(customer.commentText || "");
+    setSaveSenderNote(false);
+    setNotesConflict(null);
+    resetRecipientPersistence();
+  }, [clearCheckoutErrors, resetRecipientPersistence]);
+
+  const applyRecipientSelection = useCallback((selection: RecipientSelectionDetails) => {
+    setRecipientType(selection.recipientType);
+    setRecipientCompanyName(selection.recipientCompanyName || "");
+    setRecipientName(selection.recipientName || "");
+    setRecipientPhone(selection.recipientPhone || "");
+    setRecipientPartnerId(selection.shippingPartnerId || undefined);
+    setRecipientContact(null);
+    setRecipientContactDraft("");
+    setSaveRecipientNote(false);
+    setNotesConflict((current) => current?.target === "recipient" ? null : current);
+    if (selection.deliveryAddress) {
+      const parsed = parseDeliveryAddress(selection.deliveryAddress);
+      setDeliveryRegion(parsed.region);
+      setDeliveryDistrict(parsed.district);
+      setDeliveryArea(parsed.area);
+      setDeliveryDetail(parsed.detail);
+    }
+    clearCheckoutErrors(
+      "deliveryAddress",
+      "recipientCompanyName",
+      "recipientName",
+      "recipientPhone",
+    );
+  }, [clearCheckoutErrors]);
+
+  const applyCustomerAndRecipient = useCallback((
+    customer: DemoCustomer,
+    recipient: NonNullable<DemoCustomer["recipientMatch"]>,
+  ) => {
+    applyCustomerSelection(customer);
+    applyRecipientSelection({
+      recipientType: recipient.recipientType || "personal",
+      recipientCompanyName: recipient.companyName || null,
+      recipientName: recipient.name || null,
+      recipientPhone: recipient.phone || null,
+      deliveryAddress: recipient.deliveryAddress || null,
+      shippingPartnerId: recipient.shippingPartnerId || null,
+    });
+    toast.success("已同時套用下單人及收貨人資料");
+  }, [applyCustomerSelection, applyRecipientSelection]);
+
+  const applyRecipientAndLinkedCustomer = useCallback(async (
+    suggestion: RecipientSuggestion,
+  ) => {
+    if (!suggestion.orderingCustomerId) {
+      applyRecipientSelection(suggestion);
+      toast.success("已套用過往收貨人資料");
+      return;
+    }
+
+    const requestId = linkedPartySelectionRequestRef.current + 1;
+    linkedPartySelectionRequestRef.current = requestId;
+    try {
+      const customer = await getOdooCustomer(suggestion.orderingCustomerId);
+      if (linkedPartySelectionRequestRef.current !== requestId) return;
+      applyCustomerSelection(customer);
+      applyRecipientSelection(suggestion);
+      toast.success("已同時套用收貨人及下單人資料");
+    } catch (error: unknown) {
+      if (linkedPartySelectionRequestRef.current !== requestId) return;
+      applyRecipientSelection(suggestion);
+      toast.error(
+        error instanceof Error
+          ? `已套用收貨人，但未能載入相連下單人：${error.message}`
+          : "已套用收貨人，但未能載入相連下單人",
+      );
+    }
+  }, [applyCustomerSelection, applyRecipientSelection]);
 
   const resetOrderForm = useCallback(() => {
     setPhone("");
@@ -1283,27 +1387,8 @@ const Index = () => {
             setBillingAddress(value);
             clearCheckoutErrors("billingAddress");
           }}
-          onCustomerSelect={(c) => {
-            setSelectedCustomer(c);
-            setConfirmedNewCustomerPhone(null);
-            setCustomerName(c.name);
-            setPhone(c.phone);
-            setCustomerEmail(c.email || "");
-            setCustomerType(c.customerType || "personal");
-            setCompanyName(c.companyName || "");
-            setBillingAddress(c.billingAddress || "");
-            clearCheckoutErrors(
-              "customerName",
-              "phone",
-              "companyName",
-              "customerEmail",
-              "billingAddress",
-            );
-            setSenderContactDraft(c.commentText || "");
-            setSaveSenderNote(false);
-            setNotesConflict(null);
-            resetRecipientPersistence();
-          }}
+          onCustomerSelect={applyCustomerSelection}
+          onCustomerAndRecipientSelect={applyCustomerAndRecipient}
           phoneError={checkoutErrors.phone}
           customerNameError={checkoutErrors.customerName}
           senderNameError={checkoutErrors.senderName}
@@ -1440,28 +1525,11 @@ const Index = () => {
             resetRecipientPersistence();
           }}
           onRecipientSuggestionSelect={(suggestion) => {
-            setRecipientType(suggestion.recipientType);
-            setRecipientCompanyName(suggestion.recipientCompanyName || "");
-            setRecipientName(suggestion.recipientName || "");
-            setRecipientPhone(suggestion.recipientPhone || "");
-            setRecipientPartnerId(suggestion.shippingPartnerId || undefined);
-            setRecipientContact(null);
-            setRecipientContactDraft("");
-            setSaveRecipientNote(false);
-            if (suggestion.deliveryAddress) {
-              const parsed = parseDeliveryAddress(suggestion.deliveryAddress);
-              setDeliveryRegion(parsed.region);
-              setDeliveryDistrict(parsed.district);
-              setDeliveryArea(parsed.area);
-              setDeliveryDetail(parsed.detail);
-            }
-            clearCheckoutErrors(
-              "deliveryAddress",
-              "recipientCompanyName",
-              "recipientName",
-              "recipientPhone",
-            );
+            applyRecipientSelection(suggestion);
             toast.success("已套用過往收貨人資料");
+          }}
+          onRecipientAndCustomerSuggestionSelect={(suggestion) => {
+            void applyRecipientAndLinkedCustomer(suggestion);
           }}
           onDeliveryPersonChange={setDeliveryPerson}
           failedDeliveryAction={failedDeliveryAction}

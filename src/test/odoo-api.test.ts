@@ -61,6 +61,11 @@ describe("odoo-api note contracts", () => {
       recipientMatch: {
         name: "Mary Wong",
         phone: "6111 1111",
+        resolved: true,
+        recipientType: "company",
+        companyName: "Mary Flowers Limited",
+        deliveryAddress: "6 How Ming Street",
+        shippingPartnerId: 45,
       },
     }])));
     const { searchOdooCustomers } = await import("@/lib/odoo-api");
@@ -76,6 +81,11 @@ describe("odoo-api note contracts", () => {
       recipientMatch: {
         name: "Mary Wong",
         phone: "6111 1111",
+        resolved: true,
+        recipientType: "company",
+        companyName: "Mary Flowers Limited",
+        deliveryAddress: "6 How Ming Street",
+        shippingPartnerId: 45,
       },
       history: [],
     });
@@ -126,6 +136,11 @@ describe("odoo-api note contracts", () => {
       recipientPhone: "6123 4567",
       deliveryAddress: "九龍觀塘巧明街 6 號",
       shippingPartnerId: 45,
+      orderingCustomerId: 42,
+      orderingCustomerName: "Alice",
+      orderingCustomerPhone: "91234567",
+      orderingCustomerEmail: "alice@example.com",
+      orderingCustomerBillingAddress: "1 Flower Market Road",
     }];
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(suggestions));
     vi.stubGlobal("fetch", fetchMock);
@@ -134,6 +149,37 @@ describe("odoo-api note contracts", () => {
     await expect(searchOdooRecipients("6")).resolves.toEqual(suggestions);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/recipients?q=6",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
+  it("loads a linked ordering customer profile by partner ID", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      id: 42,
+      name: "Alice",
+      email: "alice@example.com",
+      phone: "91234567",
+      mobile: null,
+      history_count: null,
+      total_spent: null,
+      history: [],
+      tags: [],
+      customerType: "personal",
+      companyName: null,
+      billingAddress: "1 Flower Market Road",
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOdooCustomer } = await import("@/lib/odoo-api");
+
+    await expect(getOdooCustomer(42)).resolves.toMatchObject({
+      odooPartnerId: 42,
+      name: "Alice",
+      phone: "91234567",
+      email: "alice@example.com",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/customers/42",
       expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
     );
   });

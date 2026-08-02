@@ -15,6 +15,11 @@ interface OdooPartner {
   recipientMatch?: {
     name: string | null;
     phone: string | null;
+    resolved?: boolean;
+    recipientType?: "personal" | "company";
+    companyName?: string | null;
+    deliveryAddress?: string | null;
+    shippingPartnerId?: number | null;
   } | null;
   history_count: number | null;
   total_spent: number | null;
@@ -75,6 +80,11 @@ export interface RecipientSuggestion {
   recipientPhone: string | null;
   deliveryAddress: string | null;
   shippingPartnerId: number | null;
+  orderingCustomerId: number | null;
+  orderingCustomerName: string | null;
+  orderingCustomerPhone: string | null;
+  orderingCustomerEmail: string | null;
+  orderingCustomerBillingAddress: string | null;
 }
 
 export interface PartnerNoteRecord {
@@ -440,7 +450,11 @@ export async function searchOdooCustomers(
   }
 
   const partners = (await res.json()) as OdooPartner[];
-  return partners.map((p) => ({
+  return partners.map(mapOdooPartner);
+}
+
+function mapOdooPartner(p: OdooPartner): DemoCustomer {
+  return {
     id: `odoo-${p.id}`,
     odooPartnerId: p.id,
     name: p.name,
@@ -460,9 +474,31 @@ export async function searchOdooCustomers(
       ? {
           name: p.recipientMatch.name || undefined,
           phone: p.recipientMatch.phone || undefined,
+          resolved: p.recipientMatch.resolved === true,
+          recipientType: p.recipientMatch.recipientType || "personal",
+          companyName: p.recipientMatch.companyName || undefined,
+          deliveryAddress: p.recipientMatch.deliveryAddress || undefined,
+          shippingPartnerId: p.recipientMatch.shippingPartnerId || undefined,
         }
       : undefined,
-  }));
+  };
+}
+
+export async function getOdooCustomer(
+  partnerId: number,
+  signal?: AbortSignal,
+): Promise<DemoCustomer> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(`${BACKEND_URL}/customers/${partnerId}`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<DemoCustomer>(res, `Odoo customer lookup failed: ${res.status}`);
+  }
+  return mapOdooPartner((await res.json()) as OdooPartner);
 }
 
 export async function searchOdooRecipients(

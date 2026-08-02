@@ -20,6 +20,11 @@ export interface DemoCustomer {
 export interface RecipientSearchMatch {
   name?: string;
   phone?: string;
+  resolved?: boolean;
+  recipientType?: "personal" | "company";
+  companyName?: string;
+  deliveryAddress?: string;
+  shippingPartnerId?: number;
 }
 
 export interface CustomerTag {
