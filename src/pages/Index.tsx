@@ -50,6 +50,7 @@ import {
   getDeliverySlots,
   getOdooPartnerNotes,
   getOdooOrderRecords,
+  searchOdooOrderRecords,
   getAccountingPaymentOptions,
   allowLocalOnlyOrders,
   hasOdooBackend,
@@ -78,6 +79,7 @@ import {
   hongKongBusinessDate,
   loadUnsyncedOrders,
   mergeOrderRecords,
+  orderMatchesSearch,
   removeSyncedLocalOrders,
   saveUnsyncedOrders,
 } from "@/lib/order-records";
@@ -190,7 +192,10 @@ const Index = () => {
   // History
   const [localOrders, setLocalOrders] = useState<Order[]>(loadUnsyncedOrders);
   const [remoteOrders, setRemoteOrders] = useState<Order[]>([]);
+  const [remoteOrdersQuery, setRemoteOrdersQuery] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [debouncedOrderSearchQuery, setDebouncedOrderSearchQuery] = useState("");
   const [orderRecordsLoading, setOrderRecordsLoading] = useState(false);
   const [orderRecordsLoaded, setOrderRecordsLoaded] = useState(!hasOdooBackend);
   const [orderRecordsError, setOrderRecordsError] = useState<string | null>(null);
@@ -198,19 +203,60 @@ const Index = () => {
   const [orderRecordsRefreshKey, setOrderRecordsRefreshKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const visibleOrderRecords = useMemo(
-    () => mergeOrderRecords(remoteOrders, localOrders, employeePendingSubmission?.order),
-    [employeePendingSubmission, localOrders, remoteOrders],
-  );
+  const normalizedOrderSearchQuery = orderSearchQuery.trim();
+  const orderSearchActive = normalizedOrderSearchQuery.length >= 2;
+  const visibleOrderRecords = useMemo(() => {
+    if (normalizedOrderSearchQuery && !orderSearchActive) return [];
+    const matchingLocalOrders = orderSearchActive
+      ? localOrders.filter((order) => orderMatchesSearch(order, normalizedOrderSearchQuery))
+      : localOrders;
+    const matchingPendingOrder = employeePendingSubmission?.order
+      && (!orderSearchActive
+        || orderMatchesSearch(employeePendingSubmission.order, normalizedOrderSearchQuery))
+      ? employeePendingSubmission.order
+      : undefined;
+    const matchingRemoteOrders = remoteOrdersQuery === normalizedOrderSearchQuery
+      ? remoteOrders
+      : [];
+    return mergeOrderRecords(matchingRemoteOrders, matchingLocalOrders, matchingPendingOrder);
+  }, [
+    employeePendingSubmission,
+    localOrders,
+    normalizedOrderSearchQuery,
+    orderSearchActive,
+    remoteOrders,
+    remoteOrdersQuery,
+  ]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedOrderSearchQuery(orderSearchQuery.trim()),
+      300,
+    );
+    return () => window.clearTimeout(timer);
+  }, [orderSearchQuery]);
 
   useEffect(() => {
     if (!historyOpen || !hasOdooBackend) return;
+    if (debouncedOrderSearchQuery && debouncedOrderSearchQuery.length < 2) {
+      setRemoteOrders([]);
+      setOrderRecordsLoading(false);
+      setOrderRecordsLoaded(true);
+      setOrderRecordsError(null);
+      setOrderRecordsTruncated(false);
+      return;
+    }
     const controller = new AbortController();
     setOrderRecordsLoading(true);
     setOrderRecordsError(null);
 
-    getOdooOrderRecords(hongKongBusinessDate(), controller.signal)
+    const request = debouncedOrderSearchQuery.length >= 2
+      ? searchOdooOrderRecords(debouncedOrderSearchQuery, controller.signal)
+      : getOdooOrderRecords(hongKongBusinessDate(), controller.signal);
+
+    request
       .then((response) => {
+        setRemoteOrdersQuery(debouncedOrderSearchQuery);
         setRemoteOrders(response.orders);
         setLocalOrders((current) => {
           const remaining = removeSyncedLocalOrders(response.orders, current);
@@ -230,7 +276,7 @@ const Index = () => {
       });
 
     return () => controller.abort();
-  }, [historyOpen, orderRecordsRefreshKey]);
+  }, [debouncedOrderSearchQuery, historyOpen, orderRecordsRefreshKey]);
 
   const subtotal = useMemo(() => {
     const itemsTotal = orderItemsTotal(items);
@@ -1509,10 +1555,17 @@ const Index = () => {
         orders={visibleOrderRecords}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
+        searchQuery={orderSearchQuery}
+        onSearchQueryChange={(value) => {
+          setOrderSearchQuery(value);
+          setRemoteOrders([]);
+          setOrderRecordsError(null);
+          setOrderRecordsTruncated(false);
+        }}
         loading={orderRecordsLoading}
         loaded={orderRecordsLoaded}
         error={orderRecordsError}
-        stale={orderRecordsLoaded && Boolean(orderRecordsError)}
+        stale={orderRecordsLoaded && Boolean(orderRecordsError) && remoteOrders.length > 0}
         truncated={orderRecordsTruncated}
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
       />

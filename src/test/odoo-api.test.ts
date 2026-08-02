@@ -58,6 +58,10 @@ describe("odoo-api note contracts", () => {
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
+      recipientMatch: {
+        name: "Mary Wong",
+        phone: "6111 1111",
+      },
     }])));
     const { searchOdooCustomers } = await import("@/lib/odoo-api");
 
@@ -69,6 +73,10 @@ describe("odoo-api note contracts", () => {
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
+      recipientMatch: {
+        name: "Mary Wong",
+        phone: "6111 1111",
+      },
       history: [],
     });
     expect(customer.historyCount).toBeUndefined();
@@ -322,5 +330,37 @@ describe("odoo-api note contracts", () => {
       "https://backend.test/orders?date=2026-07-19",
       expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
     );
+  });
+
+  it("searches Odoo orders across dates with an encoded query", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      generatedAt: "2026-08-01T22:00:00+08:00",
+      truncated: false,
+      orders: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooOrderRecords } = await import("@/lib/odoo-api");
+
+    await expect(searchOdooOrderRecords(" accounts+hk@example.com ")).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders?q=accounts%2Bhk%40example.com",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
+  it("does not call the backend for a one-character order query", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooOrderRecords } = await import("@/lib/odoo-api");
+
+    await expect(searchOdooOrderRecords("A")).resolves.toEqual({
+      generatedAt: "",
+      truncated: false,
+      orders: [],
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

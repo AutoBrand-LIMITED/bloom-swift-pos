@@ -179,7 +179,7 @@ const CustomerSection = ({
         ? "輸入至少 4 個電話數字搜尋 Odoo 客戶"
         : activeDropdown === "customerCode"
           ? "輸入客戶編號搜尋 Odoo 客戶"
-          : "輸入至少 2 個字搜尋 Odoo 客戶"
+          : "輸入至少 2 個字搜尋下單人或收件人"
       : completedCurrentSearch
         ? activeDropdown === "customerCode"
           ? "未找到此客戶編號"
@@ -210,7 +210,9 @@ const CustomerSection = ({
   );
 
   const handleSelect = (c: DemoCustomer) => {
-    onCustomerSelect(c);
+    const customer = { ...c };
+    delete customer.recipientMatch;
+    onCustomerSelect(customer);
     setActiveDropdown(null);
     setSearch("");
   };
@@ -224,7 +226,7 @@ const CustomerSection = ({
           : "left-0 right-0"
     }`}>
       {odooLoading ? (
-        <p className="text-xs text-muted-foreground p-3">正在搜尋 Odoo 客戶...</p>
+        <p className="text-xs text-muted-foreground p-3">正在搜尋 Odoo 客戶及收件人...</p>
       ) : customerOptions.length === 0 ? (
         <div className="p-3 space-y-2">
           {odooError ? (
@@ -277,6 +279,14 @@ const CustomerSection = ({
                 <span className="text-xs text-muted-foreground ml-2 font-mono break-all">
                   {c.phone || "沒有電話"}
                 </span>
+                {c.recipientMatch && (
+                  <p className="mt-1 text-[11px] text-primary">
+                    配對收件人：
+                    {[c.recipientMatch.name, c.recipientMatch.phone]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
                 <CustomerFlags tags={c.tags} className="mt-1" />
                 {c.commentText?.trim() && (
                   <p className="mt-1 line-clamp-1 text-[10px] text-muted-foreground">

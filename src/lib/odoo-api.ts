@@ -12,6 +12,10 @@ interface OdooPartner {
   customerType?: "personal" | "company";
   companyName?: string | null;
   billingAddress?: string | null;
+  recipientMatch?: {
+    name: string | null;
+    phone: string | null;
+  } | null;
   history_count: number | null;
   total_spent: number | null;
   history: PurchaseRecord[];
@@ -209,7 +213,7 @@ export interface DayEndSummary {
 }
 
 export interface OdooOrderRecordsResponse {
-  date: string;
+  date?: string;
   generatedAt: string;
   truncated: boolean;
   orders: Order[];
@@ -442,6 +446,12 @@ export async function searchOdooCustomers(
     commentText: p.commentText || "",
     tags: p.tags || [],
     writeDate: p.writeDate || undefined,
+    recipientMatch: p.recipientMatch
+      ? {
+          name: p.recipientMatch.name || undefined,
+          phone: p.recipientMatch.phone || undefined,
+        }
+      : undefined,
   }));
 }
 
@@ -634,6 +644,28 @@ export async function getOdooOrderRecords(
 
   if (!res.ok) {
     return throwApiError<OdooOrderRecordsResponse>(res, `Odoo order records failed: ${res.status}`);
+  }
+
+  return (await res.json()) as OdooOrderRecordsResponse;
+}
+
+export async function searchOdooOrderRecords(
+  query: string,
+  signal?: AbortSignal,
+): Promise<OdooOrderRecordsResponse> {
+  const trimmed = query.trim();
+  if (!BACKEND_URL || trimmed.length < 2) {
+    return { generatedAt: "", truncated: false, orders: [] };
+  }
+
+  const params = new URLSearchParams({ q: trimmed });
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+
+  if (!res.ok) {
+    return throwApiError<OdooOrderRecordsResponse>(res, `Odoo order search failed: ${res.status}`);
   }
 
   return (await res.json()) as OdooOrderRecordsResponse;

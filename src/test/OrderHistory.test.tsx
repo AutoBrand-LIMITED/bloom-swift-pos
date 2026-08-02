@@ -37,6 +37,39 @@ const orderFixture = (overrides: Partial<Order> = {}): OrderRecordView => ({
 });
 
 describe("OrderHistory delivery summary", () => {
+  it("offers cross-date order search for customer and recipient details", () => {
+    const onSearchQueryChange = vi.fn();
+    render(
+      <OrderHistory
+        orders={[]}
+        open
+        onClose={vi.fn()}
+        searchQuery="accounts@example.com"
+        onSearchQueryChange={onSearchQueryChange}
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "搜尋訂單" })).toHaveValue("accounts@example.com");
+    expect(screen.getByText("跨日期搜尋結果：0 筆")).toBeVisible();
+    expect(screen.getByText("未找到符合資料的訂單")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "清除訂單搜尋" }));
+    expect(onSearchQueryChange).toHaveBeenCalledWith("");
+  });
+
+  it("requires two characters before starting order search", () => {
+    render(
+      <OrderHistory
+        orders={[]}
+        open
+        onClose={vi.fn()}
+        searchQuery="A"
+        onSearchQueryChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("請輸入至少 2 個字元開始搜尋")).toBeVisible();
+  });
+
   it("shows the delivery date and frozen slot snapshot", () => {
     render(<OrderHistory orders={[orderFixture({ deliveryTimeMode: "slot", deliverySlotId: 11 })]} open onClose={vi.fn()} />);
 
@@ -92,6 +125,7 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText("包裝：禮盒 · 備註：白色絲帶")).toBeVisible();
     fireEvent.click(screen.getByText("業務詳情"));
     expect(screen.getByText("accounts@example.com")).toBeVisible();
+    expect(screen.getByText("香港中環花園道 1 號")).toBeVisible();
     expect(screen.getByText("PO-300")).toBeVisible();
     expect(screen.getByText("Net 30")).toBeVisible();
   });

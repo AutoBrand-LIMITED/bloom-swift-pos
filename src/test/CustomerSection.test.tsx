@@ -239,6 +239,49 @@ describe("CustomerSection gift sender", () => {
     }));
   });
 
+  it("shows shared recipient matches as distinct ordering customers and selects the partner only", async () => {
+    searchOdooCustomers.mockResolvedValue([
+      {
+        id: "odoo-41",
+        odooPartnerId: 41,
+        name: "Customer One",
+        phone: "91234567",
+        history: [],
+        recipientMatch: { name: "Mary Wong", phone: "6111 1111" },
+      },
+      {
+        id: "odoo-42",
+        odooPartnerId: 42,
+        name: "Customer Two",
+        phone: "92345678",
+        history: [],
+        recipientMatch: { name: "Mary Wong", phone: "6111 1111" },
+      },
+    ]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText(/下單人／聯絡人/), {
+      target: { value: "Mary Wong" },
+    });
+
+    expect(await screen.findByText("Customer One")).toBeInTheDocument();
+    expect(screen.getByText("Customer Two")).toBeInTheDocument();
+    expect(screen.getAllByText("配對收件人：Mary Wong · 6111 1111")).toHaveLength(2);
+    expect(searchOdooCustomers).toHaveBeenCalledWith(
+      "Mary Wong",
+      expect.any(AbortSignal),
+      "general",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Customer Two/ }));
+    expect(selectCustomer).toHaveBeenCalledWith(expect.objectContaining({
+      odooPartnerId: 42,
+      name: "Customer Two",
+      phone: "92345678",
+    }));
+    expect(selectCustomer.mock.calls[0][0]).not.toHaveProperty("recipientMatch");
+  });
+
   it("shows Customer ID no-result only after a successful search without offering creation", async () => {
     searchOdooCustomers.mockResolvedValue([]);
     render(<CustomerLookupHarness />);
