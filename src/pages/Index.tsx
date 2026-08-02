@@ -14,6 +14,11 @@ import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryDock from "@/components/pos/CustomerHistoryDock";
 import OrderNotesSection, { type NotesConflictTarget } from "@/components/pos/OrderNotesSection";
+import OrderSummaryPanel from "@/components/pos/OrderSummaryPanel";
+import PosWorkflowTabs, {
+  type WorkflowSection,
+  type WorkflowSectionId,
+} from "@/components/pos/PosWorkflowTabs";
 import type {
   DeliveryTimeMode,
   Order,
@@ -70,6 +75,9 @@ import {
 import {
   validateCheckout,
   validatePositiveOrderTotal,
+  isValidDeliveryDate,
+  isValidEmailAddress,
+  isValidPhoneNumber,
   normalizePhoneNumber,
   type CheckoutErrors,
   type CheckoutField,
@@ -95,6 +103,32 @@ type RecipientSelectionDetails = Pick<
   | "deliveryAddress"
   | "shippingPartnerId"
 >;
+
+const WORKFLOW_SECTION_IDS: WorkflowSectionId[] = [
+  "customer",
+  "items",
+  "delivery",
+  "notes",
+  "payment",
+];
+
+const CUSTOMER_CHECKOUT_FIELDS: CheckoutField[] = [
+  "customerName",
+  "phone",
+  "senderName",
+  "companyName",
+  "customerEmail",
+  "billingAddress",
+];
+
+const DELIVERY_CHECKOUT_FIELDS: CheckoutField[] = [
+  "recipientCompanyName",
+  "recipientName",
+  "recipientPhone",
+  "deliveryAddress",
+  "deliveryDate",
+  "deliveryTime",
+];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -215,6 +249,16 @@ const Index = () => {
   const [orderRecordsTruncated, setOrderRecordsTruncated] = useState(false);
   const [orderRecordsRefreshKey, setOrderRecordsRefreshKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [activeWorkflowSection, setActiveWorkflowSection] = useState<WorkflowSectionId>("customer");
+  const workflowHeaderRef = useRef<HTMLElement | null>(null);
+  const workflowSectionRefs = useRef<Record<WorkflowSectionId, HTMLElement | null>>({
+    customer: null,
+    items: null,
+    delivery: null,
+    notes: null,
+    payment: null,
+  });
 
   const normalizedOrderSearchQuery = orderSearchQuery.trim();
   const orderSearchActive = normalizedOrderSearchQuery.length >= 2;
@@ -297,7 +341,141 @@ const Index = () => {
   }, [items, deliveryFee, urgentFee]);
 
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
+  const customerErrorCount = CUSTOMER_CHECKOUT_FIELDS.filter((field) => checkoutErrors[field]).length;
+  const deliveryErrorCount = DELIVERY_CHECKOUT_FIELDS.filter((field) => checkoutErrors[field]).length;
+  const customerResolutionComplete = !hasOdooBackend
+    || Boolean(pendingSubmission)
+    || normalizePhoneNumber(selectedCustomer?.phone || "") === normalizePhoneNumber(phone)
+    || normalizePhoneNumber(confirmedNewCustomerPhone || "") === normalizePhoneNumber(phone);
+  const customerSectionComplete = Boolean(
+    customerName.trim()
+      && senderName.trim()
+      && isValidPhoneNumber(phone)
+      && isValidEmailAddress(customerEmail)
+      && customerResolutionComplete
+      && (customerType !== "company" || (companyName.trim() && billingAddress.trim())),
+  );
+  const itemsSectionComplete = Boolean(
+    items.length > 0
+      && finalPrice > 0
+      && !(hasOdooBackend && priceOverridden)
+      && !items.some(orderLineAdjustmentNeedsReason),
+  );
+  const deliverySectionComplete = Boolean(
+    isValidDeliveryDate(deliveryDate)
+      && deliveryTimeMode
+      && deliveryTime.trim()
+      && [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail].some((value) => value.trim())
+      && recipientName.trim()
+      && isValidPhoneNumber(recipientPhone)
+      && (recipientType !== "company" || recipientCompanyName.trim()),
+  );
+  const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
+  const paymentSectionComplete = Boolean(
+    finalPrice > 0
+      && (
+        !receivesPayment
+        || (
+          paymentMethod
+          && paymentReference.trim()
+          && (
+            paymentStatus !== "deposit"
+            || (depositAmount > 0 && depositAmount < finalPrice)
+          )
+        )
+      ),
+  );
+  const notesSectionComplete = Boolean(
+    senderNote.trim()
+      || deliveryNote.trim()
+      || internalNote.trim()
+      || giftCardEnabled
+      || giftCardMessage.trim(),
+  );
+  const workflowSections: WorkflowSection[] = [
+    {
+      id: "customer",
+      label: "下單人",
+      status: customerErrorCount > 0 || (submitAttempted && !customerSectionComplete)
+        ? "error"
+        : customerSectionComplete ? "complete" : "pending",
+      errorCount: customerErrorCount || (submitAttempted && !customerSectionComplete ? 1 : 0),
+    },
+    {
+      id: "items",
+      label: "商品",
+      status: submitAttempted && !itemsSectionComplete
+        ? "error"
+        : itemsSectionComplete ? "complete" : "pending",
+      errorCount: submitAttempted && !itemsSectionComplete ? 1 : 0,
+    },
+    {
+      id: "delivery",
+      label: "收貨及送貨",
+      status: deliveryErrorCount > 0 || (submitAttempted && !deliverySectionComplete)
+        ? "error"
+        : deliverySectionComplete ? "complete" : "pending",
+      errorCount: deliveryErrorCount || (submitAttempted && !deliverySectionComplete ? 1 : 0),
+    },
+    {
+      id: "notes",
+      label: "備註及心意卡",
+      status: notesSectionComplete ? "complete" : "optional",
+    },
+    {
+      id: "payment",
+      label: "付款及確認",
+      status: submitAttempted && !paymentSectionComplete
+        ? "error"
+        : paymentSectionComplete ? "complete" : "pending",
+      errorCount: submitAttempted && !paymentSectionComplete ? 1 : 0,
+    },
+  ];
+  const completedRequiredSectionCount = [
+    customerSectionComplete,
+    itemsSectionComplete,
+    deliverySectionComplete,
+    paymentSectionComplete,
+  ].filter(Boolean).length;
   const hasSalesperson = salesId.trim().length > 0;
+
+  const scrollToWorkflowSection = useCallback((sectionId: WorkflowSectionId) => {
+    setActiveWorkflowSection(sectionId);
+    const target = workflowSectionRefs.current[sectionId];
+    if (!target) return;
+    const stickyHeaderHeight = workflowHeaderRef.current?.offsetHeight || 128;
+    window.scrollTo({
+      top: window.scrollY + target.getBoundingClientRect().top - stickyHeaderHeight - 16,
+      behavior: "smooth",
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!hasSalesperson) return;
+    let frameId = 0;
+    const updateActiveSection = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        const stickyHeaderHeight = workflowHeaderRef.current?.offsetHeight || 128;
+        const activationLine = stickyHeaderHeight + 28;
+        let nextSection: WorkflowSectionId = WORKFLOW_SECTION_IDS[0];
+        for (const sectionId of WORKFLOW_SECTION_IDS) {
+          const section = workflowSectionRefs.current[sectionId];
+          if (section && section.getBoundingClientRect().top <= activationLine) {
+            nextSection = sectionId;
+          }
+        }
+        setActiveWorkflowSection((current) => current === nextSection ? current : nextSection);
+      });
+    };
+
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", updateActiveSection);
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [hasSalesperson]);
   const pendingOwnershipMismatch = Boolean(
     posAuthRequired
       && pendingSubmission
@@ -554,6 +732,8 @@ const Index = () => {
     setCheckoutId(crypto.randomUUID());
     setPriceOverridden(false);
     setManualPrice(null);
+    setSubmitAttempted(false);
+    setActiveWorkflowSection("customer");
   }, []);
 
   const handleClearForm = useCallback(() => {
@@ -832,6 +1012,7 @@ const Index = () => {
       toast.error("請選擇已同步到 Odoo 嘅負責員工");
       return;
     }
+    setSubmitAttempted(true);
     if (
       pendingSubmission
       && !pendingOptionBindingsMatch(pendingSubmission, {
@@ -899,6 +1080,11 @@ const Index = () => {
     const validationErrorCount = Object.keys(validationErrors).length;
     if (validationErrorCount > 0) {
       toast.error(`請修正以下 ${validationErrorCount} 項訂單資料`);
+      scrollToWorkflowSection(
+        CUSTOMER_CHECKOUT_FIELDS.some((field) => validationErrors[field])
+          ? "customer"
+          : "delivery",
+      );
       return;
     }
 
@@ -923,37 +1109,44 @@ const Index = () => {
 
     if (items.length === 0) {
       toast.error("請至少加入一個項目");
+      scrollToWorkflowSection("items");
       return;
     }
 
     if (hasOdooBackend && priceOverridden) {
       toast.error("Odoo 訂單價格必須跟商品目錄；請先重設最終價格");
+      scrollToWorkflowSection("items");
       return;
     }
 
     const itemMissingAdjustmentReason = items.find(orderLineAdjustmentNeedsReason);
     if (itemMissingAdjustmentReason) {
       toast.error(`「${itemMissingAdjustmentReason.name}」已改價或折扣，請填寫原因`);
+      scrollToWorkflowSection("items");
       return;
     }
 
     const totalError = validatePositiveOrderTotal(finalPrice);
     if (totalError) {
       toast.error(totalError);
+      scrollToWorkflowSection("items");
       return;
     }
 
     const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
     if (receivesPayment && !paymentMethod) {
       toast.error("請選擇已啟用嘅 Odoo 付款方式");
+      scrollToWorkflowSection("payment");
       return;
     }
     if (receivesPayment && !paymentReference.trim()) {
       toast.error("請輸入付款參考編號");
+      scrollToWorkflowSection("payment");
       return;
     }
     if (paymentStatus === "deposit" && (depositAmount <= 0 || depositAmount >= finalPrice)) {
       toast.error("訂金必須大過 $0 並少過訂單總額");
+      scrollToWorkflowSection("payment");
       return;
     }
     const receiptTimestamp = receivesPayment
@@ -1196,7 +1389,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
+      <header ref={workflowHeaderRef} className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
         <div className="mx-auto flex max-w-full flex-col items-stretch gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <h1 className="flex min-w-0 items-center" aria-label="中西花店 POS">
             <img
@@ -1240,6 +1433,13 @@ const Index = () => {
             )}
           </div>
         </div>
+        {hasSalesperson && (
+          <PosWorkflowTabs
+            sections={workflowSections}
+            activeSection={activeWorkflowSection}
+            onSelect={scrollToWorkflowSection}
+          />
+        )}
       </header>
 
       {/* Body: left panel + main */}
@@ -1279,8 +1479,10 @@ const Index = () => {
           />
         )}
 
-        {/* Main form */}
-        <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
+        {/* Main form + desktop summary */}
+        <div className="min-w-0 flex-1">
+          <div className="mx-auto flex max-w-[1320px] items-start gap-5 px-4 py-5 pb-28 xl:pb-6">
+        <main className="min-w-0 max-w-4xl flex-1 space-y-4">
         <SalesIdSection
           salesId={salesId}
           employee={employee}
@@ -1335,6 +1537,11 @@ const Index = () => {
             </ul>
           </div>
         )}
+        <section
+          ref={(node) => { workflowSectionRefs.current.customer = node; }}
+          aria-label="下單人資料"
+          className="scroll-mt-40 space-y-4"
+        >
         <CustomerSection
           phone={phone}
           customerName={customerName}
@@ -1419,7 +1626,13 @@ const Index = () => {
           onDepartmentChange={setDepartment}
           onTermsChange={setTerms}
         />
+        </section>
 
+        <section
+          ref={(node) => { workflowSectionRefs.current.items = node; }}
+          aria-label="商品資料"
+          className="scroll-mt-40"
+        >
         <OrderItemsSection
           items={items}
           onItemsChange={setItems}
@@ -1434,7 +1647,13 @@ const Index = () => {
           onBudgetChange={setBudget}
           subtotal={subtotal}
         />
+        </section>
 
+        <section
+          ref={(node) => { workflowSectionRefs.current.delivery = node; }}
+          aria-label="收貨及送貨資料"
+          className="scroll-mt-40"
+        >
         <DeliverySection
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
@@ -1535,7 +1754,13 @@ const Index = () => {
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}
         />
+        </section>
 
+        <section
+          ref={(node) => { workflowSectionRefs.current.notes = node; }}
+          aria-label="備註及心意卡"
+          className="scroll-mt-40 space-y-4"
+        >
         <OrderNotesSection
           senderNote={senderNote}
           deliveryNote={deliveryNote}
@@ -1583,7 +1808,13 @@ const Index = () => {
           onEnabledChange={setGiftCardEnabled}
           onMessageChange={setGiftCardMessage}
         />
+        </section>
 
+        <section
+          ref={(node) => { workflowSectionRefs.current.payment = node; }}
+          aria-label="付款及確認"
+          className="scroll-mt-40"
+        >
         <PaymentSection
           subtotal={subtotal}
           finalPrice={finalPrice}
@@ -1611,6 +1842,7 @@ const Index = () => {
           onDepositAmountChange={setDepositAmount}
           priceWarning={finalPrice <= 0 && items.length > 0}
         />
+        </section>
 
           </>
         ) : (
@@ -1620,10 +1852,36 @@ const Index = () => {
           </div>
         )}
       </main>
+        {hasSalesperson && (
+          <div className="sticky top-40 hidden w-[310px] shrink-0 xl:block 2xl:w-[360px]">
+            <OrderSummaryPanel
+              customerName={customerName}
+              phone={phone}
+              recipientName={recipientType === "company" && recipientCompanyName.trim()
+                ? `${recipientCompanyName} · ${recipientName}`
+                : recipientName}
+              recipientPhone={recipientPhone}
+              deliveryDate={deliveryDate}
+              deliveryTime={deliveryTime}
+              items={items}
+              deliveryFee={deliveryFee}
+              urgentFee={urgentFee}
+              finalPrice={finalPrice}
+              paymentStatus={paymentStatus}
+              completedCount={completedRequiredSectionCount}
+              requiredSectionCount={4}
+              isSubmitting={isSubmitting}
+              onSubmit={handleSubmit}
+              onNavigate={scrollToWorkflowSection}
+            />
+          </div>
+        )}
+          </div>
+        </div>
       </div>
       {/* Sticky submit */}
       {hasSalesperson && <div
-        className="fixed bottom-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border transition-[left]"
+        className="fixed bottom-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border transition-[left] xl:hidden"
         style={{ left: checkoutBarLeftOffset(Boolean(selectedCustomer), customerHistoryOpen) }}
       >
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
