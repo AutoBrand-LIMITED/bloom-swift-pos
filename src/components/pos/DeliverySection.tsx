@@ -10,7 +10,12 @@ import {
   findDeliverySlot,
   type FrozenDeliverySlotSelection,
 } from "@/lib/delivery-slots";
-import type { DeliverySlot } from "@/lib/odoo-api";
+import {
+  hasOdooBackend,
+  searchOdooRecipients,
+  type DeliverySlot,
+  type RecipientSuggestion,
+} from "@/lib/odoo-api";
 import {
   HK_DISTRICTS,
   mergeAddressHierarchy,
@@ -73,6 +78,7 @@ interface DeliverySectionProps {
   onRecipientCompanyNameChange: (v: string) => void;
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
+  onRecipientSuggestionSelect: (suggestion: RecipientSuggestion) => void;
   onDeliveryPersonChange: (v: string) => void;
   onFailedDeliveryActionChange: (v: string) => void;
 }
@@ -91,7 +97,8 @@ const DeliverySection = ({
   onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
   onGoogleAddressSelect,
   onRecipientTypeChange, onRecipientCompanyNameChange,
-  onRecipientNameChange, onRecipientPhoneChange, onDeliveryPersonChange,
+  onRecipientNameChange, onRecipientPhoneChange, onRecipientSuggestionSelect,
+  onDeliveryPersonChange,
   onFailedDeliveryActionChange,
 }: DeliverySectionProps) => {
   const districts = deliveryRegion ? Object.keys(HK_DISTRICTS[deliveryRegion] || {}) : [];
@@ -105,14 +112,26 @@ const DeliverySection = ({
     deliveryDetail,
   ]);
   const addressListboxId = useId();
+  const recipientListboxId = useId();
   const [activeAddressSuggestion, setActiveAddressSuggestion] = useState(-1);
   const [addressInputFocused, setAddressInputFocused] = useState(false);
   const [addressCompositionActive, setAddressCompositionActive] = useState(false);
   const [addressAutocompleteDirty, setAddressAutocompleteDirty] = useState(false);
   const [authorizedMapSignature, setAuthorizedMapSignature] = useState<string | null>(null);
+  const [recipientLookupField, setRecipientLookupField] = useState<"name" | "phone" | null>(null);
+  const [debouncedRecipientQuery, setDebouncedRecipientQuery] = useState("");
+  const [recipientSuggestions, setRecipientSuggestions] = useState<RecipientSuggestion[]>([]);
+  const [recipientSuggestionsLoading, setRecipientSuggestionsLoading] = useState(false);
+  const [recipientSuggestionsError, setRecipientSuggestionsError] = useState<string | null>(null);
+  const [completedRecipientSearch, setCompletedRecipientSearch] = useState<{
+    field: "name" | "phone";
+    query: string;
+  } | null>(null);
   const lastManualAddressSignatureRef = useRef<string | null>(null);
   const authorizedAddressSignatureRef = useRef<string | null>(null);
   const previousAddressSignatureRef = useRef(currentAddressSignature);
+  const recipientLookupRef = useRef<HTMLDivElement>(null);
+  const recipientSearchRequestRef = useRef(0);
   const {
     suggestions: addressSuggestions,
     status: addressSuggestionStatus,
@@ -165,6 +184,80 @@ const DeliverySection = ({
     : deliveryTimeMode === "specified"
       ? "specified"
       : "";
+  const activeRecipientQuery = (
+    recipientLookupField === "name"
+      ? recipientName
+      : recipientLookupField === "phone"
+        ? recipientPhone
+        : ""
+  ).trim();
+  const completedCurrentRecipientSearch = completedRecipientSearch?.field === recipientLookupField
+    && completedRecipientSearch.query === activeRecipientQuery;
+  const visibleRecipientSuggestions = completedCurrentRecipientSearch
+    ? recipientSuggestions
+    : [];
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        recipientLookupRef.current
+        && !recipientLookupRef.current.contains(event.target as Node)
+      ) {
+        setRecipientLookupField(null);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedRecipientQuery(activeRecipientQuery),
+      250,
+    );
+    return () => window.clearTimeout(timer);
+  }, [activeRecipientQuery]);
+
+  useEffect(() => {
+    const field = recipientLookupField;
+    const query = debouncedRecipientQuery.trim();
+    if (!field || !query || !hasOdooBackend) {
+      setRecipientSuggestions([]);
+      setRecipientSuggestionsLoading(false);
+      setRecipientSuggestionsError(null);
+      setCompletedRecipientSearch(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const requestId = recipientSearchRequestRef.current + 1;
+    recipientSearchRequestRef.current = requestId;
+    setRecipientSuggestionsLoading(true);
+    setRecipientSuggestionsError(null);
+    setCompletedRecipientSearch(null);
+
+    searchOdooRecipients(query, controller.signal)
+      .then((suggestions) => {
+        if (controller.signal.aborted || recipientSearchRequestRef.current !== requestId) return;
+        setRecipientSuggestions(suggestions);
+        setCompletedRecipientSearch({ field, query });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || recipientSearchRequestRef.current !== requestId) return;
+        setRecipientSuggestions([]);
+        setCompletedRecipientSearch({ field, query });
+        setRecipientSuggestionsError(
+          error instanceof Error ? error.message : "未能搜尋過往收貨人",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && recipientSearchRequestRef.current === requestId) {
+          setRecipientSuggestionsLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [debouncedRecipientQuery, recipientLookupField]);
 
   const handleTimeSelectionChange = (value: string) => {
     if (value === "specified") {
@@ -262,6 +355,61 @@ const DeliverySection = ({
 
   const publicMapAddress = publicGoogleAddressQuery(fullAddress);
   const mapQuery = encodeURIComponent(publicMapAddress + " 香港");
+  const recipientDropdown = (field: "name" | "phone") => {
+    if (recipientLookupField !== field) return null;
+    return (
+      <div
+        id={recipientListboxId}
+        role="listbox"
+        aria-label="過往收貨人搜尋結果"
+        className={`absolute z-50 top-full mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-card shadow-lg sm:w-[calc(200%+0.75rem)] ${
+          field === "phone" ? "left-0 right-0 sm:left-auto sm:right-0" : "left-0 right-0"
+        }`}
+      >
+        {recipientSuggestionsLoading ? (
+          <p className="p-3 text-xs text-muted-foreground">正在搜尋過往收貨人...</p>
+        ) : recipientSuggestionsError ? (
+          <p className="p-3 text-xs text-destructive">{recipientSuggestionsError}</p>
+        ) : !activeRecipientQuery ? (
+          <p className="p-3 text-xs text-muted-foreground">輸入姓名或電話搜尋過往收貨人</p>
+        ) : visibleRecipientSuggestions.length === 0 ? (
+          <p className="p-3 text-xs text-muted-foreground">
+            {completedCurrentRecipientSearch ? "未找到過往收貨人" : "正在準備搜尋..."}
+          </p>
+        ) : (
+          visibleRecipientSuggestions.map((suggestion) => (
+            <button
+              key={suggestion.id}
+              type="button"
+              role="option"
+              aria-selected="false"
+              className="min-h-11 w-full border-b border-border px-3 py-2.5 text-left last:border-0 hover:bg-accent/50"
+              onClick={() => {
+                onRecipientSuggestionSelect(suggestion);
+                setRecipientLookupField(null);
+                setRecipientSuggestions([]);
+                setCompletedRecipientSearch(null);
+              }}
+            >
+              <span className="block text-sm font-medium">
+                {[suggestion.recipientCompanyName, suggestion.recipientName]
+                  .filter(Boolean)
+                  .join(" · ") || "未有姓名"}
+              </span>
+              <span className="block text-xs font-mono text-muted-foreground">
+                {suggestion.recipientPhone || "未有電話"}
+              </span>
+              {suggestion.deliveryAddress && (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {suggestion.deliveryAddress}
+                </span>
+              )}
+            </button>
+          ))
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -660,8 +808,8 @@ const DeliverySection = ({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
+        <div ref={recipientLookupRef} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="relative space-y-1">
           <Label htmlFor="recipient-name" className="text-xs flex items-center gap-1">
             <User className="w-3.5 h-3.5" /> 收貨人姓名／聯絡人姓名
             <span className="text-destructive">*</span>
@@ -671,9 +819,14 @@ const DeliverySection = ({
             placeholder="收貨人姓名"
             value={recipientName}
             onChange={(e) => onRecipientNameChange(e.target.value)}
+            onFocus={() => setRecipientLookupField("name")}
             className={`text-sm ${recipientNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
             maxLength={100}
             required
+            autoComplete="off"
+            aria-autocomplete="list"
+            aria-controls={recipientLookupField === "name" ? recipientListboxId : undefined}
+            aria-expanded={recipientLookupField === "name"}
             aria-invalid={Boolean(recipientNameError)}
             aria-describedby={recipientNameError ? "recipient-name-error" : undefined}
           />
@@ -682,8 +835,9 @@ const DeliverySection = ({
               {recipientNameError}
             </p>
           )}
+          {recipientDropdown("name")}
           </div>
-          <div className="space-y-1">
+          <div className="relative space-y-1">
           <Label htmlFor="recipient-phone" className="text-xs">
             收貨人電話 <span className="text-destructive">*</span>
           </Label>
@@ -692,9 +846,14 @@ const DeliverySection = ({
             placeholder="收貨人電話"
             value={recipientPhone}
             onChange={(e) => onRecipientPhoneChange(e.target.value)}
+            onFocus={() => setRecipientLookupField("phone")}
             className={`text-sm font-mono ${recipientPhoneError ? "border-destructive ring-1 ring-destructive" : ""}`}
             maxLength={30}
             required
+            autoComplete="off"
+            aria-autocomplete="list"
+            aria-controls={recipientLookupField === "phone" ? recipientListboxId : undefined}
+            aria-expanded={recipientLookupField === "phone"}
             aria-invalid={Boolean(recipientPhoneError)}
             aria-describedby={recipientPhoneError ? "recipient-phone-error" : undefined}
           />
@@ -703,6 +862,7 @@ const DeliverySection = ({
               {recipientPhoneError}
             </p>
           )}
+          {recipientDropdown("phone")}
           </div>
         </div>
       </div>

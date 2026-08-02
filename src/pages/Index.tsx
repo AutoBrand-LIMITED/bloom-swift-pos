@@ -1439,6 +1439,30 @@ const Index = () => {
             clearCheckoutErrors("recipientPhone");
             resetRecipientPersistence();
           }}
+          onRecipientSuggestionSelect={(suggestion) => {
+            setRecipientType(suggestion.recipientType);
+            setRecipientCompanyName(suggestion.recipientCompanyName || "");
+            setRecipientName(suggestion.recipientName || "");
+            setRecipientPhone(suggestion.recipientPhone || "");
+            setRecipientPartnerId(suggestion.shippingPartnerId || undefined);
+            setRecipientContact(null);
+            setRecipientContactDraft("");
+            setSaveRecipientNote(false);
+            if (suggestion.deliveryAddress) {
+              const parsed = parseDeliveryAddress(suggestion.deliveryAddress);
+              setDeliveryRegion(parsed.region);
+              setDeliveryDistrict(parsed.district);
+              setDeliveryArea(parsed.area);
+              setDeliveryDetail(parsed.detail);
+            }
+            clearCheckoutErrors(
+              "deliveryAddress",
+              "recipientCompanyName",
+              "recipientName",
+              "recipientPhone",
+            );
+            toast.success("已套用過往收貨人資料");
+          }}
           onDeliveryPersonChange={setDeliveryPerson}
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}
