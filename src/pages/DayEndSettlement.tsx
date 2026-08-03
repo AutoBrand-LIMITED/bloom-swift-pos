@@ -220,7 +220,7 @@ const BucketGrid = ({ buckets }: { buckets: DayEndPaymentBucket[] }) => (
   </div>
 );
 
-const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
+export const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
   if (!orders.length) {
     return <p className="text-sm text-muted-foreground">沒有記錄</p>;
   }
@@ -232,6 +232,7 @@ const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
           <TableHead className="min-w-[120px]">SO#</TableHead>
           <TableHead className="min-w-[135px]">時間</TableHead>
           <TableHead className="min-w-[180px]">客戶</TableHead>
+          <TableHead className="min-w-[180px]">落單員工／Sales</TableHead>
           <TableHead className="min-w-[120px]">付款</TableHead>
           <TableHead className="text-right min-w-[120px]">銷售額</TableHead>
           <TableHead className="text-right min-w-[120px]">今日收款</TableHead>
@@ -248,6 +249,7 @@ const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
             </TableCell>
             <TableCell className="font-mono text-xs">{order.dateOrder}</TableCell>
             <TableCell>{order.customerName}</TableCell>
+            <TableCell>{order.salesperson || "-"}</TableCell>
             <TableCell>
               <div>{statusLabel[order.paymentStatus] || order.paymentStatus}</div>
               <div className="text-xs text-muted-foreground">{order.paymentMethod || "未分類"}</div>

@@ -116,6 +116,40 @@ export interface OrderNoteUpdate {
   expectedWriteDate: string;
 }
 
+export interface OrderOperationalUpdate {
+  customerName: string;
+  senderName: string;
+  phone: string;
+  customerEmail: string;
+  billingAddress: string;
+  customerGroup: string;
+  senderDoNumber: string;
+  recipientDoNumber: string;
+  sourceReference: string;
+  department: string;
+  terms: string;
+  deliveryDate: string;
+  deliveryTimeMode: "slot" | "specified";
+  deliverySlotId?: number;
+  deliveryTime: string;
+  deliveryAddress: string;
+  recipientType: "personal" | "company";
+  recipientCompanyName: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryPerson: string;
+  giftCardMessage: string;
+  senderNote: string;
+  deliveryNote: string;
+  internalNote: string;
+  expectedWriteDate: string;
+}
+
+export interface OrderOperationalUpdateResponse {
+  id: number;
+  writeDate: string;
+}
+
 export class OdooConflictError<T = unknown> extends Error {
   readonly status = 409;
   readonly latest: T | undefined;
@@ -398,6 +432,32 @@ export async function submitOdooOrder(
   }
 
   return (await res.json()) as OdooOrderResponse;
+}
+
+export async function updateOdooOrderOperationalDetails(
+  orderId: number,
+  payload: OrderOperationalUpdate,
+  signal?: AbortSignal,
+): Promise<OrderOperationalUpdateResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!res.ok) {
+    return throwApiError<OrderOperationalUpdateResponse>(
+      res,
+      `Odoo order update failed: ${res.status}`,
+    );
+  }
+
+  return (await res.json()) as OrderOperationalUpdateResponse;
 }
 
 export async function getAccountingPaymentOptions(signal?: AbortSignal): Promise<AccountingPaymentOption[]> {

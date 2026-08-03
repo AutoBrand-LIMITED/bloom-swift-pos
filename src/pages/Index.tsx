@@ -1839,6 +1839,7 @@ const Index = () => {
         stale={orderRecordsLoaded && Boolean(orderRecordsError) && remoteOrders.length > 0}
         truncated={orderRecordsTruncated}
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
+        onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
       />
     </div>
   );

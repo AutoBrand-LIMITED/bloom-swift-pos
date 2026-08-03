@@ -1,14 +1,25 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OrderHistory from "@/components/pos/OrderHistory";
 import type { OrderRecordView } from "@/lib/order-records";
 import type { Order } from "@/types/order";
 
+const { updateOdooOrderOperationalDetails } = vi.hoisted(() => ({
+  updateOdooOrderOperationalDetails: vi.fn(),
+}));
+
+vi.mock("@/lib/odoo-api", () => ({
+  updateOdooOrderOperationalDetails,
+}));
+
 const orderFixture = (overrides: Partial<Order> = {}): OrderRecordView => ({
   source: "odoo",
   syncState: "synced",
   id: "order-1",
+  odooOrderId: 17,
+  odooOrderName: "S00017",
+  writeDate: "2026-08-03 10:00:00",
   salesId: "S001",
   customerName: "測試客人",
   phone: "91234567",
@@ -22,6 +33,8 @@ const orderFixture = (overrides: Partial<Order> = {}): OrderRecordView => ({
   depositAmount: 0,
   paymentMethod: "cash_other",
   deliveryDate: "2026-07-18",
+  deliveryTimeMode: "slot",
+  deliverySlotId: 11,
   deliveryTime: "上午 09:00-13:00",
   deliveryAddress: "中環",
   recipientName: "收花人",
@@ -37,6 +50,24 @@ const orderFixture = (overrides: Partial<Order> = {}): OrderRecordView => ({
 });
 
 describe("OrderHistory delivery summary", () => {
+  beforeEach(() => {
+    updateOdooOrderOperationalDetails.mockReset();
+  });
+
+  it("keeps a fixed drawer with an independently scrollable order list", () => {
+    const orders = Array.from({ length: 20 }, (_, index) => orderFixture({
+      id: `order-${index + 1}`,
+      odooOrderName: `S${String(index + 1).padStart(5, "0")}`,
+      customerName: `客人 ${index + 1}`,
+    }));
+
+    render(<OrderHistory orders={orders} open onClose={vi.fn()} />);
+
+    expect(screen.getByText("訂單記錄 (20)")).toBeVisible();
+    expect(screen.getByTestId("order-history-scroll-area")).toHaveClass("min-h-0", "flex-1");
+    expect(screen.getByRole("group", { name: /訂單 S00020/ })).toBeInTheDocument();
+  });
+
   it("offers cross-date order search for customer and recipient details", () => {
     const onSearchQueryChange = vi.fn();
     render(
@@ -73,8 +104,41 @@ describe("OrderHistory delivery summary", () => {
   it("shows the delivery date and frozen slot snapshot", () => {
     render(<OrderHistory orders={[orderFixture({ deliveryTimeMode: "slot", deliverySlotId: 11 })]} open onClose={vi.fn()} />);
 
-    const order = screen.getByRole("group", { name: /訂單 order-1/ });
+    const order = screen.getByRole("group", { name: /訂單 S00017/ });
     expect(within(order).getByText("送貨：2026-07-18 · 上午 09:00-13:00")).toBeVisible();
+  });
+
+  it("edits an existing Odoo order and refreshes the drawer", async () => {
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    const onOrderUpdated = vi.fn();
+    render(
+      <OrderHistory
+        orders={[orderFixture()]}
+        open
+        onClose={vi.fn()}
+        onOrderUpdated={onOrderUpdated}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    fireEvent.change(screen.getByLabelText("送貨地址 *"), {
+      target: { value: "觀塘新地址" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => {
+      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+        17,
+        expect.objectContaining({
+          deliveryAddress: "觀塘新地址",
+          expectedWriteDate: "2026-08-03 10:00:00",
+        }),
+      );
+    });
+    expect(onOrderUpdated).toHaveBeenCalledTimes(1);
   });
 
   it("marks specified delivery time explicitly", () => {

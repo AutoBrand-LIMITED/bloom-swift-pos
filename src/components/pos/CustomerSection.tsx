@@ -229,6 +229,11 @@ const CustomerSection = ({
     isNewCustomerConfirmed
       || (!selectedCustomer && customerCode.trim()),
   );
+  const canBackfillSelectedCustomerCode = Boolean(
+    selectedCustomer?.odooPartnerId
+      && !selectedCustomer.customerCode?.trim(),
+  );
+  const isCustomerCodeEntry = isNewCustomerDraft || canBackfillSelectedCustomerCode;
 
   const handleSelect = (c: DemoCustomer) => {
     const customer = { ...c };
@@ -471,24 +476,26 @@ const CustomerSection = ({
       <div className="space-y-3" ref={lookupRef}>
         <div className="space-y-1.5 relative">
           <Label htmlFor="customer-code-search" className="text-xs font-medium">
-            {isNewCustomerDraft
-              ? "新 Customer ID／客戶編號（選填）"
-              : "Customer ID／客戶編號"}
+            {canBackfillSelectedCustomerCode
+              ? "補填 Customer ID／客戶編號（選填）"
+              : isNewCustomerDraft
+                ? "新 Customer ID／客戶編號（選填）"
+                : "Customer ID／客戶編號"}
           </Label>
           <div className="relative">
             <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               id="customer-code-search"
-              placeholder={isNewCustomerDraft
-                ? "輸入新 Customer ID，落單時儲存到 Odoo"
+              placeholder={isCustomerCodeEntry
+                ? "輸入 Customer ID，落單時儲存到 Odoo"
                 : "輸入 Customer ID 搜尋客戶"}
-              value={isNewCustomerDraft
+              value={isCustomerCodeEntry
                 ? customerCode
                 : activeDropdown === "customerCode"
                   ? search
                   : selectedCustomer?.customerCode || ""}
               onChange={(event) => {
-                if (isNewCustomerDraft) {
+                if (isCustomerCodeEntry) {
                   onCustomerCodeChange(event.target.value);
                   return;
                 }
@@ -496,7 +503,7 @@ const CustomerSection = ({
                 setActiveDropdown("customerCode");
               }}
               onFocus={() => {
-                if (isNewCustomerDraft) return;
+                if (isCustomerCodeEntry) return;
                 setSearch(selectedCustomer?.customerCode || "");
                 setActiveDropdown("customerCode");
               }}
@@ -505,11 +512,13 @@ const CustomerSection = ({
               autoComplete="off"
             />
           </div>
-          {isNewCustomerDraft ? (
+          {isCustomerCodeEntry ? (
             <p className="text-[11px] text-muted-foreground">
-              {isNewCustomerConfirmed
-                ? "呢個 Customer ID 會連同新客戶資料儲存到 Odoo；如已被使用，系統會阻止落單。"
-                : "已保留呢個 Customer ID；請輸入電話並完成『確認新增客戶』。"}
+              {canBackfillSelectedCustomerCode
+                ? "呢個 Customer ID 會喺落單時更新返呢個現有 Odoo 客戶；如已被使用，系統會阻止落單。"
+                : isNewCustomerConfirmed
+                  ? "呢個 Customer ID 會連同新客戶資料儲存到 Odoo；如已被使用，系統會阻止落單。"
+                  : "已保留呢個 Customer ID；請輸入電話並完成『確認新增客戶』。"}
             </p>
           ) : (
             <>
