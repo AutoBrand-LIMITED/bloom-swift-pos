@@ -26,17 +26,20 @@ const emptyBusinessProps = {
 
 function Harness() {
   const [senderName, setSenderName] = useState("");
+  const [customerCode, setCustomerCode] = useState("");
 
   return (
     <CustomerSection
       phone="9123 4567"
       customerName="Secretary Chan"
+      customerCode={customerCode}
       senderName={senderName}
       customerType="personal"
       companyName=""
       {...emptyBusinessProps}
       onPhoneChange={noop}
       onNameChange={noop}
+      onCustomerCodeChange={setCustomerCode}
       onSenderNameChange={setSenderName}
       onCustomerTypeChange={noop}
       onCompanyNameChange={noop}
@@ -50,12 +53,14 @@ function Harness() {
 function CustomerLookupHarness() {
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerCode, setCustomerCode] = useState("");
   const [confirmedPhone, setConfirmedPhone] = useState<string | null>(null);
 
   return (
     <CustomerSection
       phone={phone}
       customerName={customerName}
+      customerCode={customerCode}
       senderName=""
       customerType="personal"
       companyName=""
@@ -68,6 +73,7 @@ function CustomerLookupHarness() {
         ));
       }}
       onNameChange={setCustomerName}
+      onCustomerCodeChange={setCustomerCode}
       onSenderNameChange={noop}
       onCustomerTypeChange={noop}
       onCompanyNameChange={noop}
@@ -104,12 +110,14 @@ describe("CustomerSection gift sender", () => {
       <CustomerSection
         phone=""
         customerName=""
+        customerCode=""
         senderName=""
         customerType="personal"
         companyName=""
         {...emptyBusinessProps}
         onPhoneChange={noop}
         onNameChange={noop}
+        onCustomerCodeChange={noop}
         onSenderNameChange={noop}
         onCustomerTypeChange={noop}
         onCompanyNameChange={noop}
@@ -142,6 +150,10 @@ describe("CustomerSection gift sender", () => {
     fireEvent.click(confirmButton);
 
     expect(screen.getByText("已確認新增此電話客戶")).toBeInTheDocument();
+    const newCustomerCode = screen.getByLabelText(/新 Customer ID/);
+    fireEvent.change(newCustomerCode, { target: { value: " NEW-001 " } });
+    expect(newCustomerCode).toHaveValue(" NEW-001 ");
+    expect(screen.getByText(/連同新客戶資料儲存到 Odoo/)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByLabelText(/下單人／聯絡人/)).toHaveFocus();
     });
@@ -153,6 +165,7 @@ describe("CustomerSection gift sender", () => {
       <CustomerSection
         phone="91234567"
         customerName="Company Contact"
+        customerCode=""
         senderName="Company Contact"
         customerType="company"
         companyName=""
@@ -160,6 +173,7 @@ describe("CustomerSection gift sender", () => {
         billingAddress=""
         onPhoneChange={noop}
         onNameChange={noop}
+        onCustomerCodeChange={noop}
         onSenderNameChange={noop}
         onCustomerTypeChange={noop}
         onCompanyNameChange={noop}

@@ -16,6 +16,7 @@ type CustomerLookupSource = "phone" | "name" | "customerCode";
 interface CustomerSectionProps {
   phone: string;
   customerName: string;
+  customerCode: string;
   senderName: string;
   customerType: CustomerType;
   companyName: string;
@@ -23,6 +24,7 @@ interface CustomerSectionProps {
   billingAddress: string;
   onPhoneChange: (v: string) => void;
   onNameChange: (v: string) => void;
+  onCustomerCodeChange: (v: string) => void;
   onSenderNameChange: (v: string) => void;
   onCustomerTypeChange: (v: CustomerType) => void;
   onCompanyNameChange: (v: string) => void;
@@ -46,8 +48,8 @@ interface CustomerSectionProps {
 }
 
 const CustomerSection = ({
-  phone, customerName, senderName, customerType, companyName, customerEmail, billingAddress,
-  onPhoneChange, onNameChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
+  phone, customerName, customerCode, senderName, customerType, companyName, customerEmail, billingAddress,
+  onPhoneChange, onNameChange, onCustomerCodeChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
   onCustomerEmailChange, onBillingAddressChange,
   onCustomerSelect, onCustomerAndRecipientSelect,
   phoneError, customerNameError, senderNameError,
@@ -435,21 +437,32 @@ const CustomerSection = ({
       <div className="space-y-3" ref={lookupRef}>
         <div className="space-y-1.5 relative">
           <Label htmlFor="customer-code-search" className="text-xs font-medium">
-            Customer ID／客戶編號
+            {isNewCustomerConfirmed
+              ? "新 Customer ID／客戶編號（選填）"
+              : "Customer ID／客戶編號"}
           </Label>
           <div className="relative">
             <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               id="customer-code-search"
-              placeholder="輸入 Customer ID 搜尋客戶"
-              value={activeDropdown === "customerCode"
-                ? search
-                : selectedCustomer?.customerCode || ""}
+              placeholder={isNewCustomerConfirmed
+                ? "輸入新 Customer ID，落單時儲存到 Odoo"
+                : "輸入 Customer ID 搜尋客戶"}
+              value={isNewCustomerConfirmed
+                ? customerCode
+                : activeDropdown === "customerCode"
+                  ? search
+                  : selectedCustomer?.customerCode || ""}
               onChange={(event) => {
+                if (isNewCustomerConfirmed) {
+                  onCustomerCodeChange(event.target.value);
+                  return;
+                }
                 setSearch(event.target.value);
                 setActiveDropdown("customerCode");
               }}
               onFocus={() => {
+                if (isNewCustomerConfirmed) return;
                 setSearch(selectedCustomer?.customerCode || "");
                 setActiveDropdown("customerCode");
               }}
@@ -458,7 +471,18 @@ const CustomerSection = ({
               autoComplete="off"
             />
           </div>
-          {customerDropdown("customerCode")}
+          {isNewCustomerConfirmed ? (
+            <p className="text-[11px] text-muted-foreground">
+              呢個 Customer ID 會連同新客戶資料儲存到 Odoo；如已被使用，系統會阻止落單。
+            </p>
+          ) : (
+            <>
+              <p className="text-[11px] text-muted-foreground">
+                呢度用嚟搜尋現有客戶；以電話確認新增客戶後，可在同一欄設定新 Customer ID。
+              </p>
+              {customerDropdown("customerCode")}
+            </>
+          )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5 relative">

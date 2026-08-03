@@ -150,6 +150,7 @@ const Index = () => {
   // Customer
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerCode, setCustomerCode] = useState("");
   const [senderName, setSenderName] = useState("");
   const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
   const [companyName, setCompanyName] = useState("");
@@ -567,6 +568,7 @@ const Index = () => {
   const detachSelectedCustomerProfile = useCallback(() => {
     const emptyProfile = detachedCustomerProfile();
     setSelectedCustomer(null);
+    setCustomerCode("");
     setCustomerEmail(emptyProfile.customerEmail);
     setCustomerType(emptyProfile.customerType);
     setCompanyName(emptyProfile.companyName);
@@ -589,6 +591,7 @@ const Index = () => {
     setSelectedCustomer(customer);
     setConfirmedNewCustomerPhone(null);
     setCustomerName(customer.name);
+    setCustomerCode(customer.customerCode || "");
     setPhone(customer.phone);
     setCustomerEmail(customer.email || "");
     setCustomerType(customer.customerType || "personal");
@@ -679,6 +682,7 @@ const Index = () => {
   const resetOrderForm = useCallback(() => {
     setPhone("");
     setCustomerName("");
+    setCustomerCode("");
     setSenderName("");
     setCustomerType("personal");
     setCompanyName("");
@@ -776,6 +780,7 @@ const Index = () => {
     const { order, options } = restoredEmployeePendingSubmission;
     setPhone(order.phone);
     setCustomerName(order.customerName);
+    setCustomerCode(order.customerCode || "");
     setSenderName(order.senderName ?? order.customerName ?? "");
     setCustomerType(order.customerType || options.customerType || "personal");
     setCompanyName(order.companyName || options.companyName || "");
@@ -791,9 +796,13 @@ const Index = () => {
       id: `odoo-${options.customerId}`,
       name: order.customerName,
       phone: order.phone,
+      customerCode: order.customerCode,
       history: [],
       odooPartnerId: options.customerId,
     } : null);
+    setConfirmedNewCustomerPhone(
+      options.customerId ? null : normalizePhoneNumber(order.phone),
+    );
     setItems(order.items);
     setDeliveryFee(order.deliveryFee);
     setUrgentFee(order.urgentFee);
@@ -1090,6 +1099,7 @@ const Index = () => {
 
     const addedLegacyBusinessField = pendingSubmission
       ? firstAddedLegacyBusinessField(pendingSubmission.order, {
+          customerCode,
           customerEmail,
           billingAddress,
           customerGroup,
@@ -1203,6 +1213,7 @@ const Index = () => {
       id: pendingSubmission?.order.id || checkoutId,
       ...submissionEmployee,
       customerName: customerName.trim(),
+      ...(includePendingField("customerCode") ? { customerCode: customerCode.trim() } : {}),
       ...(includePendingField("customerType") ? { customerType } : {}),
       ...(includePendingField("companyName") ? { companyName: companyName.trim() } : {}),
       ...(includePendingField("customerEmail") ? { customerEmail: customerEmail.trim() } : {}),
@@ -1267,6 +1278,7 @@ const Index = () => {
     let submission: PendingOrderSubmission = currentSubmission;
     if (pendingSubmission) {
       const hasLegacyPendingBusinessFields = [
+        "customerCode",
         "customerType",
         "companyName",
         "customerEmail",
@@ -1545,6 +1557,7 @@ const Index = () => {
         <CustomerSection
           phone={phone}
           customerName={customerName}
+          customerCode={customerCode}
           senderName={senderName}
           customerType={customerType}
           companyName={companyName}
@@ -1554,6 +1567,12 @@ const Index = () => {
             setPhone(v);
             clearCheckoutErrors("phone");
             const normalizedPhone = normalizePhoneNumber(v);
+            if (
+              confirmedNewCustomerPhone
+              && confirmedNewCustomerPhone !== normalizedPhone
+            ) {
+              setCustomerCode("");
+            }
             setConfirmedNewCustomerPhone((current) => (
               current && current !== normalizedPhone ? null : current
             ));
@@ -1571,6 +1590,7 @@ const Index = () => {
               detachSelectedCustomerProfile();
             }
           }}
+          onCustomerCodeChange={setCustomerCode}
           onSenderNameChange={(value) => {
             setSenderName(value);
             clearCheckoutErrors("senderName");
@@ -1606,6 +1626,7 @@ const Index = () => {
           confirmedNewCustomerPhone={confirmedNewCustomerPhone}
           onConfirmNewCustomer={(normalizedPhone) => {
             setSelectedCustomer(null);
+            setCustomerCode("");
             setConfirmedNewCustomerPhone(normalizedPhone);
             clearCheckoutErrors("phone");
           }}
