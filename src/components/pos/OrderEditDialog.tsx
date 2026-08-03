@@ -127,7 +127,7 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !saving && onOpenChange(nextOpen)}>
-      <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent className="h-[92dvh] max-h-[92dvh] max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12">
           <DialogTitle>編輯訂單 {order?.odooOrderName || ""}</DialogTitle>
           <DialogDescription>
@@ -136,7 +136,7 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
         </DialogHeader>
 
         {form && (
-          <ScrollArea className="min-h-0 flex-1">
+          <ScrollArea className="h-full min-h-0" data-testid="order-edit-scroll-area">
             <div className="space-y-5 p-5">
               {error && (
                 <div role="alert" className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">

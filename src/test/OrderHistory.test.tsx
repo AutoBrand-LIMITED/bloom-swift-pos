@@ -124,6 +124,15 @@ describe("OrderHistory delivery summary", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    expect(screen.getByRole("dialog")).toHaveClass(
+      "h-[92dvh]",
+      "grid-rows-[auto_minmax(0,1fr)_auto]",
+    );
+    const editScrollArea = screen.getByTestId("order-edit-scroll-area");
+    expect(editScrollArea).toHaveClass("h-full", "min-h-0");
+    expect(
+      editScrollArea.querySelector("[data-radix-scroll-area-viewport]"),
+    ).toHaveStyle({ overflowY: "scroll" });
     fireEvent.change(screen.getByLabelText("送貨地址 *"), {
       target: { value: "觀塘新地址" },
     });
