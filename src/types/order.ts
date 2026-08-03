@@ -86,6 +86,8 @@ export interface Order {
   odooInvoiceName?: string;
   odooPaymentId?: number;
   odooPaymentName?: string;
+  /** Odoo concurrency token used when editing an existing order. */
+  writeDate?: string;
 }
 
 export interface SalesStaff {

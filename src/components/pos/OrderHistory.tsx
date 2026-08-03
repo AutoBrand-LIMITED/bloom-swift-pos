@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertCircle, CalendarDays, ClipboardList, LoaderCircle, RefreshCw, Search, X } from "lucide-react";
+import { AlertCircle, CalendarDays, ClipboardList, LoaderCircle, Pencil, RefreshCw, Search, X } from "lucide-react";
 import PrintButtons from "@/components/pos/PrintButtons";
+import OrderEditDialog from "@/components/pos/OrderEditDialog";
 import type { PaymentStatus } from "@/types/order";
 import { orderItemTotal } from "@/lib/order-pricing";
 import type { OrderRecordView } from "@/lib/order-records";
@@ -20,6 +22,7 @@ interface OrderHistoryProps {
   stale?: boolean;
   truncated?: boolean;
   onRetry?: () => void;
+  onOrderUpdated?: () => void;
 }
 
 const statusBadge: Record<PaymentStatus, { label: string; variant: "destructive" | "default" | "secondary" }> = {
@@ -40,7 +43,9 @@ const OrderHistory = ({
   stale = false,
   truncated = false,
   onRetry,
+  onOrderUpdated,
 }: OrderHistoryProps) => {
+  const [editingOrder, setEditingOrder] = useState<OrderRecordView | null>(null);
   if (!open) return null;
   const normalizedSearch = searchQuery.trim();
   const searchNeedsMoreInput = normalizedSearch.length > 0 && normalizedSearch.length < 2;
@@ -49,10 +54,10 @@ const OrderHistory = ({
   return (
     <div className="fixed inset-0 z-50 bg-foreground/40 flex justify-end" onClick={onClose}>
       <div
-        className="w-full max-w-md bg-card border-l border-border h-full animate-in slide-in-from-right duration-300"
+        className="flex h-full w-full max-w-md flex-col overflow-hidden bg-card border-l border-border animate-in slide-in-from-right duration-300"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="shrink-0 flex items-center justify-between p-4 border-b border-border">
           <h2 className="font-semibold flex items-center gap-2">
             <ClipboardList className="w-5 h-5" />
             訂單記錄 ({orders.length})
@@ -61,7 +66,7 @@ const OrderHistory = ({
             <X className="w-5 h-5" />
           </Button>
         </div>
-        <div className="space-y-1.5 border-b border-border p-3">
+        <div className="shrink-0 space-y-1.5 border-b border-border p-3">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -94,7 +99,7 @@ const OrderHistory = ({
                 : "留空會顯示今日訂單；搜尋會跨日期查找。"}
           </p>
         </div>
-        <ScrollArea className="h-[calc(100vh-145px)]">
+        <ScrollArea className="min-h-0 flex-1" data-testid="order-history-scroll-area">
           {(loading || error || truncated) && (
             <div className="border-b border-border p-3 space-y-2">
               {loading && (
@@ -151,6 +156,7 @@ const OrderHistory = ({
                   ? `指定時間：${order.deliveryTime || "未指定"}`
                   : order.deliveryTime || "未指定時段";
                 const businessDetails = [
+                  ["落單員工", order.salesId],
                   ["公司名稱", order.companyName],
                   ["送花人", order.senderName],
                   ["收貨公司", order.recipientCompanyName],
@@ -229,6 +235,20 @@ const OrderHistory = ({
                           : "只儲存在本機，尚未同步 Odoo"}
                       </p>
                     )}
+                    {order.source === "odoo"
+                      && order.odooOrderId
+                      && order.writeDate
+                      && order.deliveryTimeMode && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-11 w-full gap-2 touch-manipulation"
+                          onClick={() => setEditingOrder(order)}
+                        >
+                          <Pencil className="h-4 w-4" /> 編輯訂單資料
+                        </Button>
+                    )}
                     <PrintButtons order={order} />
                   </div>
                 );
@@ -236,6 +256,14 @@ const OrderHistory = ({
             </div>
           )}
         </ScrollArea>
+        <OrderEditDialog
+          order={editingOrder}
+          open={Boolean(editingOrder)}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setEditingOrder(null);
+          }}
+          onSaved={() => onOrderUpdated?.()}
+        />
       </div>
     </div>
   );

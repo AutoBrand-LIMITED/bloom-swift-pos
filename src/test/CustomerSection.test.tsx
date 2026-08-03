@@ -86,6 +86,37 @@ function CustomerLookupHarness() {
   );
 }
 
+function ExistingCustomerWithoutCodeHarness() {
+  const [customerCode, setCustomerCode] = useState("");
+
+  return (
+    <CustomerSection
+      phone="67610707"
+      customerName="Jay"
+      customerCode={customerCode}
+      senderName="Jay"
+      customerType="personal"
+      companyName=""
+      {...emptyBusinessProps}
+      onPhoneChange={noop}
+      onNameChange={noop}
+      onCustomerCodeChange={setCustomerCode}
+      onSenderNameChange={noop}
+      onCustomerTypeChange={noop}
+      onCompanyNameChange={noop}
+      onCustomerSelect={selectCustomer}
+      onCustomerAndRecipientSelect={selectCustomerAndRecipient}
+      selectedCustomer={{
+        id: "odoo-42",
+        odooPartnerId: 42,
+        name: "Jay",
+        phone: "67610707",
+        history: [],
+      }}
+    />
+  );
+}
+
 describe("CustomerSection gift sender", () => {
   beforeEach(() => {
     searchOdooCustomers.mockReset();
@@ -158,6 +189,16 @@ describe("CustomerSection gift sender", () => {
       expect(screen.getByLabelText(/下單人／聯絡人/)).toHaveFocus();
     });
     expect(screen.queryByText(/系統未有此電話號碼的客戶/)).not.toBeInTheDocument();
+  });
+
+  it("lets an existing Odoo customer without a Customer ID receive one", () => {
+    render(<ExistingCustomerWithoutCodeHarness />);
+
+    const customerCodeInput = screen.getByLabelText(/補填 Customer ID/);
+    fireEvent.change(customerCodeInput, { target: { value: " EXISTING-001 " } });
+
+    expect(customerCodeInput).toHaveValue(" EXISTING-001 ");
+    expect(screen.getByText(/更新返呢個現有 Odoo 客戶/)).toBeInTheDocument();
   });
 
   it("shows required company billing fields and the email field", () => {
