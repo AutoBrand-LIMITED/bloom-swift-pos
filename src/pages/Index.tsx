@@ -15,10 +15,7 @@ import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryDock from "@/components/pos/CustomerHistoryDock";
 import OrderNotesSection, { type NotesConflictTarget } from "@/components/pos/OrderNotesSection";
 import OrderSummaryPanel from "@/components/pos/OrderSummaryPanel";
-import PosWorkflowTabs, {
-  type WorkflowSection,
-  type WorkflowSectionId,
-} from "@/components/pos/PosWorkflowTabs";
+import type { WorkflowSectionId } from "@/components/pos/PosWorkflowTabs";
 import type {
   DeliveryTimeMode,
   Order,
@@ -103,14 +100,6 @@ type RecipientSelectionDetails = Pick<
   | "deliveryAddress"
   | "shippingPartnerId"
 >;
-
-const WORKFLOW_SECTION_IDS: WorkflowSectionId[] = [
-  "customer",
-  "items",
-  "delivery",
-  "notes",
-  "payment",
-];
 
 const CUSTOMER_CHECKOUT_FIELDS: CheckoutField[] = [
   "customerName",
@@ -250,8 +239,6 @@ const Index = () => {
   const [orderRecordsTruncated, setOrderRecordsTruncated] = useState(false);
   const [orderRecordsRefreshKey, setOrderRecordsRefreshKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [activeWorkflowSection, setActiveWorkflowSection] = useState<WorkflowSectionId>("customer");
   const workflowHeaderRef = useRef<HTMLElement | null>(null);
   const workflowSectionRefs = useRef<Record<WorkflowSectionId, HTMLElement | null>>({
     customer: null,
@@ -342,8 +329,6 @@ const Index = () => {
   }, [items, deliveryFee, urgentFee]);
 
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
-  const customerErrorCount = CUSTOMER_CHECKOUT_FIELDS.filter((field) => checkoutErrors[field]).length;
-  const deliveryErrorCount = DELIVERY_CHECKOUT_FIELDS.filter((field) => checkoutErrors[field]).length;
   const customerResolutionComplete = !hasOdooBackend
     || Boolean(pendingSubmission)
     || normalizePhoneNumber(selectedCustomer?.phone || "") === normalizePhoneNumber(phone)
@@ -386,52 +371,6 @@ const Index = () => {
         )
       ),
   );
-  const notesSectionComplete = Boolean(
-    senderNote.trim()
-      || deliveryNote.trim()
-      || internalNote.trim()
-      || giftCardEnabled
-      || giftCardMessage.trim(),
-  );
-  const workflowSections: WorkflowSection[] = [
-    {
-      id: "customer",
-      label: "下單人",
-      status: customerErrorCount > 0 || (submitAttempted && !customerSectionComplete)
-        ? "error"
-        : customerSectionComplete ? "complete" : "pending",
-      errorCount: customerErrorCount || (submitAttempted && !customerSectionComplete ? 1 : 0),
-    },
-    {
-      id: "items",
-      label: "商品",
-      status: submitAttempted && !itemsSectionComplete
-        ? "error"
-        : itemsSectionComplete ? "complete" : "pending",
-      errorCount: submitAttempted && !itemsSectionComplete ? 1 : 0,
-    },
-    {
-      id: "delivery",
-      label: "收貨及送貨",
-      status: deliveryErrorCount > 0 || (submitAttempted && !deliverySectionComplete)
-        ? "error"
-        : deliverySectionComplete ? "complete" : "pending",
-      errorCount: deliveryErrorCount || (submitAttempted && !deliverySectionComplete ? 1 : 0),
-    },
-    {
-      id: "notes",
-      label: "備註及心意卡",
-      status: notesSectionComplete ? "complete" : "optional",
-    },
-    {
-      id: "payment",
-      label: "付款及確認",
-      status: submitAttempted && !paymentSectionComplete
-        ? "error"
-        : paymentSectionComplete ? "complete" : "pending",
-      errorCount: submitAttempted && !paymentSectionComplete ? 1 : 0,
-    },
-  ];
   const completedRequiredSectionCount = [
     customerSectionComplete,
     itemsSectionComplete,
@@ -441,7 +380,6 @@ const Index = () => {
   const hasSalesperson = salesId.trim().length > 0;
 
   const scrollToWorkflowSection = useCallback((sectionId: WorkflowSectionId) => {
-    setActiveWorkflowSection(sectionId);
     const target = workflowSectionRefs.current[sectionId];
     if (!target) return;
     const stickyHeaderHeight = workflowHeaderRef.current?.offsetHeight || 128;
@@ -450,33 +388,6 @@ const Index = () => {
       behavior: "smooth",
     });
   }, []);
-
-  useEffect(() => {
-    if (!hasSalesperson) return;
-    let frameId = 0;
-    const updateActiveSection = () => {
-      window.cancelAnimationFrame(frameId);
-      frameId = window.requestAnimationFrame(() => {
-        const stickyHeaderHeight = workflowHeaderRef.current?.offsetHeight || 128;
-        const activationLine = stickyHeaderHeight + 28;
-        let nextSection: WorkflowSectionId = WORKFLOW_SECTION_IDS[0];
-        for (const sectionId of WORKFLOW_SECTION_IDS) {
-          const section = workflowSectionRefs.current[sectionId];
-          if (section && section.getBoundingClientRect().top <= activationLine) {
-            nextSection = sectionId;
-          }
-        }
-        setActiveWorkflowSection((current) => current === nextSection ? current : nextSection);
-      });
-    };
-
-    updateActiveSection();
-    window.addEventListener("scroll", updateActiveSection, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", updateActiveSection);
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [hasSalesperson]);
   const pendingOwnershipMismatch = Boolean(
     posAuthRequired
       && pendingSubmission
@@ -736,8 +647,6 @@ const Index = () => {
     setCheckoutId(crypto.randomUUID());
     setPriceOverridden(false);
     setManualPrice(null);
-    setSubmitAttempted(false);
-    setActiveWorkflowSection("customer");
   }, []);
 
   const handleClearForm = useCallback(() => {
@@ -1021,7 +930,6 @@ const Index = () => {
       toast.error("請選擇已同步到 Odoo 嘅負責員工");
       return;
     }
-    setSubmitAttempted(true);
     if (
       pendingSubmission
       && !pendingOptionBindingsMatch(pendingSubmission, {
@@ -1445,13 +1353,6 @@ const Index = () => {
             )}
           </div>
         </div>
-        {hasSalesperson && (
-          <PosWorkflowTabs
-            sections={workflowSections}
-            activeSection={activeWorkflowSection}
-            onSelect={scrollToWorkflowSection}
-          />
-        )}
       </header>
 
       {/* Body: left panel + main */}
@@ -1626,7 +1527,6 @@ const Index = () => {
           confirmedNewCustomerPhone={confirmedNewCustomerPhone}
           onConfirmNewCustomer={(normalizedPhone) => {
             setSelectedCustomer(null);
-            setCustomerCode("");
             setConfirmedNewCustomerPhone(normalizedPhone);
             clearCheckoutErrors("phone");
           }}

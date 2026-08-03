@@ -202,6 +202,9 @@ describe("CustomerSection gift sender", () => {
 
     expect(await screen.findByText("Odoo timeout")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "確認新增客戶" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    })).not.toBeInTheDocument();
   });
 
   it("invalidates a confirmed new customer when the normalized phone changes", async () => {
@@ -216,6 +219,34 @@ describe("CustomerSection gift sender", () => {
     fireEvent.change(phoneInput, { target: { value: "9123 4568" } });
     expect(screen.queryByText("已確認新增此電話客戶")).not.toBeInTheDocument();
     expect(await screen.findByText(/系統未有此電話號碼的客戶/)).toBeInTheDocument();
+  });
+
+  it("confirms a missing Customer ID, preserves it, and continues phone verification", async () => {
+    searchOdooCustomers.mockResolvedValue([]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText("Customer ID／客戶編號"), {
+      target: { value: "NEW-001" },
+    });
+
+    expect(await screen.findByText(/系統未有此 Customer ID/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    }));
+
+    expect(screen.getByLabelText(/新 Customer ID/)).toHaveValue("NEW-001");
+    expect(screen.getByText(/請輸入電話並完成/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/下單人電話/)).toHaveFocus();
+    });
+
+    fireEvent.change(screen.getByLabelText(/下單人電話/), {
+      target: { value: "9123 4567" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "確認新增客戶" }));
+
+    expect(screen.getByLabelText(/新 Customer ID/)).toHaveValue("NEW-001");
+    expect(screen.getByText("已確認新增此電話客戶")).toBeInTheDocument();
   });
 
   it("searches an exact Customer ID explicitly and lists every duplicate match", async () => {
@@ -311,7 +342,7 @@ describe("CustomerSection gift sender", () => {
     expect(selectCustomerAndRecipient.mock.calls[0][0]).not.toHaveProperty("recipientMatch");
   });
 
-  it("shows Customer ID no-result only after a successful search without offering creation", async () => {
+  it("offers Customer ID creation only after a successful zero-result search", async () => {
     searchOdooCustomers.mockResolvedValue([]);
     render(<CustomerLookupHarness />);
 
@@ -319,8 +350,14 @@ describe("CustomerSection gift sender", () => {
       target: { value: "missing-id" },
     });
 
-    expect(await screen.findByText("未找到此客戶編號")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "確認新增客戶" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    })).not.toBeInTheDocument();
+
+    expect(await screen.findByText(/系統未有此 Customer ID/)).toBeInTheDocument();
+    expect(screen.getByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    })).toBeInTheDocument();
   });
 
   it("shows a Customer ID lookup error without also showing the no-result message", async () => {
@@ -334,5 +371,8 @@ describe("CustomerSection gift sender", () => {
     expect(await screen.findByText("Odoo timeout")).toBeInTheDocument();
     expect(screen.queryByText("未找到此客戶編號")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "確認新增客戶" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    })).not.toBeInTheDocument();
   });
 });
