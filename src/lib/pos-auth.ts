@@ -14,8 +14,9 @@ interface PosSessionResponse {
   employee: PosEmployeeIdentity;
 }
 
-export const posAuthRequired = Boolean(BACKEND_URL)
-  && import.meta.env.VITE_POS_AUTH_ENABLED !== "false";
+// A configured POS backend means every order must carry a signed employee
+// identity. Do not let a frontend-only build flag bypass that attribution.
+export const posAuthRequired = Boolean(BACKEND_URL);
 
 export function getPosSession(): string {
   return window.sessionStorage.getItem(SESSION_KEY) || "";

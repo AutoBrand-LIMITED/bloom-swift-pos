@@ -16,6 +16,23 @@ afterEach(() => {
 });
 
 describe("POS session authentication", () => {
+  it("requires employee authentication whenever a backend is configured", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    vi.stubEnv("VITE_POS_AUTH_ENABLED", "false");
+
+    const { posAuthRequired } = await import("@/lib/pos-auth");
+
+    expect(posAuthRequired).toBe(true);
+  });
+
+  it("allows backend-free local previews without employee authentication", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "");
+
+    const { posAuthRequired } = await import("@/lib/pos-auth");
+
+    expect(posAuthRequired).toBe(false);
+  });
+
   it("stores a server-issued session without bundling the password", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
