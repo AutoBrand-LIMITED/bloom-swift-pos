@@ -51,6 +51,7 @@ export function employeeSnapshotForSubmission(
 }
 
 const BUSINESS_FIELD_LABELS = {
+  customerCode: "Customer ID／客戶編號",
   customerEmail: "客戶電郵",
   billingAddress: "帳單地址",
   customerGroup: "客戶群組",
