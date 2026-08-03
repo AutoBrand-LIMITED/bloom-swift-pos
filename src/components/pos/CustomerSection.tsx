@@ -68,6 +68,7 @@ const CustomerSection = ({
   } | null>(null);
   const lookupRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
   const suppressNextNameDropdownRef = useRef(false);
 
@@ -211,9 +212,22 @@ const CustomerSection = ({
       && !odooError
       && customerOptions.length === 0,
   );
+  const canStartNewCustomerWithCode = Boolean(
+    hasOdooBackend
+      && activeDropdown === "customerCode"
+      && search.trim()
+      && completedCurrentSearch
+      && !odooLoading
+      && !odooError
+      && customerOptions.length === 0,
+  );
   const isNewCustomerConfirmed = Boolean(
     normalizedCurrentPhone
       && confirmedNewCustomerPhone === normalizedCurrentPhone,
+  );
+  const isNewCustomerDraft = Boolean(
+    isNewCustomerConfirmed
+      || (!selectedCustomer && customerCode.trim()),
   );
 
   const handleSelect = (c: DemoCustomer) => {
@@ -308,6 +322,26 @@ const CustomerSection = ({
                 }}
               >
                 確認新增客戶
+              </Button>
+            </>
+          ) : canStartNewCustomerWithCode ? (
+            <>
+              <p className="text-xs leading-relaxed text-foreground">
+                系統未有此 Customer ID。請先確認編號；如資料正確，可用此編號開始新增客戶。
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                className="min-h-11 w-full touch-manipulation"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onCustomerCodeChange(search.trim());
+                  setActiveDropdown(null);
+                  setSearch("");
+                  window.requestAnimationFrame(() => phoneInputRef.current?.focus());
+                }}
+              >
+                確認用此 Customer ID 新增客戶
               </Button>
             </>
           ) : (
@@ -437,7 +471,7 @@ const CustomerSection = ({
       <div className="space-y-3" ref={lookupRef}>
         <div className="space-y-1.5 relative">
           <Label htmlFor="customer-code-search" className="text-xs font-medium">
-            {isNewCustomerConfirmed
+            {isNewCustomerDraft
               ? "新 Customer ID／客戶編號（選填）"
               : "Customer ID／客戶編號"}
           </Label>
@@ -445,16 +479,16 @@ const CustomerSection = ({
             <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               id="customer-code-search"
-              placeholder={isNewCustomerConfirmed
+              placeholder={isNewCustomerDraft
                 ? "輸入新 Customer ID，落單時儲存到 Odoo"
                 : "輸入 Customer ID 搜尋客戶"}
-              value={isNewCustomerConfirmed
+              value={isNewCustomerDraft
                 ? customerCode
                 : activeDropdown === "customerCode"
                   ? search
                   : selectedCustomer?.customerCode || ""}
               onChange={(event) => {
-                if (isNewCustomerConfirmed) {
+                if (isNewCustomerDraft) {
                   onCustomerCodeChange(event.target.value);
                   return;
                 }
@@ -462,7 +496,7 @@ const CustomerSection = ({
                 setActiveDropdown("customerCode");
               }}
               onFocus={() => {
-                if (isNewCustomerConfirmed) return;
+                if (isNewCustomerDraft) return;
                 setSearch(selectedCustomer?.customerCode || "");
                 setActiveDropdown("customerCode");
               }}
@@ -471,14 +505,16 @@ const CustomerSection = ({
               autoComplete="off"
             />
           </div>
-          {isNewCustomerConfirmed ? (
+          {isNewCustomerDraft ? (
             <p className="text-[11px] text-muted-foreground">
-              呢個 Customer ID 會連同新客戶資料儲存到 Odoo；如已被使用，系統會阻止落單。
+              {isNewCustomerConfirmed
+                ? "呢個 Customer ID 會連同新客戶資料儲存到 Odoo；如已被使用，系統會阻止落單。"
+                : "已保留呢個 Customer ID；請輸入電話並完成『確認新增客戶』。"}
             </p>
           ) : (
             <>
               <p className="text-[11px] text-muted-foreground">
-                呢度用嚟搜尋現有客戶；以電話確認新增客戶後，可在同一欄設定新 Customer ID。
+                呢度用嚟搜尋現有客戶；搜尋冇結果時可確認用該 Customer ID 新增客戶。
               </p>
               {customerDropdown("customerCode")}
             </>
@@ -492,6 +528,7 @@ const CustomerSection = ({
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
+                ref={phoneInputRef}
                 id="phone"
                 placeholder="例如：9123 4567"
                 value={phone}
