@@ -5,11 +5,13 @@ import OrderHistory from "@/components/pos/OrderHistory";
 import type { OrderRecordView } from "@/lib/order-records";
 import type { Order } from "@/types/order";
 
-const { updateOdooOrderOperationalDetails } = vi.hoisted(() => ({
+const { getDeliverySlots, updateOdooOrderOperationalDetails } = vi.hoisted(() => ({
+  getDeliverySlots: vi.fn(),
   updateOdooOrderOperationalDetails: vi.fn(),
 }));
 
 vi.mock("@/lib/odoo-api", () => ({
+  getDeliverySlots,
   updateOdooOrderOperationalDetails,
 }));
 
@@ -51,6 +53,11 @@ const orderFixture = (overrides: Partial<Order> = {}): OrderRecordView => ({
 
 describe("OrderHistory delivery summary", () => {
   beforeEach(() => {
+    getDeliverySlots.mockReset();
+    getDeliverySlots.mockResolvedValue([
+      { id: 11, displayLabel: "上午 09:00-13:00", startTime: "09:00", endTime: "13:00" },
+      { id: 12, displayLabel: "下午 13:00-18:00", startTime: "13:00", endTime: "18:00" },
+    ]);
     updateOdooOrderOperationalDetails.mockReset();
   });
 
@@ -148,6 +155,58 @@ describe("OrderHistory delivery summary", () => {
       );
     });
     expect(onOrderUpdated).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows an existing order to select a different standard delivery slot", async () => {
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    await waitFor(() => expect(getDeliverySlots).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("combobox", { name: "標準送貨時段 *" }));
+    fireEvent.click(await screen.findByRole("option", { name: "下午 13:00-18:00" }));
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => {
+      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+        17,
+        expect.objectContaining({
+          deliveryTimeMode: "slot",
+          deliverySlotId: 12,
+          deliveryTime: "下午 13:00-18:00",
+        }),
+      );
+    });
+  });
+
+  it("allows switching an existing standard slot to a specified delivery time", async () => {
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "送貨時間模式 *" }));
+    fireEvent.click(screen.getByRole("option", { name: "指定時間" }));
+    fireEvent.change(screen.getByLabelText("指定送貨時間 *"), {
+      target: { value: "下午 3 時前" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => {
+      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+        17,
+        expect.objectContaining({
+          deliveryTimeMode: "specified",
+          deliverySlotId: undefined,
+          deliveryTime: "下午 3 時前",
+        }),
+      );
+    });
   });
 
   it("marks specified delivery time explicitly", () => {

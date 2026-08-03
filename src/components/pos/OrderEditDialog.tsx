@@ -24,7 +24,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { isValidPhoneNumber } from "@/lib/checkout-validation";
 import {
+  getDeliverySlots,
   updateOdooOrderOperationalDetails,
+  type DeliverySlot,
   type OrderOperationalUpdate,
 } from "@/lib/odoo-api";
 import type { OrderRecordView } from "@/lib/order-records";
@@ -71,12 +73,50 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
   const [form, setForm] = useState<OrderOperationalUpdate | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deliverySlots, setDeliverySlots] = useState<DeliverySlot[]>([]);
+  const [deliverySlotsLoading, setDeliverySlotsLoading] = useState(false);
+  const [deliverySlotsError, setDeliverySlotsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !order) return;
     setForm(formFromOrder(order));
     setError(null);
   }, [open, order]);
+
+  useEffect(() => {
+    if (!open || !order) return;
+    const controller = new AbortController();
+    setDeliverySlotsLoading(true);
+    setDeliverySlotsError(null);
+    getDeliverySlots(controller.signal)
+      .then((slots) => {
+        if (!controller.signal.aborted) setDeliverySlots(slots);
+      })
+      .catch((slotError: unknown) => {
+        if (controller.signal.aborted) return;
+        setDeliverySlotsError(
+          slotError instanceof Error ? slotError.message : "未能載入標準送貨時段",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDeliverySlotsLoading(false);
+      });
+    return () => controller.abort();
+  }, [open, order]);
+
+  const selectableDeliverySlots = [...deliverySlots];
+  if (
+    order?.deliverySlotId
+    && order.deliveryTime
+    && !selectableDeliverySlots.some((slot) => slot.id === order.deliverySlotId)
+  ) {
+    selectableDeliverySlots.unshift({
+      id: order.deliverySlotId,
+      displayLabel: order.deliveryTime,
+      startTime: "",
+      endTime: "",
+    });
+  }
 
   const setField = <K extends keyof OrderOperationalUpdate>(
     field: K,
@@ -165,12 +205,16 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                     <Select
                       value={form.deliveryTimeMode}
                       onValueChange={(value: "slot" | "specified") => {
-                        if (value === "slot" && order?.deliverySlotId) {
+                        if (value === "slot") {
+                          const selectedSlot = selectableDeliverySlots.find(
+                            (slot) => slot.id === form.deliverySlotId,
+                          ) || selectableDeliverySlots[0];
+                          if (!selectedSlot) return;
                           setForm((current) => current ? {
                             ...current,
                             deliveryTimeMode: "slot",
-                            deliverySlotId: order.deliverySlotId,
-                            deliveryTime: order.deliveryTime,
+                            deliverySlotId: selectedSlot.id,
+                            deliveryTime: selectedSlot.displayLabel,
                           } : current);
                           return;
                         }
@@ -181,19 +225,54 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                         } : current);
                       }}
                     >
-                      <SelectTrigger className="min-h-11"><SelectValue /></SelectTrigger>
+                      <SelectTrigger aria-label="送貨時間模式 *" className="min-h-11"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="slot" disabled={!order?.deliverySlotId}>原有標準時段</SelectItem>
+                        <SelectItem value="slot" disabled={selectableDeliverySlots.length === 0}>標準時段</SelectItem>
                         <SelectItem value="specified">指定時間</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <Field
-                    label="送貨時間 *"
-                    value={form.deliveryTime}
-                    onChange={(value) => setField("deliveryTime", value)}
-                    disabled={form.deliveryTimeMode === "slot"}
-                  />
+                  {form.deliveryTimeMode === "slot" ? (
+                    <div className="space-y-1.5">
+                      <Label>標準送貨時段 *</Label>
+                      <Select
+                        value={form.deliverySlotId ? String(form.deliverySlotId) : undefined}
+                        onValueChange={(value) => {
+                          const selectedSlot = selectableDeliverySlots.find(
+                            (slot) => slot.id === Number(value),
+                          );
+                          if (!selectedSlot) return;
+                          setForm((current) => current ? {
+                            ...current,
+                            deliverySlotId: selectedSlot.id,
+                            deliveryTime: selectedSlot.displayLabel,
+                          } : current);
+                        }}
+                      >
+                        <SelectTrigger aria-label="標準送貨時段 *" className="min-h-11">
+                          <SelectValue placeholder={deliverySlotsLoading ? "載入時段中..." : "選擇送貨時段"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectableDeliverySlots.map((slot) => (
+                            <SelectItem key={slot.id} value={String(slot.id)}>
+                              {slot.displayLabel}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {deliverySlotsError && (
+                        <p role="status" className="text-xs text-destructive">
+                          未能更新時段清單；仍可保留原有時段或改用指定時間。
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <Field
+                      label="指定送貨時間 *"
+                      value={form.deliveryTime}
+                      onChange={(value) => setField("deliveryTime", value)}
+                    />
+                  )}
                   <Field label="負責送貨同事" value={form.deliveryPerson} onChange={(value) => setField("deliveryPerson", value)} />
                 </div>
                 <TextField label="送貨地址 *" value={form.deliveryAddress} onChange={(value) => setField("deliveryAddress", value)} />
@@ -266,13 +345,11 @@ const Field = ({
   value,
   onChange,
   type = "text",
-  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
-  disabled?: boolean;
 }) => (
   <div className="space-y-1.5">
     <Label>{label}</Label>
@@ -281,7 +358,6 @@ const Field = ({
       type={type}
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      disabled={disabled}
       className="min-h-11"
     />
   </div>
