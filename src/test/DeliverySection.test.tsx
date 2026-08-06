@@ -144,6 +144,40 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onRecipientSuggestionSelect).toHaveBeenCalledWith(suggestion);
   });
 
+  it("searches historical recipients by recipient company name", async () => {
+    const suggestion = {
+      id: 92,
+      recipientType: "company" as const,
+      recipientCompanyName: "Flower Trading Limited",
+      recipientName: "Ms Lee",
+      recipientPhone: "6123 4567",
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      shippingPartnerId: 47,
+      orderingCustomerId: null,
+      orderingCustomerName: null,
+      orderingCustomerPhone: null,
+      orderingCustomerEmail: null,
+      orderingCustomerBillingAddress: null,
+    };
+    recipientSearchMocks.searchOdooRecipients.mockResolvedValue([suggestion]);
+    const props = renderSection({
+      recipientType: "company",
+      recipientCompanyName: "Flower",
+    });
+
+    fireEvent.focus(screen.getByLabelText(/收貨公司名稱/));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+
+    expect(recipientSearchMocks.searchOdooRecipients).toHaveBeenCalledWith(
+      "Flower",
+      expect.any(AbortSignal),
+    );
+    fireEvent.click(screen.getByRole("option", { name: /Flower Trading Limited/ }));
+    expect(props.onRecipientSuggestionSelect).toHaveBeenCalledWith(suggestion);
+  });
+
   it("shows the linked ordering customer and supports combined or recipient-only apply", async () => {
     const suggestion = {
       id: 91,

@@ -11,7 +11,7 @@ import { hasOdooBackend, searchOdooCustomers } from "@/lib/odoo-api";
 import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/checkout-validation";
 
 export type CustomerType = "personal" | "company";
-type CustomerLookupSource = "phone" | "name" | "customerCode";
+type CustomerLookupSource = "phone" | "name" | "email" | "customerCode";
 
 interface CustomerSectionProps {
   phone: string;
@@ -95,6 +95,7 @@ const CustomerSection = ({
     const normalizedCustomerPhone = c.phone.replace(/\D/g, "");
     return (
       c.name.toLowerCase().includes(search.toLowerCase()) ||
+      Boolean(c.email?.toLowerCase().includes(search.toLowerCase())) ||
       c.phone.includes(search) ||
       Boolean(normalizedSearchPhone && normalizedCustomerPhone.includes(normalizedSearchPhone))
     );
@@ -110,9 +111,11 @@ const CustomerSection = ({
     const canSearch =
       activeDropdown === "phone"
         ? normalizedDebouncedPhone.length >= 4
-        : activeDropdown === "customerCode"
-          ? trimmed.length >= 1
-          : trimmed.length >= 2;
+        : activeDropdown === "email"
+          ? trimmed.includes("@") && trimmed.length >= 3
+          : activeDropdown === "customerCode"
+            ? trimmed.length >= 1
+            : trimmed.length >= 2;
 
     if (!activeDropdown || !hasOdooBackend || !canSearch) {
       setOdooCustomers([]);
@@ -169,7 +172,10 @@ const CustomerSection = ({
     const visibleOdooCustomers = completedCurrentSearch
       ? odooCustomers
       : [];
-    const visibleLocalCustomers = activeDropdown === "customerCode" ? [] : filtered;
+    const visibleLocalCustomers = activeDropdown === "customerCode"
+      || (activeDropdown === "email" && !search.trim())
+      ? []
+      : filtered;
 
     for (const c of [...visibleOdooCustomers, ...visibleLocalCustomers]) {
       const key = customerIdentityKey(c);
@@ -179,15 +185,17 @@ const CustomerSection = ({
     }
 
     return options;
-  }, [activeDropdown, completedCurrentSearch, filtered, odooCustomers]);
+  }, [activeDropdown, completedCurrentSearch, filtered, odooCustomers, search]);
 
   const searchHint =
     sourceRequiresMoreInput(activeDropdown, search)
       ? activeDropdown === "phone"
         ? "輸入至少 4 個電話數字搜尋 Odoo 客戶"
-        : activeDropdown === "customerCode"
-          ? "輸入客戶編號搜尋 Odoo 客戶"
-          : "輸入至少 2 個字搜尋下單人或收件人"
+        : activeDropdown === "email"
+          ? "輸入完整電郵地址搜尋 Odoo 客戶"
+          : activeDropdown === "customerCode"
+            ? "輸入客戶編號搜尋 Odoo 客戶"
+            : "輸入至少 2 個字搜尋下單人或收件人"
       : completedCurrentSearch
         ? activeDropdown === "customerCode"
           ? "未找到此客戶編號"
@@ -268,6 +276,9 @@ const CustomerSection = ({
         <span className="text-xs text-muted-foreground ml-2 font-mono break-all">
           {c.phone || "沒有電話"}
         </span>
+        {c.email && (
+          <p className="mt-1 break-all text-[11px] text-muted-foreground">{c.email}</p>
+        )}
         {c.recipientMatch && (
           <p className="mt-1 text-[11px] text-primary">
             配對收件人：
@@ -295,13 +306,16 @@ const CustomerSection = ({
   );
 
   const customerDropdown = (source: CustomerLookupSource) => activeDropdown === source && (
-    <div className={`absolute z-50 top-full mt-1 sm:w-[calc(200%+0.75rem)] bg-card border border-border rounded-lg shadow-lg overflow-hidden ${
+    <div
+      id={`customer-${source}-results`}
+      className={`absolute z-50 top-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden ${
       source === "name"
-        ? "left-0 right-0 sm:left-auto sm:right-0"
-        : source === "customerCode"
+        ? "left-0 right-0 sm:left-auto sm:right-0 sm:w-[calc(200%+0.75rem)]"
+        : source === "customerCode" || source === "email"
           ? "left-0 right-0 sm:w-full"
-          : "left-0 right-0"
-    }`}>
+          : "left-0 right-0 sm:w-[calc(200%+0.75rem)]"
+      }`}
+    >
       {odooLoading ? (
         <p className="text-xs text-muted-foreground p-3">正在搜尋 Odoo 客戶及收件人...</p>
       ) : customerOptions.length === 0 ? (
@@ -623,9 +637,8 @@ const CustomerSection = ({
             )}
           </div>
         </div>
-      </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 relative">
         <Label htmlFor="customer-email" className="text-xs font-medium flex items-center gap-1.5">
           <Mail className="h-3.5 w-3.5" />
           客戶電郵
@@ -636,15 +649,30 @@ const CustomerSection = ({
           inputMode="email"
           placeholder="例如：accounts@example.com"
           value={customerEmail}
-          onChange={(event) => onCustomerEmailChange(event.target.value)}
+          onChange={(event) => {
+            const nextEmail = event.target.value;
+            onCustomerEmailChange(nextEmail);
+            setSearch(nextEmail);
+            setActiveDropdown("email");
+          }}
+          onFocus={() => {
+            setSearch(customerEmail);
+            setActiveDropdown("email");
+          }}
           className={`text-base ${customerEmailError ? "border-destructive ring-1 ring-destructive" : ""}`}
           maxLength={254}
+          autoComplete="off"
+          aria-autocomplete="list"
+          aria-controls={activeDropdown === "email" ? "customer-email-results" : undefined}
+          aria-expanded={activeDropdown === "email"}
           aria-invalid={Boolean(customerEmailError)}
           aria-describedby={customerEmailError ? "customer-email-error" : undefined}
         />
+        {customerDropdown("email")}
         {customerEmailError && (
           <p id="customer-email-error" role="alert" className="text-xs text-destructive">{customerEmailError}</p>
         )}
+      </div>
       </div>
 
       <div className="space-y-1.5">
@@ -688,6 +716,7 @@ function sourceRequiresMoreInput(source: CustomerLookupSource | null, value: str
   if (!source) return false;
   const trimmed = value.trim();
   if (source === "phone") return trimmed.replace(/\D/g, "").length < 4;
+  if (source === "email") return !trimmed.includes("@") || trimmed.length < 3;
   if (source === "customerCode") return trimmed.length < 1;
   return trimmed.length < 2;
 }

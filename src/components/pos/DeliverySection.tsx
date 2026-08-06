@@ -85,6 +85,7 @@ interface DeliverySectionProps {
 }
 
 const RECIPIENT_SUGGESTION_CACHE_LIMIT = 100;
+type RecipientLookupField = "company" | "name" | "phone";
 
 const DeliverySection = ({
   deliveryDate, deliveryTime, deliveryTimeMode, deliverySlotId,
@@ -122,13 +123,13 @@ const DeliverySection = ({
   const [addressCompositionActive, setAddressCompositionActive] = useState(false);
   const [addressAutocompleteDirty, setAddressAutocompleteDirty] = useState(false);
   const [authorizedMapSignature, setAuthorizedMapSignature] = useState<string | null>(null);
-  const [recipientLookupField, setRecipientLookupField] = useState<"name" | "phone" | null>(null);
+  const [recipientLookupField, setRecipientLookupField] = useState<RecipientLookupField | null>(null);
   const [debouncedRecipientQuery, setDebouncedRecipientQuery] = useState("");
   const [recipientSuggestions, setRecipientSuggestions] = useState<RecipientSuggestion[]>([]);
   const [recipientSuggestionsLoading, setRecipientSuggestionsLoading] = useState(false);
   const [recipientSuggestionsError, setRecipientSuggestionsError] = useState<string | null>(null);
   const [completedRecipientSearch, setCompletedRecipientSearch] = useState<{
-    field: "name" | "phone";
+    field: RecipientLookupField;
     query: string;
   } | null>(null);
   const lastManualAddressSignatureRef = useRef<string | null>(null);
@@ -190,11 +191,13 @@ const DeliverySection = ({
       ? "specified"
       : "";
   const activeRecipientQuery = (
-    recipientLookupField === "name"
-      ? recipientName
-      : recipientLookupField === "phone"
-        ? recipientPhone
-        : ""
+    recipientLookupField === "company"
+      ? recipientCompanyName
+      : recipientLookupField === "name"
+        ? recipientName
+        : recipientLookupField === "phone"
+          ? recipientPhone
+          : ""
   ).trim();
   const completedCurrentRecipientSearch = completedRecipientSearch?.field === recipientLookupField
     && completedRecipientSearch.query === activeRecipientQuery;
@@ -404,15 +407,19 @@ const DeliverySection = ({
       )}
     </>
   );
-  const recipientDropdown = (field: "name" | "phone") => {
+  const recipientDropdown = (field: RecipientLookupField) => {
     if (recipientLookupField !== field) return null;
     return (
       <div
         id={recipientListboxId}
         role="listbox"
         aria-label="過往收貨人搜尋結果"
-        className={`absolute z-50 top-full mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-card shadow-lg sm:w-[calc(200%+0.75rem)] ${
-          field === "phone" ? "left-0 right-0 sm:left-auto sm:right-0" : "left-0 right-0"
+        className={`absolute z-50 top-full mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-card shadow-lg ${
+          field === "company"
+            ? "left-0 right-0 sm:w-full"
+            : field === "phone"
+              ? "left-0 right-0 sm:left-auto sm:right-0 sm:w-[calc(200%+0.75rem)]"
+              : "left-0 right-0 sm:w-[calc(200%+0.75rem)]"
         }`}
       >
         {recipientSuggestionsLoading ? (
@@ -420,7 +427,7 @@ const DeliverySection = ({
         ) : recipientSuggestionsError ? (
           <p className="p-3 text-xs text-destructive">{recipientSuggestionsError}</p>
         ) : !activeRecipientQuery ? (
-          <p className="p-3 text-xs text-muted-foreground">輸入姓名或電話搜尋過往收貨人</p>
+          <p className="p-3 text-xs text-muted-foreground">輸入公司、姓名或電話搜尋過往收貨人</p>
         ) : visibleRecipientSuggestions.length === 0 ? (
           <p className="p-3 text-xs text-muted-foreground">
             {completedCurrentRecipientSearch ? "未找到過往收貨人" : "正在準備搜尋..."}
@@ -813,7 +820,7 @@ const DeliverySection = ({
       </div>
 
       {/* Recipient info */}
-      <div className="space-y-3 border-t border-border pt-3">
+      <div ref={recipientLookupRef} className="space-y-3 border-t border-border pt-3">
         <div className="space-y-1.5">
           <Label className="text-xs">收貨人類型</Label>
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="收貨人類型">
@@ -843,7 +850,7 @@ const DeliverySection = ({
         </div>
 
         {recipientType === "company" && (
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <Label htmlFor="recipient-company-name" className="flex items-center gap-1 text-xs">
               <Building2 className="h-3.5 w-3.5" /> 收貨公司名稱
               <span className="text-destructive">*</span>
@@ -852,13 +859,22 @@ const DeliverySection = ({
               id="recipient-company-name"
               placeholder="輸入收貨公司名稱"
               value={recipientCompanyName}
-              onChange={(e) => onRecipientCompanyNameChange(e.target.value)}
+              onChange={(e) => {
+                onRecipientCompanyNameChange(e.target.value);
+                setRecipientLookupField("company");
+              }}
+              onFocus={() => setRecipientLookupField("company")}
               className={`text-sm ${recipientCompanyNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
               maxLength={200}
               required
+              autoComplete="off"
+              aria-autocomplete="list"
+              aria-controls={recipientLookupField === "company" ? recipientListboxId : undefined}
+              aria-expanded={recipientLookupField === "company"}
               aria-invalid={Boolean(recipientCompanyNameError)}
               aria-describedby={recipientCompanyNameError ? "recipient-company-name-error" : undefined}
             />
+            {recipientDropdown("company")}
             {recipientCompanyNameError && (
               <p id="recipient-company-name-error" role="alert" className="text-xs font-medium text-destructive">
                 {recipientCompanyNameError}
@@ -867,7 +883,7 @@ const DeliverySection = ({
           </div>
         )}
 
-        <div ref={recipientLookupRef} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="relative space-y-1">
           <Label htmlFor="recipient-name" className="text-xs flex items-center gap-1">
             <User className="w-3.5 h-3.5" /> 收貨人姓名／聯絡人姓名
