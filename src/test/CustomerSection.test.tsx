@@ -54,6 +54,7 @@ function CustomerLookupHarness() {
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerCode, setCustomerCode] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [confirmedPhone, setConfirmedPhone] = useState<string | null>(null);
 
   return (
@@ -65,6 +66,8 @@ function CustomerLookupHarness() {
       customerType="personal"
       companyName=""
       {...emptyBusinessProps}
+      customerEmail={customerEmail}
+      onCustomerEmailChange={setCustomerEmail}
       onPhoneChange={(value) => {
         setPhone(value);
         const normalized = normalizePhoneNumber(value);
@@ -231,6 +234,33 @@ describe("CustomerSection gift sender", () => {
     expect(screen.getByLabelText(/公司名稱/)).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText(/帳單地址/)).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText(/客戶電郵/)).toHaveValue("accounts@example.com");
+  });
+
+  it("searches Odoo customers by email and applies the matching customer", async () => {
+    const customer = {
+      id: "odoo-88",
+      odooPartnerId: 88,
+      name: "Accounts Contact",
+      phone: "91234567",
+      email: "accounts@gmail.com",
+      history: [],
+    };
+    searchOdooCustomers.mockResolvedValue([customer]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText(/客戶電郵/), {
+      target: { value: "accounts@gmail.com" },
+    });
+
+    expect(await screen.findByText("Accounts Contact")).toBeVisible();
+    expect(searchOdooCustomers).toHaveBeenCalledWith(
+      "accounts@gmail.com",
+      expect.any(AbortSignal),
+      "general",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Accounts Contact/ }));
+    expect(selectCustomer).toHaveBeenCalledWith(customer);
   });
 
   it("does not offer new-customer confirmation when the Odoo search fails", async () => {
