@@ -6,6 +6,7 @@ import {
   UNSYNCED_ORDERS_KEY,
   loadUnsyncedOrders,
   mergeOrderRecords,
+  orderMatchesSearch,
   removeSyncedLocalOrders,
 } from "@/lib/order-records";
 import type { Order } from "@/types/order";
@@ -94,6 +95,26 @@ describe("order record sources", () => {
 
     expect(removeSyncedLocalOrders([synced], [order("same"), unsynced])).toEqual([unsynced]);
     expect(removeSyncedLocalOrders([], [order("same"), unsynced])).toHaveLength(2);
+  });
+
+  it("matches local orders by email, sender, delivery address, recipient, and formatted phone", () => {
+    const record = order("searchable", {
+      senderName: "Director Lee",
+      customerEmail: "accounts@example.com",
+      billingAddress: "1 Flower Market Road",
+      deliveryAddress: "香港中環皇后大道 66 號",
+      recipientCompanyName: "Recipient Limited",
+      recipientName: "陳小姐",
+      recipientPhone: "+852 6123 4567",
+    });
+
+    expect(orderMatchesSearch(record, "accounts@example.com")).toBe(true);
+    expect(orderMatchesSearch(record, "director lee")).toBe(true);
+    expect(orderMatchesSearch(record, "皇后大道")).toBe(true);
+    expect(orderMatchesSearch(record, "Recipient Limited")).toBe(true);
+    expect(orderMatchesSearch(record, "陳小姐")).toBe(true);
+    expect(orderMatchesSearch(record, "61234567")).toBe(true);
+    expect(orderMatchesSearch(record, "not present")).toBe(false);
   });
 
   it("migrates only unsynced legacy orders into durable local storage", () => {

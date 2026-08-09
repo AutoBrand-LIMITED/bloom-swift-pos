@@ -16,6 +16,7 @@ vi.mock("@/lib/odoo-api", () => ({
 
 const noop = vi.fn();
 const selectCustomer = vi.fn();
+const selectCustomerAndRecipient = vi.fn();
 const emptyBusinessProps = {
   customerEmail: "",
   billingAddress: "",
@@ -25,21 +26,25 @@ const emptyBusinessProps = {
 
 function Harness() {
   const [senderName, setSenderName] = useState("");
+  const [customerCode, setCustomerCode] = useState("");
 
   return (
     <CustomerSection
       phone="9123 4567"
       customerName="Secretary Chan"
+      customerCode={customerCode}
       senderName={senderName}
       customerType="personal"
       companyName=""
       {...emptyBusinessProps}
       onPhoneChange={noop}
       onNameChange={noop}
+      onCustomerCodeChange={setCustomerCode}
       onSenderNameChange={setSenderName}
       onCustomerTypeChange={noop}
       onCompanyNameChange={noop}
       onCustomerSelect={selectCustomer}
+      onCustomerAndRecipientSelect={selectCustomerAndRecipient}
       selectedCustomer={null}
     />
   );
@@ -48,16 +53,21 @@ function Harness() {
 function CustomerLookupHarness() {
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerCode, setCustomerCode] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [confirmedPhone, setConfirmedPhone] = useState<string | null>(null);
 
   return (
     <CustomerSection
       phone={phone}
       customerName={customerName}
+      customerCode={customerCode}
       senderName=""
       customerType="personal"
       companyName=""
       {...emptyBusinessProps}
+      customerEmail={customerEmail}
+      onCustomerEmailChange={setCustomerEmail}
       onPhoneChange={(value) => {
         setPhone(value);
         const normalized = normalizePhoneNumber(value);
@@ -66,13 +76,46 @@ function CustomerLookupHarness() {
         ));
       }}
       onNameChange={setCustomerName}
+      onCustomerCodeChange={setCustomerCode}
       onSenderNameChange={noop}
       onCustomerTypeChange={noop}
       onCompanyNameChange={noop}
       onCustomerSelect={selectCustomer}
+      onCustomerAndRecipientSelect={selectCustomerAndRecipient}
       selectedCustomer={null}
       confirmedNewCustomerPhone={confirmedPhone}
       onConfirmNewCustomer={setConfirmedPhone}
+    />
+  );
+}
+
+function ExistingCustomerWithoutCodeHarness() {
+  const [customerCode, setCustomerCode] = useState("");
+
+  return (
+    <CustomerSection
+      phone="67610707"
+      customerName="Jay"
+      customerCode={customerCode}
+      senderName="Jay"
+      customerType="personal"
+      companyName=""
+      {...emptyBusinessProps}
+      onPhoneChange={noop}
+      onNameChange={noop}
+      onCustomerCodeChange={setCustomerCode}
+      onSenderNameChange={noop}
+      onCustomerTypeChange={noop}
+      onCompanyNameChange={noop}
+      onCustomerSelect={selectCustomer}
+      onCustomerAndRecipientSelect={selectCustomerAndRecipient}
+      selectedCustomer={{
+        id: "odoo-42",
+        odooPartnerId: 42,
+        name: "Jay",
+        phone: "67610707",
+        history: [],
+      }}
     />
   );
 }
@@ -81,6 +124,7 @@ describe("CustomerSection gift sender", () => {
   beforeEach(() => {
     searchOdooCustomers.mockReset();
     selectCustomer.mockReset();
+    selectCustomerAndRecipient.mockReset();
   });
 
   it("keeps the ordering customer and gift sender as separate inputs", () => {
@@ -100,16 +144,19 @@ describe("CustomerSection gift sender", () => {
       <CustomerSection
         phone=""
         customerName=""
+        customerCode=""
         senderName=""
         customerType="personal"
         companyName=""
         {...emptyBusinessProps}
         onPhoneChange={noop}
         onNameChange={noop}
+        onCustomerCodeChange={noop}
         onSenderNameChange={noop}
         onCustomerTypeChange={noop}
         onCompanyNameChange={noop}
         onCustomerSelect={noop}
+        onCustomerAndRecipientSelect={noop}
         phoneError="請輸入下單人電話"
         customerNameError="請輸入下單人／聯絡人名稱"
         senderNameError="請輸入送花人名稱"
@@ -137,10 +184,24 @@ describe("CustomerSection gift sender", () => {
     fireEvent.click(confirmButton);
 
     expect(screen.getByText("已確認新增此電話客戶")).toBeInTheDocument();
+    const newCustomerCode = screen.getByLabelText(/新 Customer ID/);
+    fireEvent.change(newCustomerCode, { target: { value: " NEW-001 " } });
+    expect(newCustomerCode).toHaveValue(" NEW-001 ");
+    expect(screen.getByText(/連同新客戶資料儲存到 Odoo/)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByLabelText(/下單人／聯絡人/)).toHaveFocus();
     });
     expect(screen.queryByText(/系統未有此電話號碼的客戶/)).not.toBeInTheDocument();
+  });
+
+  it("lets an existing Odoo customer without a Customer ID receive one", () => {
+    render(<ExistingCustomerWithoutCodeHarness />);
+
+    const customerCodeInput = screen.getByLabelText(/補填 Customer ID/);
+    fireEvent.change(customerCodeInput, { target: { value: " EXISTING-001 " } });
+
+    expect(customerCodeInput).toHaveValue(" EXISTING-001 ");
+    expect(screen.getByText(/更新返呢個現有 Odoo 客戶/)).toBeInTheDocument();
   });
 
   it("shows required company billing fields and the email field", () => {
@@ -148,6 +209,7 @@ describe("CustomerSection gift sender", () => {
       <CustomerSection
         phone="91234567"
         customerName="Company Contact"
+        customerCode=""
         senderName="Company Contact"
         customerType="company"
         companyName=""
@@ -155,12 +217,14 @@ describe("CustomerSection gift sender", () => {
         billingAddress=""
         onPhoneChange={noop}
         onNameChange={noop}
+        onCustomerCodeChange={noop}
         onSenderNameChange={noop}
         onCustomerTypeChange={noop}
         onCompanyNameChange={noop}
         onCustomerEmailChange={noop}
         onBillingAddressChange={noop}
         onCustomerSelect={noop}
+        onCustomerAndRecipientSelect={noop}
         companyNameError="公司客戶必須輸入公司名稱"
         billingAddressError="公司客戶必須輸入帳單地址"
         selectedCustomer={null}
@@ -170,6 +234,33 @@ describe("CustomerSection gift sender", () => {
     expect(screen.getByLabelText(/公司名稱/)).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText(/帳單地址/)).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText(/客戶電郵/)).toHaveValue("accounts@example.com");
+  });
+
+  it("searches Odoo customers by email and applies the matching customer", async () => {
+    const customer = {
+      id: "odoo-88",
+      odooPartnerId: 88,
+      name: "Accounts Contact",
+      phone: "91234567",
+      email: "accounts@gmail.com",
+      history: [],
+    };
+    searchOdooCustomers.mockResolvedValue([customer]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText(/客戶電郵/), {
+      target: { value: "accounts@gmail.com" },
+    });
+
+    expect(await screen.findByText("Accounts Contact")).toBeVisible();
+    expect(searchOdooCustomers).toHaveBeenCalledWith(
+      "accounts@gmail.com",
+      expect.any(AbortSignal),
+      "general",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Accounts Contact/ }));
+    expect(selectCustomer).toHaveBeenCalledWith(customer);
   });
 
   it("does not offer new-customer confirmation when the Odoo search fails", async () => {
@@ -182,6 +273,9 @@ describe("CustomerSection gift sender", () => {
 
     expect(await screen.findByText("Odoo timeout")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "確認新增客戶" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    })).not.toBeInTheDocument();
   });
 
   it("invalidates a confirmed new customer when the normalized phone changes", async () => {
@@ -196,6 +290,34 @@ describe("CustomerSection gift sender", () => {
     fireEvent.change(phoneInput, { target: { value: "9123 4568" } });
     expect(screen.queryByText("已確認新增此電話客戶")).not.toBeInTheDocument();
     expect(await screen.findByText(/系統未有此電話號碼的客戶/)).toBeInTheDocument();
+  });
+
+  it("confirms a missing Customer ID, preserves it, and continues phone verification", async () => {
+    searchOdooCustomers.mockResolvedValue([]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText("Customer ID／客戶編號"), {
+      target: { value: "NEW-001" },
+    });
+
+    expect(await screen.findByText(/系統未有此 Customer ID/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    }));
+
+    expect(screen.getByLabelText(/新 Customer ID/)).toHaveValue("NEW-001");
+    expect(screen.getByText(/請輸入電話並完成/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/下單人電話/)).toHaveFocus();
+    });
+
+    fireEvent.change(screen.getByLabelText(/下單人電話/), {
+      target: { value: "9123 4567" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "確認新增客戶" }));
+
+    expect(screen.getByLabelText(/新 Customer ID/)).toHaveValue("NEW-001");
+    expect(screen.getByText("已確認新增此電話客戶")).toBeInTheDocument();
   });
 
   it("searches an exact Customer ID explicitly and lists every duplicate match", async () => {
@@ -239,7 +361,59 @@ describe("CustomerSection gift sender", () => {
     }));
   });
 
-  it("shows Customer ID no-result only after a successful search without offering creation", async () => {
+  it("offers matching actions for a linked ordering customer and recipient", async () => {
+    searchOdooCustomers.mockResolvedValue([
+      {
+        id: "odoo-41",
+        odooPartnerId: 41,
+        name: "Customer One",
+        phone: "91234567",
+        history: [],
+        recipientMatch: {
+          name: "Mary Wong",
+          phone: "6111 1111",
+          resolved: true,
+          deliveryAddress: "九龍觀塘巧明街 6 號",
+          shippingPartnerId: 45,
+        },
+      },
+      {
+        id: "odoo-42",
+        odooPartnerId: 42,
+        name: "Customer Two",
+        phone: "92345678",
+        history: [],
+        recipientMatch: { name: "Mary Wong", phone: "6111 1111", resolved: true },
+      },
+    ]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText(/下單人／聯絡人/), {
+      target: { value: "Mary Wong" },
+    });
+
+    expect(await screen.findByText("Customer One")).toBeInTheDocument();
+    expect(screen.getByText("Customer Two")).toBeInTheDocument();
+    expect(screen.getAllByText("配對收件人：Mary Wong · 6111 1111")).toHaveLength(2);
+    expect(searchOdooCustomers).toHaveBeenCalledWith(
+      "Mary Wong",
+      expect.any(AbortSignal),
+      "general",
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Customer Two/ })[0]);
+    expect(selectCustomerAndRecipient).toHaveBeenCalledWith(expect.objectContaining({
+      odooPartnerId: 42,
+      name: "Customer Two",
+      phone: "92345678",
+    }), expect.objectContaining({
+      name: "Mary Wong",
+      phone: "6111 1111",
+    }));
+    expect(selectCustomerAndRecipient.mock.calls[0][0]).not.toHaveProperty("recipientMatch");
+  });
+
+  it("offers Customer ID creation only after a successful zero-result search", async () => {
     searchOdooCustomers.mockResolvedValue([]);
     render(<CustomerLookupHarness />);
 
@@ -247,8 +421,14 @@ describe("CustomerSection gift sender", () => {
       target: { value: "missing-id" },
     });
 
-    expect(await screen.findByText("未找到此客戶編號")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "確認新增客戶" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    })).not.toBeInTheDocument();
+
+    expect(await screen.findByText(/系統未有此 Customer ID/)).toBeInTheDocument();
+    expect(screen.getByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    })).toBeInTheDocument();
   });
 
   it("shows a Customer ID lookup error without also showing the no-result message", async () => {
@@ -262,5 +442,8 @@ describe("CustomerSection gift sender", () => {
     expect(await screen.findByText("Odoo timeout")).toBeInTheDocument();
     expect(screen.queryByText("未找到此客戶編號")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "確認新增客戶" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {
+      name: "確認用此 Customer ID 新增客戶",
+    })).not.toBeInTheDocument();
   });
 });

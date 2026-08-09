@@ -14,6 +14,17 @@ export interface DemoCustomer {
   commentText?: string;
   tags?: CustomerTag[];
   writeDate?: string;
+  recipientMatch?: RecipientSearchMatch;
+}
+
+export interface RecipientSearchMatch {
+  name?: string;
+  phone?: string;
+  resolved?: boolean;
+  recipientType?: "personal" | "company";
+  companyName?: string;
+  deliveryAddress?: string;
+  shippingPartnerId?: number;
 }
 
 export interface CustomerTag {

@@ -14,6 +14,8 @@ import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryDock from "@/components/pos/CustomerHistoryDock";
 import OrderNotesSection, { type NotesConflictTarget } from "@/components/pos/OrderNotesSection";
+import OrderSummaryPanel from "@/components/pos/OrderSummaryPanel";
+import type { WorkflowSectionId } from "@/components/pos/PosWorkflowTabs";
 import type {
   DeliveryTimeMode,
   Order,
@@ -48,8 +50,10 @@ import {
 } from "@/lib/pending-submission";
 import {
   getDeliverySlots,
+  getOdooCustomer,
   getOdooPartnerNotes,
   getOdooOrderRecords,
+  searchOdooOrderRecords,
   getAccountingPaymentOptions,
   allowLocalOnlyOrders,
   hasOdooBackend,
@@ -59,6 +63,7 @@ import {
   type AccountingPaymentOption,
   type DeliverySlot,
   type PartnerNoteRecord,
+  type RecipientSuggestion,
 } from "@/lib/odoo-api";
 import {
   DEMO_DELIVERY_SLOTS,
@@ -67,6 +72,9 @@ import {
 import {
   validateCheckout,
   validatePositiveOrderTotal,
+  isValidDeliveryDate,
+  isValidEmailAddress,
+  isValidPhoneNumber,
   normalizePhoneNumber,
   type CheckoutErrors,
   type CheckoutField,
@@ -78,9 +86,38 @@ import {
   hongKongBusinessDate,
   loadUnsyncedOrders,
   mergeOrderRecords,
+  orderMatchesSearch,
   removeSyncedLocalOrders,
   saveUnsyncedOrders,
 } from "@/lib/order-records";
+
+type RecipientSelectionDetails = Pick<
+  RecipientSuggestion,
+  | "recipientType"
+  | "recipientCompanyName"
+  | "recipientName"
+  | "recipientPhone"
+  | "deliveryAddress"
+  | "shippingPartnerId"
+>;
+
+const CUSTOMER_CHECKOUT_FIELDS: CheckoutField[] = [
+  "customerName",
+  "phone",
+  "senderName",
+  "companyName",
+  "customerEmail",
+  "billingAddress",
+];
+
+const DELIVERY_CHECKOUT_FIELDS: CheckoutField[] = [
+  "recipientCompanyName",
+  "recipientName",
+  "recipientPhone",
+  "deliveryAddress",
+  "deliveryDate",
+  "deliveryTime",
+];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -102,6 +139,7 @@ const Index = () => {
   // Customer
   const [phone, setPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerCode, setCustomerCode] = useState("");
   const [senderName, setSenderName] = useState("");
   const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
   const [companyName, setCompanyName] = useState("");
@@ -118,6 +156,7 @@ const Index = () => {
   const [customerHistoryOpen, setCustomerHistoryOpen] = useState(true);
   const [confirmedNewCustomerPhone, setConfirmedNewCustomerPhone] = useState<string | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
+  const linkedPartySelectionRequestRef = useRef(0);
 
   // Items
   const [budget, setBudget] = useState(0);
@@ -190,27 +229,79 @@ const Index = () => {
   // History
   const [localOrders, setLocalOrders] = useState<Order[]>(loadUnsyncedOrders);
   const [remoteOrders, setRemoteOrders] = useState<Order[]>([]);
+  const [remoteOrdersQuery, setRemoteOrdersQuery] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [debouncedOrderSearchQuery, setDebouncedOrderSearchQuery] = useState("");
   const [orderRecordsLoading, setOrderRecordsLoading] = useState(false);
   const [orderRecordsLoaded, setOrderRecordsLoaded] = useState(!hasOdooBackend);
   const [orderRecordsError, setOrderRecordsError] = useState<string | null>(null);
   const [orderRecordsTruncated, setOrderRecordsTruncated] = useState(false);
   const [orderRecordsRefreshKey, setOrderRecordsRefreshKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const workflowHeaderRef = useRef<HTMLElement | null>(null);
+  const workflowSectionRefs = useRef<Record<WorkflowSectionId, HTMLElement | null>>({
+    customer: null,
+    items: null,
+    delivery: null,
+    notes: null,
+    payment: null,
+  });
 
-  const visibleOrderRecords = useMemo(
-    () => mergeOrderRecords(remoteOrders, localOrders, employeePendingSubmission?.order),
-    [employeePendingSubmission, localOrders, remoteOrders],
-  );
+  const normalizedOrderSearchQuery = orderSearchQuery.trim();
+  const orderSearchActive = normalizedOrderSearchQuery.length >= 2;
+  const visibleOrderRecords = useMemo(() => {
+    if (normalizedOrderSearchQuery && !orderSearchActive) return [];
+    const matchingLocalOrders = orderSearchActive
+      ? localOrders.filter((order) => orderMatchesSearch(order, normalizedOrderSearchQuery))
+      : localOrders;
+    const matchingPendingOrder = employeePendingSubmission?.order
+      && (!orderSearchActive
+        || orderMatchesSearch(employeePendingSubmission.order, normalizedOrderSearchQuery))
+      ? employeePendingSubmission.order
+      : undefined;
+    const matchingRemoteOrders = remoteOrdersQuery === normalizedOrderSearchQuery
+      ? remoteOrders
+      : [];
+    return mergeOrderRecords(matchingRemoteOrders, matchingLocalOrders, matchingPendingOrder);
+  }, [
+    employeePendingSubmission,
+    localOrders,
+    normalizedOrderSearchQuery,
+    orderSearchActive,
+    remoteOrders,
+    remoteOrdersQuery,
+  ]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedOrderSearchQuery(orderSearchQuery.trim()),
+      300,
+    );
+    return () => window.clearTimeout(timer);
+  }, [orderSearchQuery]);
 
   useEffect(() => {
     if (!historyOpen || !hasOdooBackend) return;
+    if (debouncedOrderSearchQuery && debouncedOrderSearchQuery.length < 2) {
+      setRemoteOrders([]);
+      setOrderRecordsLoading(false);
+      setOrderRecordsLoaded(true);
+      setOrderRecordsError(null);
+      setOrderRecordsTruncated(false);
+      return;
+    }
     const controller = new AbortController();
     setOrderRecordsLoading(true);
     setOrderRecordsError(null);
 
-    getOdooOrderRecords(hongKongBusinessDate(), controller.signal)
+    const request = debouncedOrderSearchQuery.length >= 2
+      ? searchOdooOrderRecords(debouncedOrderSearchQuery, controller.signal)
+      : getOdooOrderRecords(hongKongBusinessDate(), controller.signal);
+
+    request
       .then((response) => {
+        setRemoteOrdersQuery(debouncedOrderSearchQuery);
         setRemoteOrders(response.orders);
         setLocalOrders((current) => {
           const remaining = removeSyncedLocalOrders(response.orders, current);
@@ -230,7 +321,7 @@ const Index = () => {
       });
 
     return () => controller.abort();
-  }, [historyOpen, orderRecordsRefreshKey]);
+  }, [debouncedOrderSearchQuery, historyOpen, orderRecordsRefreshKey]);
 
   const subtotal = useMemo(() => {
     const itemsTotal = orderItemsTotal(items);
@@ -238,7 +329,65 @@ const Index = () => {
   }, [items, deliveryFee, urgentFee]);
 
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
+  const customerResolutionComplete = !hasOdooBackend
+    || Boolean(pendingSubmission)
+    || normalizePhoneNumber(selectedCustomer?.phone || "") === normalizePhoneNumber(phone)
+    || normalizePhoneNumber(confirmedNewCustomerPhone || "") === normalizePhoneNumber(phone);
+  const customerSectionComplete = Boolean(
+    customerName.trim()
+      && senderName.trim()
+      && isValidPhoneNumber(phone)
+      && isValidEmailAddress(customerEmail)
+      && customerResolutionComplete
+      && (customerType !== "company" || (companyName.trim() && billingAddress.trim())),
+  );
+  const itemsSectionComplete = Boolean(
+    items.length > 0
+      && finalPrice > 0
+      && !(hasOdooBackend && priceOverridden)
+      && !items.some(orderLineAdjustmentNeedsReason),
+  );
+  const deliverySectionComplete = Boolean(
+    isValidDeliveryDate(deliveryDate)
+      && deliveryTimeMode
+      && deliveryTime.trim()
+      && [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail].some((value) => value.trim())
+      && recipientName.trim()
+      && isValidPhoneNumber(recipientPhone)
+      && (recipientType !== "company" || recipientCompanyName.trim()),
+  );
+  const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
+  const paymentSectionComplete = Boolean(
+    finalPrice > 0
+      && (
+        !receivesPayment
+        || (
+          paymentMethod
+          && paymentReference.trim()
+          && (
+            paymentStatus !== "deposit"
+            || (depositAmount > 0 && depositAmount < finalPrice)
+          )
+        )
+      ),
+  );
+  const completedRequiredSectionCount = [
+    customerSectionComplete,
+    itemsSectionComplete,
+    deliverySectionComplete,
+    paymentSectionComplete,
+  ].filter(Boolean).length;
   const hasSalesperson = salesId.trim().length > 0;
+
+  const scrollToWorkflowSection = useCallback((sectionId: WorkflowSectionId) => {
+    const target = workflowSectionRefs.current[sectionId];
+    if (!target) return;
+    const stickyHeaderHeight = workflowHeaderRef.current?.offsetHeight || 128;
+    window.scrollTo({
+      top: window.scrollY + target.getBoundingClientRect().top - stickyHeaderHeight - 16,
+      behavior: "smooth",
+    });
+  }, []);
   const pendingOwnershipMismatch = Boolean(
     posAuthRequired
       && pendingSubmission
@@ -330,6 +479,7 @@ const Index = () => {
   const detachSelectedCustomerProfile = useCallback(() => {
     const emptyProfile = detachedCustomerProfile();
     setSelectedCustomer(null);
+    setCustomerCode("");
     setCustomerEmail(emptyProfile.customerEmail);
     setCustomerType(emptyProfile.customerType);
     setCompanyName(emptyProfile.companyName);
@@ -348,9 +498,102 @@ const Index = () => {
     });
   }, []);
 
+  const applyCustomerSelection = useCallback((customer: DemoCustomer) => {
+    setSelectedCustomer(customer);
+    setConfirmedNewCustomerPhone(null);
+    setCustomerName(customer.name);
+    setCustomerCode(customer.customerCode || "");
+    setPhone(customer.phone);
+    setCustomerEmail(customer.email || "");
+    setCustomerType(customer.customerType || "personal");
+    setCompanyName(customer.companyName || "");
+    setBillingAddress(customer.billingAddress || "");
+    clearCheckoutErrors(
+      "customerName",
+      "phone",
+      "companyName",
+      "customerEmail",
+      "billingAddress",
+    );
+    setSenderContactDraft(customer.commentText || "");
+    setSaveSenderNote(false);
+    setNotesConflict(null);
+    resetRecipientPersistence();
+  }, [clearCheckoutErrors, resetRecipientPersistence]);
+
+  const applyRecipientSelection = useCallback((selection: RecipientSelectionDetails) => {
+    setRecipientType(selection.recipientType);
+    setRecipientCompanyName(selection.recipientCompanyName || "");
+    setRecipientName(selection.recipientName || "");
+    setRecipientPhone(selection.recipientPhone || "");
+    setRecipientPartnerId(selection.shippingPartnerId || undefined);
+    setRecipientContact(null);
+    setRecipientContactDraft("");
+    setSaveRecipientNote(false);
+    setNotesConflict((current) => current?.target === "recipient" ? null : current);
+    if (selection.deliveryAddress) {
+      const parsed = parseDeliveryAddress(selection.deliveryAddress);
+      setDeliveryRegion(parsed.region);
+      setDeliveryDistrict(parsed.district);
+      setDeliveryArea(parsed.area);
+      setDeliveryDetail(parsed.detail);
+    }
+    clearCheckoutErrors(
+      "deliveryAddress",
+      "recipientCompanyName",
+      "recipientName",
+      "recipientPhone",
+    );
+  }, [clearCheckoutErrors]);
+
+  const applyCustomerAndRecipient = useCallback((
+    customer: DemoCustomer,
+    recipient: NonNullable<DemoCustomer["recipientMatch"]>,
+  ) => {
+    applyCustomerSelection(customer);
+    applyRecipientSelection({
+      recipientType: recipient.recipientType || "personal",
+      recipientCompanyName: recipient.companyName || null,
+      recipientName: recipient.name || null,
+      recipientPhone: recipient.phone || null,
+      deliveryAddress: recipient.deliveryAddress || null,
+      shippingPartnerId: recipient.shippingPartnerId || null,
+    });
+    toast.success("已同時套用下單人及收貨人資料");
+  }, [applyCustomerSelection, applyRecipientSelection]);
+
+  const applyRecipientAndLinkedCustomer = useCallback(async (
+    suggestion: RecipientSuggestion,
+  ) => {
+    if (!suggestion.orderingCustomerId) {
+      applyRecipientSelection(suggestion);
+      toast.success("已套用過往收貨人資料");
+      return;
+    }
+
+    const requestId = linkedPartySelectionRequestRef.current + 1;
+    linkedPartySelectionRequestRef.current = requestId;
+    try {
+      const customer = await getOdooCustomer(suggestion.orderingCustomerId);
+      if (linkedPartySelectionRequestRef.current !== requestId) return;
+      applyCustomerSelection(customer);
+      applyRecipientSelection(suggestion);
+      toast.success("已同時套用收貨人及下單人資料");
+    } catch (error: unknown) {
+      if (linkedPartySelectionRequestRef.current !== requestId) return;
+      applyRecipientSelection(suggestion);
+      toast.error(
+        error instanceof Error
+          ? `已套用收貨人，但未能載入相連下單人：${error.message}`
+          : "已套用收貨人，但未能載入相連下單人",
+      );
+    }
+  }, [applyCustomerSelection, applyRecipientSelection]);
+
   const resetOrderForm = useCallback(() => {
     setPhone("");
     setCustomerName("");
+    setCustomerCode("");
     setSenderName("");
     setCustomerType("personal");
     setCompanyName("");
@@ -446,6 +689,7 @@ const Index = () => {
     const { order, options } = restoredEmployeePendingSubmission;
     setPhone(order.phone);
     setCustomerName(order.customerName);
+    setCustomerCode(order.customerCode || "");
     setSenderName(order.senderName ?? order.customerName ?? "");
     setCustomerType(order.customerType || options.customerType || "personal");
     setCompanyName(order.companyName || options.companyName || "");
@@ -461,9 +705,13 @@ const Index = () => {
       id: `odoo-${options.customerId}`,
       name: order.customerName,
       phone: order.phone,
+      customerCode: order.customerCode,
       history: [],
       odooPartnerId: options.customerId,
     } : null);
+    setConfirmedNewCustomerPhone(
+      options.customerId ? null : normalizePhoneNumber(order.phone),
+    );
     setItems(order.items);
     setDeliveryFee(order.deliveryFee);
     setUrgentFee(order.urgentFee);
@@ -749,11 +997,17 @@ const Index = () => {
     const validationErrorCount = Object.keys(validationErrors).length;
     if (validationErrorCount > 0) {
       toast.error(`請修正以下 ${validationErrorCount} 項訂單資料`);
+      scrollToWorkflowSection(
+        CUSTOMER_CHECKOUT_FIELDS.some((field) => validationErrors[field])
+          ? "customer"
+          : "delivery",
+      );
       return;
     }
 
     const addedLegacyBusinessField = pendingSubmission
       ? firstAddedLegacyBusinessField(pendingSubmission.order, {
+          customerCode,
           customerEmail,
           billingAddress,
           customerGroup,
@@ -773,37 +1027,44 @@ const Index = () => {
 
     if (items.length === 0) {
       toast.error("請至少加入一個項目");
+      scrollToWorkflowSection("items");
       return;
     }
 
     if (hasOdooBackend && priceOverridden) {
       toast.error("Odoo 訂單價格必須跟商品目錄；請先重設最終價格");
+      scrollToWorkflowSection("items");
       return;
     }
 
     const itemMissingAdjustmentReason = items.find(orderLineAdjustmentNeedsReason);
     if (itemMissingAdjustmentReason) {
       toast.error(`「${itemMissingAdjustmentReason.name}」已改價或折扣，請填寫原因`);
+      scrollToWorkflowSection("items");
       return;
     }
 
     const totalError = validatePositiveOrderTotal(finalPrice);
     if (totalError) {
       toast.error(totalError);
+      scrollToWorkflowSection("items");
       return;
     }
 
     const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
     if (receivesPayment && !paymentMethod) {
       toast.error("請選擇已啟用嘅 Odoo 付款方式");
+      scrollToWorkflowSection("payment");
       return;
     }
     if (receivesPayment && !paymentReference.trim()) {
       toast.error("請輸入付款參考編號");
+      scrollToWorkflowSection("payment");
       return;
     }
     if (paymentStatus === "deposit" && (depositAmount <= 0 || depositAmount >= finalPrice)) {
       toast.error("訂金必須大過 $0 並少過訂單總額");
+      scrollToWorkflowSection("payment");
       return;
     }
     const receiptTimestamp = receivesPayment
@@ -860,6 +1121,7 @@ const Index = () => {
       id: pendingSubmission?.order.id || checkoutId,
       ...submissionEmployee,
       customerName: customerName.trim(),
+      ...(includePendingField("customerCode") ? { customerCode: customerCode.trim() } : {}),
       ...(includePendingField("customerType") ? { customerType } : {}),
       ...(includePendingField("companyName") ? { companyName: companyName.trim() } : {}),
       ...(includePendingField("customerEmail") ? { customerEmail: customerEmail.trim() } : {}),
@@ -924,6 +1186,7 @@ const Index = () => {
     let submission: PendingOrderSubmission = currentSubmission;
     if (pendingSubmission) {
       const hasLegacyPendingBusinessFields = [
+        "customerCode",
         "customerType",
         "companyName",
         "customerEmail",
@@ -1046,7 +1309,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
+      <header ref={workflowHeaderRef} className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
         <div className="mx-auto flex max-w-full flex-col items-stretch gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <h1 className="flex min-w-0 items-center" aria-label="中西花店 POS">
             <img
@@ -1129,8 +1392,10 @@ const Index = () => {
           />
         )}
 
-        {/* Main form */}
-        <main className="flex-1 max-w-3xl mx-auto px-4 py-5 space-y-4 pb-28">
+        {/* Main form + desktop summary */}
+        <div className="min-w-0 flex-1">
+          <div className="mx-auto flex max-w-[1320px] items-start gap-5 px-4 py-5 pb-28 xl:pb-6">
+        <main className="min-w-0 max-w-4xl flex-1 space-y-4">
         <SalesIdSection
           salesId={salesId}
           employee={employee}
@@ -1185,9 +1450,15 @@ const Index = () => {
             </ul>
           </div>
         )}
+        <section
+          ref={(node) => { workflowSectionRefs.current.customer = node; }}
+          aria-label="下單人資料"
+          className="scroll-mt-40 space-y-4"
+        >
         <CustomerSection
           phone={phone}
           customerName={customerName}
+          customerCode={customerCode}
           senderName={senderName}
           customerType={customerType}
           companyName={companyName}
@@ -1197,6 +1468,12 @@ const Index = () => {
             setPhone(v);
             clearCheckoutErrors("phone");
             const normalizedPhone = normalizePhoneNumber(v);
+            if (
+              confirmedNewCustomerPhone
+              && confirmedNewCustomerPhone !== normalizedPhone
+            ) {
+              setCustomerCode("");
+            }
             setConfirmedNewCustomerPhone((current) => (
               current && current !== normalizedPhone ? null : current
             ));
@@ -1214,6 +1491,7 @@ const Index = () => {
               detachSelectedCustomerProfile();
             }
           }}
+          onCustomerCodeChange={setCustomerCode}
           onSenderNameChange={(value) => {
             setSenderName(value);
             clearCheckoutErrors("senderName");
@@ -1237,27 +1515,8 @@ const Index = () => {
             setBillingAddress(value);
             clearCheckoutErrors("billingAddress");
           }}
-          onCustomerSelect={(c) => {
-            setSelectedCustomer(c);
-            setConfirmedNewCustomerPhone(null);
-            setCustomerName(c.name);
-            setPhone(c.phone);
-            setCustomerEmail(c.email || "");
-            setCustomerType(c.customerType || "personal");
-            setCompanyName(c.companyName || "");
-            setBillingAddress(c.billingAddress || "");
-            clearCheckoutErrors(
-              "customerName",
-              "phone",
-              "companyName",
-              "customerEmail",
-              "billingAddress",
-            );
-            setSenderContactDraft(c.commentText || "");
-            setSaveSenderNote(false);
-            setNotesConflict(null);
-            resetRecipientPersistence();
-          }}
+          onCustomerSelect={applyCustomerSelection}
+          onCustomerAndRecipientSelect={applyCustomerAndRecipient}
           phoneError={checkoutErrors.phone}
           customerNameError={checkoutErrors.customerName}
           senderNameError={checkoutErrors.senderName}
@@ -1288,7 +1547,13 @@ const Index = () => {
           onDepartmentChange={setDepartment}
           onTermsChange={setTerms}
         />
+        </section>
 
+        <section
+          ref={(node) => { workflowSectionRefs.current.items = node; }}
+          aria-label="商品資料"
+          className="scroll-mt-40"
+        >
         <OrderItemsSection
           items={items}
           onItemsChange={setItems}
@@ -1303,7 +1568,13 @@ const Index = () => {
           onBudgetChange={setBudget}
           subtotal={subtotal}
         />
+        </section>
 
+        <section
+          ref={(node) => { workflowSectionRefs.current.delivery = node; }}
+          aria-label="收貨及送貨資料"
+          className="scroll-mt-40"
+        >
         <DeliverySection
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
@@ -1393,11 +1664,24 @@ const Index = () => {
             clearCheckoutErrors("recipientPhone");
             resetRecipientPersistence();
           }}
+          onRecipientSuggestionSelect={(suggestion) => {
+            applyRecipientSelection(suggestion);
+            toast.success("已套用過往收貨人資料");
+          }}
+          onRecipientAndCustomerSuggestionSelect={(suggestion) => {
+            void applyRecipientAndLinkedCustomer(suggestion);
+          }}
           onDeliveryPersonChange={setDeliveryPerson}
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}
         />
+        </section>
 
+        <section
+          ref={(node) => { workflowSectionRefs.current.notes = node; }}
+          aria-label="備註及心意卡"
+          className="scroll-mt-40 space-y-4"
+        >
         <OrderNotesSection
           senderNote={senderNote}
           deliveryNote={deliveryNote}
@@ -1445,7 +1729,13 @@ const Index = () => {
           onEnabledChange={setGiftCardEnabled}
           onMessageChange={setGiftCardMessage}
         />
+        </section>
 
+        <section
+          ref={(node) => { workflowSectionRefs.current.payment = node; }}
+          aria-label="付款及確認"
+          className="scroll-mt-40"
+        >
         <PaymentSection
           subtotal={subtotal}
           finalPrice={finalPrice}
@@ -1473,6 +1763,7 @@ const Index = () => {
           onDepositAmountChange={setDepositAmount}
           priceWarning={finalPrice <= 0 && items.length > 0}
         />
+        </section>
 
           </>
         ) : (
@@ -1482,10 +1773,36 @@ const Index = () => {
           </div>
         )}
       </main>
+        {hasSalesperson && (
+          <div className="sticky top-40 hidden w-[310px] shrink-0 xl:block 2xl:w-[360px]">
+            <OrderSummaryPanel
+              customerName={customerName}
+              phone={phone}
+              recipientName={recipientType === "company" && recipientCompanyName.trim()
+                ? `${recipientCompanyName} · ${recipientName}`
+                : recipientName}
+              recipientPhone={recipientPhone}
+              deliveryDate={deliveryDate}
+              deliveryTime={deliveryTime}
+              items={items}
+              deliveryFee={deliveryFee}
+              urgentFee={urgentFee}
+              finalPrice={finalPrice}
+              paymentStatus={paymentStatus}
+              completedCount={completedRequiredSectionCount}
+              requiredSectionCount={4}
+              isSubmitting={isSubmitting}
+              onSubmit={handleSubmit}
+              onNavigate={scrollToWorkflowSection}
+            />
+          </div>
+        )}
+          </div>
+        </div>
       </div>
       {/* Sticky submit */}
       {hasSalesperson && <div
-        className="fixed bottom-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border transition-[left]"
+        className="fixed bottom-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border transition-[left] xl:hidden"
         style={{ left: checkoutBarLeftOffset(Boolean(selectedCustomer), customerHistoryOpen) }}
       >
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
@@ -1509,12 +1826,20 @@ const Index = () => {
         orders={visibleOrderRecords}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
+        searchQuery={orderSearchQuery}
+        onSearchQueryChange={(value) => {
+          setOrderSearchQuery(value);
+          setRemoteOrders([]);
+          setOrderRecordsError(null);
+          setOrderRecordsTruncated(false);
+        }}
         loading={orderRecordsLoading}
         loaded={orderRecordsLoaded}
         error={orderRecordsError}
-        stale={orderRecordsLoaded && Boolean(orderRecordsError)}
+        stale={orderRecordsLoaded && Boolean(orderRecordsError) && remoteOrders.length > 0}
         truncated={orderRecordsTruncated}
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
+        onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
       />
     </div>
   );

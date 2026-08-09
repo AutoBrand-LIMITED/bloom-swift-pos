@@ -12,6 +12,15 @@ interface OdooPartner {
   customerType?: "personal" | "company";
   companyName?: string | null;
   billingAddress?: string | null;
+  recipientMatch?: {
+    name: string | null;
+    phone: string | null;
+    resolved?: boolean;
+    recipientType?: "personal" | "company";
+    companyName?: string | null;
+    deliveryAddress?: string | null;
+    shippingPartnerId?: number | null;
+  } | null;
   history_count: number | null;
   total_spent: number | null;
   history: PurchaseRecord[];
@@ -63,6 +72,21 @@ export interface DeliverySlot {
   endTime: string;
 }
 
+export interface RecipientSuggestion {
+  id: number;
+  recipientType: "personal" | "company";
+  recipientCompanyName: string | null;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  deliveryAddress: string | null;
+  shippingPartnerId: number | null;
+  orderingCustomerId: number | null;
+  orderingCustomerName: string | null;
+  orderingCustomerPhone: string | null;
+  orderingCustomerEmail: string | null;
+  orderingCustomerBillingAddress: string | null;
+}
+
 export interface PartnerNoteRecord {
   partnerId: number;
   commentText: string;
@@ -90,6 +114,40 @@ export interface OrderNoteUpdate {
   deliveryNote?: string;
   internalNote?: string;
   expectedWriteDate: string;
+}
+
+export interface OrderOperationalUpdate {
+  customerName: string;
+  senderName: string;
+  phone: string;
+  customerEmail: string;
+  billingAddress: string;
+  customerGroup: string;
+  senderDoNumber: string;
+  recipientDoNumber: string;
+  sourceReference: string;
+  department: string;
+  terms: string;
+  deliveryDate: string;
+  deliveryTimeMode: "slot" | "specified";
+  deliverySlotId?: number;
+  deliveryTime: string;
+  deliveryAddress: string;
+  recipientType: "personal" | "company";
+  recipientCompanyName: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryPerson: string;
+  giftCardMessage: string;
+  senderNote: string;
+  deliveryNote: string;
+  internalNote: string;
+  expectedWriteDate: string;
+}
+
+export interface OrderOperationalUpdateResponse {
+  id: number;
+  writeDate: string;
 }
 
 export class OdooConflictError<T = unknown> extends Error {
@@ -209,7 +267,7 @@ export interface DayEndSummary {
 }
 
 export interface OdooOrderRecordsResponse {
-  date: string;
+  date?: string;
   generatedAt: string;
   truncated: boolean;
   orders: Order[];
@@ -376,6 +434,32 @@ export async function submitOdooOrder(
   return (await res.json()) as OdooOrderResponse;
 }
 
+export async function updateOdooOrderOperationalDetails(
+  orderId: number,
+  payload: OrderOperationalUpdate,
+  signal?: AbortSignal,
+): Promise<OrderOperationalUpdateResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!res.ok) {
+    return throwApiError<OrderOperationalUpdateResponse>(
+      res,
+      `Odoo order update failed: ${res.status}`,
+    );
+  }
+
+  return (await res.json()) as OrderOperationalUpdateResponse;
+}
+
 export async function getAccountingPaymentOptions(signal?: AbortSignal): Promise<AccountingPaymentOption[]> {
   if (!BACKEND_URL) return [];
 
@@ -426,7 +510,11 @@ export async function searchOdooCustomers(
   }
 
   const partners = (await res.json()) as OdooPartner[];
-  return partners.map((p) => ({
+  return partners.map(mapOdooPartner);
+}
+
+function mapOdooPartner(p: OdooPartner): DemoCustomer {
+  return {
     id: `odoo-${p.id}`,
     odooPartnerId: p.id,
     name: p.name,
@@ -442,7 +530,56 @@ export async function searchOdooCustomers(
     commentText: p.commentText || "",
     tags: p.tags || [],
     writeDate: p.writeDate || undefined,
-  }));
+    recipientMatch: p.recipientMatch
+      ? {
+          name: p.recipientMatch.name || undefined,
+          phone: p.recipientMatch.phone || undefined,
+          resolved: p.recipientMatch.resolved === true,
+          recipientType: p.recipientMatch.recipientType || "personal",
+          companyName: p.recipientMatch.companyName || undefined,
+          deliveryAddress: p.recipientMatch.deliveryAddress || undefined,
+          shippingPartnerId: p.recipientMatch.shippingPartnerId || undefined,
+        }
+      : undefined,
+  };
+}
+
+export async function getOdooCustomer(
+  partnerId: number,
+  signal?: AbortSignal,
+): Promise<DemoCustomer> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(`${BACKEND_URL}/customers/${partnerId}`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<DemoCustomer>(res, `Odoo customer lookup failed: ${res.status}`);
+  }
+  return mapOdooPartner((await res.json()) as OdooPartner);
+}
+
+export async function searchOdooRecipients(
+  query: string,
+  signal?: AbortSignal,
+): Promise<RecipientSuggestion[]> {
+  const trimmed = query.trim();
+  if (!BACKEND_URL || !trimmed) return [];
+
+  const params = new URLSearchParams({ q: trimmed });
+  const res = await authenticatedFetch(`${BACKEND_URL}/recipients?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<RecipientSuggestion[]>(
+      res,
+      `Odoo recipient search failed: ${res.status}`,
+    );
+  }
+  return (await res.json()) as RecipientSuggestion[];
 }
 
 export async function getOdooPartnerNotes(
@@ -634,6 +771,28 @@ export async function getOdooOrderRecords(
 
   if (!res.ok) {
     return throwApiError<OdooOrderRecordsResponse>(res, `Odoo order records failed: ${res.status}`);
+  }
+
+  return (await res.json()) as OdooOrderRecordsResponse;
+}
+
+export async function searchOdooOrderRecords(
+  query: string,
+  signal?: AbortSignal,
+): Promise<OdooOrderRecordsResponse> {
+  const trimmed = query.trim();
+  if (!BACKEND_URL || trimmed.length < 2) {
+    return { generatedAt: "", truncated: false, orders: [] };
+  }
+
+  const params = new URLSearchParams({ q: trimmed });
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+
+  if (!res.ok) {
+    return throwApiError<OdooOrderRecordsResponse>(res, `Odoo order search failed: ${res.status}`);
   }
 
   return (await res.json()) as OdooOrderRecordsResponse;

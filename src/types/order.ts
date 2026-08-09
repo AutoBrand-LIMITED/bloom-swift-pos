@@ -31,6 +31,8 @@ export interface Order {
   salesId: string;
   operatorEmployeeId?: number;
   customerName: string;
+  /** Customer ID stored in Odoo as res.partner/sale.order x_customer_code. */
+  customerCode?: string;
   customerType?: "personal" | "company";
   companyName?: string;
   customerEmail?: string;
@@ -84,6 +86,8 @@ export interface Order {
   odooInvoiceName?: string;
   odooPaymentId?: number;
   odooPaymentName?: string;
+  /** Odoo concurrency token used when editing an existing order. */
+  writeDate?: string;
 }
 
 export interface SalesStaff {
