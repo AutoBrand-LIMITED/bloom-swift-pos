@@ -521,6 +521,24 @@ const Index = () => {
     resetRecipientPersistence();
   }, [clearCheckoutErrors, resetRecipientPersistence]);
 
+  const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
+    const emptyProfile = detachedCustomerProfile();
+    setSelectedCustomer(null);
+    setConfirmedNewCustomerPhone(null);
+    setCustomerCode(accountCode);
+    setPhone("");
+    setCustomerName("");
+    setSenderName("");
+    setCustomerEmail(emptyProfile.customerEmail);
+    setCustomerType(emptyProfile.customerType);
+    setCompanyName(emptyProfile.companyName);
+    setBillingAddress(emptyProfile.billingAddress);
+    setSenderContactDraft("");
+    setSaveSenderNote(false);
+    resetRecipientPersistence();
+    clearCheckoutErrors("customerName", "phone", "companyName", "customerEmail", "billingAddress");
+  }, [clearCheckoutErrors, resetRecipientPersistence]);
+
   const applyRecipientSelection = useCallback((selection: RecipientSelectionDetails) => {
     setRecipientType(selection.recipientType);
     setRecipientCompanyName(selection.recipientCompanyName || "");
@@ -1516,6 +1534,7 @@ const Index = () => {
             clearCheckoutErrors("billingAddress");
           }}
           onCustomerSelect={applyCustomerSelection}
+          onStartNewCustomerUnderAccount={startNewCustomerUnderAccount}
           onCustomerAndRecipientSelect={applyCustomerAndRecipient}
           phoneError={checkoutErrors.phone}
           customerNameError={checkoutErrors.customerName}

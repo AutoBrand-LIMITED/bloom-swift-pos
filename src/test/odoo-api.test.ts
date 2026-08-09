@@ -126,6 +126,42 @@ describe("odoo-api note contracts", () => {
     });
   });
 
+  it("loads a shared Customer ID as an account with selectable contacts", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      customerCode: "WONDER",
+      contactCount: 1435,
+      truncated: true,
+      contacts: [{
+        id: 42,
+        name: "Alice",
+        email: "alice@example.com",
+        phone: "91234567",
+        mobile: null,
+        customerCode: "WONDER",
+        history_count: null,
+        total_spent: null,
+        history: [],
+        tags: [],
+      }],
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooCustomerAccount } = await import("@/lib/odoo-api");
+
+    const account = await searchOdooCustomerAccount(" wonder ");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/customer-accounts?code=wonder",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+    expect(account).toMatchObject({
+      customerCode: "WONDER",
+      contactCount: 1435,
+      truncated: true,
+      contacts: [{ odooPartnerId: 42, customerCode: "WONDER" }],
+    });
+  });
+
   it("searches historical recipients from a single phone digit", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const suggestions = [{

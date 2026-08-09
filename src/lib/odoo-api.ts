@@ -35,6 +35,13 @@ interface OdooPartnerHistory {
   history: PurchaseRecord[];
 }
 
+export interface CustomerAccountLookup {
+  customerCode: string;
+  contactCount: number;
+  contacts: DemoCustomer[];
+  truncated: boolean;
+}
+
 interface OdooEmployee {
   id: number;
   name: string;
@@ -511,6 +518,39 @@ export async function searchOdooCustomers(
 
   const partners = (await res.json()) as OdooPartner[];
   return partners.map(mapOdooPartner);
+}
+
+export async function searchOdooCustomerAccount(
+  code: string,
+  signal?: AbortSignal,
+): Promise<CustomerAccountLookup> {
+  const trimmed = code.trim();
+  if (!BACKEND_URL || !trimmed) {
+    return { customerCode: trimmed, contactCount: 0, contacts: [], truncated: false };
+  }
+
+  const params = new URLSearchParams({ code: trimmed });
+  const res = await authenticatedFetch(`${BACKEND_URL}/customer-accounts?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Odoo customer account search failed: ${res.status}`);
+  }
+
+  const account = (await res.json()) as {
+    customerCode: string;
+    contactCount: number;
+    contacts: OdooPartner[];
+    truncated: boolean;
+  };
+  return {
+    customerCode: account.customerCode,
+    contactCount: account.contactCount,
+    contacts: account.contacts.map(mapOdooPartner),
+    truncated: account.truncated,
+  };
 }
 
 function mapOdooPartner(p: OdooPartner): DemoCustomer {

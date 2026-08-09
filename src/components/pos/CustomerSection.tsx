@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import type { DemoCustomer } from "@/data/demo-customers";
 import CustomerFlags from "@/components/pos/CustomerFlags";
 import { customerIdentityKey, loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
-import { hasOdooBackend, searchOdooCustomers } from "@/lib/odoo-api";
+import {
+  hasOdooBackend,
+  searchOdooCustomerAccount,
+  searchOdooCustomers,
+  type CustomerAccountLookup,
+} from "@/lib/odoo-api";
 import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/checkout-validation";
 
 export type CustomerType = "personal" | "company";
@@ -31,6 +36,7 @@ interface CustomerSectionProps {
   onCustomerEmailChange: (v: string) => void;
   onBillingAddressChange: (v: string) => void;
   onCustomerSelect: (c: DemoCustomer) => void;
+  onStartNewCustomerUnderAccount?: (customerCode: string) => void;
   onCustomerAndRecipientSelect: (
     customer: DemoCustomer,
     recipient: NonNullable<DemoCustomer["recipientMatch"]>,
@@ -51,7 +57,7 @@ const CustomerSection = ({
   phone, customerName, customerCode, senderName, customerType, companyName, customerEmail, billingAddress,
   onPhoneChange, onNameChange, onCustomerCodeChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
   onCustomerEmailChange, onBillingAddressChange,
-  onCustomerSelect, onCustomerAndRecipientSelect,
+  onCustomerSelect, onCustomerAndRecipientSelect, onStartNewCustomerUnderAccount,
   phoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
   confirmedNewCustomerPhone, onConfirmNewCustomer,
@@ -60,6 +66,7 @@ const CustomerSection = ({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [odooCustomers, setOdooCustomers] = useState<DemoCustomer[]>([]);
+  const [customerAccount, setCustomerAccount] = useState<CustomerAccountLookup | null>(null);
   const [odooLoading, setOdooLoading] = useState(false);
   const [odooError, setOdooError] = useState<string | null>(null);
   const [completedOdooSearch, setCompletedOdooSearch] = useState<{
@@ -119,6 +126,7 @@ const CustomerSection = ({
 
     if (!activeDropdown || !hasOdooBackend || !canSearch) {
       setOdooCustomers([]);
+      setCustomerAccount(null);
       setOdooLoading(false);
       setOdooError(null);
       return;
@@ -131,13 +139,20 @@ const CustomerSection = ({
     setOdooError(null);
     setCompletedOdooSearch(null);
 
-    searchOdooCustomers(
-      trimmed,
-      controller.signal,
-      activeDropdown === "customerCode" ? "customer_code" : "general",
-    )
-      .then((customers) => {
+    const searchPromise = activeDropdown === "customerCode"
+      ? searchOdooCustomerAccount(trimmed, controller.signal).then((account) => ({
+          account,
+          customers: account.contacts,
+        }))
+      : searchOdooCustomers(trimmed, controller.signal, "general").then((customers) => ({
+          account: null,
+          customers,
+        }));
+
+    searchPromise
+      .then(({ account, customers }) => {
         if (controller.signal.aborted || searchRequestRef.current !== requestId) return;
+        setCustomerAccount(account);
         setOdooCustomers(customers);
         setCompletedOdooSearch({
           source: activeDropdown,
@@ -149,6 +164,7 @@ const CustomerSection = ({
       .catch((err: unknown) => {
         if (controller.signal.aborted || searchRequestRef.current !== requestId) return;
         setOdooCustomers([]);
+        setCustomerAccount(null);
         setCompletedOdooSearch(null);
         setOdooError(err instanceof Error ? err.message : "未能連接 Odoo 客戶資料");
       })
@@ -227,7 +243,13 @@ const CustomerSection = ({
       && completedCurrentSearch
       && !odooLoading
       && !odooError
-      && customerOptions.length === 0,
+      && customerAccount?.contactCount === 0,
+  );
+  const hasExistingCustomerAccount = Boolean(
+    activeDropdown === "customerCode"
+      && completedCurrentSearch
+      && customerAccount
+      && customerAccount.contactCount > 0,
   );
   const isNewCustomerConfirmed = Boolean(
     normalizedCurrentPhone
@@ -318,7 +340,7 @@ const CustomerSection = ({
     >
       {odooLoading ? (
         <p className="text-xs text-muted-foreground p-3">正在搜尋 Odoo 客戶及收件人...</p>
-      ) : customerOptions.length === 0 ? (
+      ) : customerOptions.length === 0 && !hasExistingCustomerAccount ? (
         <div className="p-3 space-y-2">
           {odooError ? (
             <p className="text-xs text-destructive">{odooError}</p>
@@ -368,7 +390,33 @@ const CustomerSection = ({
           )}
         </div>
       ) : (
-        <div className="max-h-48 overflow-y-auto">
+        <div className="max-h-64 overflow-y-auto">
+          {hasExistingCustomerAccount && customerAccount && (
+            <div className="sticky top-0 z-10 space-y-2 border-b border-border bg-card p-3">
+              <p className="text-sm font-semibold">
+                {customerAccount.customerCode} 帳戶 · {customerAccount.contactCount} 位聯絡人
+              </p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Customer ID 只代表帳戶。請揀實際下單人，系統唔會自動套用第一位聯絡人。
+                {customerAccount.truncated ? " 以下只顯示部分聯絡人；可用電話、姓名或電郵搜尋指定人士。" : ""}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="min-h-10 w-full touch-manipulation"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onStartNewCustomerUnderAccount?.(customerAccount.customerCode);
+                  setActiveDropdown(null);
+                  setSearch("");
+                  window.requestAnimationFrame(() => phoneInputRef.current?.focus());
+                }}
+              >
+                在 {customerAccount.customerCode} 帳戶新增聯絡人
+              </Button>
+            </div>
+          )}
           {odooError && (
             <p className="px-3 py-2 text-[10px] text-destructive border-b border-border">
               Odoo 搜尋暫時不可用，以下顯示本機記錄
@@ -529,15 +577,15 @@ const CustomerSection = ({
           {isCustomerCodeEntry ? (
             <p className="text-[11px] text-muted-foreground">
               {canBackfillSelectedCustomerCode
-                ? "呢個 Customer ID 會喺落單時更新返呢個現有 Odoo 客戶；如已被使用，系統會阻止落單。"
+                ? "呢個 Customer ID 會喺落單時加入呢位現有 Odoo 聯絡人；同一帳戶可有多位聯絡人。"
                 : isNewCustomerConfirmed
-                  ? "呢個 Customer ID 會連同新客戶資料儲存到 Odoo；如已被使用，系統會阻止落單。"
-                  : "已保留呢個 Customer ID；請輸入電話並完成『確認新增客戶』。"}
+                  ? "呢個聯絡人會用此 Customer ID 加入相同帳戶，並連同新客戶資料儲存到 Odoo。"
+                  : "已保留呢個帳戶 Customer ID；請輸入電話並完成『確認新增客戶』。"}
             </p>
           ) : (
             <>
               <p className="text-[11px] text-muted-foreground">
-                呢度用嚟搜尋現有客戶；搜尋冇結果時可確認用該 Customer ID 新增客戶。
+                呢度用嚟搜尋客戶帳戶；揀帳戶後仍要揀實際聯絡人，亦可在帳戶下新增聯絡人。
               </p>
               {customerDropdown("customerCode")}
             </>
