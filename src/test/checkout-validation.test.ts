@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isValidDeliveryDate,
+  isValidEmailAddress,
   isValidPhoneNumber,
   validatePositiveOrderTotal,
   validateCheckout,
@@ -61,6 +62,26 @@ describe("checkout phone validation", () => {
     "+852.9123.4567",
   ])("rejects unsupported phone format %s", (phone) => {
     expect(isValidPhoneNumber(phone)).toBe(false);
+  });
+});
+
+describe("checkout email validation", () => {
+  it.each([
+    "",
+    "accounts@example.com",
+    "jayng@autobrand.site",
+    "jayng@autobrand,site",
+    "name@",
+    "@domain",
+  ])("accepts an optional email containing @: %s", (email) => {
+    expect(isValidEmailAddress(email)).toBe(true);
+  });
+
+  it.each([
+    "jayng.autobrand.site",
+    "not-an-email",
+  ])("rejects a non-empty value without @: %s", (email) => {
+    expect(isValidEmailAddress(email)).toBe(false);
   });
 });
 
