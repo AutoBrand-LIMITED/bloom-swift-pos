@@ -128,6 +128,13 @@ describe("CustomerSection gift sender", () => {
   beforeEach(() => {
     searchOdooCustomerAccount.mockReset();
     searchOdooCustomers.mockReset();
+    searchOdooCustomerAccount.mockResolvedValue({
+      customerCode: "",
+      contactCount: 0,
+      contacts: [],
+      truncated: false,
+    });
+    searchOdooCustomers.mockResolvedValue([]);
     selectCustomer.mockReset();
     selectCustomerAndRecipient.mockReset();
   });
@@ -295,6 +302,56 @@ describe("CustomerSection gift sender", () => {
     fireEvent.change(phoneInput, { target: { value: "9123 4568" } });
     expect(screen.queryByText("已確認新增此電話客戶")).not.toBeInTheDocument();
     expect(await screen.findByText(/系統未有此電話號碼的客戶/)).toBeInTheDocument();
+  });
+
+  it("rechecks Customer ID collisions after confirming a new phone customer", async () => {
+    searchOdooCustomers.mockResolvedValue([]);
+    searchOdooCustomerAccount.mockImplementation(async (customerCode: string) => (
+      customerCode === "WONDER"
+        ? {
+          customerCode: "WONDER",
+          contactCount: 1,
+          contacts: [{
+            id: "odoo-41",
+            odooPartnerId: 41,
+            customerCode: "WONDER",
+            name: "Existing Contact",
+            phone: "92345678",
+            history: [],
+          }],
+          truncated: false,
+        }
+        : {
+          customerCode: "NEW-001",
+          contactCount: 0,
+          contacts: [],
+          truncated: false,
+        }
+    ));
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText(/下單人電話/), {
+      target: { value: "9123 4567" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "確認新增客戶" }));
+
+    const customerCodeInput = screen.getByLabelText(/新 Customer ID/);
+    fireEvent.change(customerCodeInput, { target: { value: "NEW-001" } });
+    await waitFor(() => {
+      expect(searchOdooCustomerAccount).toHaveBeenCalledWith(
+        "NEW-001",
+        expect.any(AbortSignal),
+      );
+    });
+
+    fireEvent.change(customerCodeInput, { target: { value: "WONDER" } });
+
+    expect(await screen.findByText("WONDER 帳戶 · 1 位聯絡人")).toBeInTheDocument();
+    expect(screen.getByText("Existing Contact")).toBeInTheDocument();
+    expect(searchOdooCustomerAccount).toHaveBeenLastCalledWith(
+      "WONDER",
+      expect.any(AbortSignal),
+    );
   });
 
   it("confirms a missing Customer ID, preserves it, and continues phone verification", async () => {

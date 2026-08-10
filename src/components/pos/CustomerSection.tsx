@@ -558,15 +558,19 @@ const CustomerSection = ({
                   : selectedCustomer?.customerCode || ""}
               onChange={(event) => {
                 if (isCustomerCodeEntry) {
-                  onCustomerCodeChange(event.target.value);
+                  const nextCustomerCode = event.target.value;
+                  onCustomerCodeChange(nextCustomerCode);
+                  setSearch(nextCustomerCode);
+                  setActiveDropdown("customerCode");
                   return;
                 }
                 setSearch(event.target.value);
                 setActiveDropdown("customerCode");
               }}
               onFocus={() => {
-                if (isCustomerCodeEntry) return;
-                setSearch(selectedCustomer?.customerCode || "");
+                setSearch(isCustomerCodeEntry
+                  ? customerCode
+                  : selectedCustomer?.customerCode || "");
                 setActiveDropdown("customerCode");
               }}
               className="pl-9 font-mono text-base"
@@ -587,9 +591,9 @@ const CustomerSection = ({
               <p className="text-[11px] text-muted-foreground">
                 呢度用嚟搜尋客戶帳戶；揀帳戶後仍要揀實際聯絡人，亦可在帳戶下新增聯絡人。
               </p>
-              {customerDropdown("customerCode")}
             </>
           )}
+          {customerDropdown("customerCode")}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5 relative">
