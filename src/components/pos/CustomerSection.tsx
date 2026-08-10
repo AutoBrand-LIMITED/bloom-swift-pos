@@ -73,20 +73,24 @@ const CustomerSection = ({
     source: CustomerLookupSource;
     query: string;
   } | null>(null);
-  const lookupRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
   const suppressNextNameDropdownRef = useRef(false);
 
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (lookupRef.current && !lookupRef.current.contains(e.target as Node)) {
-        setActiveDropdown(null);
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element
+        && target.closest("[data-customer-lookup-interactive]")
+      ) {
+        return;
       }
+      setActiveDropdown(null);
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown);
   }, []);
 
   // Keep only real imported/local customers here. Odoo results are merged below.
@@ -330,6 +334,7 @@ const CustomerSection = ({
   const customerDropdown = (source: CustomerLookupSource) => activeDropdown === source && (
     <div
       id={`customer-${source}-results`}
+      data-customer-lookup-interactive
       className={`absolute z-50 top-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden ${
       source === "name"
         ? "left-0 right-0 sm:left-auto sm:right-0 sm:w-[calc(200%+0.75rem)]"
@@ -535,7 +540,7 @@ const CustomerSection = ({
           </div>
         </div>
       )}
-      <div className="space-y-3" ref={lookupRef}>
+      <div className="space-y-3">
         <div className="space-y-1.5 relative">
           <Label htmlFor="customer-code-search" className="text-xs font-medium">
             {canBackfillSelectedCustomerCode
@@ -544,7 +549,7 @@ const CustomerSection = ({
                 ? "新 Customer ID／客戶編號（選填）"
                 : "Customer ID／客戶編號"}
           </Label>
-          <div className="relative">
+          <div className="relative" data-customer-lookup-interactive>
             <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               id="customer-code-search"
@@ -600,7 +605,7 @@ const CustomerSection = ({
             <Label htmlFor="phone" className="text-xs font-medium">
               下單人電話 <span className="text-destructive">*</span>
             </Label>
-            <div className="relative">
+            <div className="relative" data-customer-lookup-interactive>
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 ref={phoneInputRef}
@@ -640,7 +645,7 @@ const CustomerSection = ({
             <Label htmlFor="customer-name" className="text-xs font-medium">
               下單人／聯絡人 <span className="text-destructive">*</span>
             </Label>
-            <div className="relative">
+            <div className="relative" data-customer-lookup-interactive>
               <Input
                 ref={nameInputRef}
                 id="customer-name"
@@ -696,6 +701,7 @@ const CustomerSection = ({
           客戶電郵
         </Label>
         <Input
+          data-customer-lookup-interactive
           id="customer-email"
           type="email"
           inputMode="email"

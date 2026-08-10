@@ -275,6 +275,28 @@ describe("CustomerSection gift sender", () => {
     expect(selectCustomer).toHaveBeenCalledWith(customer);
   });
 
+  it("closes customer suggestions when any non-dropdown form area is pressed", async () => {
+    searchOdooCustomers.mockResolvedValue([{
+      id: "odoo-89",
+      odooPartnerId: 89,
+      name: "Oh Contact",
+      phone: "91234567",
+      history: [],
+    }]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText(/下單人／聯絡人/), {
+      target: { value: "Oh" },
+    });
+
+    expect(await screen.findByText("Oh Contact")).toBeVisible();
+
+    fireEvent.pointerDown(screen.getByText(/呢度用嚟搜尋客戶帳戶/));
+
+    expect(screen.queryByText("Oh Contact")).not.toBeInTheDocument();
+    expect(selectCustomer).not.toHaveBeenCalled();
+  });
+
   it("does not offer new-customer confirmation when the Odoo search fails", async () => {
     searchOdooCustomers.mockRejectedValue(new Error("Odoo timeout"));
     render(<CustomerLookupHarness />);
