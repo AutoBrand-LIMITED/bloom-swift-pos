@@ -29,7 +29,9 @@ interface CheckoutValidationInput {
   billingAddress: string;
   allowLegacyMissingCompanyFields?: boolean;
   phone: string;
+  selectedCustomerName?: string;
   selectedCustomerPhone?: string;
+  confirmedNewCustomerName?: string | null;
   confirmedNewCustomerPhone?: string | null;
   restoredPendingSubmission?: boolean;
   requiresCustomerResolution?: boolean;
@@ -52,6 +54,10 @@ const ISO_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 
 export function normalizePhoneNumber(value: string): string {
   return value.replace(/\D/g, "");
+}
+
+export function normalizeCustomerIdentityName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
 export function isValidPhoneNumber(value: string): boolean {
@@ -100,7 +106,7 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
   } else if (!isValidPhoneNumber(input.phone)) {
     errors.phone = "請輸入有效電話號碼";
   } else if (input.requiresCustomerResolution && !hasResolvedCustomer(input)) {
-    errors.phone = "請先搜尋並選擇現有客戶，或確認新增客戶";
+    errors.phone = "請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人";
   }
   if (!input.senderName.trim()) errors.senderName = "請輸入送花人名稱";
   if (input.recipientType === "company" && !input.recipientCompanyName.trim()) {
@@ -141,14 +147,17 @@ function hasResolvedCustomer(input: CheckoutValidationInput): boolean {
   if (input.restoredPendingSubmission) return true;
 
   const currentPhone = normalizePhoneNumber(input.phone);
+  const currentName = normalizeCustomerIdentityName(input.customerName);
   const selectedPhone = normalizePhoneNumber(input.selectedCustomerPhone || "");
+  const selectedName = normalizeCustomerIdentityName(input.selectedCustomerName || "");
   const confirmedPhone = normalizePhoneNumber(input.confirmedNewCustomerPhone || "");
+  const confirmedName = normalizeCustomerIdentityName(input.confirmedNewCustomerName || "");
 
   return Boolean(
-    currentPhone
+    currentPhone && currentName
       && (
-        (selectedPhone && selectedPhone === currentPhone)
-        || (confirmedPhone && confirmedPhone === currentPhone)
+        (selectedPhone === currentPhone && selectedName === currentName)
+        || (confirmedPhone === currentPhone && confirmedName === currentName)
       )
   );
 }

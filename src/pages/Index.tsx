@@ -75,6 +75,7 @@ import {
   isValidDeliveryDate,
   isValidEmailAddress,
   isValidPhoneNumber,
+  normalizeCustomerIdentityName,
   normalizePhoneNumber,
   type CheckoutErrors,
   type CheckoutField,
@@ -154,6 +155,7 @@ const Index = () => {
   const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({});
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
   const [customerHistoryOpen, setCustomerHistoryOpen] = useState(true);
+  const [confirmedNewCustomerName, setConfirmedNewCustomerName] = useState<string | null>(null);
   const [confirmedNewCustomerPhone, setConfirmedNewCustomerPhone] = useState<string | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
   const linkedPartySelectionRequestRef = useRef(0);
@@ -331,8 +333,16 @@ const Index = () => {
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
   const customerResolutionComplete = !hasOdooBackend
     || Boolean(pendingSubmission)
-    || normalizePhoneNumber(selectedCustomer?.phone || "") === normalizePhoneNumber(phone)
-    || normalizePhoneNumber(confirmedNewCustomerPhone || "") === normalizePhoneNumber(phone);
+    || (
+      normalizePhoneNumber(selectedCustomer?.phone || "") === normalizePhoneNumber(phone)
+      && normalizeCustomerIdentityName(selectedCustomer?.name || "")
+        === normalizeCustomerIdentityName(customerName)
+    )
+    || (
+      normalizePhoneNumber(confirmedNewCustomerPhone || "") === normalizePhoneNumber(phone)
+      && normalizeCustomerIdentityName(confirmedNewCustomerName || "")
+        === normalizeCustomerIdentityName(customerName)
+    );
   const customerSectionComplete = Boolean(
     customerName.trim()
       && senderName.trim()
@@ -500,6 +510,7 @@ const Index = () => {
 
   const applyCustomerSelection = useCallback((customer: DemoCustomer) => {
     setSelectedCustomer(customer);
+    setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
     setCustomerName(customer.name);
     setCustomerCode(customer.customerCode || "");
@@ -524,6 +535,7 @@ const Index = () => {
   const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
     const emptyProfile = detachedCustomerProfile();
     setSelectedCustomer(null);
+    setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
     setCustomerCode(accountCode);
     setPhone("");
@@ -625,6 +637,7 @@ const Index = () => {
     setTerms("");
     setCheckoutErrors({});
     setSelectedCustomer(null);
+    setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
     setItems([]);
     setBudget(0);
@@ -727,9 +740,8 @@ const Index = () => {
       history: [],
       odooPartnerId: options.customerId,
     } : null);
-    setConfirmedNewCustomerPhone(
-      options.customerId ? null : normalizePhoneNumber(order.phone),
-    );
+    setConfirmedNewCustomerName(options.customerId ? null : order.customerName);
+    setConfirmedNewCustomerPhone(options.customerId ? null : normalizePhoneNumber(order.phone));
     setItems(order.items);
     setDeliveryFee(order.deliveryFee);
     setUrgentFee(order.urgentFee);
@@ -994,7 +1006,9 @@ const Index = () => {
           )
       ),
       phone,
+      selectedCustomerName: selectedCustomer?.name,
       selectedCustomerPhone: selectedCustomer?.phone,
+      confirmedNewCustomerName,
       confirmedNewCustomerPhone,
       restoredPendingSubmission: Boolean(pendingSubmission),
       requiresCustomerResolution: hasOdooBackend,
@@ -1496,6 +1510,12 @@ const Index = () => {
               current && current !== normalizedPhone ? null : current
             ));
             if (
+              confirmedNewCustomerPhone
+              && confirmedNewCustomerPhone !== normalizedPhone
+            ) {
+              setConfirmedNewCustomerName(null);
+            }
+            if (
               selectedCustomer
               && normalizedPhone !== normalizePhoneNumber(selectedCustomer.phone)
             ) {
@@ -1505,6 +1525,14 @@ const Index = () => {
           onNameChange={(value) => {
             setCustomerName(value);
             clearCheckoutErrors("customerName");
+            if (
+              confirmedNewCustomerName
+              && normalizeCustomerIdentityName(value)
+                !== normalizeCustomerIdentityName(confirmedNewCustomerName)
+            ) {
+              setConfirmedNewCustomerName(null);
+              setConfirmedNewCustomerPhone(null);
+            }
             if (selectedCustomer && value !== selectedCustomer.name) {
               detachSelectedCustomerProfile();
             }
@@ -1543,11 +1571,13 @@ const Index = () => {
           customerEmailError={checkoutErrors.customerEmail}
           billingAddressError={checkoutErrors.billingAddress}
           selectedCustomer={selectedCustomer}
+          confirmedNewCustomerName={confirmedNewCustomerName}
           confirmedNewCustomerPhone={confirmedNewCustomerPhone}
-          onConfirmNewCustomer={(normalizedPhone) => {
+          onConfirmNewCustomer={(normalizedPhone, confirmedName) => {
             setSelectedCustomer(null);
+            setConfirmedNewCustomerName(confirmedName);
             setConfirmedNewCustomerPhone(normalizedPhone);
-            clearCheckoutErrors("phone");
+            clearCheckoutErrors("customerName", "phone");
           }}
           refreshKey={customerRefreshKey}
         />

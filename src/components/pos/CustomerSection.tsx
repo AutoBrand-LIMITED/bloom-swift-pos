@@ -13,7 +13,11 @@ import {
   searchOdooCustomers,
   type CustomerAccountLookup,
 } from "@/lib/odoo-api";
-import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/checkout-validation";
+import {
+  isValidPhoneNumber,
+  normalizeCustomerIdentityName,
+  normalizePhoneNumber,
+} from "@/lib/checkout-validation";
 
 export type CustomerType = "personal" | "company";
 type CustomerLookupSource = "phone" | "name" | "email" | "customerCode";
@@ -48,8 +52,9 @@ interface CustomerSectionProps {
   customerEmailError?: string;
   billingAddressError?: string;
   selectedCustomer: DemoCustomer | null;
+  confirmedNewCustomerName?: string | null;
   confirmedNewCustomerPhone?: string | null;
-  onConfirmNewCustomer?: (normalizedPhone: string) => void;
+  onConfirmNewCustomer?: (normalizedPhone: string, normalizedName: string) => void;
   refreshKey?: number;
 }
 
@@ -60,7 +65,7 @@ const CustomerSection = ({
   onCustomerSelect, onCustomerAndRecipientSelect, onStartNewCustomerUnderAccount,
   phoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
-  confirmedNewCustomerPhone, onConfirmNewCustomer,
+  confirmedNewCustomerName, confirmedNewCustomerPhone, onConfirmNewCustomer,
 }: CustomerSectionProps) => {
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
   const [search, setSearch] = useState("");
@@ -76,7 +81,6 @@ const CustomerSection = ({
   const nameInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
-  const suppressNextNameDropdownRef = useRef(false);
 
   useEffect(() => {
     const handleOutsidePointerDown = (event: PointerEvent) => {
@@ -228,17 +232,28 @@ const CustomerSection = ({
       : customerName
   ).trim();
   const normalizedCurrentPhone = normalizePhoneNumber(phone);
+  const normalizedCurrentCustomerName = normalizeCustomerIdentityName(customerName);
+  const currentSearchMatchesField = activeDropdown === "phone"
+    ? normalizedSearchPhone === normalizedCurrentPhone
+    : activeDropdown === "name"
+      ? normalizeCustomerIdentityName(search) === normalizedCurrentCustomerName
+      : activeDropdown === "email"
+        ? search.trim().toLocaleLowerCase() === customerEmail.trim().toLocaleLowerCase()
+        : false;
+  const hasExactCustomerIdentity = customerOptions.some((customer) => (
+    normalizePhoneNumber(customer.phone) === normalizedCurrentPhone
+      && normalizeCustomerIdentityName(customer.name) === normalizedCurrentCustomerName
+  ));
   const canConfirmNewCustomer = Boolean(
     hasOdooBackend
-      && activeDropdown === "phone"
+      && activeDropdown !== "customerCode"
       && isValidPhoneNumber(phone)
-      && normalizedSearchPhone === normalizedCurrentPhone
-      && normalizedDebouncedPhone === normalizedCurrentPhone
-      && completedOdooSearch?.source === "phone"
-      && completedOdooSearch.query === normalizedCurrentPhone
+      && normalizedCurrentCustomerName
+      && currentSearchMatchesField
+      && completedCurrentSearch
       && !odooLoading
       && !odooError
-      && customerOptions.length === 0,
+      && !hasExactCustomerIdentity,
   );
   const canStartNewCustomerWithCode = Boolean(
     hasOdooBackend
@@ -257,7 +272,9 @@ const CustomerSection = ({
   );
   const isNewCustomerConfirmed = Boolean(
     normalizedCurrentPhone
-      && confirmedNewCustomerPhone === normalizedCurrentPhone,
+      && normalizedCurrentCustomerName
+      && confirmedNewCustomerPhone === normalizedCurrentPhone
+      && normalizeCustomerIdentityName(confirmedNewCustomerName || "") === normalizedCurrentCustomerName,
   );
   const isNewCustomerDraft = Boolean(
     isNewCustomerConfirmed
@@ -331,6 +348,27 @@ const CustomerSection = ({
     </>
   );
 
+  const confirmNewCustomerAction = canConfirmNewCustomer && (
+    <div className="space-y-2 border-t border-border bg-muted/20 p-3">
+      <p className="text-xs leading-relaxed text-foreground">
+        搜尋結果唔係同一位聯絡人？可保留電話 {phone.trim()}，以「{customerName.trim()}」新增聯絡人。
+      </p>
+      <Button
+        type="button"
+        size="sm"
+        className="min-h-11 w-full touch-manipulation"
+        onClick={(event) => {
+          event.stopPropagation();
+          onConfirmNewCustomer?.(normalizedCurrentPhone, customerName.trim());
+          setActiveDropdown(null);
+          setSearch("");
+        }}
+      >
+        確認新增聯絡人
+      </Button>
+    </div>
+  );
+
   const customerDropdown = (source: CustomerLookupSource) => activeDropdown === source && (
     <div
       id={`customer-${source}-results`}
@@ -352,23 +390,9 @@ const CustomerSection = ({
           ) : canConfirmNewCustomer ? (
             <>
               <p className="text-xs leading-relaxed text-foreground">
-                系統未有此電話號碼的客戶。請先檢查電話；如資料正確，確認新增客戶。
+                系統未有符合此電話及聯絡人名稱嘅客戶。
               </p>
-              <Button
-                type="button"
-                size="sm"
-                className="min-h-11 w-full touch-manipulation"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onConfirmNewCustomer?.(normalizedCurrentPhone);
-                  setActiveDropdown(null);
-                  setSearch("");
-                  suppressNextNameDropdownRef.current = true;
-                  window.requestAnimationFrame(() => nameInputRef.current?.focus());
-                }}
-              >
-                確認新增客戶
-              </Button>
+              {confirmNewCustomerAction}
             </>
           ) : canStartNewCustomerWithCode ? (
             <>
@@ -463,6 +487,7 @@ const CustomerSection = ({
               {customerOptionContent(c)}
             </button>
           ))}
+          {confirmNewCustomerAction}
         </div>
       )}
     </div>
@@ -589,7 +614,7 @@ const CustomerSection = ({
                 ? "呢個 Customer ID 會喺落單時加入呢位現有 Odoo 聯絡人；同一帳戶可有多位聯絡人。"
                 : isNewCustomerConfirmed
                   ? "呢個聯絡人會用此 Customer ID 加入相同帳戶，並連同新客戶資料儲存到 Odoo。"
-                  : "已保留呢個帳戶 Customer ID；請輸入電話並完成『確認新增客戶』。"}
+                  : "已保留呢個帳戶 Customer ID；請輸入電話及聯絡人名稱，再完成『確認新增聯絡人』。"}
             </p>
           ) : (
             <>
@@ -637,7 +662,7 @@ const CustomerSection = ({
             {isNewCustomerConfirmed && (
               <p className="flex items-center gap-1 text-xs text-emerald-700">
                 <UserRoundCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                已確認新增此電話客戶
+                已確認以此電話及名稱新增聯絡人
               </p>
             )}
           </div>
@@ -657,10 +682,6 @@ const CustomerSection = ({
                   setActiveDropdown("name");
                 }}
                 onFocus={() => {
-                  if (suppressNextNameDropdownRef.current) {
-                    suppressNextNameDropdownRef.current = false;
-                    return;
-                  }
                   setSearch(customerName);
                   setActiveDropdown("name");
                 }}
