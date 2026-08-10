@@ -24,6 +24,14 @@ const formatMoney = (value: number) =>
 const formatQuantity = (value: number) =>
   value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
+const formatSalesperson = (value?: string) => {
+  const salesperson = value?.trim();
+  if (!salesperson || ["new", "n/a", "na", "unknown", "-"].includes(salesperson.toLocaleLowerCase())) {
+    return "舊資料未有記錄";
+  }
+  return salesperson;
+};
+
 const normalizeIdentityPart = (value?: string) =>
   value?.trim().replace(/\s+/g, " ").toLocaleLowerCase() ?? "";
 
@@ -70,10 +78,12 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
 
   useEffect(() => {
     setHistoryExpanded(false);
     setExpandedRecord(null);
+    setShowAllAddresses(false);
   }, [customer?.id]);
 
   useEffect(() => {
@@ -251,7 +261,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                   <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <MapPin className="w-3 h-3" /> 過往送貨地址
                   </p>
-                  {pastAddresses.slice(0, 3).map((a, i) => (
+                  {(showAllAddresses ? pastAddresses : pastAddresses.slice(0, 3)).map((a, i) => (
                     <button
                       key={i}
                       type="button"
@@ -291,7 +301,17 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                     </button>
                   ))}
                   {pastAddresses.length > 3 && (
-                    <p className="text-[10px] text-muted-foreground">另有 {pastAddresses.length - 3} 個過往地址可喺消費紀錄入面查看</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="min-h-11 w-full justify-center px-2 text-[10px] text-primary"
+                      onClick={() => setShowAllAddresses((showAll) => !showAll)}
+                    >
+                      {showAllAddresses
+                        ? "收起地址"
+                        : `查看全部 ${pastAddresses.length} 個地址`}
+                    </Button>
                   )}
                 </div>
               )}
@@ -402,12 +422,10 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                       地址：{h.deliveryAddress || "未有資料"}
                     </span>
                   </p>
-                  {h.salesperson && (
-                    <p className="flex items-start gap-1.5">
-                      <User className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      <span>銷售：{h.salesperson}</span>
-                    </p>
-                  )}
+                  <p className="flex items-start gap-1.5">
+                    <User className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span>銷售：{formatSalesperson(h.salesperson)}</span>
+                  </p>
                 </div>
 
                 <div className="rounded-md bg-secondary/40 p-2">
@@ -475,7 +493,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                       <p><span className="text-muted-foreground">收花人：</span>{h.recipientName || "未有資料"}</p>
                       <p><span className="text-muted-foreground">收花電話：</span>{h.recipientPhone || "未有資料"}</p>
                       <p className="break-words"><span className="text-muted-foreground">送貨地址：</span>{h.deliveryAddress || "未有資料"}</p>
-                      <p><span className="text-muted-foreground">銷售員：</span>{h.salesperson || "未有資料"}</p>
+                      <p><span className="text-muted-foreground">銷售員：</span>{formatSalesperson(h.salesperson)}</p>
                       <p><span className="text-muted-foreground">送貨員：</span>{h.deliveryPerson || "舊資料未有記錄"}</p>
                       {(h.senderDoNumber || h.recipientDoNumber) && (
                         <p className="break-words">

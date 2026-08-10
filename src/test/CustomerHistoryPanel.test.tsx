@@ -201,6 +201,54 @@ describe("CustomerHistoryPanel resizable history", () => {
     }));
   });
 
+  it("shows all saved delivery addresses only after the compact view is expanded", () => {
+    const manyAddressCustomer: DemoCustomer = {
+      ...customer,
+      history: Array.from({ length: 5 }, (_, index) => ({
+        ...customer.history[0],
+        id: index + 1,
+        deliveryAddress: `測試地址 ${index + 1}`,
+        recipientName: `收貨人 ${index + 1}`,
+        recipientPhone: `6123456${index}`,
+        shippingPartnerId: index + 80,
+      })),
+    };
+
+    render(
+      <CustomerHistoryPanel
+        customer={manyAddressCustomer}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "使用過往地址 測試地址 3" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "使用過往地址 測試地址 4" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "查看全部 5 個地址" }));
+
+    expect(screen.getByRole("button", { name: "使用過往地址 測試地址 4" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "收起地址" })).toBeVisible();
+  });
+
+  it("does not present the legacy NEW placeholder as a real salesperson", () => {
+    const legacySalespersonCustomer: DemoCustomer = {
+      ...customer,
+      history: [{ ...customer.history[0], salesperson: "NEW" }],
+    };
+
+    render(
+      <CustomerHistoryPanel
+        customer={legacySalespersonCustomer}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /查看呢位客人過往消費紀錄/ }));
+
+    expect(screen.getByText("銷售：舊資料未有記錄")).toBeVisible();
+    expect(screen.queryByText("銷售：NEW")).not.toBeInTheDocument();
+  });
+
   it("shows an explicit unavailable state and retries Odoo history", async () => {
     const remoteCustomer: DemoCustomer = {
       ...customer,
