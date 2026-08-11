@@ -169,7 +169,7 @@ const OrderSummaryPanel = ({
           disabled={isSubmitting}
           className="mt-4 min-h-12 w-full touch-manipulation text-base font-semibold shadow-md"
         >
-          {isSubmitting ? "同步中..." : "確認訂單"}
+          {isSubmitting ? "下單中" : "確認訂單"}
         </Button>
       </div>
     </aside>

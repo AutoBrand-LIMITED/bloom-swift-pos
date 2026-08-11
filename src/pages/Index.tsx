@@ -1445,7 +1445,7 @@ const Index = () => {
           </div>
         )}
 
-        {pendingSubmission && !pendingOwnershipMismatch && (
+        {pendingSubmission && !isSubmitting && !pendingOwnershipMismatch && (
           <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
             <p>
               {posAuthRequired
@@ -1865,7 +1865,7 @@ const Index = () => {
             size="lg"
             className="px-8 text-base font-semibold shadow-lg"
           >
-            {isSubmitting ? "同步中..." : "確認訂單"}
+            {isSubmitting ? "下單中" : "確認訂單"}
           </Button>
         </div>
       </div>}
