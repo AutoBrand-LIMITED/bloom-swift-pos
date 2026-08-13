@@ -1584,17 +1584,9 @@ const Index = () => {
 
         <BusinessDetailsSection
           customerGroup={customerGroup}
-          senderDoNumber={senderDoNumber}
-          recipientDoNumber={recipientDoNumber}
-          sourceReference={sourceReference}
           department={department}
-          terms={terms}
           onCustomerGroupChange={setCustomerGroup}
-          onSenderDoNumberChange={setSenderDoNumber}
-          onRecipientDoNumberChange={setRecipientDoNumber}
-          onSourceReferenceChange={setSourceReference}
           onDepartmentChange={setDepartment}
-          onTermsChange={setTerms}
         />
         </section>
 

@@ -109,9 +109,9 @@ describe("CustomerHistoryPanel resizable history", () => {
     expect(screen.getByText("accounts@example.com")).toBeVisible();
     expect(screen.getByText("香港中環花園道 1 號")).toBeVisible();
     expect(screen.getByText("Corporate")).toBeVisible();
-    expect(screen.getByText("PO-300")).toBeVisible();
     expect(screen.getByText("Marketing")).toBeVisible();
-    expect(screen.getByText("Net 30")).toBeVisible();
+    expect(screen.queryByText("PO-300")).not.toBeInTheDocument();
+    expect(screen.queryByText("Net 30")).not.toBeInTheDocument();
     expect(screen.getByText("白色絲帶")).toBeVisible();
   });
 

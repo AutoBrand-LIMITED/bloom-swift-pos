@@ -309,10 +309,6 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <Field label="客戶群組" value={form.customerGroup} onChange={(value) => setField("customerGroup", value)} />
                   <Field label="部門" value={form.department} onChange={(value) => setField("department", value)} />
-                  <Field label="送花人 DO 編號" value={form.senderDoNumber} onChange={(value) => setField("senderDoNumber", value)} />
-                  <Field label="收花人 DO 編號" value={form.recipientDoNumber} onChange={(value) => setField("recipientDoNumber", value)} />
-                  <Field label="客戶參考／PO 編號" value={form.sourceReference} onChange={(value) => setField("sourceReference", value)} />
-                  <Field label="條款" value={form.terms} onChange={(value) => setField("terms", value)} />
                 </div>
               </details>
 

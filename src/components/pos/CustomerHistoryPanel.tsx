@@ -495,12 +495,6 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                       <p className="break-words"><span className="text-muted-foreground">送貨地址：</span>{h.deliveryAddress || "未有資料"}</p>
                       <p><span className="text-muted-foreground">銷售員：</span>{formatSalesperson(h.salesperson)}</p>
                       <p><span className="text-muted-foreground">送貨員：</span>{h.deliveryPerson || "舊資料未有記錄"}</p>
-                      {(h.senderDoNumber || h.recipientDoNumber) && (
-                        <p className="break-words">
-                          <span className="text-muted-foreground">DO：</span>
-                          {[h.senderDoNumber, h.recipientDoNumber].filter(Boolean).join(" / ")}
-                        </p>
-                      )}
                       {h.customerEmail && (
                         <p className="break-all">
                           <span className="text-muted-foreground">客戶電郵：</span>{h.customerEmail}
@@ -516,19 +510,9 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                           <span className="text-muted-foreground">Customer Group：</span>{h.customerGroup}
                         </p>
                       )}
-                      {h.sourceReference && (
-                        <p className="break-words">
-                          <span className="text-muted-foreground">Reference：</span>{h.sourceReference}
-                        </p>
-                      )}
                       {h.department && (
                         <p className="break-words">
                           <span className="text-muted-foreground">Department：</span>{h.department}
-                        </p>
-                      )}
-                      {h.terms && (
-                        <p className="whitespace-pre-wrap break-words">
-                          <span className="text-muted-foreground">Terms：</span>{h.terms}
                         </p>
                       )}
                       {h.senderNote && (

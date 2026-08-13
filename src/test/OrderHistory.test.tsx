@@ -258,7 +258,7 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(screen.getByText("業務詳情"));
     expect(screen.getByText("accounts@example.com")).toBeVisible();
     expect(screen.getByText("香港中環花園道 1 號")).toBeVisible();
-    expect(screen.getByText("PO-300")).toBeVisible();
-    expect(screen.getByText("Net 30")).toBeVisible();
+    expect(screen.queryByText("PO-300")).not.toBeInTheDocument();
+    expect(screen.queryByText("Net 30")).not.toBeInTheDocument();
   });
 });
