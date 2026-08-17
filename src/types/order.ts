@@ -55,6 +55,8 @@ export interface Order {
   priceOverridden: boolean;
   paymentStatus: PaymentStatus;
   depositAmount: number;
+  /** Outstanding amount reported by Odoo Accounting. */
+  balanceAmount?: number;
   paymentMethod: string;
   paymentReference?: string;
   paymentReceivedAt?: string;

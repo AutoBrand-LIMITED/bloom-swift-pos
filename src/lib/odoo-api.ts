@@ -72,6 +72,25 @@ export interface AccountingPaymentOption {
   label: string;
 }
 
+export interface OrderPaymentUpdate {
+  amount: number;
+  paymentMethod: string;
+  paymentReference: string;
+  paymentReceivedAt: string;
+  paymentIdempotencyKey: string;
+}
+
+export interface OrderPaymentUpdateResponse {
+  id: number;
+  invoice: { id: number; name: string };
+  payment: { id: number; name: string };
+  amountReceivedMinor: number;
+  amountResidualMinor: number;
+  paymentStatus: "paid" | "deposit";
+  writeDate: string;
+  idempotentReplay: boolean;
+}
+
 export interface DeliverySlot {
   id: number;
   displayLabel: string;
@@ -470,6 +489,32 @@ export async function updateOdooOrderOperationalDetails(
   }
 
   return (await res.json()) as OrderOperationalUpdateResponse;
+}
+
+export async function recordOdooOrderPayment(
+  orderId: number,
+  payload: OrderPaymentUpdate,
+  signal?: AbortSignal,
+): Promise<OrderPaymentUpdateResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}/payments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!res.ok) {
+    return throwApiError<OrderPaymentUpdateResponse>(
+      res,
+      `Odoo payment update failed: ${res.status}`,
+    );
+  }
+
+  return (await res.json()) as OrderPaymentUpdateResponse;
 }
 
 export async function getAccountingPaymentOptions(signal?: AbortSignal): Promise<AccountingPaymentOption[]> {

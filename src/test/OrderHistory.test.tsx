@@ -5,13 +5,22 @@ import OrderHistory from "@/components/pos/OrderHistory";
 import type { OrderRecordView } from "@/lib/order-records";
 import type { Order } from "@/types/order";
 
-const { getDeliverySlots, updateOdooOrderOperationalDetails } = vi.hoisted(() => ({
+const {
+  getAccountingPaymentOptions,
+  getDeliverySlots,
+  recordOdooOrderPayment,
+  updateOdooOrderOperationalDetails,
+} = vi.hoisted(() => ({
+  getAccountingPaymentOptions: vi.fn(),
   getDeliverySlots: vi.fn(),
+  recordOdooOrderPayment: vi.fn(),
   updateOdooOrderOperationalDetails: vi.fn(),
 }));
 
 vi.mock("@/lib/odoo-api", () => ({
+  getAccountingPaymentOptions,
   getDeliverySlots,
+  recordOdooOrderPayment,
   updateOdooOrderOperationalDetails,
 }));
 
@@ -59,6 +68,12 @@ describe("OrderHistory delivery summary", () => {
       { id: 12, displayLabel: "下午 13:00-18:00", startTime: "13:00", endTime: "18:00" },
     ]);
     updateOdooOrderOperationalDetails.mockReset();
+    getAccountingPaymentOptions.mockReset();
+    getAccountingPaymentOptions.mockResolvedValue([
+      { code: "cash_other", label: "現金／其他" },
+      { code: "bank_in_fps", label: "轉數快" },
+    ]);
+    recordOdooOrderPayment.mockReset();
   });
 
   it("keeps a fixed drawer with an independently scrollable order list", () => {
@@ -207,6 +222,42 @@ describe("OrderHistory delivery summary", () => {
         }),
       );
     });
+  });
+
+  it("records a later payment against an unpaid Odoo order", async () => {
+    recordOdooOrderPayment.mockResolvedValue({
+      id: 17,
+      invoice: { id: 21, name: "INV/2026/00021" },
+      payment: { id: 31, name: "PBNK1/2026/00031" },
+      amountReceivedMinor: 68000,
+      amountResidualMinor: 0,
+      paymentStatus: "paid",
+      writeDate: "2026-08-03 10:02:00",
+      idempotentReplay: false,
+    });
+    const onOrderUpdated = vi.fn();
+    render(<OrderHistory orders={[orderFixture({
+      paymentStatus: "unpaid",
+      depositAmount: 0,
+      balanceAmount: 680,
+    })]} open onClose={vi.fn()} onOrderUpdated={onOrderUpdated} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    await waitFor(() => expect(getAccountingPaymentOptions).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText("付款參考編號 *"), {
+      target: { value: "FPS-680" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "記錄付款到 Odoo" }));
+
+    await waitFor(() => {
+      expect(recordOdooOrderPayment).toHaveBeenCalledWith(17, expect.objectContaining({
+        amount: 680,
+        paymentMethod: "cash_other",
+        paymentReference: "FPS-680",
+        paymentIdempotencyKey: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      }));
+    });
+    expect(onOrderUpdated).toHaveBeenCalledTimes(1);
   });
 
   it("marks specified delivery time explicitly", () => {
