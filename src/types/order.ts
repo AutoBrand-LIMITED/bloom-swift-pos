@@ -21,6 +21,38 @@ export type DeliveryTimeMode = "slot" | "specified";
 export type RecipientType = "personal" | "company";
 export type FulfillmentType = "delivery" | "pickup";
 
+export interface DeliverySplitItemAllocation {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+}
+
+/** An additional destination in a split-delivery order. */
+export interface DeliverySplit {
+  id: string;
+  deliveryDate: string;
+  deliveryTimeMode?: DeliveryTimeMode;
+  deliverySlotId?: number;
+  deliveryTime: string;
+  deliveryRegion: string;
+  deliveryDistrict: string;
+  deliveryArea: string;
+  deliveryDetail: string;
+  deliveryAddress: string;
+  deliveryGoogleAddress: string;
+  deliveryBuilding: string;
+  deliveryFloor: string;
+  deliveryUnit: string;
+  recipientType: RecipientType;
+  recipientCompanyName: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryPerson: string;
+  failedDeliveryAction: string;
+  deliveryNote: string;
+  itemAllocations: DeliverySplitItemAllocation[];
+}
+
 export interface PartnerNoteMutation {
   commentText: string;
   targetPartnerId?: number;
@@ -73,6 +105,8 @@ export interface Order {
   deliveryBuilding?: string;
   deliveryFloor?: string;
   deliveryUnit?: string;
+  /** Additional destinations; unallocated item quantities remain at the primary destination. */
+  deliverySplits?: DeliverySplit[];
   recipientType?: RecipientType;
   recipientCompanyName?: string;
   recipientName: string;

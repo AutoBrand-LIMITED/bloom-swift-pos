@@ -42,6 +42,8 @@ import {
 } from "lucide-react";
 
 interface DeliverySectionProps {
+  showFulfillmentSelector?: boolean;
+  sectionTitle?: string;
   fulfillmentType: FulfillmentType;
   deliveryDate: string;
   deliveryTime: string;
@@ -99,6 +101,8 @@ const RECIPIENT_SUGGESTION_CACHE_LIMIT = 100;
 type RecipientLookupField = "company" | "name" | "phone";
 
 const DeliverySection = ({
+  showFulfillmentSelector = true,
+  sectionTitle = "收貨方式",
   fulfillmentType,
   deliveryDate, deliveryTime, deliveryTimeMode, deliverySlotId,
   frozenSlotSelection,
@@ -495,8 +499,9 @@ const DeliverySection = ({
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
         <MapPin className="w-4 h-4" />
-        收貨方式
+        {sectionTitle}
       </h2>
+      {showFulfillmentSelector && (
       <div className="grid grid-cols-2 gap-2" role="group" aria-label="收貨方式">
         <Button
           type="button"
@@ -517,6 +522,7 @@ const DeliverySection = ({
           <Store className="mr-1.5 h-4 w-4" />自取
         </Button>
       </div>
+      )}
       {fulfillmentType === "pickup" && (
         <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
           自取訂單只需選擇日期及時間，毋須填寫地址或收貨人資料。

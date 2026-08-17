@@ -9,6 +9,8 @@ import CustomerSection from "@/components/pos/CustomerSection";
 import BusinessDetailsSection from "@/components/pos/BusinessDetailsSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
+import SplitDeliverySection from "@/components/pos/SplitDeliverySection";
+import { validateDeliverySplits } from "@/lib/split-delivery";
 import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
@@ -18,6 +20,7 @@ import OrderSummaryPanel from "@/components/pos/OrderSummaryPanel";
 import type { WorkflowSectionId } from "@/components/pos/PosWorkflowTabs";
 import type {
   DeliveryTimeMode,
+  DeliverySplit,
   FulfillmentType,
   Order,
   OrderItem,
@@ -209,6 +212,9 @@ const Index = () => {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryPerson, setDeliveryPerson] = useState("");
   const [failedDeliveryAction, setFailedDeliveryAction] = useState("none");
+  const [deliverySplits, setDeliverySplits] = useState<DeliverySplit[]>(
+    () => restoredEmployeePendingSubmission?.order.deliverySplits || [],
+  );
 
   // Gift card
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
@@ -375,6 +381,9 @@ const Index = () => {
           && (recipientType !== "company" || recipientCompanyName.trim())
         )
       ),
+  ) && !validateDeliverySplits(
+    fulfillmentType === "delivery" ? deliverySplits : [],
+    items,
   );
   const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
   const paymentSectionComplete = Boolean(
@@ -681,6 +690,7 @@ const Index = () => {
     setRecipientPhone("");
     setDeliveryPerson("");
     setFailedDeliveryAction("none");
+    setDeliverySplits([]);
     setGiftCardEnabled(false);
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
@@ -786,6 +796,7 @@ const Index = () => {
     setRecipientName(order.recipientName);
     setRecipientPhone(order.recipientPhone);
     setDeliveryPerson(order.deliveryPerson);
+    setDeliverySplits(order.deliverySplits || []);
     setGiftCardEnabled(order.giftCardEnabled);
     setGiftCardMessage(order.giftCardMessage);
     setPaymentStatus(order.paymentStatus);
@@ -1064,6 +1075,15 @@ const Index = () => {
       );
       return;
     }
+    const deliverySplitsError = validateDeliverySplits(
+      fulfillmentType === "delivery" ? deliverySplits : [],
+      items,
+    );
+    if (deliverySplitsError) {
+      toast.error(deliverySplitsError);
+      scrollToWorkflowSection("delivery");
+      return;
+    }
 
     const addedLegacyBusinessField = pendingSubmission
       ? firstAddedLegacyBusinessField(pendingSubmission.order, {
@@ -1219,6 +1239,9 @@ const Index = () => {
       deliveryBuilding: fulfillmentType === "delivery" ? deliveryBuilding.trim() : "",
       deliveryFloor: fulfillmentType === "delivery" ? deliveryFloor.trim() : "",
       deliveryUnit: fulfillmentType === "delivery" ? deliveryUnit.trim() : "",
+      ...(includePendingField("deliverySplits")
+        ? { deliverySplits: fulfillmentType === "delivery" ? deliverySplits : [] }
+        : {}),
       ...(includePendingField("recipientType") ? { recipientType } : {}),
       ...(includePendingField("recipientCompanyName")
         ? { recipientCompanyName: recipientCompanyName.trim() }
@@ -1688,6 +1711,7 @@ const Index = () => {
           }}
           onFulfillmentTypeChange={(value) => {
             setFulfillmentType(value);
+            if (value === "pickup") setDeliverySplits([]);
             clearCheckoutErrors(
               "deliveryAddress",
               "recipientName",
@@ -1766,6 +1790,21 @@ const Index = () => {
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}
         />
+        {fulfillmentType === "delivery" && (
+          <SplitDeliverySection
+            items={items}
+            splits={deliverySplits}
+            onChange={setDeliverySplits}
+            defaultDeliveryDate={deliveryDate}
+            defaultDeliveryTime={deliveryTime}
+            defaultDeliveryTimeMode={deliveryTimeMode}
+            defaultDeliverySlotId={deliverySlotId}
+            deliverySlots={deliverySlots}
+            deliverySlotsLoading={deliverySlotsLoading}
+            deliverySlotsError={deliverySlotsError}
+            onRetryDeliverySlots={() => setDeliverySlotsRefreshKey((key) => key + 1)}
+          />
+        )}
         </section>
 
         <section
