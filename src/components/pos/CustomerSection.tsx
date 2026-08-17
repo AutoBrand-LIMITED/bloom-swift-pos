@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Phone, ChevronDown, Building2, UserRoundCheck, Hash, Mail, MapPin } from "lucide-react";
+import { User, ChevronDown, Building2, UserRoundCheck, Hash, Mail, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DemoCustomer } from "@/data/demo-customers";
 import CustomerFlags from "@/components/pos/CustomerFlags";
+import RegionalPhoneInput from "@/components/pos/RegionalPhoneInput";
 import { customerIdentityKey, loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
 import {
   hasOdooBackend,
@@ -18,6 +19,7 @@ import {
   normalizeCustomerIdentityName,
   normalizePhoneNumber,
 } from "@/lib/checkout-validation";
+import { phoneLocalDigits, phoneMatchesQuery, phoneSearchRank } from "@/lib/phone-utils";
 
 export type CustomerType = "personal" | "company";
 type CustomerLookupSource = "phone" | "name" | "email" | "customerCode";
@@ -104,15 +106,14 @@ const CustomerSection = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  const normalizedSearchPhone = normalizePhoneNumber(search);
-  const normalizedDebouncedPhone = normalizePhoneNumber(debouncedSearch);
+  const normalizedSearchPhone = phoneLocalDigits(search);
+  const normalizedDebouncedPhone = phoneLocalDigits(debouncedSearch);
   const filtered = allCustomers.filter((c) => {
-    const normalizedCustomerPhone = c.phone.replace(/\D/g, "");
     return (
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       Boolean(c.email?.toLowerCase().includes(search.toLowerCase())) ||
       c.phone.includes(search) ||
-      Boolean(normalizedSearchPhone && normalizedCustomerPhone.includes(normalizedSearchPhone))
+      Boolean(normalizedSearchPhone && phoneMatchesQuery(c.phone, search))
     );
   });
 
@@ -208,8 +209,11 @@ const CustomerSection = ({
       options.push(c);
     }
 
+    if (activeDropdown === "phone" && normalizedSearchPhone) {
+      options.sort((left, right) => phoneSearchRank(left.phone, search) - phoneSearchRank(right.phone, search));
+    }
     return options;
-  }, [activeDropdown, completedCurrentSearch, filtered, odooCustomers, search]);
+  }, [activeDropdown, completedCurrentSearch, filtered, normalizedSearchPhone, odooCustomers, search]);
 
   const searchHint =
     sourceRequiresMoreInput(activeDropdown, search)
@@ -232,9 +236,10 @@ const CustomerSection = ({
       : customerName
   ).trim();
   const normalizedCurrentPhone = normalizePhoneNumber(phone);
+  const currentPhoneSearchKey = phoneLocalDigits(phone);
   const normalizedCurrentCustomerName = normalizeCustomerIdentityName(customerName);
   const currentSearchMatchesField = activeDropdown === "phone"
-    ? normalizedSearchPhone === normalizedCurrentPhone
+    ? normalizedSearchPhone === currentPhoneSearchKey
     : activeDropdown === "name"
       ? normalizeCustomerIdentityName(search) === normalizedCurrentCustomerName
       : activeDropdown === "email"
@@ -630,15 +635,13 @@ const CustomerSection = ({
             <Label htmlFor="phone" className="text-xs font-medium">
               下單人電話 <span className="text-destructive">*</span>
             </Label>
-            <div className="relative" data-customer-lookup-interactive>
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                ref={phoneInputRef}
+            <div data-customer-lookup-interactive>
+              <RegionalPhoneInput
+                inputRef={phoneInputRef}
                 id="phone"
-                placeholder="例如：9123 4567"
+                ariaLabel="下單人電話"
                 value={phone}
-                onChange={(e) => {
-                  const nextPhone = e.target.value;
+                onChange={(nextPhone) => {
                   onPhoneChange(nextPhone);
                   setSearch(nextPhone);
                   setActiveDropdown("phone");
@@ -649,10 +652,7 @@ const CustomerSection = ({
                     setActiveDropdown("phone");
                   }
                 }}
-                className={`pl-9 font-mono text-base ${phoneError ? "border-destructive ring-1 ring-destructive" : ""}`}
-                maxLength={30}
-                aria-invalid={Boolean(phoneError)}
-                aria-describedby={phoneError ? "phone-error" : undefined}
+                invalid={Boolean(phoneError)}
               />
             </div>
             {customerDropdown("phone")}
