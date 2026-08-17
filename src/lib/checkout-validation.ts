@@ -4,6 +4,7 @@ import {
 } from "@/lib/delivery-slots";
 import type { DeliverySlot } from "@/lib/odoo-api";
 import type { DeliveryTimeMode, RecipientType } from "@/types/order";
+import { canonicalPhoneValue, isValidSupportedPhone } from "@/lib/phone-utils";
 
 export type CheckoutField =
   | "customerName"
@@ -53,7 +54,7 @@ const ALLOWED_PHONE_CHARACTERS = /^\+?[0-9 ()-]+$/;
 const ISO_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 
 export function normalizePhoneNumber(value: string): string {
-  return value.replace(/\D/g, "");
+  return canonicalPhoneValue(value);
 }
 
 export function normalizeCustomerIdentityName(value: string): string {
@@ -64,10 +65,11 @@ export function isValidPhoneNumber(value: string): boolean {
   const phone = value.trim();
   if (!phone || !ALLOWED_PHONE_CHARACTERS.test(phone)) return false;
 
-  const digits = normalizePhoneNumber(phone);
-  if (phone.startsWith("+")) return digits.length >= 8 && digits.length <= 15;
-  return digits.length === 8
-    || (digits.length === 11 && (digits.startsWith("852") || digits.startsWith("853")));
+  if (phone.startsWith("+") && !/^(?:\+852|\+853)/.test(phone.replace(/[ ()-]/g, ""))) {
+    const digits = phone.replace(/\D/g, "");
+    return digits.length >= 8 && digits.length <= 15;
+  }
+  return isValidSupportedPhone(phone);
 }
 
 export function isValidDeliveryDate(value: string): boolean {

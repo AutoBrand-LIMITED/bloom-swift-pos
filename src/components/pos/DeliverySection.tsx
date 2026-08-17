@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import RegionalPhoneInput from "@/components/pos/RegionalPhoneInput";
 import { RadioGroup } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGoogleAddressSuggestions } from "@/hooks/useGoogleAddressSuggestions";
@@ -916,21 +917,14 @@ const DeliverySection = ({
           <Label htmlFor="recipient-phone" className="text-xs">
             收貨人電話 <span className="text-destructive">*</span>
           </Label>
-          <Input
+          <RegionalPhoneInput
             id="recipient-phone"
-            placeholder="收貨人電話"
+            ariaLabel="收貨人電話"
             value={recipientPhone}
-            onChange={(e) => onRecipientPhoneChange(e.target.value)}
+            onChange={onRecipientPhoneChange}
             onFocus={() => setRecipientLookupField("phone")}
-            className={`text-sm font-mono ${recipientPhoneError ? "border-destructive ring-1 ring-destructive" : ""}`}
-            maxLength={30}
-            required
-            autoComplete="off"
-            aria-autocomplete="list"
-            aria-controls={recipientLookupField === "phone" ? recipientListboxId : undefined}
-            aria-expanded={recipientLookupField === "phone"}
-            aria-invalid={Boolean(recipientPhoneError)}
-            aria-describedby={recipientPhoneError ? "recipient-phone-error" : undefined}
+            invalid={Boolean(recipientPhoneError)}
+            compact
           />
           {recipientPhoneError && (
             <p id="recipient-phone-error" role="alert" className="text-xs font-medium text-destructive">
