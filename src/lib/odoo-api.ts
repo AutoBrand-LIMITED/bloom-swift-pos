@@ -135,11 +135,16 @@ export interface OrderOperationalUpdate {
   sourceReference: string;
   department: string;
   terms: string;
+  fulfillmentType: "delivery" | "pickup";
   deliveryDate: string;
   deliveryTimeMode: "slot" | "specified";
   deliverySlotId?: number;
   deliveryTime: string;
   deliveryAddress: string;
+  deliveryGoogleAddress: string;
+  deliveryBuilding: string;
+  deliveryFloor: string;
+  deliveryUnit: string;
   recipientType: "personal" | "company";
   recipientCompanyName: string;
   recipientName: string;

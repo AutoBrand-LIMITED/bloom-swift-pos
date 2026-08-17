@@ -123,6 +123,18 @@ describe("checkout required-field validation", () => {
     })).toEqual({});
   });
 
+  it("allows pickup with date and time but without delivery details", () => {
+    expect(validateCheckout({
+      ...validCheckout,
+      fulfillmentType: "pickup",
+      deliveryAddress: "",
+      recipientName: "",
+      recipientPhone: "",
+      recipientType: "company",
+      recipientCompanyName: "",
+    })).toEqual({});
+  });
+
   it("requires company name and billing address only for company customers", () => {
     const companyErrors = validateCheckout({
       ...validCheckout,

@@ -19,6 +19,7 @@ export interface OrderItem {
 export type PaymentStatus = "unpaid" | "paid" | "deposit";
 export type DeliveryTimeMode = "slot" | "specified";
 export type RecipientType = "personal" | "company";
+export type FulfillmentType = "delivery" | "pickup";
 
 export interface PartnerNoteMutation {
   commentText: string;
@@ -58,12 +59,18 @@ export interface Order {
   paymentReference?: string;
   paymentReceivedAt?: string;
   paymentIdempotencyKey?: string;
+  fulfillmentType?: FulfillmentType;
   deliveryDate: string;
   deliveryTimeMode?: DeliveryTimeMode;
   deliverySlotId?: number;
   /** Human-readable snapshot retained even if the configured slot changes later. */
   deliveryTime: string;
   deliveryAddress: string;
+  /** Google-selected base address. Unit details are stored separately. */
+  deliveryGoogleAddress?: string;
+  deliveryBuilding?: string;
+  deliveryFloor?: string;
+  deliveryUnit?: string;
   recipientType?: RecipientType;
   recipientCompanyName?: string;
   recipientName: string;

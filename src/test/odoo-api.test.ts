@@ -408,6 +408,7 @@ describe("odoo-api note contracts", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { updateOdooOrderOperationalDetails } = await import("@/lib/odoo-api");
     const payload = {
+      fulfillmentType: "delivery" as const,
       customerName: "Jay",
       senderName: "Jay",
       phone: "67610707",
@@ -423,6 +424,10 @@ describe("odoo-api note contracts", () => {
       deliveryTimeMode: "specified" as const,
       deliveryTime: "上午 10 時前",
       deliveryAddress: "觀塘新地址",
+      deliveryGoogleAddress: "觀塘新地址",
+      deliveryBuilding: "",
+      deliveryFloor: "",
+      deliveryUnit: "",
       recipientType: "personal" as const,
       recipientCompanyName: "",
       recipientName: "Ng",
