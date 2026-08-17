@@ -169,6 +169,34 @@ describe("CustomerSection gift sender", () => {
     expect(senderInput).toHaveValue("Secretary Chan");
   });
 
+  it("uses the ordering contact instead of the company name for a company customer", () => {
+    const onSenderNameChange = vi.fn();
+
+    render(
+      <CustomerSection
+        phone="67610808"
+        customerName="Jay"
+        customerCode="testcompany"
+        senderName="Autobrand LIMITED"
+        customerType="company"
+        companyName="Autobrand LIMITED"
+        {...emptyBusinessProps}
+        onPhoneChange={noop}
+        onNameChange={noop}
+        onCustomerCodeChange={noop}
+        onSenderNameChange={onSenderNameChange}
+        onCustomerTypeChange={noop}
+        onCompanyNameChange={noop}
+        onCustomerSelect={noop}
+        onCustomerAndRecipientSelect={noop}
+        selectedCustomer={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
+    expect(onSenderNameChange).toHaveBeenCalledWith("Jay");
+  });
+
   it("marks required customer fields invalid and exposes inline alerts", () => {
     render(
       <CustomerSection
