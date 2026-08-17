@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Index from "@/pages/Index";
 import {
@@ -58,5 +58,25 @@ describe("Index pending recovery without POS authentication", () => {
     expect(screen.getByDisplayValue("Private delivery address")).toBeInTheDocument();
     expect(screen.getByText(/系統已恢復這部瀏覽器的未確認訂單/)).toBeInTheDocument();
     expect(screen.queryByText(/並不屬於目前登入員工/)).not.toBeInTheDocument();
+  });
+
+  it("releases a reviewed pending lock without clearing the restored form", async () => {
+    localStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(pendingSubmission()));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<MemoryRouter><Index /></MemoryRouter>);
+
+    expect(await screen.findByDisplayValue("Private Recipient Limited")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {
+      name: "核對 Odoo 後解除鎖定（保留資料）",
+    }));
+
+    await waitFor(() => {
+      expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
+    });
+    expect(screen.getByDisplayValue("Private Recipient Limited")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Private Contact")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Private delivery address")).toBeInTheDocument();
+    expect(screen.queryByText(/系統已恢復這部瀏覽器的未確認訂單/)).not.toBeInTheDocument();
   });
 });

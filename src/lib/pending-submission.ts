@@ -281,7 +281,15 @@ export function upgradeLegacyPendingDeliverySelection(
 export function isDeterministicSubmissionFailure(error: unknown): boolean {
   if (!error || typeof error !== "object" || !("status" in error)) return false;
   const status = Number((error as { status?: unknown }).status);
-  return status === 400 || status === 422;
+  if (status === 400 || status === 422) return true;
+
+  // This conflict is raised before Odoo creates an order. It is safe to
+  // release the pending snapshot so staff can choose the correct customer or
+  // amend the phone number and submit again. Other 409 responses can describe
+  // an existing checkout and must continue to require manual Odoo review.
+  return status === 409
+    && error instanceof Error
+    && error.message.includes("More than one Odoo customer has this phone number");
 }
 
 export async function submitPersistedOrder<T>(

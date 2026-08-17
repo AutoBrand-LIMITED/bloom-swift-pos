@@ -18,7 +18,7 @@ import {
   upgradeLegacyPendingDeliverySelection,
   type PendingOrderSubmission,
 } from "@/lib/pending-submission";
-import { OdooApiError } from "@/lib/odoo-api";
+import { OdooApiError, OdooConflictError } from "@/lib/odoo-api";
 import type { Order } from "@/types/order";
 
 function buildSubmission(): PendingOrderSubmission {
@@ -235,6 +235,30 @@ describe("pending Odoo submission", () => {
 
     await expect(submitPersistedOrder(submission, submitter)).rejects.toThrow("改價原因必填");
     expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
+  });
+
+  it("unlocks a duplicate-phone customer conflict raised before order creation", async () => {
+    const submission = buildSubmission();
+    const submitter = vi.fn().mockRejectedValue(new OdooConflictError(
+      "More than one Odoo customer has this phone number and contact name; select the customer explicitly.",
+    ));
+
+    await expect(submitPersistedOrder(submission, submitter)).rejects.toThrow(
+      "More than one Odoo customer has this phone number",
+    );
+    expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
+  });
+
+  it("keeps an unrelated checkout conflict pending for manual Odoo review", async () => {
+    const submission = buildSubmission();
+    const submitter = vi.fn().mockRejectedValue(new OdooConflictError(
+      "Duplicate Odoo checkout keys require administrator review.",
+    ));
+
+    await expect(submitPersistedOrder(submission, submitter)).rejects.toThrow(
+      "Duplicate Odoo checkout keys require administrator review",
+    );
+    expect(loadPendingSubmission()?.order.id).toBe(submission.order.id);
   });
 
   it("keeps the envelope for server failures with an ambiguous write result", async () => {

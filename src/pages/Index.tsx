@@ -711,9 +711,10 @@ const Index = () => {
       return;
     }
     setPendingSubmission(null);
-    resetOrderForm();
-    toast.success("已移除本機待確認資料；Odoo 訂單沒有被刪除或修改。");
-  }, [employee, pendingSubmission, resetOrderForm]);
+    setCheckoutId(crypto.randomUUID());
+    setPaymentIdempotencyKey(crypto.randomUUID());
+    toast.success("已解除待確認狀態；表格資料已保留，可以修改後再提交。");
+  }, [employee, pendingSubmission]);
 
   useEffect(() => {
     if (!restoredEmployeePendingSubmission) return;
@@ -1459,7 +1460,7 @@ const Index = () => {
               onClick={handleDiscardPending}
               className="border-amber-400 bg-white text-amber-950 hover:bg-amber-100"
             >
-              核對 Odoo 後移除本機資料
+              核對 Odoo 後解除鎖定（保留資料）
             </Button>
           </div>
         )}
