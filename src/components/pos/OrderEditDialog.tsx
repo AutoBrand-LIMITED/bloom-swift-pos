@@ -50,6 +50,7 @@ const formFromOrder = (order: OrderRecordView): OrderOperationalUpdate => ({
   sourceReference: order.sourceReference || "",
   department: order.department || "",
   terms: order.terms || "",
+  fulfillmentType: order.fulfillmentType || "delivery",
   deliveryDate: order.deliveryDate || "",
   deliveryTimeMode: order.deliveryTimeMode || "specified",
   ...(order.deliveryTimeMode === "slot" && order.deliverySlotId
@@ -57,6 +58,10 @@ const formFromOrder = (order: OrderRecordView): OrderOperationalUpdate => ({
     : {}),
   deliveryTime: order.deliveryTime || "",
   deliveryAddress: order.deliveryAddress || "",
+  deliveryGoogleAddress: order.deliveryGoogleAddress || order.deliveryAddress || "",
+  deliveryBuilding: order.deliveryBuilding || "",
+  deliveryFloor: order.deliveryFloor || "",
+  deliveryUnit: order.deliveryUnit || "",
   recipientType: order.recipientType || "personal",
   recipientCompanyName: order.recipientCompanyName || "",
   recipientName: order.recipientName || "",
@@ -134,21 +139,27 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
       setError("客戶名稱及送花人名稱不能留空。");
       return;
     }
-    if (!isValidPhoneNumber(form.phone) || !isValidPhoneNumber(form.recipientPhone)) {
-      setError("請輸入有效嘅下單人及收貨人電話。");
+    if (!isValidPhoneNumber(form.phone)) {
+      setError("請輸入有效嘅下單人電話。");
       return;
     }
-    if (!form.deliveryDate || !form.deliveryTime.trim() || !form.deliveryAddress.trim()) {
-      setError("送貨日期、時間及地址不能留空。");
+    if (!form.deliveryDate || !form.deliveryTime.trim()) {
+      setError("日期及時間不能留空。");
       return;
     }
-    if (!form.recipientName.trim()) {
-      setError("收貨人姓名不能留空。");
-      return;
-    }
-    if (form.recipientType === "company" && !form.recipientCompanyName.trim()) {
-      setError("公司收貨人必須填寫公司名稱。");
-      return;
+    if (form.fulfillmentType === "delivery") {
+      if (!form.deliveryAddress.trim() || !form.recipientName.trim()) {
+        setError("送貨地址及收貨人姓名不能留空。");
+        return;
+      }
+      if (!isValidPhoneNumber(form.recipientPhone)) {
+        setError("請輸入有效嘅收貨人電話。");
+        return;
+      }
+      if (form.recipientType === "company" && !form.recipientCompanyName.trim()) {
+        setError("公司收貨人必須填寫公司名稱。");
+        return;
+      }
     }
 
     setSaving(true);
@@ -198,6 +209,19 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
 
               <section className="space-y-3 border-t pt-5" aria-label="送貨資料">
                 <h3 className="text-sm font-semibold">送貨及收貨人資料</h3>
+                <div className="space-y-1.5">
+                  <Label>收貨方式 *</Label>
+                  <Select
+                    value={form.fulfillmentType}
+                    onValueChange={(value: "delivery" | "pickup") => setField("fulfillmentType", value)}
+                  >
+                    <SelectTrigger className="min-h-11"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="delivery">送貨</SelectItem>
+                      <SelectItem value="pickup">自取</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="送貨日期 *" value={form.deliveryDate} onChange={(value) => setField("deliveryDate", value)} type="date" />
                   <div className="space-y-1.5">
@@ -273,9 +297,17 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                       onChange={(value) => setField("deliveryTime", value)}
                     />
                   )}
-                  <Field label="負責送貨同事" value={form.deliveryPerson} onChange={(value) => setField("deliveryPerson", value)} />
+                  {form.fulfillmentType === "delivery" && (
+                    <Field label="負責送貨同事" value={form.deliveryPerson} onChange={(value) => setField("deliveryPerson", value)} />
+                  )}
                 </div>
+                {form.fulfillmentType === "delivery" && <>
                 <TextField label="送貨地址 *" value={form.deliveryAddress} onChange={(value) => setField("deliveryAddress", value)} />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="大廈／座" value={form.deliveryBuilding} onChange={(value) => setField("deliveryBuilding", value)} />
+                  <Field label="樓層" value={form.deliveryFloor} onChange={(value) => setField("deliveryFloor", value)} />
+                  <Field label="室／單位" value={form.deliveryUnit} onChange={(value) => setField("deliveryUnit", value)} />
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label>收貨人類型 *</Label>
@@ -302,6 +334,7 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                   <Field label="收貨人／聯絡人姓名 *" value={form.recipientName} onChange={(value) => setField("recipientName", value)} />
                   <Field label="收貨人電話 *" value={form.recipientPhone} onChange={(value) => setField("recipientPhone", value)} />
                 </div>
+                </>}
               </section>
 
               <details className="rounded-lg border p-3">

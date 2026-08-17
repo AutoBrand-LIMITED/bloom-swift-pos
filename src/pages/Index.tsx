@@ -18,6 +18,7 @@ import OrderSummaryPanel from "@/components/pos/OrderSummaryPanel";
 import type { WorkflowSectionId } from "@/components/pos/PosWorkflowTabs";
 import type {
   DeliveryTimeMode,
+  FulfillmentType,
   Order,
   OrderItem,
   PaymentStatus,
@@ -184,6 +185,7 @@ const Index = () => {
   } | null>(null);
 
   // Delivery
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("delivery");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [deliveryTimeMode, setDeliveryTimeMode] = useState<DeliveryTimeMode>();
@@ -198,6 +200,9 @@ const Index = () => {
   const [deliveryDistrict, setDeliveryDistrict] = useState("");
   const [deliveryArea, setDeliveryArea] = useState("");
   const [deliveryDetail, setDeliveryDetail] = useState("");
+  const [deliveryBuilding, setDeliveryBuilding] = useState("");
+  const [deliveryFloor, setDeliveryFloor] = useState("");
+  const [deliveryUnit, setDeliveryUnit] = useState("");
   const [recipientType, setRecipientType] = useState<RecipientType>("personal");
   const [recipientCompanyName, setRecipientCompanyName] = useState("");
   const [recipientName, setRecipientName] = useState("");
@@ -361,10 +366,15 @@ const Index = () => {
     isValidDeliveryDate(deliveryDate)
       && deliveryTimeMode
       && deliveryTime.trim()
-      && [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail].some((value) => value.trim())
-      && recipientName.trim()
-      && isValidPhoneNumber(recipientPhone)
-      && (recipientType !== "company" || recipientCompanyName.trim()),
+      && (
+        fulfillmentType === "pickup"
+        || (
+          [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail].some((value) => value.trim())
+          && recipientName.trim()
+          && isValidPhoneNumber(recipientPhone)
+          && (recipientType !== "company" || recipientCompanyName.trim())
+        )
+      ),
   );
   const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
   const paymentSectionComplete = Boolean(
@@ -654,6 +664,7 @@ const Index = () => {
     setRecipientContactDraft("");
     setNotesConflict(null);
     setDeliveryDate("");
+    setFulfillmentType("delivery");
     setDeliveryTime("");
     setDeliveryTimeMode(undefined);
     setDeliverySlotId(undefined);
@@ -661,6 +672,9 @@ const Index = () => {
     setDeliveryDistrict("");
     setDeliveryArea("");
     setDeliveryDetail("");
+    setDeliveryBuilding("");
+    setDeliveryFloor("");
+    setDeliveryUnit("");
     setRecipientType("personal");
     setRecipientCompanyName("");
     setRecipientName("");
@@ -752,6 +766,7 @@ const Index = () => {
     setSenderContactDraft(order.customerNoteMutation?.commentText || "");
     setRecipientContactDraft(order.recipientNoteMutation?.commentText || "");
     setRecipientPartnerId(order.recipientPartnerId);
+    setFulfillmentType(order.fulfillmentType || "delivery");
     setDeliveryDate(order.deliveryDate);
     setDeliveryTime(order.deliveryTime);
     setDeliveryTimeMode(order.deliveryTimeMode);
@@ -759,7 +774,10 @@ const Index = () => {
     setDeliveryRegion("");
     setDeliveryDistrict("");
     setDeliveryArea("");
-    setDeliveryDetail(order.deliveryAddress);
+    setDeliveryDetail(order.deliveryGoogleAddress || order.deliveryAddress);
+    setDeliveryBuilding(order.deliveryBuilding || "");
+    setDeliveryFloor(order.deliveryFloor || "");
+    setDeliveryUnit(order.deliveryUnit || "");
     setRecipientType(
       order.recipientType
         || (order.recipientCompanyName?.trim() ? "company" : "personal"),
@@ -986,13 +1004,22 @@ const Index = () => {
       );
       return;
     }
-    const deliveryAddress = [
+    const deliveryGoogleAddress = [
       deliveryRegion,
       deliveryDistrict,
       deliveryArea,
       deliveryDetail.trim(),
     ].filter(Boolean).join(" ");
+    const deliveryAddress = fulfillmentType === "pickup"
+      ? ""
+      : [
+          deliveryGoogleAddress,
+          deliveryBuilding.trim(),
+          deliveryFloor.trim() ? `${deliveryFloor.trim()}樓` : "",
+          deliveryUnit.trim() ? `${deliveryUnit.trim()}室` : "",
+        ].filter(Boolean).join("，");
     const validationErrors = validateCheckout({
+      fulfillmentType,
       customerName,
       customerType,
       companyName,
@@ -1179,6 +1206,7 @@ const Index = () => {
       paymentReference: receivesPayment ? paymentReference.trim() : "",
       paymentReceivedAt: receiptTimestamp,
       paymentIdempotencyKey: pendingSubmission?.order.paymentIdempotencyKey || receiptIdempotencyKey,
+      fulfillmentType,
       deliveryDate,
       ...deliveryContractFieldsForSubmission(
         deliveryTimeMode,
@@ -1187,6 +1215,10 @@ const Index = () => {
       ),
       deliveryTime,
       deliveryAddress,
+      deliveryGoogleAddress: fulfillmentType === "delivery" ? deliveryGoogleAddress : "",
+      deliveryBuilding: fulfillmentType === "delivery" ? deliveryBuilding.trim() : "",
+      deliveryFloor: fulfillmentType === "delivery" ? deliveryFloor.trim() : "",
+      deliveryUnit: fulfillmentType === "delivery" ? deliveryUnit.trim() : "",
       ...(includePendingField("recipientType") ? { recipientType } : {}),
       ...(includePendingField("recipientCompanyName")
         ? { recipientCompanyName: recipientCompanyName.trim() }
@@ -1626,6 +1658,7 @@ const Index = () => {
           className="scroll-mt-40"
         >
         <DeliverySection
+          fulfillmentType={fulfillmentType}
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
           deliveryTimeMode={deliveryTimeMode}
@@ -1649,6 +1682,9 @@ const Index = () => {
           deliveryDistrict={deliveryDistrict}
           deliveryArea={deliveryArea}
           deliveryDetail={deliveryDetail}
+          deliveryBuilding={deliveryBuilding}
+          deliveryFloor={deliveryFloor}
+          deliveryUnit={deliveryUnit}
           recipientType={recipientType}
           recipientCompanyName={recipientCompanyName}
           recipientName={recipientName}
@@ -1657,6 +1693,16 @@ const Index = () => {
           onDateChange={(value) => {
             setDeliveryDate(value);
             clearCheckoutErrors("deliveryDate", "deliveryTime");
+          }}
+          onFulfillmentTypeChange={(value) => {
+            setFulfillmentType(value);
+            clearCheckoutErrors(
+              "deliveryAddress",
+              "recipientName",
+              "recipientCompanyName",
+              "recipientPhone",
+            );
+            resetRecipientPersistence();
           }}
           onTimeChange={(value) => {
             setDeliveryTime(value);
@@ -1693,6 +1739,9 @@ const Index = () => {
             clearCheckoutErrors("deliveryAddress");
             resetRecipientPersistence();
           }}
+          onBuildingChange={setDeliveryBuilding}
+          onFloorChange={setDeliveryFloor}
+          onUnitChange={setDeliveryUnit}
           onRecipientTypeChange={(value) => {
             setRecipientType(value);
             if (value === "personal") setRecipientCompanyName("");

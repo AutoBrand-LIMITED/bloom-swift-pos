@@ -3,7 +3,7 @@ import {
   type FrozenDeliverySlotSelection,
 } from "@/lib/delivery-slots";
 import type { DeliverySlot } from "@/lib/odoo-api";
-import type { DeliveryTimeMode, RecipientType } from "@/types/order";
+import type { DeliveryTimeMode, FulfillmentType, RecipientType } from "@/types/order";
 import { canonicalPhoneValue, isValidSupportedPhone } from "@/lib/phone-utils";
 
 export type CheckoutField =
@@ -23,6 +23,7 @@ export type CheckoutField =
 export type CheckoutErrors = Partial<Record<CheckoutField, string>>;
 
 interface CheckoutValidationInput {
+  fulfillmentType?: FulfillmentType;
   customerName: string;
   customerType: "personal" | "company";
   companyName: string;
@@ -111,16 +112,18 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
     errors.phone = "請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人";
   }
   if (!input.senderName.trim()) errors.senderName = "請輸入送花人名稱";
-  if (input.recipientType === "company" && !input.recipientCompanyName.trim()) {
-    errors.recipientCompanyName = "公司收貨人必須輸入公司名稱";
+  if ((input.fulfillmentType || "delivery") === "delivery") {
+    if (input.recipientType === "company" && !input.recipientCompanyName.trim()) {
+      errors.recipientCompanyName = "公司收貨人必須輸入公司名稱";
+    }
+    if (!input.recipientName.trim()) errors.recipientName = "請輸入收花人姓名";
+    if (!input.recipientPhone.trim()) {
+      errors.recipientPhone = "請輸入收花人電話";
+    } else if (!isValidPhoneNumber(input.recipientPhone)) {
+      errors.recipientPhone = "請輸入有效收花人電話";
+    }
+    if (!input.deliveryAddress.trim()) errors.deliveryAddress = "請選擇或輸入送貨地址";
   }
-  if (!input.recipientName.trim()) errors.recipientName = "請輸入收花人姓名";
-  if (!input.recipientPhone.trim()) {
-    errors.recipientPhone = "請輸入收花人電話";
-  } else if (!isValidPhoneNumber(input.recipientPhone)) {
-    errors.recipientPhone = "請輸入有效收花人電話";
-  }
-  if (!input.deliveryAddress.trim()) errors.deliveryAddress = "請輸入送貨地址";
 
   if (!input.deliveryDate.trim()) {
     errors.deliveryDate = "請選擇送貨日期";
