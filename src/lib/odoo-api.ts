@@ -227,6 +227,9 @@ export interface OdooProduct {
   templateId: number | null;
   barcode: string | null;
   availableInPos: boolean;
+  displaySequence: number;
+  availableFrom: string | null;
+  availableUntil: string | null;
 }
 
 export interface OdooProductWritePayload {
@@ -236,6 +239,9 @@ export interface OdooProductWritePayload {
   categoryId?: number | null;
   barcode?: string | null;
   availableInPos: boolean;
+  displaySequence: number;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
 }
 
 export interface OdooProductCategory {

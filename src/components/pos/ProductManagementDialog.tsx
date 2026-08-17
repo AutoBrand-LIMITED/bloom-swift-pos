@@ -54,6 +54,9 @@ interface ProductFormState {
   categoryId: string;
   barcode: string;
   availableInPos: boolean;
+  displaySequence: string;
+  availableFrom: string;
+  availableUntil: string;
 }
 
 const EMPTY_FORM: ProductFormState = {
@@ -64,6 +67,9 @@ const EMPTY_FORM: ProductFormState = {
   categoryId: "none",
   barcode: "",
   availableInPos: true,
+  displaySequence: "100",
+  availableFrom: "",
+  availableUntil: "",
 };
 
 const formFromProduct = (product: OdooProduct): ProductFormState => ({
@@ -74,6 +80,9 @@ const formFromProduct = (product: OdooProduct): ProductFormState => ({
   categoryId: product.categoryId ? String(product.categoryId) : "none",
   barcode: product.barcode || "",
   availableInPos: product.availableInPos,
+  displaySequence: String(product.displaySequence ?? 100),
+  availableFrom: product.availableFrom || "",
+  availableUntil: product.availableUntil || "",
 });
 
 const ProductManagementDialog = ({
@@ -149,12 +158,19 @@ const ProductManagementDialog = ({
     categoryId: form.categoryId === "none" ? null : Number(form.categoryId),
     barcode: form.barcode.trim() || null,
     availableInPos: form.availableInPos,
+    displaySequence: Number(form.displaySequence) || 0,
+    availableFrom: form.availableFrom || null,
+    availableUntil: form.availableUntil || null,
   });
 
   const saveProduct = async () => {
     const payload = payloadFromForm();
     if (!payload.name) {
       setError("商品名稱必須填寫。");
+      return;
+    }
+    if (payload.availableFrom && payload.availableUntil && payload.availableFrom > payload.availableUntil) {
+      setError("開始顯示日期不可遲過結束顯示日期。");
       return;
     }
 
@@ -242,6 +258,12 @@ const ProductManagementDialog = ({
                     {product.availableInPos ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                     {product.availableInPos ? "顯示於 POS" : "已隱藏"}
                   </span>
+                  <span className="mt-1 block text-[11px] text-muted-foreground">
+                    排序 {product.displaySequence ?? 100}
+                    {product.availableFrom || product.availableUntil
+                      ? ` · ${product.availableFrom || "不限"} 至 ${product.availableUntil || "不限"}`
+                      : " · 長期顯示"}
+                  </span>
                 </button>
               ))}
               {!loading && products.length === 0 && (
@@ -317,6 +339,40 @@ const ProductManagementDialog = ({
                   onChange={(event) => setFormField("barcode", event.target.value)}
                   placeholder="可留空"
                   maxLength={64}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="product-manager-sequence">POS 排序</Label>
+                <Input
+                  id="product-manager-sequence"
+                  type="number"
+                  value={form.displaySequence}
+                  onChange={(event) => setFormField("displaySequence", event.target.value)}
+                  min={0}
+                  max={9999}
+                  placeholder="100"
+                />
+                <p className="text-xs text-muted-foreground">數字越細，商品越前。</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="product-manager-available-from">開始顯示日期</Label>
+                <Input
+                  id="product-manager-available-from"
+                  type="date"
+                  value={form.availableFrom}
+                  onChange={(event) => setFormField("availableFrom", event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="product-manager-available-until">結束顯示日期</Label>
+                <Input
+                  id="product-manager-available-until"
+                  type="date"
+                  value={form.availableUntil}
+                  onChange={(event) => setFormField("availableUntil", event.target.value)}
                 />
               </div>
 

@@ -1704,6 +1704,10 @@ const Index = () => {
           recipientCompanyName={recipientCompanyName}
           recipientName={recipientName}
           recipientPhone={recipientPhone}
+          senderType={customerType}
+          senderCompanyName={companyName}
+          senderName={senderName || customerName}
+          senderPhone={phone}
           deliveryPerson={deliveryPerson}
           onDateChange={(value) => {
             setDeliveryDate(value);
@@ -1803,6 +1807,10 @@ const Index = () => {
             deliverySlotsLoading={deliverySlotsLoading}
             deliverySlotsError={deliverySlotsError}
             onRetryDeliverySlots={() => setDeliverySlotsRefreshKey((key) => key + 1)}
+            senderType={customerType}
+            senderCompanyName={companyName}
+            senderName={senderName || customerName}
+            senderPhone={phone}
           />
         )}
         </section>

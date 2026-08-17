@@ -21,6 +21,10 @@ interface SplitDeliverySectionProps {
   deliverySlotsLoading: boolean;
   deliverySlotsError: string | null;
   onRetryDeliverySlots: () => void;
+  senderType: "personal" | "company";
+  senderCompanyName: string;
+  senderName: string;
+  senderPhone: string;
 }
 
 const addressSnapshot = (split: DeliverySplit) => {
@@ -164,6 +168,10 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
             recipientCompanyName={split.recipientCompanyName}
             recipientName={split.recipientName}
             recipientPhone={split.recipientPhone}
+            senderType={props.senderType}
+            senderCompanyName={props.senderCompanyName}
+            senderName={props.senderName}
+            senderPhone={props.senderPhone}
             deliveryPerson={split.deliveryPerson}
             failedDeliveryAction={split.failedDeliveryAction}
             onFulfillmentTypeChange={() => undefined}

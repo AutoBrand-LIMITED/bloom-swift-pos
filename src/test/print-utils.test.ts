@@ -116,6 +116,48 @@ describe("print layout contract", () => {
     expect(html).toContain('data-signature="recipient"');
   });
 
+  it("prints every split-delivery destination on its own page with allocated items", () => {
+    const html = generateDeliveryNote(orderFixture({
+      items: [
+        { id: "line-1", name: "Rose bouquet", price: 680, quantity: 3 },
+        { id: "line-2", name: "Glass vase", price: 250, quantity: 1 },
+      ],
+      deliverySplits: [{
+        id: "split-1",
+        deliveryDate: "2026-07-17",
+        deliveryTimeMode: "slot",
+        deliveryTime: "下午 13:00-18:00",
+        deliveryRegion: "九龍",
+        deliveryDistrict: "觀塘區",
+        deliveryArea: "觀塘",
+        deliveryDetail: "第二地址",
+        deliveryAddress: "九龍觀塘第二地址",
+        deliveryGoogleAddress: "九龍觀塘第二地址",
+        deliveryBuilding: "",
+        deliveryFloor: "",
+        deliveryUnit: "",
+        recipientType: "personal",
+        recipientCompanyName: "",
+        recipientName: "SECOND RECIPIENT",
+        recipientPhone: "6111 1111",
+        deliveryPerson: "Driver B",
+        failedDeliveryAction: "",
+        deliveryNote: "Second address note",
+        itemAllocations: [{ itemId: "line-1", itemName: "Rose bouquet", quantity: 1 }],
+      }],
+    }));
+
+    expect(html.match(/data-print-document="delivery-note"/g)).toHaveLength(2);
+    expect(html).toContain("S17738-D1");
+    expect(html).toContain("S17738-D2");
+    expect(html).toContain("SECOND RECIPIENT");
+    expect(html).toContain("九龍觀塘第二地址");
+    expect(html).toContain("Second address note");
+    expect(html).toContain("DELIVERY NOTE · 1/2");
+    expect(html).toContain("DELIVERY NOTE · 2/2");
+    expect(html).toContain("page-break-before: always");
+  });
+
   it("keeps the receipt as a formal priced customer and payment document", () => {
     const html = generateReceipt(orderFixture());
 

@@ -113,6 +113,22 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onFulfillmentTypeChange).toHaveBeenCalledWith("delivery");
   });
 
+  it("copies the sender into the recipient fields with one confirmation", () => {
+    const props = renderSection({
+      senderType: "company",
+      senderCompanyName: "Sender Limited",
+      senderName: "Ms Chan",
+      senderPhone: "+852 6123 4567",
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "收貨人同送花人相同" }));
+
+    expect(props.onRecipientTypeChange).toHaveBeenCalledWith("company");
+    expect(props.onRecipientCompanyNameChange).toHaveBeenCalledWith("Sender Limited");
+    expect(props.onRecipientNameChange).toHaveBeenCalledWith("Ms Chan");
+    expect(props.onRecipientPhoneChange).toHaveBeenCalledWith("+852 6123 4567");
+  });
+
   it("toggles company recipient details while keeping the contact required", () => {
     const props = renderSection({
       recipientType: "company",

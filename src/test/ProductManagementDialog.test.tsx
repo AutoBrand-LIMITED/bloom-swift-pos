@@ -26,6 +26,9 @@ const testingProduct = {
   templateId: 4338,
   barcode: "1234",
   availableInPos: true,
+  displaySequence: 20,
+  availableFrom: "2026-02-01",
+  availableUntil: "2026-02-28",
   imageUrl: "",
 };
 
@@ -60,6 +63,9 @@ describe("ProductManagementDialog", () => {
     expect(screen.getByLabelText("Product Code")).toHaveValue("");
     expect(screen.getByLabelText("售價 ($)")).toHaveValue(null);
     expect(screen.getByLabelText("Barcode")).toHaveValue("");
+    expect(screen.getByLabelText("POS 排序")).toHaveValue(100);
+    expect(screen.getByLabelText("開始顯示日期")).toHaveValue("");
+    expect(screen.getByLabelText("結束顯示日期")).toHaveValue("");
     expect(apiMocks.searchProducts).toHaveBeenCalledTimes(1);
   });
 });
