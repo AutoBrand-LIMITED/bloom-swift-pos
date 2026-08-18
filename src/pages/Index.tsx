@@ -10,7 +10,10 @@ import BusinessDetailsSection from "@/components/pos/BusinessDetailsSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
 import SplitDeliverySection from "@/components/pos/SplitDeliverySection";
-import { validateDeliverySplits } from "@/lib/split-delivery";
+import {
+  normalizeDeliverySplitsForSubmission,
+  validateDeliverySplits,
+} from "@/lib/split-delivery";
 import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
@@ -381,10 +384,7 @@ const Index = () => {
           && (recipientType !== "company" || recipientCompanyName.trim())
         )
       ),
-  ) && !validateDeliverySplits(
-    fulfillmentType === "delivery" ? deliverySplits : [],
-    items,
-  );
+  ) && !validateDeliverySplits(deliverySplits, items);
   const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
   const paymentSectionComplete = Boolean(
     finalPrice > 0
@@ -1064,10 +1064,7 @@ const Index = () => {
       );
       return;
     }
-    const deliverySplitsError = validateDeliverySplits(
-      fulfillmentType === "delivery" ? deliverySplits : [],
-      items,
-    );
+    const deliverySplitsError = validateDeliverySplits(deliverySplits, items);
     if (deliverySplitsError) {
       toast.error(deliverySplitsError);
       scrollToWorkflowSection("delivery");
@@ -1229,7 +1226,7 @@ const Index = () => {
       deliveryFloor: fulfillmentType === "delivery" ? deliveryFloor.trim() : "",
       deliveryUnit: fulfillmentType === "delivery" ? deliveryUnit.trim() : "",
       ...(includePendingField("deliverySplits")
-        ? { deliverySplits: fulfillmentType === "delivery" ? deliverySplits : [] }
+        ? { deliverySplits: normalizeDeliverySplitsForSubmission(deliverySplits) }
         : {}),
       ...(includePendingField("recipientType") ? { recipientType } : {}),
       ...(includePendingField("recipientCompanyName")
@@ -1696,7 +1693,6 @@ const Index = () => {
           }}
           onFulfillmentTypeChange={(value) => {
             setFulfillmentType(value);
-            if (value === "pickup") setDeliverySplits([]);
             clearCheckoutErrors(
               "deliveryAddress",
               "recipientName",
@@ -1775,25 +1771,23 @@ const Index = () => {
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}
         />
-        {fulfillmentType === "delivery" && (
-          <SplitDeliverySection
-            items={items}
-            splits={deliverySplits}
-            onChange={setDeliverySplits}
-            defaultDeliveryDate={deliveryDate}
-            defaultDeliveryTime={deliveryTime}
-            defaultDeliveryTimeMode={deliveryTimeMode}
-            defaultDeliverySlotId={deliverySlotId}
-            deliverySlots={deliverySlots}
-            deliverySlotsLoading={deliverySlotsLoading}
-            deliverySlotsError={deliverySlotsError}
-            onRetryDeliverySlots={() => setDeliverySlotsRefreshKey((key) => key + 1)}
-            senderType={customerType}
-            senderCompanyName={companyName}
-            senderName={senderName || customerName}
-            senderPhone={phone}
-          />
-        )}
+        <SplitDeliverySection
+          items={items}
+          splits={deliverySplits}
+          onChange={setDeliverySplits}
+          defaultDeliveryDate={deliveryDate}
+          defaultDeliveryTime={deliveryTime}
+          defaultDeliveryTimeMode={deliveryTimeMode}
+          defaultDeliverySlotId={deliverySlotId}
+          deliverySlots={deliverySlots}
+          deliverySlotsLoading={deliverySlotsLoading}
+          deliverySlotsError={deliverySlotsError}
+          onRetryDeliverySlots={() => setDeliverySlotsRefreshKey((key) => key + 1)}
+          senderType={customerType}
+          senderCompanyName={companyName}
+          senderName={senderName || customerName}
+          senderPhone={phone}
+        />
         </section>
 
         <section

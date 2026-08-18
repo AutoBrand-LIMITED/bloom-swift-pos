@@ -45,6 +45,7 @@ const addressSnapshot = (split: DeliverySplit) => {
 
 const newSplit = (props: SplitDeliverySectionProps): DeliverySplit => ({
   id: crypto.randomUUID(),
+  fulfillmentType: "delivery",
   deliveryDate: props.defaultDeliveryDate,
   deliveryTimeMode: props.defaultDeliveryTimeMode,
   deliverySlotId: props.defaultDeliverySlotId,
@@ -125,7 +126,7 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
       {props.splits.length > 0 && (
         <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
           <p className="flex items-center gap-2 text-sm font-semibold">
-            <PackageOpen className="h-4 w-4" />主送貨點保留商品
+            <PackageOpen className="h-4 w-4" />主要收貨點保留商品
           </p>
           <div className="mt-2 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
             {props.items.map((item) => (
@@ -138,16 +139,16 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
       {props.splits.map((split, index) => (
         <div key={split.id} className="space-y-3 rounded-xl border-2 border-dashed border-primary/30 p-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold">拆單送貨點 {index + 2}</p>
+            <p className="text-sm font-semibold">拆單收貨點 {index + 2}</p>
             <Button type="button" variant="outline" size="sm" onClick={() => remove(split.id)}>
               <Trash2 className="mr-1.5 h-4 w-4" />移除
             </Button>
           </div>
 
           <DeliverySection
-            showFulfillmentSelector={false}
-            sectionTitle={`額外送貨資料 ${index + 2}`}
-            fulfillmentType="delivery"
+            showFulfillmentSelector
+            sectionTitle={`額外收貨資料 ${index + 2}`}
+            fulfillmentType={split.fulfillmentType || "delivery"}
             deliveryDate={split.deliveryDate}
             deliveryTime={split.deliveryTime}
             deliveryTimeMode={split.deliveryTimeMode}
@@ -174,7 +175,7 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
             senderPhone={props.senderPhone}
             deliveryPerson={split.deliveryPerson}
             failedDeliveryAction={split.failedDeliveryAction}
-            onFulfillmentTypeChange={() => undefined}
+            onFulfillmentTypeChange={(fulfillmentType) => update(split.id, { fulfillmentType })}
             onDateChange={(deliveryDate) => update(split.id, { deliveryDate })}
             onTimeChange={(deliveryTime) => update(split.id, { deliveryTime })}
             onSlotChange={(slot) => update(split.id, {
@@ -222,8 +223,8 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
           />
 
           <div className="rounded-xl border border-border bg-card p-4">
-            <p className="text-sm font-semibold">分配到此地址嘅商品數量</p>
-            <p className="mt-1 text-xs text-muted-foreground">未分配數量會保留喺主送貨地址，系統唔會重複計算。</p>
+            <p className="text-sm font-semibold">分配到此收貨點嘅商品數量</p>
+            <p className="mt-1 text-xs text-muted-foreground">未分配數量會保留喺主要收貨點，系統不會重複計算。</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {props.items.map((item) => {
                 const max = Math.max(0, item.quantity - allocatedOutside(split.id, item.id));
@@ -254,7 +255,7 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
         disabled={props.splits.length >= 10 || props.items.length === 0}
         onClick={() => props.onChange([...props.splits, newSplit(props)])}
       >
-        <Plus className="mr-2 h-4 w-4" />新增另一個送貨地址
+        <Plus className="mr-2 h-4 w-4" />新增另一個收貨點
       </Button>
     </div>
   );

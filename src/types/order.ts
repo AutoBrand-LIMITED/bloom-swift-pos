@@ -30,6 +30,8 @@ export interface DeliverySplitItemAllocation {
 /** An additional destination in a split-delivery order. */
 export interface DeliverySplit {
   id: string;
+  /** Each additional destination can be delivered or collected independently. */
+  fulfillmentType?: FulfillmentType;
   deliveryDate: string;
   deliveryTimeMode?: DeliveryTimeMode;
   deliverySlotId?: number;
