@@ -129,6 +129,38 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onRecipientPhoneChange).toHaveBeenCalledWith("+852 6123 4567");
   });
 
+  it("restores the previous recipient when same-as-sender is cancelled", () => {
+    const props = renderSectionProps({
+      recipientType: "personal",
+      recipientCompanyName: "",
+      recipientName: "Original Recipient",
+      recipientPhone: "+852 6999 9999",
+      senderType: "company",
+      senderCompanyName: "Sender Limited",
+      senderName: "Ms Chan",
+      senderPhone: "+852 6123 4567",
+    });
+    const view = render(<DeliverySection {...props} />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "收貨人同送花人相同" }));
+    view.rerender(<DeliverySection
+      {...props}
+      recipientType="company"
+      recipientCompanyName="Sender Limited"
+      recipientName="Ms Chan"
+      recipientPhone="+852 6123 4567"
+    />);
+
+    const checkbox = screen.getByRole("checkbox", { name: "收貨人同送花人相同" });
+    expect(checkbox).toBeChecked();
+    fireEvent.click(checkbox);
+
+    expect(props.onRecipientTypeChange).toHaveBeenLastCalledWith("personal");
+    expect(props.onRecipientCompanyNameChange).toHaveBeenLastCalledWith("");
+    expect(props.onRecipientNameChange).toHaveBeenLastCalledWith("Original Recipient");
+    expect(props.onRecipientPhoneChange).toHaveBeenLastCalledWith("+852 6999 9999");
+  });
+
   it("toggles company recipient details while keeping the contact required", () => {
     const props = renderSection({
       recipientType: "company",
