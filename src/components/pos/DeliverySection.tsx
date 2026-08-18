@@ -104,6 +104,12 @@ interface DeliverySectionProps {
 
 const RECIPIENT_SUGGESTION_CACHE_LIMIT = 100;
 type RecipientLookupField = "company" | "name" | "phone";
+interface RecipientDraft {
+  type: RecipientType;
+  companyName: string;
+  name: string;
+  phone: string;
+}
 
 const DeliverySection = ({
   showFulfillmentSelector = true,
@@ -162,6 +168,7 @@ const DeliverySection = ({
   const recipientLookupRef = useRef<HTMLDivElement>(null);
   const recipientSearchRequestRef = useRef(0);
   const recipientSuggestionCacheRef = useRef(new Map<string, RecipientSuggestion[]>());
+  const recipientBeforeSenderCopyRef = useRef<RecipientDraft | null>(null);
   const {
     suggestions: addressSuggestions,
     status: addressSuggestionStatus,
@@ -236,10 +243,28 @@ const DeliverySection = ({
     && recipientPhone.trim() === senderPhone.trim();
 
   const handleUseSenderAsRecipient = () => {
+    recipientBeforeSenderCopyRef.current = {
+      type: recipientType,
+      companyName: recipientCompanyName,
+      name: recipientName,
+      phone: recipientPhone,
+    };
     onRecipientTypeChange(senderType);
     onRecipientCompanyNameChange(senderType === "company" ? senderCompanyName.trim() : "");
     onRecipientNameChange(senderName.trim());
     onRecipientPhoneChange(senderPhone.trim());
+    setRecipientLookupField(null);
+    setRecipientSuggestions([]);
+    setCompletedRecipientSearch(null);
+  };
+
+  const handleStopUsingSenderAsRecipient = () => {
+    const previousRecipient = recipientBeforeSenderCopyRef.current;
+    onRecipientTypeChange(previousRecipient?.type ?? "personal");
+    onRecipientCompanyNameChange(previousRecipient?.companyName ?? "");
+    onRecipientNameChange(previousRecipient?.name ?? "");
+    onRecipientPhoneChange(previousRecipient?.phone ?? "");
+    recipientBeforeSenderCopyRef.current = null;
     setRecipientLookupField(null);
     setRecipientSuggestions([]);
     setCompletedRecipientSearch(null);
@@ -928,7 +953,11 @@ const DeliverySection = ({
             checked={recipientMatchesSender}
             disabled={!canUseSenderAsRecipient}
             onCheckedChange={(checked) => {
-              if (checked) handleUseSenderAsRecipient();
+              if (checked) {
+                handleUseSenderAsRecipient();
+              } else {
+                handleStopUsingSenderAsRecipient();
+              }
             }}
           />
         </div>
