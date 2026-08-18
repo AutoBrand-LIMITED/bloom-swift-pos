@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { validateDeliverySplits } from "@/lib/split-delivery";
+import {
+  normalizeDeliverySplitsForSubmission,
+  validateDeliverySplits,
+} from "@/lib/split-delivery";
 import type { DeliverySplit, OrderItem } from "@/types/order";
 
 const items: OrderItem[] = [{ id: "line-1", name: "Bouquet", price: 100, quantity: 2 }];
 
 const split = (quantity = 1): DeliverySplit => ({
   id: "split-2",
+  fulfillmentType: "delivery",
   deliveryDate: "2026-08-18",
   deliveryTimeMode: "slot",
   deliverySlotId: 1,
@@ -43,5 +47,32 @@ describe("validateDeliverySplits", () => {
   it("requires complete recipient and address data", () => {
     expect(validateDeliverySplits([{ ...split(), recipientName: "" }], items))
       .toContain("收貨人名稱");
+  });
+
+  it("accepts pickup destinations with only date, time, and item allocations", () => {
+    const pickup = {
+      ...split(),
+      fulfillmentType: "pickup" as const,
+      deliveryAddress: "",
+      recipientName: "",
+      recipientPhone: "",
+    };
+
+    expect(validateDeliverySplits([pickup], items)).toBeNull();
+  });
+
+  it("normalizes hidden delivery details before submitting a pickup destination", () => {
+    const pickup = normalizeDeliverySplitsForSubmission([{
+      ...split(),
+      fulfillmentType: "pickup",
+    }])[0];
+
+    expect(pickup).toMatchObject({
+      fulfillmentType: "pickup",
+      deliveryAddress: "",
+      recipientName: "",
+      recipientPhone: "",
+      itemAllocations: [{ itemId: "line-1", quantity: 1 }],
+    });
   });
 });

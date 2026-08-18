@@ -446,6 +446,7 @@ function splitAsOrder(order: Order, split: DeliverySplit, items: OrderItem[]): O
   return {
     ...order,
     items,
+    fulfillmentType: split.fulfillmentType || "delivery",
     deliveryDate: split.deliveryDate,
     deliveryTimeMode: split.deliveryTimeMode,
     deliverySlotId: split.deliverySlotId,
