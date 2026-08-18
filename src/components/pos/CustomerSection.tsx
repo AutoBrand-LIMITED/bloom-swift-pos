@@ -248,6 +248,7 @@ const CustomerSection = ({
   ));
   const canConfirmNewCustomer = Boolean(
     hasOdooBackend
+      && !selectedCustomer
       && activeDropdown !== "customerCode"
       && isValidPhoneNumber(phone)
       && normalizedCurrentCustomerName
@@ -389,6 +390,10 @@ const CustomerSection = ({
         <div className="p-3 space-y-2">
           {odooError ? (
             <p className="text-xs text-destructive">{odooError}</p>
+          ) : source === "email" && selectedCustomer?.odooPartnerId ? (
+            <p className="text-xs leading-relaxed text-foreground">
+              未有其他客戶使用呢個電郵；提交訂單時會補填到已選客戶，不會新增另一位客戶。
+            </p>
           ) : canConfirmNewCustomer ? (
             <>
               <p className="text-xs leading-relaxed text-foreground">

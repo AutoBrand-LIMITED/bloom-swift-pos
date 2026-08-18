@@ -318,6 +318,56 @@ describe("CustomerSection gift sender", () => {
     expect(selectCustomer).toHaveBeenCalledWith(customer);
   });
 
+  it("backfills a missing email on the selected customer instead of asking to create another contact", async () => {
+    const onConfirmNewCustomer = vi.fn();
+
+    function SelectedCustomerHarness() {
+      const [customerEmail, setCustomerEmail] = useState("");
+
+      return (
+        <CustomerSection
+          phone="67610707"
+          customerName="Jay"
+          customerCode="testing"
+          senderName="Jay"
+          customerType="personal"
+          companyName=""
+          billingAddress=""
+          customerEmail={customerEmail}
+          onPhoneChange={noop}
+          onNameChange={noop}
+          onCustomerCodeChange={noop}
+          onSenderNameChange={noop}
+          onCustomerTypeChange={noop}
+          onCompanyNameChange={noop}
+          onCustomerEmailChange={setCustomerEmail}
+          onBillingAddressChange={noop}
+          onCustomerSelect={noop}
+          onCustomerAndRecipientSelect={noop}
+          selectedCustomer={{
+            id: "odoo-42",
+            odooPartnerId: 42,
+            name: "Jay",
+            phone: "67610707",
+            customerCode: "testing",
+            email: "",
+            history: [],
+          }}
+          onConfirmNewCustomer={onConfirmNewCustomer}
+        />
+      );
+    }
+
+    render(<SelectedCustomerHarness />);
+    fireEvent.change(screen.getByLabelText(/客戶電郵/), {
+      target: { value: "jay@example.com" },
+    });
+
+    expect(await screen.findByText(/提交訂單時會補填到已選客戶/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "確認新增聯絡人" })).not.toBeInTheDocument();
+    expect(onConfirmNewCustomer).not.toHaveBeenCalled();
+  });
+
   it("closes customer suggestions when any non-dropdown form area is pressed", async () => {
     searchOdooCustomers.mockResolvedValue([{
       id: "odoo-89",
