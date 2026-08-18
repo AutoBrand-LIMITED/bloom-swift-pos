@@ -42,7 +42,7 @@ const pendingSubmission = (): PendingOrderSubmission => ({
     createdAt: "2026-08-01T10:00:00+08:00",
   },
   options: { customerType: "personal", companyName: "" },
-  savedAt: "2026-08-01T10:00:00+08:00",
+  savedAt: new Date().toISOString(),
 });
 
 describe("Index pending recovery without POS authentication", () => {

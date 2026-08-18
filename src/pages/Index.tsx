@@ -128,7 +128,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { employee, logout } = usePosAuth();
   const [pendingSubmission, setPendingSubmission] = useState<PendingOrderSubmission | null>(
-    loadPendingSubmission,
+    () => loadPendingSubmission(employee, posAuthRequired),
   );
   const restoredPendingSubmission = useRef(pendingSubmission).current;
   const restoredEmployeePendingSubmission = pendingSubmissionForEmployee(
@@ -417,11 +417,6 @@ const Index = () => {
       behavior: "smooth",
     });
   }, []);
-  const pendingOwnershipMismatch = Boolean(
-    posAuthRequired
-      && pendingSubmission
-      && !employeePendingSubmission,
-  );
   const frozenDeliverySlotSelection = employeePendingSubmission?.order.deliveryTimeMode === "slot"
     && employeePendingSubmission.order.deliverySlotId !== undefined
     ? {
@@ -975,12 +970,6 @@ const Index = () => {
       });
       return;
     }
-    if (pendingSubmission && pendingOwnershipMismatch) {
-      toast.error("這張待確認訂單屬於另一位或未知員工；請由原本員工重新登入後再重試。", {
-        duration: 9000,
-      });
-      return;
-    }
     // Validation
     if (!salesId.trim()) {
       toast.error("請先選擇負責員工");
@@ -1493,15 +1482,7 @@ const Index = () => {
           }}
         />
 
-        {pendingOwnershipMismatch && (
-          <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive">
-            <p>
-              這張未確認訂單並不屬於目前登入員工，系統不會自動轉名或容許移除。請登出後由原本員工重新登入；如無法辨認原員工，請由管理員到 Odoo 核對。
-            </p>
-          </div>
-        )}
-
-        {pendingSubmission && !isSubmitting && !pendingOwnershipMismatch && (
+        {pendingSubmission && !isSubmitting && (
           <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
             <p>
               {posAuthRequired

@@ -14,6 +14,104 @@ export interface PendingOrderSubmission {
 }
 
 export const PENDING_SUBMISSION_KEY = "florist-pos-pending-odoo-submission-v1";
+export const PENDING_SUBMISSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface PendingSubmissionStore {
+  version: 2;
+  submissions: Record<string, PendingOrderSubmission>;
+}
+
+const EMPTY_PENDING_STORE = (): PendingSubmissionStore => ({
+  version: 2,
+  submissions: {},
+});
+
+const submissionScopeKey = (pending: PendingOrderSubmission): string => {
+  const employeeId = pending.order.operatorEmployeeId;
+  return employeeId === undefined ? "anonymous" : `employee:${employeeId}`;
+};
+
+const employeeScopeKey = (employee: PosEmployeeIdentity): string => `employee:${employee.id}`;
+
+function isPendingSubmission(value: unknown): value is PendingOrderSubmission {
+  if (!value || typeof value !== "object") return false;
+  const pending = value as Partial<PendingOrderSubmission>;
+  return Boolean(
+    pending.order?.id
+      && pending.order.createdAt
+      && pending.savedAt
+      && (pending.order.paymentStatus === "unpaid" || pending.order.paymentIdempotencyKey),
+  );
+}
+
+function isExpired(pending: PendingOrderSubmission, now = Date.now()): boolean {
+  const savedAt = Date.parse(pending.savedAt);
+  return !Number.isFinite(savedAt) || now - savedAt > PENDING_SUBMISSION_TTL_MS;
+}
+
+function persistStore(store: PendingSubmissionStore): void {
+  if (Object.keys(store.submissions).length === 0) {
+    localStorage.removeItem(PENDING_SUBMISSION_KEY);
+    return;
+  }
+  localStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(store));
+}
+
+function readPendingStore(): PendingSubmissionStore {
+  try {
+    const raw = localStorage.getItem(PENDING_SUBMISSION_KEY);
+    if (!raw) return EMPTY_PENDING_STORE();
+    const parsed = JSON.parse(raw) as unknown;
+    const store = EMPTY_PENDING_STORE();
+    let shouldPersist = false;
+
+    if (isPendingSubmission(parsed)) {
+      // Migrate the original single-envelope format in place. Unknown legacy
+      // ownership remains isolated under "anonymous" and cannot block a
+      // signed-in employee.
+      store.submissions[submissionScopeKey(parsed)] = parsed;
+      shouldPersist = true;
+    } else if (
+      parsed
+      && typeof parsed === "object"
+      && (parsed as Partial<PendingSubmissionStore>).version === 2
+      && (parsed as Partial<PendingSubmissionStore>).submissions
+    ) {
+      const candidates = (parsed as PendingSubmissionStore).submissions;
+      for (const [scope, pending] of Object.entries(candidates)) {
+        if (isPendingSubmission(pending) && !isExpired(pending)) {
+          const normalizedScope = submissionScopeKey(pending);
+          store.submissions[normalizedScope] = pending;
+          if (normalizedScope !== scope) shouldPersist = true;
+        } else {
+          shouldPersist = true;
+        }
+      }
+    } else {
+      localStorage.removeItem(PENDING_SUBMISSION_KEY);
+      return store;
+    }
+
+    if (Object.values(store.submissions).some((pending) => isExpired(pending))) {
+      for (const [scope, pending] of Object.entries(store.submissions)) {
+        if (isExpired(pending)) delete store.submissions[scope];
+      }
+      shouldPersist = true;
+    }
+    if (shouldPersist) persistStore(store);
+    return store;
+  } catch {
+    localStorage.removeItem(PENDING_SUBMISSION_KEY);
+    return EMPTY_PENDING_STORE();
+  }
+}
+
+function pendingSubmissionForScope(
+  store: PendingSubmissionStore,
+  pending: PendingOrderSubmission,
+): PendingOrderSubmission | null {
+  return store.submissions[submissionScopeKey(pending)] || null;
+}
 
 export function pendingSubmissionBelongsToEmployee(
   pending: PendingOrderSubmission,
@@ -130,48 +228,55 @@ export function deliveryContractFieldsForSubmission(
   };
 }
 
-export function loadPendingSubmission(): PendingOrderSubmission | null {
-  try {
-    const raw = localStorage.getItem(PENDING_SUBMISSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as PendingOrderSubmission;
-    if (
-      !parsed?.order?.id
-      || !parsed.order.createdAt
-      || !parsed.savedAt
-      || (parsed.order.paymentStatus !== "unpaid" && !parsed.order.paymentIdempotencyKey)
-    ) {
-      localStorage.removeItem(PENDING_SUBMISSION_KEY);
-      return null;
-    }
-    return parsed;
-  } catch {
-    localStorage.removeItem(PENDING_SUBMISSION_KEY);
-    return null;
+export function loadPendingSubmission(
+  employee: PosEmployeeIdentity | null = null,
+  authRequired = false,
+): PendingOrderSubmission | null {
+  const store = readPendingStore();
+  if (authRequired) {
+    return employee ? store.submissions[employeeScopeKey(employee)] || null : null;
   }
+  if (employee) return store.submissions[employeeScopeKey(employee)] || null;
+  return Object.values(store.submissions)[0] || null;
 }
 
 export function savePendingSubmission(submission: PendingOrderSubmission): void {
-  const existing = loadPendingSubmission();
+  const store = readPendingStore();
+  const scope = submissionScopeKey(submission);
+  const existing = store.submissions[scope];
   if (existing && existing.order.id !== submission.order.id) {
-    throw new Error("另一張 Odoo 訂單仍待確認，請先重試原本訂單");
+    throw new Error("目前員工有另一張 Odoo 訂單仍待確認，請先重試原本訂單");
   }
   if (existing && !submissionPayloadMatches(existing, submission)) {
     throw new Error("待確認嘅 Odoo 訂單內容已改變，請重新載入原本訂單");
   }
-  localStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(submission));
+  store.submissions[scope] = submission;
+  persistStore(store);
 }
 
 export function clearPendingSubmission(expected?: string | PendingOrderSubmission): boolean {
-  if (expected) {
-    const existing = loadPendingSubmission();
-    const expectedCheckoutId = typeof expected === "string" ? expected : expected.order.id;
-    if (existing && existing.order.id !== expectedCheckoutId) return false;
-    if (existing && typeof expected !== "string" && !submissionPayloadMatches(existing, expected)) {
+  const store = readPendingStore();
+  if (!expected) {
+    localStorage.removeItem(PENDING_SUBMISSION_KEY);
+    return true;
+  }
+
+  if (typeof expected === "string") {
+    const matchingScopes = Object.entries(store.submissions)
+      .filter(([, pending]) => pending.order.id === expected)
+      .map(([scope]) => scope);
+    if (matchingScopes.length !== 1) return false;
+    delete store.submissions[matchingScopes[0]];
+  } else {
+    const scope = submissionScopeKey(expected);
+    const existing = store.submissions[scope];
+    if (!existing || !submissionPayloadMatches(existing, expected)) {
       return false;
     }
+    delete store.submissions[scope];
   }
-  localStorage.removeItem(PENDING_SUBMISSION_KEY);
+
+  persistStore(store);
   return true;
 }
 
@@ -254,7 +359,8 @@ export function upgradeLegacyPendingDeliverySelection(
     throw new Error("指定時間不可包含標準時段編號");
   }
 
-  const persisted = loadPendingSubmission();
+  const store = readPendingStore();
+  const persisted = pendingSubmissionForScope(store, pending);
   if (!persisted || !submissionPayloadMatches(persisted, pending)) {
     throw new Error("待確認嘅 Odoo 訂單已改變，請重新載入後再選擇送貨時間");
   }
@@ -274,7 +380,8 @@ export function upgradeLegacyPendingDeliverySelection(
   if (!candidateMatchesSelection || !unchangedOutsideDelivery) {
     throw new Error("待確認訂單除送貨時間外曾被修改；請還原原本內容後再重試");
   }
-  localStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(candidate));
+  store.submissions[submissionScopeKey(candidate)] = candidate;
+  persistStore(store);
   return candidate;
 }
 
