@@ -4,6 +4,7 @@ import {
   normalizeDeliverySplitsForSubmission,
   validateDeliverySplits,
 } from "@/lib/split-delivery";
+import { PICKUP_LOCATION_ADDRESS } from "@/lib/fulfillment";
 import type { DeliverySplit, OrderItem } from "@/types/order";
 
 const items: OrderItem[] = [{ id: "line-1", name: "Bouquet", price: 100, quantity: 2 }];
@@ -53,7 +54,7 @@ describe("validateDeliverySplits", () => {
     const pickup = {
       ...split(),
       fulfillmentType: "pickup" as const,
-      deliveryAddress: "",
+      deliveryAddress: PICKUP_LOCATION_ADDRESS,
       recipientName: "",
       recipientPhone: "",
     };
@@ -69,7 +70,7 @@ describe("validateDeliverySplits", () => {
 
     expect(pickup).toMatchObject({
       fulfillmentType: "pickup",
-      deliveryAddress: "",
+      deliveryAddress: PICKUP_LOCATION_ADDRESS,
       recipientName: "",
       recipientPhone: "",
       itemAllocations: [{ itemId: "line-1", quantity: 1 }],

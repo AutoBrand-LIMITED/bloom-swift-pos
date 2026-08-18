@@ -1,4 +1,5 @@
 import { isValidDeliveryDate, isValidPhoneNumber } from "@/lib/checkout-validation";
+import { PICKUP_LOCATION_ADDRESS } from "@/lib/fulfillment";
 import type { DeliverySplit, OrderItem } from "@/types/order";
 
 export const splitFulfillmentType = (split: DeliverySplit) => (
@@ -18,7 +19,7 @@ export const normalizeDeliverySplitsForSubmission = (
     deliveryDistrict: "",
     deliveryArea: "",
     deliveryDetail: "",
-    deliveryAddress: "",
+    deliveryAddress: PICKUP_LOCATION_ADDRESS,
     deliveryGoogleAddress: "",
     deliveryBuilding: "",
     deliveryFloor: "",

@@ -14,6 +14,7 @@ import {
   normalizeDeliverySplitsForSubmission,
   validateDeliverySplits,
 } from "@/lib/split-delivery";
+import { PICKUP_LOCATION_ADDRESS } from "@/lib/fulfillment";
 import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
@@ -1011,7 +1012,7 @@ const Index = () => {
       deliveryDetail.trim(),
     ].filter(Boolean).join(" ");
     const deliveryAddress = fulfillmentType === "pickup"
-      ? ""
+      ? PICKUP_LOCATION_ADDRESS
       : [
           deliveryGoogleAddress,
           deliveryBuilding.trim(),
