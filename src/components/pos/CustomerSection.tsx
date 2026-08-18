@@ -2,13 +2,24 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Phone, ChevronDown, Building2, UserRoundCheck, Hash, Mail, MapPin } from "lucide-react";
+import { User, ChevronDown, Building2, UserRoundCheck, Hash, Mail, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DemoCustomer } from "@/data/demo-customers";
 import CustomerFlags from "@/components/pos/CustomerFlags";
+import RegionalPhoneInput from "@/components/pos/RegionalPhoneInput";
 import { customerIdentityKey, loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
-import { hasOdooBackend, searchOdooCustomers } from "@/lib/odoo-api";
-import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/checkout-validation";
+import {
+  hasOdooBackend,
+  searchOdooCustomerAccount,
+  searchOdooCustomers,
+  type CustomerAccountLookup,
+} from "@/lib/odoo-api";
+import {
+  isValidPhoneNumber,
+  normalizeCustomerIdentityName,
+  normalizePhoneNumber,
+} from "@/lib/checkout-validation";
+import { phoneLocalDigits, phoneMatchesQuery, phoneSearchRank } from "@/lib/phone-utils";
 
 export type CustomerType = "personal" | "company";
 type CustomerLookupSource = "phone" | "name" | "email" | "customerCode";
@@ -31,6 +42,7 @@ interface CustomerSectionProps {
   onCustomerEmailChange: (v: string) => void;
   onBillingAddressChange: (v: string) => void;
   onCustomerSelect: (c: DemoCustomer) => void;
+  onStartNewCustomerUnderAccount?: (customerCode: string) => void;
   onCustomerAndRecipientSelect: (
     customer: DemoCustomer,
     recipient: NonNullable<DemoCustomer["recipientMatch"]>,
@@ -42,8 +54,9 @@ interface CustomerSectionProps {
   customerEmailError?: string;
   billingAddressError?: string;
   selectedCustomer: DemoCustomer | null;
+  confirmedNewCustomerName?: string | null;
   confirmedNewCustomerPhone?: string | null;
-  onConfirmNewCustomer?: (normalizedPhone: string) => void;
+  onConfirmNewCustomer?: (normalizedPhone: string, normalizedName: string) => void;
   refreshKey?: number;
 }
 
@@ -51,35 +64,39 @@ const CustomerSection = ({
   phone, customerName, customerCode, senderName, customerType, companyName, customerEmail, billingAddress,
   onPhoneChange, onNameChange, onCustomerCodeChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
   onCustomerEmailChange, onBillingAddressChange,
-  onCustomerSelect, onCustomerAndRecipientSelect,
+  onCustomerSelect, onCustomerAndRecipientSelect, onStartNewCustomerUnderAccount,
   phoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
-  confirmedNewCustomerPhone, onConfirmNewCustomer,
+  confirmedNewCustomerName, confirmedNewCustomerPhone, onConfirmNewCustomer,
 }: CustomerSectionProps) => {
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [odooCustomers, setOdooCustomers] = useState<DemoCustomer[]>([]);
+  const [customerAccount, setCustomerAccount] = useState<CustomerAccountLookup | null>(null);
   const [odooLoading, setOdooLoading] = useState(false);
   const [odooError, setOdooError] = useState<string | null>(null);
   const [completedOdooSearch, setCompletedOdooSearch] = useState<{
     source: CustomerLookupSource;
     query: string;
   } | null>(null);
-  const lookupRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
-  const suppressNextNameDropdownRef = useRef(false);
 
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (lookupRef.current && !lookupRef.current.contains(e.target as Node)) {
-        setActiveDropdown(null);
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element
+        && target.closest("[data-customer-lookup-interactive]")
+      ) {
+        return;
       }
+      setActiveDropdown(null);
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown);
   }, []);
 
   // Keep only real imported/local customers here. Odoo results are merged below.
@@ -89,15 +106,14 @@ const CustomerSection = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  const normalizedSearchPhone = normalizePhoneNumber(search);
-  const normalizedDebouncedPhone = normalizePhoneNumber(debouncedSearch);
+  const normalizedSearchPhone = phoneLocalDigits(search);
+  const normalizedDebouncedPhone = phoneLocalDigits(debouncedSearch);
   const filtered = allCustomers.filter((c) => {
-    const normalizedCustomerPhone = c.phone.replace(/\D/g, "");
     return (
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       Boolean(c.email?.toLowerCase().includes(search.toLowerCase())) ||
       c.phone.includes(search) ||
-      Boolean(normalizedSearchPhone && normalizedCustomerPhone.includes(normalizedSearchPhone))
+      Boolean(normalizedSearchPhone && phoneMatchesQuery(c.phone, search))
     );
   });
 
@@ -119,6 +135,7 @@ const CustomerSection = ({
 
     if (!activeDropdown || !hasOdooBackend || !canSearch) {
       setOdooCustomers([]);
+      setCustomerAccount(null);
       setOdooLoading(false);
       setOdooError(null);
       return;
@@ -131,13 +148,20 @@ const CustomerSection = ({
     setOdooError(null);
     setCompletedOdooSearch(null);
 
-    searchOdooCustomers(
-      trimmed,
-      controller.signal,
-      activeDropdown === "customerCode" ? "customer_code" : "general",
-    )
-      .then((customers) => {
+    const searchPromise = activeDropdown === "customerCode"
+      ? searchOdooCustomerAccount(trimmed, controller.signal).then((account) => ({
+          account,
+          customers: account.contacts,
+        }))
+      : searchOdooCustomers(trimmed, controller.signal, "general").then((customers) => ({
+          account: null,
+          customers,
+        }));
+
+    searchPromise
+      .then(({ account, customers }) => {
         if (controller.signal.aborted || searchRequestRef.current !== requestId) return;
+        setCustomerAccount(account);
         setOdooCustomers(customers);
         setCompletedOdooSearch({
           source: activeDropdown,
@@ -149,6 +173,7 @@ const CustomerSection = ({
       .catch((err: unknown) => {
         if (controller.signal.aborted || searchRequestRef.current !== requestId) return;
         setOdooCustomers([]);
+        setCustomerAccount(null);
         setCompletedOdooSearch(null);
         setOdooError(err instanceof Error ? err.message : "未能連接 Odoo 客戶資料");
       })
@@ -184,8 +209,11 @@ const CustomerSection = ({
       options.push(c);
     }
 
+    if (activeDropdown === "phone" && normalizedSearchPhone) {
+      options.sort((left, right) => phoneSearchRank(left.phone, search) - phoneSearchRank(right.phone, search));
+    }
     return options;
-  }, [activeDropdown, completedCurrentSearch, filtered, odooCustomers, search]);
+  }, [activeDropdown, completedCurrentSearch, filtered, normalizedSearchPhone, odooCustomers, search]);
 
   const searchHint =
     sourceRequiresMoreInput(activeDropdown, search)
@@ -202,23 +230,32 @@ const CustomerSection = ({
           : "未搵到客戶"
         : "正在準備搜尋...";
 
-  const orderingCustomerName = (
-    customerType === "company" && companyName.trim()
-      ? companyName
-      : customerName
-  ).trim();
+  // 「同客戶相同」係指實際下單人／聯絡人；公司名稱只屬於帳戶資料。
+  const orderingCustomerName = customerName.trim();
   const normalizedCurrentPhone = normalizePhoneNumber(phone);
+  const currentPhoneSearchKey = phoneLocalDigits(phone);
+  const normalizedCurrentCustomerName = normalizeCustomerIdentityName(customerName);
+  const currentSearchMatchesField = activeDropdown === "phone"
+    ? normalizedSearchPhone === currentPhoneSearchKey
+    : activeDropdown === "name"
+      ? normalizeCustomerIdentityName(search) === normalizedCurrentCustomerName
+      : activeDropdown === "email"
+        ? search.trim().toLocaleLowerCase() === customerEmail.trim().toLocaleLowerCase()
+        : false;
+  const hasExactCustomerIdentity = customerOptions.some((customer) => (
+    normalizePhoneNumber(customer.phone) === normalizedCurrentPhone
+      && normalizeCustomerIdentityName(customer.name) === normalizedCurrentCustomerName
+  ));
   const canConfirmNewCustomer = Boolean(
     hasOdooBackend
-      && activeDropdown === "phone"
+      && activeDropdown !== "customerCode"
       && isValidPhoneNumber(phone)
-      && normalizedSearchPhone === normalizedCurrentPhone
-      && normalizedDebouncedPhone === normalizedCurrentPhone
-      && completedOdooSearch?.source === "phone"
-      && completedOdooSearch.query === normalizedCurrentPhone
+      && normalizedCurrentCustomerName
+      && currentSearchMatchesField
+      && completedCurrentSearch
       && !odooLoading
       && !odooError
-      && customerOptions.length === 0,
+      && !hasExactCustomerIdentity,
   );
   const canStartNewCustomerWithCode = Boolean(
     hasOdooBackend
@@ -227,11 +264,19 @@ const CustomerSection = ({
       && completedCurrentSearch
       && !odooLoading
       && !odooError
-      && customerOptions.length === 0,
+      && customerAccount?.contactCount === 0,
+  );
+  const hasExistingCustomerAccount = Boolean(
+    activeDropdown === "customerCode"
+      && completedCurrentSearch
+      && customerAccount
+      && customerAccount.contactCount > 0,
   );
   const isNewCustomerConfirmed = Boolean(
     normalizedCurrentPhone
-      && confirmedNewCustomerPhone === normalizedCurrentPhone,
+      && normalizedCurrentCustomerName
+      && confirmedNewCustomerPhone === normalizedCurrentPhone
+      && normalizeCustomerIdentityName(confirmedNewCustomerName || "") === normalizedCurrentCustomerName,
   );
   const isNewCustomerDraft = Boolean(
     isNewCustomerConfirmed
@@ -305,9 +350,31 @@ const CustomerSection = ({
     </>
   );
 
+  const confirmNewCustomerAction = canConfirmNewCustomer && (
+    <div className="space-y-2 border-t border-border bg-muted/20 p-3">
+      <p className="text-xs leading-relaxed text-foreground">
+        搜尋結果唔係同一位聯絡人？可保留電話 {phone.trim()}，以「{customerName.trim()}」新增聯絡人。
+      </p>
+      <Button
+        type="button"
+        size="sm"
+        className="min-h-11 w-full touch-manipulation"
+        onClick={(event) => {
+          event.stopPropagation();
+          onConfirmNewCustomer?.(normalizedCurrentPhone, customerName.trim());
+          setActiveDropdown(null);
+          setSearch("");
+        }}
+      >
+        確認新增聯絡人
+      </Button>
+    </div>
+  );
+
   const customerDropdown = (source: CustomerLookupSource) => activeDropdown === source && (
     <div
       id={`customer-${source}-results`}
+      data-customer-lookup-interactive
       className={`absolute z-50 top-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden ${
       source === "name"
         ? "left-0 right-0 sm:left-auto sm:right-0 sm:w-[calc(200%+0.75rem)]"
@@ -318,30 +385,16 @@ const CustomerSection = ({
     >
       {odooLoading ? (
         <p className="text-xs text-muted-foreground p-3">正在搜尋 Odoo 客戶及收件人...</p>
-      ) : customerOptions.length === 0 ? (
+      ) : customerOptions.length === 0 && !hasExistingCustomerAccount ? (
         <div className="p-3 space-y-2">
           {odooError ? (
             <p className="text-xs text-destructive">{odooError}</p>
           ) : canConfirmNewCustomer ? (
             <>
               <p className="text-xs leading-relaxed text-foreground">
-                系統未有此電話號碼的客戶。請先檢查電話；如資料正確，確認新增客戶。
+                系統未有符合此電話及聯絡人名稱嘅客戶。
               </p>
-              <Button
-                type="button"
-                size="sm"
-                className="min-h-11 w-full touch-manipulation"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onConfirmNewCustomer?.(normalizedCurrentPhone);
-                  setActiveDropdown(null);
-                  setSearch("");
-                  suppressNextNameDropdownRef.current = true;
-                  window.requestAnimationFrame(() => nameInputRef.current?.focus());
-                }}
-              >
-                確認新增客戶
-              </Button>
+              {confirmNewCustomerAction}
             </>
           ) : canStartNewCustomerWithCode ? (
             <>
@@ -368,7 +421,33 @@ const CustomerSection = ({
           )}
         </div>
       ) : (
-        <div className="max-h-48 overflow-y-auto">
+        <div className="max-h-64 overflow-y-auto">
+          {hasExistingCustomerAccount && customerAccount && (
+            <div className="sticky top-0 z-10 space-y-2 border-b border-border bg-card p-3">
+              <p className="text-sm font-semibold">
+                {customerAccount.customerCode} 帳戶 · {customerAccount.contactCount} 位聯絡人
+              </p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Customer ID 只代表帳戶。請揀實際下單人，系統唔會自動套用第一位聯絡人。
+                {customerAccount.truncated ? " 以下只顯示部分聯絡人；可用電話、姓名或電郵搜尋指定人士。" : ""}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="min-h-10 w-full touch-manipulation"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onStartNewCustomerUnderAccount?.(customerAccount.customerCode);
+                  setActiveDropdown(null);
+                  setSearch("");
+                  window.requestAnimationFrame(() => phoneInputRef.current?.focus());
+                }}
+              >
+                在 {customerAccount.customerCode} 帳戶新增聯絡人
+              </Button>
+            </div>
+          )}
           {odooError && (
             <p className="px-3 py-2 text-[10px] text-destructive border-b border-border">
               Odoo 搜尋暫時不可用，以下顯示本機記錄
@@ -410,6 +489,7 @@ const CustomerSection = ({
               {customerOptionContent(c)}
             </button>
           ))}
+          {confirmNewCustomerAction}
         </div>
       )}
     </div>
@@ -487,7 +567,7 @@ const CustomerSection = ({
           </div>
         </div>
       )}
-      <div className="space-y-3" ref={lookupRef}>
+      <div className="space-y-3">
         <div className="space-y-1.5 relative">
           <Label htmlFor="customer-code-search" className="text-xs font-medium">
             {canBackfillSelectedCustomerCode
@@ -496,7 +576,7 @@ const CustomerSection = ({
                 ? "新 Customer ID／客戶編號（選填）"
                 : "Customer ID／客戶編號"}
           </Label>
-          <div className="relative">
+          <div className="relative" data-customer-lookup-interactive>
             <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               id="customer-code-search"
@@ -510,15 +590,19 @@ const CustomerSection = ({
                   : selectedCustomer?.customerCode || ""}
               onChange={(event) => {
                 if (isCustomerCodeEntry) {
-                  onCustomerCodeChange(event.target.value);
+                  const nextCustomerCode = event.target.value;
+                  onCustomerCodeChange(nextCustomerCode);
+                  setSearch(nextCustomerCode);
+                  setActiveDropdown("customerCode");
                   return;
                 }
                 setSearch(event.target.value);
                 setActiveDropdown("customerCode");
               }}
               onFocus={() => {
-                if (isCustomerCodeEntry) return;
-                setSearch(selectedCustomer?.customerCode || "");
+                setSearch(isCustomerCodeEntry
+                  ? customerCode
+                  : selectedCustomer?.customerCode || "");
                 setActiveDropdown("customerCode");
               }}
               className="pl-9 font-mono text-base"
@@ -529,34 +613,32 @@ const CustomerSection = ({
           {isCustomerCodeEntry ? (
             <p className="text-[11px] text-muted-foreground">
               {canBackfillSelectedCustomerCode
-                ? "呢個 Customer ID 會喺落單時更新返呢個現有 Odoo 客戶；如已被使用，系統會阻止落單。"
+                ? "呢個 Customer ID 會喺落單時加入呢位現有 Odoo 聯絡人；同一帳戶可有多位聯絡人。"
                 : isNewCustomerConfirmed
-                  ? "呢個 Customer ID 會連同新客戶資料儲存到 Odoo；如已被使用，系統會阻止落單。"
-                  : "已保留呢個 Customer ID；請輸入電話並完成『確認新增客戶』。"}
+                  ? "呢個聯絡人會用此 Customer ID 加入相同帳戶，並連同新客戶資料儲存到 Odoo。"
+                  : "已保留呢個帳戶 Customer ID；請輸入電話及聯絡人名稱，再完成『確認新增聯絡人』。"}
             </p>
           ) : (
             <>
               <p className="text-[11px] text-muted-foreground">
-                呢度用嚟搜尋現有客戶；搜尋冇結果時可確認用該 Customer ID 新增客戶。
+                呢度用嚟搜尋客戶帳戶；揀帳戶後仍要揀實際聯絡人，亦可在帳戶下新增聯絡人。
               </p>
-              {customerDropdown("customerCode")}
             </>
           )}
+          {customerDropdown("customerCode")}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5 relative">
             <Label htmlFor="phone" className="text-xs font-medium">
               下單人電話 <span className="text-destructive">*</span>
             </Label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                ref={phoneInputRef}
+            <div data-customer-lookup-interactive>
+              <RegionalPhoneInput
+                inputRef={phoneInputRef}
                 id="phone"
-                placeholder="例如：9123 4567"
+                ariaLabel="下單人電話"
                 value={phone}
-                onChange={(e) => {
-                  const nextPhone = e.target.value;
+                onChange={(nextPhone) => {
                   onPhoneChange(nextPhone);
                   setSearch(nextPhone);
                   setActiveDropdown("phone");
@@ -567,10 +649,7 @@ const CustomerSection = ({
                     setActiveDropdown("phone");
                   }
                 }}
-                className={`pl-9 font-mono text-base ${phoneError ? "border-destructive ring-1 ring-destructive" : ""}`}
-                maxLength={30}
-                aria-invalid={Boolean(phoneError)}
-                aria-describedby={phoneError ? "phone-error" : undefined}
+                invalid={Boolean(phoneError)}
               />
             </div>
             {customerDropdown("phone")}
@@ -580,7 +659,7 @@ const CustomerSection = ({
             {isNewCustomerConfirmed && (
               <p className="flex items-center gap-1 text-xs text-emerald-700">
                 <UserRoundCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                已確認新增此電話客戶
+                已確認以此電話及名稱新增聯絡人
               </p>
             )}
           </div>
@@ -588,7 +667,7 @@ const CustomerSection = ({
             <Label htmlFor="customer-name" className="text-xs font-medium">
               下單人／聯絡人 <span className="text-destructive">*</span>
             </Label>
-            <div className="relative">
+            <div className="relative" data-customer-lookup-interactive>
               <Input
                 ref={nameInputRef}
                 id="customer-name"
@@ -600,10 +679,6 @@ const CustomerSection = ({
                   setActiveDropdown("name");
                 }}
                 onFocus={() => {
-                  if (suppressNextNameDropdownRef.current) {
-                    suppressNextNameDropdownRef.current = false;
-                    return;
-                  }
                   setSearch(customerName);
                   setActiveDropdown("name");
                 }}
@@ -644,6 +719,7 @@ const CustomerSection = ({
           客戶電郵
         </Label>
         <Input
+          data-customer-lookup-interactive
           id="customer-email"
           type="email"
           inputMode="email"

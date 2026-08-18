@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import RegionalPhoneInput from "@/components/pos/RegionalPhoneInput";
 import { RadioGroup } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGoogleAddressSuggestions } from "@/hooks/useGoogleAddressSuggestions";
@@ -22,7 +24,7 @@ import {
   parseDeliveryAddress,
   type GoogleAddressSelection,
 } from "@/lib/hk-address";
-import type { DeliveryTimeMode, RecipientType } from "@/types/order";
+import type { DeliveryTimeMode, FulfillmentType, RecipientType } from "@/types/order";
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import {
@@ -34,11 +36,16 @@ import {
   LoaderCircle,
   MapPin,
   RefreshCw,
+  Store,
+  Truck,
   User,
   UserCheck,
 } from "lucide-react";
 
 interface DeliverySectionProps {
+  showFulfillmentSelector?: boolean;
+  sectionTitle?: string;
+  fulfillmentType: FulfillmentType;
   deliveryDate: string;
   deliveryTime: string;
   deliveryTimeMode?: DeliveryTimeMode;
@@ -58,13 +65,21 @@ interface DeliverySectionProps {
   deliveryDistrict: string;
   deliveryArea: string;
   deliveryDetail: string;
+  deliveryBuilding: string;
+  deliveryFloor: string;
+  deliveryUnit: string;
   recipientType: RecipientType;
   recipientCompanyName: string;
   recipientName: string;
   recipientPhone: string;
+  senderType?: RecipientType;
+  senderCompanyName?: string;
+  senderName?: string;
+  senderPhone?: string;
   deliveryPerson: string;
   failedDeliveryAction: string;
   onDateChange: (v: string) => void;
+  onFulfillmentTypeChange: (v: FulfillmentType) => void;
   onTimeChange: (v: string) => void;
   onSlotChange: (slot: DeliverySlot) => void;
   onSpecifiedTimeSelect: () => void;
@@ -73,6 +88,9 @@ interface DeliverySectionProps {
   onDistrictChange: (v: string) => void;
   onAreaChange: (v: string) => void;
   onDetailChange: (v: string) => void;
+  onBuildingChange: (v: string) => void;
+  onFloorChange: (v: string) => void;
+  onUnitChange: (v: string) => void;
   onGoogleAddressSelect: (selection: GoogleAddressSelection) => void;
   onRecipientTypeChange: (v: RecipientType) => void;
   onRecipientCompanyNameChange: (v: string) => void;
@@ -88,6 +106,9 @@ const RECIPIENT_SUGGESTION_CACHE_LIMIT = 100;
 type RecipientLookupField = "company" | "name" | "phone";
 
 const DeliverySection = ({
+  showFulfillmentSelector = true,
+  sectionTitle = "收貨方式",
+  fulfillmentType,
   deliveryDate, deliveryTime, deliveryTimeMode, deliverySlotId,
   frozenSlotSelection,
   deliverySlots, deliverySlotsLoading, deliverySlotsError, deliveryTimeError,
@@ -95,10 +116,13 @@ const DeliverySection = ({
   recipientPhoneError,
   legacyDeliveryTime,
   deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
+  deliveryBuilding, deliveryFloor, deliveryUnit,
   recipientType, recipientCompanyName, recipientName, recipientPhone,
+  senderType = "personal", senderCompanyName = "", senderName = "", senderPhone = "",
   deliveryPerson, failedDeliveryAction,
-  onDateChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect, onRetryDeliverySlots,
+  onDateChange, onFulfillmentTypeChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect, onRetryDeliverySlots,
   onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
+  onBuildingChange, onFloorChange, onUnitChange,
   onGoogleAddressSelect,
   onRecipientTypeChange, onRecipientCompanyNameChange,
   onRecipientNameChange, onRecipientPhoneChange, onRecipientSuggestionSelect,
@@ -204,6 +228,22 @@ const DeliverySection = ({
   const visibleRecipientSuggestions = completedCurrentRecipientSearch
     ? recipientSuggestions
     : [];
+  const canUseSenderAsRecipient = Boolean(senderName.trim() && senderPhone.trim());
+  const recipientMatchesSender = canUseSenderAsRecipient
+    && recipientType === senderType
+    && recipientCompanyName.trim() === (senderType === "company" ? senderCompanyName.trim() : "")
+    && recipientName.trim() === senderName.trim()
+    && recipientPhone.trim() === senderPhone.trim();
+
+  const handleUseSenderAsRecipient = () => {
+    onRecipientTypeChange(senderType);
+    onRecipientCompanyNameChange(senderType === "company" ? senderCompanyName.trim() : "");
+    onRecipientNameChange(senderName.trim());
+    onRecipientPhoneChange(senderPhone.trim());
+    setRecipientLookupField(null);
+    setRecipientSuggestions([]);
+    setCompletedRecipientSearch(null);
+  };
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -481,12 +521,39 @@ const DeliverySection = ({
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
         <MapPin className="w-4 h-4" />
-        送貨資料
+        {sectionTitle}
       </h2>
+      {showFulfillmentSelector && (
+      <div className="grid grid-cols-2 gap-2" role="group" aria-label="收貨方式">
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={fulfillmentType === "delivery"}
+          className={`min-h-11 ${fulfillmentType === "delivery" ? "border-primary bg-primary/10 text-primary" : ""}`}
+          onClick={() => onFulfillmentTypeChange("delivery")}
+        >
+          <Truck className="mr-1.5 h-4 w-4" />送貨
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={fulfillmentType === "pickup"}
+          className={`min-h-11 ${fulfillmentType === "pickup" ? "border-primary bg-primary/10 text-primary" : ""}`}
+          onClick={() => onFulfillmentTypeChange("pickup")}
+        >
+          <Store className="mr-1.5 h-4 w-4" />自取
+        </Button>
+      </div>
+      )}
+      {fulfillmentType === "pickup" && (
+        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+          自取訂單只需選擇日期及時間，毋須填寫地址或收貨人資料。
+        </p>
+      )}
       <div className="space-y-3">
         <div className="space-y-1 max-w-xs">
           <Label htmlFor="delivery-date" className="text-xs flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5" /> 送貨日期
+            <Calendar className="w-3.5 h-3.5" /> {fulfillmentType === "pickup" ? "取貨日期" : "送貨日期"}
             <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -512,7 +579,7 @@ const DeliverySection = ({
           aria-describedby={deliveryTimeError ? "delivery-time-error" : undefined}
         >
           <legend className="text-xs flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" /> 送貨時間
+            <Clock className="w-3.5 h-3.5" /> {fulfillmentType === "pickup" ? "取貨時間" : "送貨時間"}
             <span className="text-destructive">*</span>
           </legend>
 
@@ -641,6 +708,7 @@ const DeliverySection = ({
         </fieldset>
       </div>
 
+      {fulfillmentType === "delivery" && <>
       {/* Address: Region → District → Area */}
       <div className="space-y-2">
         <Label htmlFor="delivery-detail" className="text-xs">
@@ -683,7 +751,7 @@ const DeliverySection = ({
         <div className="relative">
           <Input
             id="delivery-detail"
-            placeholder="詳細地址（輸入即顯示 Google 建議）"
+            placeholder="搜尋並選擇 Google 地址"
             value={deliveryDetail}
             onChange={(event) => {
               lastManualAddressSignatureRef.current = JSON.stringify([
@@ -766,6 +834,32 @@ const DeliverySection = ({
             </div>
           )}
         </div>
+        <p className="text-xs text-muted-foreground">
+          Google 地址只記錄街道及大廈位置；樓層、座數及單位請填在下方，唔會影響 Google 配對。
+        </p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <Input
+            aria-label="大廈或座數"
+            placeholder="大廈／座（選填）"
+            value={deliveryBuilding}
+            onChange={(event) => onBuildingChange(event.target.value)}
+            maxLength={120}
+          />
+          <Input
+            aria-label="樓層"
+            placeholder="樓層（選填）"
+            value={deliveryFloor}
+            onChange={(event) => onFloorChange(event.target.value)}
+            maxLength={40}
+          />
+          <Input
+            aria-label="室或單位"
+            placeholder="室／單位（選填）"
+            value={deliveryUnit}
+            onChange={(event) => onUnitChange(event.target.value)}
+            maxLength={60}
+          />
+        </div>
         {addressSuggestionStatus === "loading" && (
           <p role="status" className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
@@ -821,6 +915,23 @@ const DeliverySection = ({
 
       {/* Recipient info */}
       <div ref={recipientLookupRef} className="space-y-3 border-t border-border pt-3">
+        <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
+          <div>
+            <Label htmlFor={`${recipientListboxId}-same-as-sender`} className="text-sm font-medium">
+              收貨人同送花人相同
+            </Label>
+            <p className="text-xs text-muted-foreground">一鍵套用送花人姓名、電話及公司資料。</p>
+          </div>
+          <Checkbox
+            id={`${recipientListboxId}-same-as-sender`}
+            aria-label="收貨人同送花人相同"
+            checked={recipientMatchesSender}
+            disabled={!canUseSenderAsRecipient}
+            onCheckedChange={(checked) => {
+              if (checked) handleUseSenderAsRecipient();
+            }}
+          />
+        </div>
         <div className="space-y-1.5">
           <Label className="text-xs">收貨人類型</Label>
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="收貨人類型">
@@ -916,21 +1027,14 @@ const DeliverySection = ({
           <Label htmlFor="recipient-phone" className="text-xs">
             收貨人電話 <span className="text-destructive">*</span>
           </Label>
-          <Input
+          <RegionalPhoneInput
             id="recipient-phone"
-            placeholder="收貨人電話"
+            ariaLabel="收貨人電話"
             value={recipientPhone}
-            onChange={(e) => onRecipientPhoneChange(e.target.value)}
+            onChange={onRecipientPhoneChange}
             onFocus={() => setRecipientLookupField("phone")}
-            className={`text-sm font-mono ${recipientPhoneError ? "border-destructive ring-1 ring-destructive" : ""}`}
-            maxLength={30}
-            required
-            autoComplete="off"
-            aria-autocomplete="list"
-            aria-controls={recipientLookupField === "phone" ? recipientListboxId : undefined}
-            aria-expanded={recipientLookupField === "phone"}
-            aria-invalid={Boolean(recipientPhoneError)}
-            aria-describedby={recipientPhoneError ? "recipient-phone-error" : undefined}
+            invalid={Boolean(recipientPhoneError)}
+            compact
           />
           {recipientPhoneError && (
             <p id="recipient-phone-error" role="alert" className="text-xs font-medium text-destructive">
@@ -976,6 +1080,7 @@ const DeliverySection = ({
           </Select>
         </div>
       </div>
+      </>}
     </div>
   );
 };

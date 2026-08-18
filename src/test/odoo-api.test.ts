@@ -126,6 +126,42 @@ describe("odoo-api note contracts", () => {
     });
   });
 
+  it("loads a shared Customer ID as an account with selectable contacts", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      customerCode: "WONDER",
+      contactCount: 1435,
+      truncated: true,
+      contacts: [{
+        id: 42,
+        name: "Alice",
+        email: "alice@example.com",
+        phone: "91234567",
+        mobile: null,
+        customerCode: "WONDER",
+        history_count: null,
+        total_spent: null,
+        history: [],
+        tags: [],
+      }],
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooCustomerAccount } = await import("@/lib/odoo-api");
+
+    const account = await searchOdooCustomerAccount(" wonder ");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/customer-accounts?code=wonder",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+    expect(account).toMatchObject({
+      customerCode: "WONDER",
+      contactCount: 1435,
+      truncated: true,
+      contacts: [{ odooPartnerId: 42, customerCode: "WONDER" }],
+    });
+  });
+
   it("searches historical recipients from a single phone digit", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const suggestions = [{
@@ -372,6 +408,7 @@ describe("odoo-api note contracts", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { updateOdooOrderOperationalDetails } = await import("@/lib/odoo-api");
     const payload = {
+      fulfillmentType: "delivery" as const,
       customerName: "Jay",
       senderName: "Jay",
       phone: "67610707",
@@ -387,6 +424,10 @@ describe("odoo-api note contracts", () => {
       deliveryTimeMode: "specified" as const,
       deliveryTime: "上午 10 時前",
       deliveryAddress: "觀塘新地址",
+      deliveryGoogleAddress: "觀塘新地址",
+      deliveryBuilding: "",
+      deliveryFloor: "",
+      deliveryUnit: "",
       recipientType: "personal" as const,
       recipientCompanyName: "",
       recipientName: "Ng",

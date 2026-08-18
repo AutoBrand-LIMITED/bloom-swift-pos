@@ -1,4 +1,4 @@
-import type { Order } from "@/types/order";
+import type { DeliverySplit, Order, OrderItem } from "@/types/order";
 import {
   normalizeDiscountPercent,
   orderItemTotal,
@@ -333,8 +333,58 @@ export function generateReceipt(order: Order): string {
 
 /** 客人送貨單 */
 export function generateDeliveryNote(order: Order): string {
+  const destinations = deliveryDestinations(order);
+  const pages = destinations.map(({ order: destinationOrder, reference }, index) => `
+    <main class="print-document delivery-document" data-print-document="delivery-note" data-delivery-destination="${index + 1}">
+      <header class="delivery-heading">
+        <div class="document-title">
+          <div class="brand-name">中西花店</div>
+          <h1>送貨單</h1>
+          <div class="english-title">DELIVERY NOTE${destinations.length > 1 ? ` · ${index + 1}/${destinations.length}` : ""}</div>
+        </div>
+      </header>
+      <div class="delivery-overview" data-document-section="delivery-overview">
+        <section class="recipient-block" data-delivery-column="recipient">
+          <h2 class="block-title">收貨資料 / RECIPIENT</h2>
+          ${fieldRows([
+            ...(destinationOrder.recipientCompanyName?.trim()
+              ? [["收貨公司", destinationOrder.recipientCompanyName] as [string, unknown]]
+              : []),
+            ["收貨人", destinationOrder.recipientName],
+            ["收貨人電話", destinationOrder.recipientPhone],
+            ["送貨地址", destinationOrder.deliveryAddress],
+          ])}
+        </section>
+        <section class="delivery-reference-block" data-delivery-column="reference">
+          <h2 class="block-title">送貨資料 / REFERENCE</h2>
+          ${fieldRows([
+            ["訂單編號", reference],
+            ["送貨日期", destinationOrder.deliveryDate],
+            ["送貨時間", deliveryTimeLabel(destinationOrder)],
+          ])}
+        </section>
+      </div>
+      <section data-document-section="items">
+        <h2 class="section-heading">送貨物品 / ITEMS</h2>
+        ${itemsTable(destinationOrder, false)}
+      </section>
+      <section data-document-section="delivery-note">
+        <h2 class="section-heading">送貨備註 / DELIVERY NOTE</h2>
+        <div class="document-notes">${destinationOrder.deliveryNote ? nl2br(destinationOrder.deliveryNote) : "&nbsp;"}</div>
+      </section>
+      <div class="signature-grid" data-document-section="signatures">
+        <div class="signature-line" data-signature="delivery">送貨人簽署 / DELIVERED BY</div>
+        <div class="signature-line" data-signature="recipient">收貨人簽署 / RECEIVED BY</div>
+      </div>
+      <div class="footer">此送貨單由花店 POS 系統產生 | ${new Date().toLocaleDateString("zh-HK")}</div>
+    </main>`).join("\n");
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送貨單 - ${escapeHtml(orderReference(order))}</title>
     <style>${commonStyles}
+      .delivery-document + .delivery-document {
+        break-before: page;
+        page-break-before: always;
+      }
       .delivery-heading {
         display: flex;
         justify-content: space-between;
@@ -363,50 +413,72 @@ export function generateDeliveryNote(order: Order): string {
       .delivery-overview .field-row { grid-template-columns: 31mm minmax(0, 1fr); padding: 1.5mm 0; }
       .recipient-address { white-space: normal; }
     </style></head><body>
-    <main class="print-document delivery-document" data-print-document="delivery-note">
-      <header class="delivery-heading">
-        <div class="document-title">
-          <div class="brand-name">中西花店</div>
-          <h1>送貨單</h1>
-          <div class="english-title">DELIVERY NOTE</div>
-        </div>
-      </header>
-      <div class="delivery-overview" data-document-section="delivery-overview">
-        <section class="recipient-block" data-delivery-column="recipient">
-          <h2 class="block-title">收貨資料 / RECIPIENT</h2>
-          ${fieldRows([
-            ...(order.recipientCompanyName?.trim()
-              ? [["收貨公司", order.recipientCompanyName] as [string, unknown]]
-              : []),
-            ["收貨人", order.recipientName],
-            ["收貨人電話", order.recipientPhone],
-            ["送貨地址", order.deliveryAddress],
-          ])}
-        </section>
-        <section class="delivery-reference-block" data-delivery-column="reference">
-          <h2 class="block-title">送貨資料 / REFERENCE</h2>
-          ${fieldRows([
-            ["訂單編號", orderReference(order)],
-            ["送貨日期", order.deliveryDate],
-            ["送貨時間", deliveryTimeLabel(order)],
-          ])}
-        </section>
-      </div>
-      <section data-document-section="items">
-        <h2 class="section-heading">送貨物品 / ITEMS</h2>
-        ${itemsTable(order, false)}
-      </section>
-      <section data-document-section="delivery-note">
-        <h2 class="section-heading">送貨備註 / DELIVERY NOTE</h2>
-        <div class="document-notes">${order.deliveryNote ? nl2br(order.deliveryNote) : "&nbsp;"}</div>
-      </section>
-      <div class="signature-grid" data-document-section="signatures">
-        <div class="signature-line" data-signature="delivery">送貨人簽署 / DELIVERED BY</div>
-        <div class="signature-line" data-signature="recipient">收貨人簽署 / RECEIVED BY</div>
-      </div>
-      <div class="footer">此送貨單由花店 POS 系統產生 | ${new Date().toLocaleDateString("zh-HK")}</div>
-    </main>
+    ${pages}
   </body></html>`;
+}
+
+function splitItems(order: Order, split: DeliverySplit): OrderItem[] {
+  return split.itemAllocations.flatMap((allocation) => {
+    const item = order.items.find((candidate) => candidate.id === allocation.itemId);
+    if (!item || allocation.quantity <= 0) return [];
+    return [{ ...item, quantity: allocation.quantity }];
+  });
+}
+
+function primaryDestinationItems(order: Order): OrderItem[] {
+  const allocated = new Map<string, number>();
+  for (const split of order.deliverySplits || []) {
+    for (const allocation of split.itemAllocations) {
+      allocated.set(
+        allocation.itemId,
+        (allocated.get(allocation.itemId) || 0) + allocation.quantity,
+      );
+    }
+  }
+
+  return order.items.flatMap((item) => {
+    const quantity = item.quantity - (allocated.get(item.id) || 0);
+    return quantity > 0 ? [{ ...item, quantity }] : [];
+  });
+}
+
+function splitAsOrder(order: Order, split: DeliverySplit, items: OrderItem[]): Order {
+  return {
+    ...order,
+    items,
+    deliveryDate: split.deliveryDate,
+    deliveryTimeMode: split.deliveryTimeMode,
+    deliverySlotId: split.deliverySlotId,
+    deliveryTime: split.deliveryTime,
+    deliveryAddress: split.deliveryAddress,
+    deliveryGoogleAddress: split.deliveryGoogleAddress,
+    deliveryBuilding: split.deliveryBuilding,
+    deliveryFloor: split.deliveryFloor,
+    deliveryUnit: split.deliveryUnit,
+    recipientType: split.recipientType,
+    recipientCompanyName: split.recipientCompanyName,
+    recipientName: split.recipientName,
+    recipientPhone: split.recipientPhone,
+    deliveryPerson: split.deliveryPerson,
+    deliveryNote: split.deliveryNote,
+  };
+}
+
+function deliveryDestinations(order: Order): Array<{ order: Order; reference: string }> {
+  const splits = order.deliverySplits || [];
+  if (!splits.length) return [{ order, reference: orderReference(order) }];
+
+  const reference = orderReference(order);
+  return [
+    {
+      order: { ...order, items: primaryDestinationItems(order) },
+      reference: `${reference}-D1`,
+    },
+    ...splits.map((split, index) => ({
+      order: splitAsOrder(order, split, splitItems(order, split)),
+      reference: `${reference}-D${index + 2}`,
+    })),
+  ];
 }
 
 /** 倉庫執貨單 */

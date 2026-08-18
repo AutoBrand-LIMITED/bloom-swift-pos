@@ -19,6 +19,39 @@ export interface OrderItem {
 export type PaymentStatus = "unpaid" | "paid" | "deposit";
 export type DeliveryTimeMode = "slot" | "specified";
 export type RecipientType = "personal" | "company";
+export type FulfillmentType = "delivery" | "pickup";
+
+export interface DeliverySplitItemAllocation {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+}
+
+/** An additional destination in a split-delivery order. */
+export interface DeliverySplit {
+  id: string;
+  deliveryDate: string;
+  deliveryTimeMode?: DeliveryTimeMode;
+  deliverySlotId?: number;
+  deliveryTime: string;
+  deliveryRegion: string;
+  deliveryDistrict: string;
+  deliveryArea: string;
+  deliveryDetail: string;
+  deliveryAddress: string;
+  deliveryGoogleAddress: string;
+  deliveryBuilding: string;
+  deliveryFloor: string;
+  deliveryUnit: string;
+  recipientType: RecipientType;
+  recipientCompanyName: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryPerson: string;
+  failedDeliveryAction: string;
+  deliveryNote: string;
+  itemAllocations: DeliverySplitItemAllocation[];
+}
 
 export interface PartnerNoteMutation {
   commentText: string;
@@ -54,16 +87,26 @@ export interface Order {
   priceOverridden: boolean;
   paymentStatus: PaymentStatus;
   depositAmount: number;
+  /** Outstanding amount reported by Odoo Accounting. */
+  balanceAmount?: number;
   paymentMethod: string;
   paymentReference?: string;
   paymentReceivedAt?: string;
   paymentIdempotencyKey?: string;
+  fulfillmentType?: FulfillmentType;
   deliveryDate: string;
   deliveryTimeMode?: DeliveryTimeMode;
   deliverySlotId?: number;
   /** Human-readable snapshot retained even if the configured slot changes later. */
   deliveryTime: string;
   deliveryAddress: string;
+  /** Google-selected base address. Unit details are stored separately. */
+  deliveryGoogleAddress?: string;
+  deliveryBuilding?: string;
+  deliveryFloor?: string;
+  deliveryUnit?: string;
+  /** Additional destinations; unallocated item quantities remain at the primary destination. */
+  deliverySplits?: DeliverySplit[];
   recipientType?: RecipientType;
   recipientCompanyName?: string;
   recipientName: string;

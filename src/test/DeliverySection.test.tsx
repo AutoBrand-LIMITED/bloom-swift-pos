@@ -29,6 +29,7 @@ const slots: DeliverySlot[] = [
 
 function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySection>> = {}) {
   const props: React.ComponentProps<typeof DeliverySection> = {
+    fulfillmentType: "delivery",
     deliveryDate: "2026-07-17",
     deliveryTime: "",
     deliveryTimeMode: undefined,
@@ -42,6 +43,9 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     deliveryDistrict: "",
     deliveryArea: "",
     deliveryDetail: "",
+    deliveryBuilding: "",
+    deliveryFloor: "",
+    deliveryUnit: "",
     recipientType: "personal",
     recipientCompanyName: "",
     recipientName: "",
@@ -49,6 +53,7 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     deliveryPerson: "",
     failedDeliveryAction: "none",
     onDateChange: vi.fn(),
+    onFulfillmentTypeChange: vi.fn(),
     onTimeChange: vi.fn(),
     onSlotChange: vi.fn(),
     onSpecifiedTimeSelect: vi.fn(),
@@ -57,6 +62,9 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     onDistrictChange: vi.fn(),
     onAreaChange: vi.fn(),
     onDetailChange: vi.fn(),
+    onBuildingChange: vi.fn(),
+    onFloorChange: vi.fn(),
+    onUnitChange: vi.fn(),
     onGoogleAddressSelect: vi.fn(),
     onRecipientTypeChange: vi.fn(),
     onRecipientCompanyNameChange: vi.fn(),
@@ -92,6 +100,33 @@ describe("DeliverySection delivery time controls", () => {
     fireEvent.click(screen.getByRole("radio", { name: "下午 13:00-18:00" }));
 
     expect(props.onSlotChange).toHaveBeenCalledWith(slots[1]);
+  });
+
+  it("shows only date and time details for pickup orders", () => {
+    const props = renderSection({ fulfillmentType: "pickup" });
+
+    expect(screen.getByText(/自取訂單只需選擇日期及時間/)).toBeVisible();
+    expect(screen.queryByLabelText("送貨地區")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/收貨人姓名/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /送貨/ }));
+    expect(props.onFulfillmentTypeChange).toHaveBeenCalledWith("delivery");
+  });
+
+  it("copies the sender into the recipient fields with one confirmation", () => {
+    const props = renderSection({
+      senderType: "company",
+      senderCompanyName: "Sender Limited",
+      senderName: "Ms Chan",
+      senderPhone: "+852 6123 4567",
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "收貨人同送花人相同" }));
+
+    expect(props.onRecipientTypeChange).toHaveBeenCalledWith("company");
+    expect(props.onRecipientCompanyNameChange).toHaveBeenCalledWith("Sender Limited");
+    expect(props.onRecipientNameChange).toHaveBeenCalledWith("Ms Chan");
+    expect(props.onRecipientPhoneChange).toHaveBeenCalledWith("+852 6123 4567");
   });
 
   it("toggles company recipient details while keeping the contact required", () => {
@@ -307,7 +342,7 @@ describe("DeliverySection delivery time controls", () => {
 
   it("uses the existing detail field as the only Google address input", () => {
     const props = renderSection();
-    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    const input = screen.getByPlaceholderText("搜尋並選擇 Google 地址");
 
     expect(screen.queryByLabelText("Google 地址搜尋")).not.toBeInTheDocument();
     expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
@@ -329,7 +364,7 @@ describe("DeliverySection delivery time controls", () => {
     const { rerender } = render(
       <DeliverySection {...renderSectionProps({ deliveryDetail: "" })} />,
     );
-    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    const input = screen.getByPlaceholderText("搜尋並選擇 Google 地址");
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "巧" } });
     expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
@@ -353,7 +388,7 @@ describe("DeliverySection delivery time controls", () => {
     const { rerender } = render(
       <DeliverySection {...renderSectionProps({ deliveryDetail: "" })} />,
     );
-    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    const input = screen.getByPlaceholderText("搜尋並選擇 Google 地址");
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "巧" } });
 
@@ -379,7 +414,7 @@ describe("DeliverySection delivery time controls", () => {
 
   it("stops autocomplete immediately after a Google suggestion is selected", () => {
     renderSection({ deliveryDetail: "巧" });
-    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    const input = screen.getByPlaceholderText("搜尋並選擇 Google 地址");
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "巧運" } });
     expect(addressHookMocks.useGoogleAddressSuggestions).toHaveBeenLastCalledWith(
@@ -603,7 +638,7 @@ describe("DeliverySection delivery time controls", () => {
     });
     renderSection({ deliveryDetail: "巧" });
 
-    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    const input = screen.getByPlaceholderText("搜尋並選擇 Google 地址");
     const option = screen.getByRole("option", { name: /巧運工業大廈/ });
     expect(input.parentElement).toContainElement(screen.getByRole("listbox", { name: "Google 地址建議" }));
 
@@ -626,7 +661,7 @@ describe("DeliverySection delivery time controls", () => {
       selectSuggestion: addressHookMocks.selectSuggestion,
     });
     renderSection({ deliveryDetail: "巧" });
-    const input = screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）");
+    const input = screen.getByPlaceholderText("搜尋並選擇 Google 地址");
 
     fireEvent.keyDown(input, { key: "ArrowDown" });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -653,7 +688,7 @@ describe("DeliverySection delivery time controls", () => {
     expect(screen.getByRole("combobox", { name: "送貨地區" })).toBeEnabled();
     expect(screen.getByRole("combobox", { name: "送貨分區" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "送貨地點" })).toBeDisabled();
-    expect(screen.getByPlaceholderText("詳細地址（輸入即顯示 Google 建議）")).toBeEnabled();
+    expect(screen.getByPlaceholderText("搜尋並選擇 Google 地址")).toBeEnabled();
   });
 });
 
@@ -661,6 +696,7 @@ function renderSectionProps(
   overrides: Partial<React.ComponentProps<typeof DeliverySection>> = {},
 ): React.ComponentProps<typeof DeliverySection> {
   return {
+    fulfillmentType: "delivery",
     deliveryDate: "2026-07-17",
     deliveryTime: "",
     deliveryTimeMode: undefined,
@@ -674,6 +710,9 @@ function renderSectionProps(
     deliveryDistrict: "",
     deliveryArea: "",
     deliveryDetail: "",
+    deliveryBuilding: "",
+    deliveryFloor: "",
+    deliveryUnit: "",
     recipientType: "personal",
     recipientCompanyName: "",
     recipientName: "",
@@ -681,6 +720,7 @@ function renderSectionProps(
     deliveryPerson: "",
     failedDeliveryAction: "none",
     onDateChange: vi.fn(),
+    onFulfillmentTypeChange: vi.fn(),
     onTimeChange: vi.fn(),
     onSlotChange: vi.fn(),
     onSpecifiedTimeSelect: vi.fn(),
@@ -689,6 +729,9 @@ function renderSectionProps(
     onDistrictChange: vi.fn(),
     onAreaChange: vi.fn(),
     onDetailChange: vi.fn(),
+    onBuildingChange: vi.fn(),
+    onFloorChange: vi.fn(),
+    onUnitChange: vi.fn(),
     onGoogleAddressSelect: vi.fn(),
     onRecipientTypeChange: vi.fn(),
     onRecipientCompanyNameChange: vi.fn(),

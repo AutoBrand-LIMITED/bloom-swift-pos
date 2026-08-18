@@ -35,6 +35,13 @@ interface OdooPartnerHistory {
   history: PurchaseRecord[];
 }
 
+export interface CustomerAccountLookup {
+  customerCode: string;
+  contactCount: number;
+  contacts: DemoCustomer[];
+  truncated: boolean;
+}
+
 interface OdooEmployee {
   id: number;
   name: string;
@@ -63,6 +70,25 @@ interface OdooOrderResponse {
 export interface AccountingPaymentOption {
   code: string;
   label: string;
+}
+
+export interface OrderPaymentUpdate {
+  amount: number;
+  paymentMethod: string;
+  paymentReference: string;
+  paymentReceivedAt: string;
+  paymentIdempotencyKey: string;
+}
+
+export interface OrderPaymentUpdateResponse {
+  id: number;
+  invoice: { id: number; name: string };
+  payment: { id: number; name: string };
+  amountReceivedMinor: number;
+  amountResidualMinor: number;
+  paymentStatus: "paid" | "deposit";
+  writeDate: string;
+  idempotentReplay: boolean;
 }
 
 export interface DeliverySlot {
@@ -128,11 +154,16 @@ export interface OrderOperationalUpdate {
   sourceReference: string;
   department: string;
   terms: string;
+  fulfillmentType: "delivery" | "pickup";
   deliveryDate: string;
   deliveryTimeMode: "slot" | "specified";
   deliverySlotId?: number;
   deliveryTime: string;
   deliveryAddress: string;
+  deliveryGoogleAddress: string;
+  deliveryBuilding: string;
+  deliveryFloor: string;
+  deliveryUnit: string;
   recipientType: "personal" | "company";
   recipientCompanyName: string;
   recipientName: string;
@@ -196,6 +227,9 @@ export interface OdooProduct {
   templateId: number | null;
   barcode: string | null;
   availableInPos: boolean;
+  displaySequence: number;
+  availableFrom: string | null;
+  availableUntil: string | null;
 }
 
 export interface OdooProductWritePayload {
@@ -205,6 +239,9 @@ export interface OdooProductWritePayload {
   categoryId?: number | null;
   barcode?: string | null;
   availableInPos: boolean;
+  displaySequence: number;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
 }
 
 export interface OdooProductCategory {
@@ -460,6 +497,32 @@ export async function updateOdooOrderOperationalDetails(
   return (await res.json()) as OrderOperationalUpdateResponse;
 }
 
+export async function recordOdooOrderPayment(
+  orderId: number,
+  payload: OrderPaymentUpdate,
+  signal?: AbortSignal,
+): Promise<OrderPaymentUpdateResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}/payments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!res.ok) {
+    return throwApiError<OrderPaymentUpdateResponse>(
+      res,
+      `Odoo payment update failed: ${res.status}`,
+    );
+  }
+
+  return (await res.json()) as OrderPaymentUpdateResponse;
+}
+
 export async function getAccountingPaymentOptions(signal?: AbortSignal): Promise<AccountingPaymentOption[]> {
   if (!BACKEND_URL) return [];
 
@@ -511,6 +574,39 @@ export async function searchOdooCustomers(
 
   const partners = (await res.json()) as OdooPartner[];
   return partners.map(mapOdooPartner);
+}
+
+export async function searchOdooCustomerAccount(
+  code: string,
+  signal?: AbortSignal,
+): Promise<CustomerAccountLookup> {
+  const trimmed = code.trim();
+  if (!BACKEND_URL || !trimmed) {
+    return { customerCode: trimmed, contactCount: 0, contacts: [], truncated: false };
+  }
+
+  const params = new URLSearchParams({ code: trimmed });
+  const res = await authenticatedFetch(`${BACKEND_URL}/customer-accounts?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Odoo customer account search failed: ${res.status}`);
+  }
+
+  const account = (await res.json()) as {
+    customerCode: string;
+    contactCount: number;
+    contacts: OdooPartner[];
+    truncated: boolean;
+  };
+  return {
+    customerCode: account.customerCode,
+    contactCount: account.contactCount,
+    contacts: account.contacts.map(mapOdooPartner),
+    truncated: account.truncated,
+  };
 }
 
 function mapOdooPartner(p: OdooPartner): DemoCustomer {

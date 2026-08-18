@@ -123,6 +123,18 @@ describe("checkout required-field validation", () => {
     })).toEqual({});
   });
 
+  it("allows pickup with date and time but without delivery details", () => {
+    expect(validateCheckout({
+      ...validCheckout,
+      fulfillmentType: "pickup",
+      deliveryAddress: "",
+      recipientName: "",
+      recipientPhone: "",
+      recipientType: "company",
+      recipientCompanyName: "",
+    })).toEqual({});
+  });
+
   it("requires company name and billing address only for company customers", () => {
     const companyErrors = validateCheckout({
       ...validCheckout,
@@ -205,17 +217,19 @@ describe("checkout required-field validation", () => {
     expect(validateCheckout({
       ...validCheckout,
       requiresCustomerResolution: true,
-    }).phone).toBe("請先搜尋並選擇現有客戶，或確認新增客戶");
+    }).phone).toBe("請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人");
 
     expect(validateCheckout({
       ...validCheckout,
       requiresCustomerResolution: true,
+      selectedCustomerName: validCheckout.customerName,
       selectedCustomerPhone: "91234567",
     })).toEqual({});
 
     expect(validateCheckout({
       ...validCheckout,
       requiresCustomerResolution: true,
+      confirmedNewCustomerName: validCheckout.customerName,
       confirmedNewCustomerPhone: "91234567",
     })).toEqual({});
   });
@@ -225,9 +239,23 @@ describe("checkout required-field validation", () => {
       ...validCheckout,
       phone: "9123 4568",
       requiresCustomerResolution: true,
+      selectedCustomerName: validCheckout.customerName,
       selectedCustomerPhone: "9123 4567",
+      confirmedNewCustomerName: validCheckout.customerName,
       confirmedNewCustomerPhone: "91234567",
-    }).phone).toBe("請先搜尋並選擇現有客戶，或確認新增客戶");
+    }).phone).toBe("請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人");
+  });
+
+  it("requires a new identity confirmation when the phone is unchanged but the contact name changes", () => {
+    expect(validateCheckout({
+      ...validCheckout,
+      customerName: "Different Boss",
+      requiresCustomerResolution: true,
+      selectedCustomerName: validCheckout.customerName,
+      selectedCustomerPhone: "91234567",
+      confirmedNewCustomerName: validCheckout.customerName,
+      confirmedNewCustomerPhone: "91234567",
+    }).phone).toBe("請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人");
   });
 
   it("allows restored pending submissions and local demo checkouts", () => {
@@ -256,7 +284,7 @@ describe("checkout required-field validation", () => {
       requiresCustomerResolution: true,
       restoredPendingSubmission: false,
     });
-    expect(nextOrderErrors.phone).toBe("請先搜尋並選擇現有客戶，或確認新增客戶");
+    expect(nextOrderErrors.phone).toBe("請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人");
   });
 });
 

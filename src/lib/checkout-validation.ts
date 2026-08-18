@@ -3,7 +3,8 @@ import {
   type FrozenDeliverySlotSelection,
 } from "@/lib/delivery-slots";
 import type { DeliverySlot } from "@/lib/odoo-api";
-import type { DeliveryTimeMode, RecipientType } from "@/types/order";
+import type { DeliveryTimeMode, FulfillmentType, RecipientType } from "@/types/order";
+import { canonicalPhoneValue, isValidSupportedPhone } from "@/lib/phone-utils";
 
 export type CheckoutField =
   | "customerName"
@@ -22,6 +23,7 @@ export type CheckoutField =
 export type CheckoutErrors = Partial<Record<CheckoutField, string>>;
 
 interface CheckoutValidationInput {
+  fulfillmentType?: FulfillmentType;
   customerName: string;
   customerType: "personal" | "company";
   companyName: string;
@@ -29,7 +31,9 @@ interface CheckoutValidationInput {
   billingAddress: string;
   allowLegacyMissingCompanyFields?: boolean;
   phone: string;
+  selectedCustomerName?: string;
   selectedCustomerPhone?: string;
+  confirmedNewCustomerName?: string | null;
   confirmedNewCustomerPhone?: string | null;
   restoredPendingSubmission?: boolean;
   requiresCustomerResolution?: boolean;
@@ -51,17 +55,22 @@ const ALLOWED_PHONE_CHARACTERS = /^\+?[0-9 ()-]+$/;
 const ISO_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 
 export function normalizePhoneNumber(value: string): string {
-  return value.replace(/\D/g, "");
+  return canonicalPhoneValue(value);
+}
+
+export function normalizeCustomerIdentityName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
 export function isValidPhoneNumber(value: string): boolean {
   const phone = value.trim();
   if (!phone || !ALLOWED_PHONE_CHARACTERS.test(phone)) return false;
 
-  const digits = normalizePhoneNumber(phone);
-  if (phone.startsWith("+")) return digits.length >= 8 && digits.length <= 15;
-  return digits.length === 8
-    || (digits.length === 11 && (digits.startsWith("852") || digits.startsWith("853")));
+  if (phone.startsWith("+") && !/^(?:\+852|\+853)/.test(phone.replace(/[ ()-]/g, ""))) {
+    const digits = phone.replace(/\D/g, "");
+    return digits.length >= 8 && digits.length <= 15;
+  }
+  return isValidSupportedPhone(phone);
 }
 
 export function isValidDeliveryDate(value: string): boolean {
@@ -100,19 +109,21 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
   } else if (!isValidPhoneNumber(input.phone)) {
     errors.phone = "請輸入有效電話號碼";
   } else if (input.requiresCustomerResolution && !hasResolvedCustomer(input)) {
-    errors.phone = "請先搜尋並選擇現有客戶，或確認新增客戶";
+    errors.phone = "請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人";
   }
   if (!input.senderName.trim()) errors.senderName = "請輸入送花人名稱";
-  if (input.recipientType === "company" && !input.recipientCompanyName.trim()) {
-    errors.recipientCompanyName = "公司收貨人必須輸入公司名稱";
+  if ((input.fulfillmentType || "delivery") === "delivery") {
+    if (input.recipientType === "company" && !input.recipientCompanyName.trim()) {
+      errors.recipientCompanyName = "公司收貨人必須輸入公司名稱";
+    }
+    if (!input.recipientName.trim()) errors.recipientName = "請輸入收花人姓名";
+    if (!input.recipientPhone.trim()) {
+      errors.recipientPhone = "請輸入收花人電話";
+    } else if (!isValidPhoneNumber(input.recipientPhone)) {
+      errors.recipientPhone = "請輸入有效收花人電話";
+    }
+    if (!input.deliveryAddress.trim()) errors.deliveryAddress = "請選擇或輸入送貨地址";
   }
-  if (!input.recipientName.trim()) errors.recipientName = "請輸入收花人姓名";
-  if (!input.recipientPhone.trim()) {
-    errors.recipientPhone = "請輸入收花人電話";
-  } else if (!isValidPhoneNumber(input.recipientPhone)) {
-    errors.recipientPhone = "請輸入有效收花人電話";
-  }
-  if (!input.deliveryAddress.trim()) errors.deliveryAddress = "請輸入送貨地址";
 
   if (!input.deliveryDate.trim()) {
     errors.deliveryDate = "請選擇送貨日期";
@@ -141,14 +152,17 @@ function hasResolvedCustomer(input: CheckoutValidationInput): boolean {
   if (input.restoredPendingSubmission) return true;
 
   const currentPhone = normalizePhoneNumber(input.phone);
+  const currentName = normalizeCustomerIdentityName(input.customerName);
   const selectedPhone = normalizePhoneNumber(input.selectedCustomerPhone || "");
+  const selectedName = normalizeCustomerIdentityName(input.selectedCustomerName || "");
   const confirmedPhone = normalizePhoneNumber(input.confirmedNewCustomerPhone || "");
+  const confirmedName = normalizeCustomerIdentityName(input.confirmedNewCustomerName || "");
 
   return Boolean(
-    currentPhone
+    currentPhone && currentName
       && (
-        (selectedPhone && selectedPhone === currentPhone)
-        || (confirmedPhone && confirmedPhone === currentPhone)
+        (selectedPhone === currentPhone && selectedName === currentName)
+        || (confirmedPhone === currentPhone && confirmedName === currentName)
       )
   );
 }

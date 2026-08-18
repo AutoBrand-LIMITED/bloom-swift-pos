@@ -166,11 +166,7 @@ const OrderHistory = ({
                   ["客戶電郵", order.customerEmail],
                   ["帳單地址", order.billingAddress],
                   ["客戶群組", order.customerGroup],
-                  ["送花人 DO", order.senderDoNumber],
-                  ["收花人 DO", order.recipientDoNumber],
-                  ["客戶參考／PO", order.sourceReference],
                   ["部門", order.department],
-                  ["條款", order.terms],
                 ].filter((detail): detail is [string, string] => Boolean(detail[1]?.trim()));
                 return (
                   <div

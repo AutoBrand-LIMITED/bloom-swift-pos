@@ -9,6 +9,8 @@ import CustomerSection from "@/components/pos/CustomerSection";
 import BusinessDetailsSection from "@/components/pos/BusinessDetailsSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
+import SplitDeliverySection from "@/components/pos/SplitDeliverySection";
+import { validateDeliverySplits } from "@/lib/split-delivery";
 import GiftCardSection from "@/components/pos/GiftCardSection";
 import PaymentSection from "@/components/pos/PaymentSection";
 import OrderHistory from "@/components/pos/OrderHistory";
@@ -18,6 +20,8 @@ import OrderSummaryPanel from "@/components/pos/OrderSummaryPanel";
 import type { WorkflowSectionId } from "@/components/pos/PosWorkflowTabs";
 import type {
   DeliveryTimeMode,
+  DeliverySplit,
+  FulfillmentType,
   Order,
   OrderItem,
   PaymentStatus,
@@ -75,6 +79,7 @@ import {
   isValidDeliveryDate,
   isValidEmailAddress,
   isValidPhoneNumber,
+  normalizeCustomerIdentityName,
   normalizePhoneNumber,
   type CheckoutErrors,
   type CheckoutField,
@@ -123,7 +128,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { employee, logout } = usePosAuth();
   const [pendingSubmission, setPendingSubmission] = useState<PendingOrderSubmission | null>(
-    loadPendingSubmission,
+    () => loadPendingSubmission(employee, posAuthRequired),
   );
   const restoredPendingSubmission = useRef(pendingSubmission).current;
   const restoredEmployeePendingSubmission = pendingSubmissionForEmployee(
@@ -154,6 +159,7 @@ const Index = () => {
   const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({});
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
   const [customerHistoryOpen, setCustomerHistoryOpen] = useState(true);
+  const [confirmedNewCustomerName, setConfirmedNewCustomerName] = useState<string | null>(null);
   const [confirmedNewCustomerPhone, setConfirmedNewCustomerPhone] = useState<string | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
   const linkedPartySelectionRequestRef = useRef(0);
@@ -182,6 +188,7 @@ const Index = () => {
   } | null>(null);
 
   // Delivery
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("delivery");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [deliveryTimeMode, setDeliveryTimeMode] = useState<DeliveryTimeMode>();
@@ -196,12 +203,18 @@ const Index = () => {
   const [deliveryDistrict, setDeliveryDistrict] = useState("");
   const [deliveryArea, setDeliveryArea] = useState("");
   const [deliveryDetail, setDeliveryDetail] = useState("");
+  const [deliveryBuilding, setDeliveryBuilding] = useState("");
+  const [deliveryFloor, setDeliveryFloor] = useState("");
+  const [deliveryUnit, setDeliveryUnit] = useState("");
   const [recipientType, setRecipientType] = useState<RecipientType>("personal");
   const [recipientCompanyName, setRecipientCompanyName] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryPerson, setDeliveryPerson] = useState("");
   const [failedDeliveryAction, setFailedDeliveryAction] = useState("none");
+  const [deliverySplits, setDeliverySplits] = useState<DeliverySplit[]>(
+    () => restoredEmployeePendingSubmission?.order.deliverySplits || [],
+  );
 
   // Gift card
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
@@ -331,8 +344,16 @@ const Index = () => {
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
   const customerResolutionComplete = !hasOdooBackend
     || Boolean(pendingSubmission)
-    || normalizePhoneNumber(selectedCustomer?.phone || "") === normalizePhoneNumber(phone)
-    || normalizePhoneNumber(confirmedNewCustomerPhone || "") === normalizePhoneNumber(phone);
+    || (
+      normalizePhoneNumber(selectedCustomer?.phone || "") === normalizePhoneNumber(phone)
+      && normalizeCustomerIdentityName(selectedCustomer?.name || "")
+        === normalizeCustomerIdentityName(customerName)
+    )
+    || (
+      normalizePhoneNumber(confirmedNewCustomerPhone || "") === normalizePhoneNumber(phone)
+      && normalizeCustomerIdentityName(confirmedNewCustomerName || "")
+        === normalizeCustomerIdentityName(customerName)
+    );
   const customerSectionComplete = Boolean(
     customerName.trim()
       && senderName.trim()
@@ -351,10 +372,18 @@ const Index = () => {
     isValidDeliveryDate(deliveryDate)
       && deliveryTimeMode
       && deliveryTime.trim()
-      && [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail].some((value) => value.trim())
-      && recipientName.trim()
-      && isValidPhoneNumber(recipientPhone)
-      && (recipientType !== "company" || recipientCompanyName.trim()),
+      && (
+        fulfillmentType === "pickup"
+        || (
+          [deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail].some((value) => value.trim())
+          && recipientName.trim()
+          && isValidPhoneNumber(recipientPhone)
+          && (recipientType !== "company" || recipientCompanyName.trim())
+        )
+      ),
+  ) && !validateDeliverySplits(
+    fulfillmentType === "delivery" ? deliverySplits : [],
+    items,
   );
   const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
   const paymentSectionComplete = Boolean(
@@ -388,11 +417,6 @@ const Index = () => {
       behavior: "smooth",
     });
   }, []);
-  const pendingOwnershipMismatch = Boolean(
-    posAuthRequired
-      && pendingSubmission
-      && !employeePendingSubmission,
-  );
   const frozenDeliverySlotSelection = employeePendingSubmission?.order.deliveryTimeMode === "slot"
     && employeePendingSubmission.order.deliverySlotId !== undefined
     ? {
@@ -500,6 +524,7 @@ const Index = () => {
 
   const applyCustomerSelection = useCallback((customer: DemoCustomer) => {
     setSelectedCustomer(customer);
+    setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
     setCustomerName(customer.name);
     setCustomerCode(customer.customerCode || "");
@@ -519,6 +544,25 @@ const Index = () => {
     setSaveSenderNote(false);
     setNotesConflict(null);
     resetRecipientPersistence();
+  }, [clearCheckoutErrors, resetRecipientPersistence]);
+
+  const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
+    const emptyProfile = detachedCustomerProfile();
+    setSelectedCustomer(null);
+    setConfirmedNewCustomerName(null);
+    setConfirmedNewCustomerPhone(null);
+    setCustomerCode(accountCode);
+    setPhone("");
+    setCustomerName("");
+    setSenderName("");
+    setCustomerEmail(emptyProfile.customerEmail);
+    setCustomerType(emptyProfile.customerType);
+    setCompanyName(emptyProfile.companyName);
+    setBillingAddress(emptyProfile.billingAddress);
+    setSenderContactDraft("");
+    setSaveSenderNote(false);
+    resetRecipientPersistence();
+    clearCheckoutErrors("customerName", "phone", "companyName", "customerEmail", "billingAddress");
   }, [clearCheckoutErrors, resetRecipientPersistence]);
 
   const applyRecipientSelection = useCallback((selection: RecipientSelectionDetails) => {
@@ -607,6 +651,7 @@ const Index = () => {
     setTerms("");
     setCheckoutErrors({});
     setSelectedCustomer(null);
+    setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
     setItems([]);
     setBudget(0);
@@ -623,6 +668,7 @@ const Index = () => {
     setRecipientContactDraft("");
     setNotesConflict(null);
     setDeliveryDate("");
+    setFulfillmentType("delivery");
     setDeliveryTime("");
     setDeliveryTimeMode(undefined);
     setDeliverySlotId(undefined);
@@ -630,12 +676,16 @@ const Index = () => {
     setDeliveryDistrict("");
     setDeliveryArea("");
     setDeliveryDetail("");
+    setDeliveryBuilding("");
+    setDeliveryFloor("");
+    setDeliveryUnit("");
     setRecipientType("personal");
     setRecipientCompanyName("");
     setRecipientName("");
     setRecipientPhone("");
     setDeliveryPerson("");
     setFailedDeliveryAction("none");
+    setDeliverySplits([]);
     setGiftCardEnabled(false);
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
@@ -680,9 +730,10 @@ const Index = () => {
       return;
     }
     setPendingSubmission(null);
-    resetOrderForm();
-    toast.success("已移除本機待確認資料；Odoo 訂單沒有被刪除或修改。");
-  }, [employee, pendingSubmission, resetOrderForm]);
+    setCheckoutId(crypto.randomUUID());
+    setPaymentIdempotencyKey(crypto.randomUUID());
+    toast.success("已解除待確認狀態；表格資料已保留，可以修改後再提交。");
+  }, [employee, pendingSubmission]);
 
   useEffect(() => {
     if (!restoredEmployeePendingSubmission) return;
@@ -709,9 +760,8 @@ const Index = () => {
       history: [],
       odooPartnerId: options.customerId,
     } : null);
-    setConfirmedNewCustomerPhone(
-      options.customerId ? null : normalizePhoneNumber(order.phone),
-    );
+    setConfirmedNewCustomerName(options.customerId ? null : order.customerName);
+    setConfirmedNewCustomerPhone(options.customerId ? null : normalizePhoneNumber(order.phone));
     setItems(order.items);
     setDeliveryFee(order.deliveryFee);
     setUrgentFee(order.urgentFee);
@@ -721,6 +771,7 @@ const Index = () => {
     setSenderContactDraft(order.customerNoteMutation?.commentText || "");
     setRecipientContactDraft(order.recipientNoteMutation?.commentText || "");
     setRecipientPartnerId(order.recipientPartnerId);
+    setFulfillmentType(order.fulfillmentType || "delivery");
     setDeliveryDate(order.deliveryDate);
     setDeliveryTime(order.deliveryTime);
     setDeliveryTimeMode(order.deliveryTimeMode);
@@ -728,7 +779,10 @@ const Index = () => {
     setDeliveryRegion("");
     setDeliveryDistrict("");
     setDeliveryArea("");
-    setDeliveryDetail(order.deliveryAddress);
+    setDeliveryDetail(order.deliveryGoogleAddress || order.deliveryAddress);
+    setDeliveryBuilding(order.deliveryBuilding || "");
+    setDeliveryFloor(order.deliveryFloor || "");
+    setDeliveryUnit(order.deliveryUnit || "");
     setRecipientType(
       order.recipientType
         || (order.recipientCompanyName?.trim() ? "company" : "personal"),
@@ -737,6 +791,7 @@ const Index = () => {
     setRecipientName(order.recipientName);
     setRecipientPhone(order.recipientPhone);
     setDeliveryPerson(order.deliveryPerson);
+    setDeliverySplits(order.deliverySplits || []);
     setGiftCardEnabled(order.giftCardEnabled);
     setGiftCardMessage(order.giftCardMessage);
     setPaymentStatus(order.paymentStatus);
@@ -915,12 +970,6 @@ const Index = () => {
       });
       return;
     }
-    if (pendingSubmission && pendingOwnershipMismatch) {
-      toast.error("這張待確認訂單屬於另一位或未知員工；請由原本員工重新登入後再重試。", {
-        duration: 9000,
-      });
-      return;
-    }
     // Validation
     if (!salesId.trim()) {
       toast.error("請先選擇負責員工");
@@ -955,13 +1004,22 @@ const Index = () => {
       );
       return;
     }
-    const deliveryAddress = [
+    const deliveryGoogleAddress = [
       deliveryRegion,
       deliveryDistrict,
       deliveryArea,
       deliveryDetail.trim(),
     ].filter(Boolean).join(" ");
+    const deliveryAddress = fulfillmentType === "pickup"
+      ? ""
+      : [
+          deliveryGoogleAddress,
+          deliveryBuilding.trim(),
+          deliveryFloor.trim() ? `${deliveryFloor.trim()}樓` : "",
+          deliveryUnit.trim() ? `${deliveryUnit.trim()}室` : "",
+        ].filter(Boolean).join("，");
     const validationErrors = validateCheckout({
+      fulfillmentType,
       customerName,
       customerType,
       companyName,
@@ -976,7 +1034,9 @@ const Index = () => {
           )
       ),
       phone,
+      selectedCustomerName: selectedCustomer?.name,
       selectedCustomerPhone: selectedCustomer?.phone,
+      confirmedNewCustomerName,
       confirmedNewCustomerPhone,
       restoredPendingSubmission: Boolean(pendingSubmission),
       requiresCustomerResolution: hasOdooBackend,
@@ -1002,6 +1062,15 @@ const Index = () => {
           ? "customer"
           : "delivery",
       );
+      return;
+    }
+    const deliverySplitsError = validateDeliverySplits(
+      fulfillmentType === "delivery" ? deliverySplits : [],
+      items,
+    );
+    if (deliverySplitsError) {
+      toast.error(deliverySplitsError);
+      scrollToWorkflowSection("delivery");
       return;
     }
 
@@ -1146,6 +1215,7 @@ const Index = () => {
       paymentReference: receivesPayment ? paymentReference.trim() : "",
       paymentReceivedAt: receiptTimestamp,
       paymentIdempotencyKey: pendingSubmission?.order.paymentIdempotencyKey || receiptIdempotencyKey,
+      fulfillmentType,
       deliveryDate,
       ...deliveryContractFieldsForSubmission(
         deliveryTimeMode,
@@ -1154,6 +1224,13 @@ const Index = () => {
       ),
       deliveryTime,
       deliveryAddress,
+      deliveryGoogleAddress: fulfillmentType === "delivery" ? deliveryGoogleAddress : "",
+      deliveryBuilding: fulfillmentType === "delivery" ? deliveryBuilding.trim() : "",
+      deliveryFloor: fulfillmentType === "delivery" ? deliveryFloor.trim() : "",
+      deliveryUnit: fulfillmentType === "delivery" ? deliveryUnit.trim() : "",
+      ...(includePendingField("deliverySplits")
+        ? { deliverySplits: fulfillmentType === "delivery" ? deliverySplits : [] }
+        : {}),
       ...(includePendingField("recipientType") ? { recipientType } : {}),
       ...(includePendingField("recipientCompanyName")
         ? { recipientCompanyName: recipientCompanyName.trim() }
@@ -1405,15 +1482,7 @@ const Index = () => {
           }}
         />
 
-        {pendingOwnershipMismatch && (
-          <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive">
-            <p>
-              這張未確認訂單並不屬於目前登入員工，系統不會自動轉名或容許移除。請登出後由原本員工重新登入；如無法辨認原員工，請由管理員到 Odoo 核對。
-            </p>
-          </div>
-        )}
-
-        {pendingSubmission && !pendingOwnershipMismatch && (
+        {pendingSubmission && !isSubmitting && (
           <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
             <p>
               {posAuthRequired
@@ -1427,7 +1496,7 @@ const Index = () => {
               onClick={handleDiscardPending}
               className="border-amber-400 bg-white text-amber-950 hover:bg-amber-100"
             >
-              核對 Odoo 後移除本機資料
+              核對 Odoo 後解除鎖定（保留資料）
             </Button>
           </div>
         )}
@@ -1478,6 +1547,12 @@ const Index = () => {
               current && current !== normalizedPhone ? null : current
             ));
             if (
+              confirmedNewCustomerPhone
+              && confirmedNewCustomerPhone !== normalizedPhone
+            ) {
+              setConfirmedNewCustomerName(null);
+            }
+            if (
               selectedCustomer
               && normalizedPhone !== normalizePhoneNumber(selectedCustomer.phone)
             ) {
@@ -1487,6 +1562,14 @@ const Index = () => {
           onNameChange={(value) => {
             setCustomerName(value);
             clearCheckoutErrors("customerName");
+            if (
+              confirmedNewCustomerName
+              && normalizeCustomerIdentityName(value)
+                !== normalizeCustomerIdentityName(confirmedNewCustomerName)
+            ) {
+              setConfirmedNewCustomerName(null);
+              setConfirmedNewCustomerPhone(null);
+            }
             if (selectedCustomer && value !== selectedCustomer.name) {
               detachSelectedCustomerProfile();
             }
@@ -1516,6 +1599,7 @@ const Index = () => {
             clearCheckoutErrors("billingAddress");
           }}
           onCustomerSelect={applyCustomerSelection}
+          onStartNewCustomerUnderAccount={startNewCustomerUnderAccount}
           onCustomerAndRecipientSelect={applyCustomerAndRecipient}
           phoneError={checkoutErrors.phone}
           customerNameError={checkoutErrors.customerName}
@@ -1524,28 +1608,22 @@ const Index = () => {
           customerEmailError={checkoutErrors.customerEmail}
           billingAddressError={checkoutErrors.billingAddress}
           selectedCustomer={selectedCustomer}
+          confirmedNewCustomerName={confirmedNewCustomerName}
           confirmedNewCustomerPhone={confirmedNewCustomerPhone}
-          onConfirmNewCustomer={(normalizedPhone) => {
+          onConfirmNewCustomer={(normalizedPhone, confirmedName) => {
             setSelectedCustomer(null);
+            setConfirmedNewCustomerName(confirmedName);
             setConfirmedNewCustomerPhone(normalizedPhone);
-            clearCheckoutErrors("phone");
+            clearCheckoutErrors("customerName", "phone");
           }}
           refreshKey={customerRefreshKey}
         />
 
         <BusinessDetailsSection
           customerGroup={customerGroup}
-          senderDoNumber={senderDoNumber}
-          recipientDoNumber={recipientDoNumber}
-          sourceReference={sourceReference}
           department={department}
-          terms={terms}
           onCustomerGroupChange={setCustomerGroup}
-          onSenderDoNumberChange={setSenderDoNumber}
-          onRecipientDoNumberChange={setRecipientDoNumber}
-          onSourceReferenceChange={setSourceReference}
           onDepartmentChange={setDepartment}
-          onTermsChange={setTerms}
         />
         </section>
 
@@ -1576,6 +1654,7 @@ const Index = () => {
           className="scroll-mt-40"
         >
         <DeliverySection
+          fulfillmentType={fulfillmentType}
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
           deliveryTimeMode={deliveryTimeMode}
@@ -1599,14 +1678,32 @@ const Index = () => {
           deliveryDistrict={deliveryDistrict}
           deliveryArea={deliveryArea}
           deliveryDetail={deliveryDetail}
+          deliveryBuilding={deliveryBuilding}
+          deliveryFloor={deliveryFloor}
+          deliveryUnit={deliveryUnit}
           recipientType={recipientType}
           recipientCompanyName={recipientCompanyName}
           recipientName={recipientName}
           recipientPhone={recipientPhone}
+          senderType={customerType}
+          senderCompanyName={companyName}
+          senderName={senderName || customerName}
+          senderPhone={phone}
           deliveryPerson={deliveryPerson}
           onDateChange={(value) => {
             setDeliveryDate(value);
             clearCheckoutErrors("deliveryDate", "deliveryTime");
+          }}
+          onFulfillmentTypeChange={(value) => {
+            setFulfillmentType(value);
+            if (value === "pickup") setDeliverySplits([]);
+            clearCheckoutErrors(
+              "deliveryAddress",
+              "recipientName",
+              "recipientCompanyName",
+              "recipientPhone",
+            );
+            resetRecipientPersistence();
           }}
           onTimeChange={(value) => {
             setDeliveryTime(value);
@@ -1643,6 +1740,9 @@ const Index = () => {
             clearCheckoutErrors("deliveryAddress");
             resetRecipientPersistence();
           }}
+          onBuildingChange={setDeliveryBuilding}
+          onFloorChange={setDeliveryFloor}
+          onUnitChange={setDeliveryUnit}
           onRecipientTypeChange={(value) => {
             setRecipientType(value);
             if (value === "personal") setRecipientCompanyName("");
@@ -1675,6 +1775,25 @@ const Index = () => {
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}
         />
+        {fulfillmentType === "delivery" && (
+          <SplitDeliverySection
+            items={items}
+            splits={deliverySplits}
+            onChange={setDeliverySplits}
+            defaultDeliveryDate={deliveryDate}
+            defaultDeliveryTime={deliveryTime}
+            defaultDeliveryTimeMode={deliveryTimeMode}
+            defaultDeliverySlotId={deliverySlotId}
+            deliverySlots={deliverySlots}
+            deliverySlotsLoading={deliverySlotsLoading}
+            deliverySlotsError={deliverySlotsError}
+            onRetryDeliverySlots={() => setDeliverySlotsRefreshKey((key) => key + 1)}
+            senderType={customerType}
+            senderCompanyName={companyName}
+            senderName={senderName || customerName}
+            senderPhone={phone}
+          />
+        )}
         </section>
 
         <section
@@ -1816,7 +1935,7 @@ const Index = () => {
             size="lg"
             className="px-8 text-base font-semibold shadow-lg"
           >
-            {isSubmitting ? "同步中..." : "確認訂單"}
+            {isSubmitting ? "下單中" : "確認訂單"}
           </Button>
         </div>
       </div>}

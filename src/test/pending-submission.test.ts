@@ -12,13 +12,14 @@ import {
   pendingSubmissionBelongsToEmployee,
   pendingSubmissionForEmployee,
   PENDING_SUBMISSION_KEY,
+  PENDING_SUBMISSION_TTL_MS,
   savePendingSubmission,
   submissionPayloadMatches,
   submitPersistedOrder,
   upgradeLegacyPendingDeliverySelection,
   type PendingOrderSubmission,
 } from "@/lib/pending-submission";
-import { OdooApiError } from "@/lib/odoo-api";
+import { OdooApiError, OdooConflictError } from "@/lib/odoo-api";
 import type { Order } from "@/types/order";
 
 function buildSubmission(): PendingOrderSubmission {
@@ -59,7 +60,7 @@ function buildSubmission(): PendingOrderSubmission {
   return {
     order,
     options: { customerId: 42, customerType: "personal", companyName: "" },
-    savedAt: "2026-07-16T09:00:00+08:00",
+    savedAt: new Date().toISOString(),
   };
 }
 
@@ -157,6 +158,111 @@ describe("pending Odoo submission", () => {
     expect(pendingSubmissionForEmployee(pending, null, false)).toBe(pending);
   });
 
+  it("stores pending submissions independently for each employee", () => {
+    const first = buildSubmission();
+    const second = buildSubmission();
+    second.order = {
+      ...second.order,
+      id: "9f714481-76fc-40d7-ab1f-3f5361795ea7",
+      salesId: "AC03 — Another Cashier",
+      operatorEmployeeId: 96,
+    };
+
+    savePendingSubmission(first);
+    savePendingSubmission(second);
+
+    expect(loadPendingSubmission({
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "AC02 — Elma",
+    }, true)).toEqual(first);
+    expect(loadPendingSubmission({
+      id: 96,
+      name: "Another Cashier",
+      login: "cashier-96",
+      salesLabel: "AC03 — Another Cashier",
+    }, true)).toEqual(second);
+  });
+
+  it("clears only the submitting employee recovery record", async () => {
+    const first = buildSubmission();
+    const second = buildSubmission();
+    second.order = {
+      ...second.order,
+      id: "9f714481-76fc-40d7-ab1f-3f5361795ea7",
+      salesId: "AC03 — Another Cashier",
+      operatorEmployeeId: 96,
+    };
+    savePendingSubmission(first);
+    savePendingSubmission(second);
+
+    await submitPersistedOrder(second, async () => ({ id: 502 }));
+
+    expect(loadPendingSubmission({
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "AC02 — Elma",
+    }, true)).toEqual(first);
+    expect(loadPendingSubmission({
+      id: 96,
+      name: "Another Cashier",
+      login: "cashier-96",
+      salesLabel: "AC03 — Another Cashier",
+    }, true)).toBeNull();
+  });
+
+  it("migrates a legacy envelope without exposing it to another employee", () => {
+    const legacy = buildSubmission();
+    localStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(legacy));
+
+    expect(loadPendingSubmission({
+      id: 96,
+      name: "Another Cashier",
+      login: "cashier-96",
+      salesLabel: "AC03 — Another Cashier",
+    }, true)).toBeNull();
+    expect(loadPendingSubmission({
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "AC02 — Elma",
+    }, true)).toEqual(legacy);
+  });
+
+  it("normalizes a malformed store by the employee recorded on the order", () => {
+    const pending = buildSubmission();
+    localStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify({
+      version: 2,
+      submissions: {
+        "employee:96": pending,
+      },
+    }));
+
+    expect(loadPendingSubmission({
+      id: 96,
+      name: "Another Cashier",
+      login: "cashier-96",
+      salesLabel: "AC03 — Another Cashier",
+    }, true)).toBeNull();
+    expect(loadPendingSubmission({
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "AC02 — Elma",
+    }, true)).toEqual(pending);
+  });
+
+  it("expires stale recovery records", () => {
+    const expired = buildSubmission();
+    expired.savedAt = new Date(Date.now() - PENDING_SUBMISSION_TTL_MS - 1).toISOString();
+    localStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(expired));
+
+    expect(loadPendingSubmission()).toBeNull();
+    expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
+  });
+
   it("requires explicit confirmation before discarding only the local pending record", () => {
     const pending = buildSubmission();
     savePendingSubmission(pending);
@@ -235,6 +341,30 @@ describe("pending Odoo submission", () => {
 
     await expect(submitPersistedOrder(submission, submitter)).rejects.toThrow("改價原因必填");
     expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
+  });
+
+  it("unlocks a duplicate-phone customer conflict raised before order creation", async () => {
+    const submission = buildSubmission();
+    const submitter = vi.fn().mockRejectedValue(new OdooConflictError(
+      "More than one Odoo customer has this phone number and contact name; select the customer explicitly.",
+    ));
+
+    await expect(submitPersistedOrder(submission, submitter)).rejects.toThrow(
+      "More than one Odoo customer has this phone number",
+    );
+    expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
+  });
+
+  it("keeps an unrelated checkout conflict pending for manual Odoo review", async () => {
+    const submission = buildSubmission();
+    const submitter = vi.fn().mockRejectedValue(new OdooConflictError(
+      "Duplicate Odoo checkout keys require administrator review.",
+    ));
+
+    await expect(submitPersistedOrder(submission, submitter)).rejects.toThrow(
+      "Duplicate Odoo checkout keys require administrator review",
+    );
+    expect(loadPendingSubmission()?.order.id).toBe(submission.order.id);
   });
 
   it("keeps the envelope for server failures with an ambiguous write result", async () => {
