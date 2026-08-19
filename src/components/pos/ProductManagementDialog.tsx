@@ -394,7 +394,7 @@ const ProductManagementDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="relative block h-[92vh] max-h-[980px] w-[calc(100vw-1rem)] max-w-[1240px] overflow-hidden p-0">
+      <DialogContent className="block h-[92vh] max-h-[980px] w-[calc(100vw-1rem)] max-w-[1240px] overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-5 py-4 pr-14">
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="h-5 w-5" />

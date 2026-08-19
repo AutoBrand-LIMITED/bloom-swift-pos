@@ -65,6 +65,15 @@ describe("ProductManagementDialog", () => {
     }));
   });
 
+  it("keeps the management panel fixed and visible above the modal overlay", async () => {
+    renderDialog();
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveClass("fixed");
+    expect(dialog).not.toHaveClass("relative");
+    await screen.findByText("testing");
+  });
+
   it("keeps the default view compact and opens editing only from product settings", async () => {
     renderDialog();
 
