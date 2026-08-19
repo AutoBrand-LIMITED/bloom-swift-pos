@@ -45,6 +45,7 @@ import { cn } from "@/lib/utils";
 import {
   createOdooProduct,
   hasOdooBackend,
+  reorderOdooProducts,
   searchManageableOdooProducts,
   updateOdooProduct,
   type OdooProduct,
@@ -79,6 +80,8 @@ interface DragSession {
   startY: number;
   active: boolean;
   timer: number | null;
+  clientX: number;
+  clientY: number;
 }
 
 const EMPTY_FORM: ProductFormState = {
@@ -107,18 +110,6 @@ const formFromProduct = (product: OdooProduct): ProductFormState => ({
   availableUntil: product.availableUntil || "",
 });
 
-const payloadFromProduct = (product: OdooProduct, displaySequence: number): OdooProductWritePayload => ({
-  name: product.name,
-  price: product.price,
-  productCode: product.productCode,
-  categoryId: product.categoryId,
-  barcode: product.barcode,
-  availableInPos: product.availableInPos,
-  displaySequence,
-  availableFrom: product.availableFrom,
-  availableUntil: product.availableUntil,
-});
-
 const ProductManagementDialog = ({
   open,
   onOpenChange,
@@ -133,19 +124,31 @@ const ProductManagementDialog = ({
   const [saving, setSaving] = useState(false);
   const [sortMode, setSortMode] = useState(false);
   const [sortSaving, setSortSaving] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("all");
   const [draggedProductId, setDraggedProductId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const creatingProductRef = useRef(false);
   const sortSnapshotRef = useRef<OdooProduct[]>([]);
   const dragSessionRef = useRef<DragSession | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const autoScrollFrameRef = useRef<number | null>(null);
 
-  const loadProducts = useCallback(async (signal?: AbortSignal, searchQuery = query) => {
+  const loadProducts = useCallback(async (
+    signal?: AbortSignal,
+    searchQuery = "",
+    categoryKey = "all",
+  ) => {
     if (!hasOdooBackend) return [];
     setLoading(true);
     setError(null);
     try {
-      const rows = await searchManageableOdooProducts(searchQuery, signal);
+      const categoryId = categoryKey === "all"
+        ? undefined
+        : categoryKey === "uncategorized"
+          ? 0
+          : Number(categoryKey);
+      const rows = await searchManageableOdooProducts(searchQuery, signal, categoryId);
       setProducts(rows);
       return rows;
     } catch (loadError) {
@@ -155,22 +158,33 @@ const ProductManagementDialog = ({
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [query]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     creatingProductRef.current = false;
     setEditorOpen(false);
     setSortMode(false);
+    setActiveCategory("all");
+    setQuery("");
     const controller = new AbortController();
-    void loadProducts(controller.signal);
+    void loadProducts(controller.signal, "", "all");
     return () => controller.abort();
   }, [loadProducts, open]);
 
   useEffect(() => () => {
     const session = dragSessionRef.current;
     if (session?.timer) window.clearTimeout(session.timer);
+    if (autoScrollFrameRef.current !== null) window.cancelAnimationFrame(autoScrollFrameRef.current);
   }, []);
+
+  const selectCategory = (categoryKey: string) => {
+    if (sortMode || categoryKey === activeCategory) return;
+    setActiveCategory(categoryKey);
+    setError(null);
+    setSavedMessage(null);
+    void loadProducts(undefined, query, categoryKey);
+  };
 
   const setFormField = <K extends keyof ProductFormState>(field: K, value: ProductFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -249,10 +263,14 @@ const ProductManagementDialog = ({
   const startSorting = async () => {
     setError(null);
     setSavedMessage(null);
+    if (activeCategory === "all") {
+      setError("請先揀一個商品分類，再調整該分類內嘅排序。");
+      return;
+    }
     let sortableProducts = products;
     if (query.trim()) {
       setQuery("");
-      sortableProducts = await loadProducts(undefined, "");
+      sortableProducts = await loadProducts(undefined, "", activeCategory);
     }
     sortSnapshotRef.current = [...sortableProducts];
     setSortMode(true);
@@ -263,6 +281,10 @@ const ProductManagementDialog = ({
     setSortMode(false);
     setDraggedProductId(null);
     setSavedMessage(null);
+    if (autoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
   };
 
   const moveProductTo = useCallback((productId: number, targetId: number) => {
@@ -297,6 +319,44 @@ const ProductManagementDialog = ({
     setSavedMessage("拖拉商品到新位置，完成後儲存排序。");
   };
 
+  const moveToPointerTarget = useCallback((session: DragSession) => {
+    const target = document
+      .elementFromPoint(session.clientX, session.clientY)
+      ?.closest<HTMLElement>("[data-product-sort-id]");
+    const targetId = Number(target?.dataset.productSortId);
+    if (targetId) moveProductTo(session.productId, targetId);
+  }, [moveProductTo]);
+
+  const startAutoScroll = useCallback(() => {
+    if (autoScrollFrameRef.current !== null) return;
+
+    const tick = () => {
+      const session = dragSessionRef.current;
+      const container = scrollContainerRef.current;
+      if (!session?.active || !container) {
+        autoScrollFrameRef.current = null;
+        return;
+      }
+
+      const bounds = container.getBoundingClientRect();
+      const edgeSize = Math.min(120, bounds.height * 0.24);
+      let speed = 0;
+      if (session.clientY < bounds.top + edgeSize) {
+        speed = -Math.ceil(((bounds.top + edgeSize - session.clientY) / edgeSize) * 24);
+      } else if (session.clientY > bounds.bottom - edgeSize) {
+        speed = Math.ceil(((session.clientY - (bounds.bottom - edgeSize)) / edgeSize) * 24);
+      }
+
+      if (speed !== 0) {
+        container.scrollTop += speed;
+        moveToPointerTarget(session);
+      }
+      autoScrollFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    autoScrollFrameRef.current = window.requestAnimationFrame(tick);
+  }, [moveToPointerTarget]);
+
   const handleDragPointerDown = (productId: number, event: ReactPointerEvent<HTMLButtonElement>) => {
     if (!sortMode) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -307,6 +367,8 @@ const ProductManagementDialog = ({
       startY: event.clientY,
       active: false,
       timer: null,
+      clientX: event.clientX,
+      clientY: event.clientY,
     };
     dragSessionRef.current = session;
     if (event.pointerType === "mouse") {
@@ -319,6 +381,8 @@ const ProductManagementDialog = ({
   const handleDragPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const session = dragSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
+    session.clientX = event.clientX;
+    session.clientY = event.clientY;
     if (!session.active) {
       const distance = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
       if (distance > 10 && session.timer) {
@@ -328,11 +392,8 @@ const ProductManagementDialog = ({
       return;
     }
     event.preventDefault();
-    const target = document
-      .elementFromPoint(event.clientX, event.clientY)
-      ?.closest<HTMLElement>("[data-product-sort-id]");
-    const targetId = Number(target?.dataset.productSortId);
-    if (targetId) moveProductTo(session.productId, targetId);
+    moveToPointerTarget(session);
+    startAutoScroll();
   };
 
   const finishDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -344,6 +405,10 @@ const ProductManagementDialog = ({
     }
     dragSessionRef.current = null;
     setDraggedProductId(null);
+    if (autoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
   };
 
   const handleDragKeyDown = (productId: number, event: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -372,8 +437,11 @@ const ProductManagementDialog = ({
     setError(null);
     setSavedMessage(null);
     try {
-      for (const { product, displaySequence } of updates) {
-        await updateOdooProduct(product.id, payloadFromProduct(product, displaySequence));
+      if (updates.length > 0) {
+        await reorderOdooProducts(updates.map(({ product, displaySequence }) => ({
+          id: product.id,
+          displaySequence,
+        })));
       }
       setProducts((current) => current.map((product, index) => ({
         ...product,
@@ -384,13 +452,21 @@ const ProductManagementDialog = ({
       onCatalogChanged();
     } catch (sortError) {
       setError(sortError instanceof Error ? sortError.message : "未能儲存商品排序");
-      await loadProducts(undefined, "");
+      await loadProducts(undefined, "", activeCategory);
     } finally {
       setSortSaving(false);
     }
   };
 
-  const productCountLabel = useMemo(() => `${products.length} 件商品`, [products.length]);
+  const activeCategoryLabel = useMemo(() => {
+    if (activeCategory === "all") return "全部商品";
+    if (activeCategory === "uncategorized") return "未分類";
+    return categories.find((category) => String(category.id) === activeCategory)?.name ?? "商品分類";
+  }, [activeCategory, categories]);
+  const productCountLabel = useMemo(
+    () => `${activeCategoryLabel} · ${products.length} 件商品`,
+    [activeCategoryLabel, products.length],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -414,7 +490,7 @@ const ProductManagementDialog = ({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter") void loadProducts();
+                    if (event.key === "Enter") void loadProducts(undefined, query, activeCategory);
                   }}
                   placeholder="搜尋名稱 / code / barcode"
                   className="h-11 pl-9"
@@ -426,7 +502,7 @@ const ProductManagementDialog = ({
                   type="button"
                   variant="outline"
                   className="h-11 gap-1.5"
-                  onClick={() => void loadProducts()}
+                  onClick={() => void loadProducts(undefined, query, activeCategory)}
                   disabled={sortMode || loading}
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -446,8 +522,56 @@ const ProductManagementDialog = ({
                 )}
               </div>
             </div>
+            <div
+              aria-label="商品分類"
+              className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]"
+            >
+              <Button
+                type="button"
+                size="sm"
+                variant={activeCategory === "all" ? "default" : "outline"}
+                className="shrink-0"
+                aria-pressed={activeCategory === "all"}
+                disabled={sortMode}
+                onClick={() => selectCategory("all")}
+              >
+                全部
+              </Button>
+              {categories.map((category) => {
+                const categoryKey = String(category.id);
+                return (
+                  <Button
+                    key={category.id}
+                    type="button"
+                    size="sm"
+                    variant={activeCategory === categoryKey ? "default" : "outline"}
+                    className="shrink-0"
+                    aria-pressed={activeCategory === categoryKey}
+                    disabled={sortMode}
+                    onClick={() => selectCategory(categoryKey)}
+                  >
+                    {category.name}
+                  </Button>
+                );
+              })}
+              <Button
+                type="button"
+                size="sm"
+                variant={activeCategory === "uncategorized" ? "default" : "outline"}
+                className="shrink-0"
+                aria-pressed={activeCategory === "uncategorized"}
+                disabled={sortMode}
+                onClick={() => selectCategory("uncategorized")}
+              >
+                未分類
+              </Button>
+            </div>
             <div className="mt-2 flex min-h-6 items-center justify-between gap-3 text-xs text-muted-foreground">
-              <span>{sortMode ? "拉住手柄移動商品。手機請長按約半秒。" : productCountLabel}</span>
+              <span>
+                {sortMode
+                  ? `正在調整「${activeCategoryLabel}」：拖到畫面頂部或底部可自動捲動。`
+                  : productCountLabel}
+              </span>
               {savedMessage && !editorOpen && (
                 <span className="inline-flex items-center gap-1 text-primary">
                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -457,7 +581,10 @@ const ProductManagementDialog = ({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto bg-secondary/15 px-4 py-4 sm:px-5">
+          <div
+            ref={scrollContainerRef}
+            className="min-h-0 flex-1 overflow-y-auto bg-secondary/15 px-4 py-4 sm:px-5"
+          >
             {error && !editorOpen && (
               <div className="mb-3 rounded-lg border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
                 {error}
@@ -554,7 +681,9 @@ const ProductManagementDialog = ({
 
           {sortMode && (
             <div className="flex items-center justify-between gap-3 border-t border-border bg-background px-4 py-3 sm:px-5">
-              <p className="hidden text-sm text-muted-foreground sm:block">畫面順序會同步成 POS 商品順序。</p>
+              <p className="hidden text-sm text-muted-foreground sm:block">
+                只會更新「{activeCategoryLabel}」入面嘅 POS 商品順序。
+              </p>
               <div className="ml-auto flex gap-2">
                 <Button type="button" variant="outline" className="h-11" onClick={cancelSorting} disabled={sortSaving}>
                   取消

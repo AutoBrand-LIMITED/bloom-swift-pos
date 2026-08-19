@@ -7,6 +7,7 @@ const apiMocks = vi.hoisted(() => ({
   searchProducts: vi.fn(),
   createProduct: vi.fn(),
   updateProduct: vi.fn(),
+  reorderProducts: vi.fn(),
 }));
 
 vi.mock("@/lib/odoo-api", () => ({
@@ -14,6 +15,7 @@ vi.mock("@/lib/odoo-api", () => ({
   searchManageableOdooProducts: apiMocks.searchProducts,
   createOdooProduct: apiMocks.createProduct,
   updateOdooProduct: apiMocks.updateProduct,
+  reorderOdooProducts: apiMocks.reorderProducts,
 }));
 
 const testingProduct = {
@@ -57,12 +59,14 @@ describe("ProductManagementDialog", () => {
     apiMocks.searchProducts.mockReset();
     apiMocks.createProduct.mockReset();
     apiMocks.updateProduct.mockReset();
+    apiMocks.reorderProducts.mockReset();
     apiMocks.searchProducts.mockResolvedValue([testingProduct]);
     apiMocks.updateProduct.mockImplementation(async (id: number, payload: Record<string, unknown>) => ({
       ...(id === testingProduct.id ? testingProduct : chocolateProduct),
       ...payload,
       id,
     }));
+    apiMocks.reorderProducts.mockResolvedValue({ updated: 2 });
   });
 
   it("keeps the management panel fixed and visible above the modal overlay", async () => {
@@ -109,26 +113,36 @@ describe("ProductManagementDialog", () => {
     expect(apiMocks.searchProducts).toHaveBeenCalledTimes(1);
   });
 
-  it("supports keyboard reordering and persists hidden sequence values", async () => {
+  it("filters products by category before sorting", async () => {
+    renderDialog();
+
+    await screen.findByText("testing");
+    fireEvent.click(screen.getByRole("button", { name: "花束 Bouquets" }));
+
+    await waitFor(() => expect(apiMocks.searchProducts).toHaveBeenLastCalledWith(
+      "",
+      undefined,
+      1,
+    ));
+  });
+
+  it("supports keyboard reordering and persists the category order in one request", async () => {
     apiMocks.searchProducts.mockResolvedValue([testingProduct, chocolateProduct]);
     renderDialog();
 
     await screen.findByText("Chocolate");
+    fireEvent.click(screen.getByRole("button", { name: "花束 Bouquets" }));
+    await waitFor(() => expect(apiMocks.searchProducts).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
     fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowRight" });
     fireEvent.click(screen.getByRole("button", { name: "儲存排序" }));
 
-    await waitFor(() => expect(apiMocks.updateProduct).toHaveBeenCalledTimes(2));
-    expect(apiMocks.updateProduct).toHaveBeenNthCalledWith(
-      1,
-      chocolateProduct.id,
-      expect.objectContaining({ displaySequence: 10 })
-    );
-    expect(apiMocks.updateProduct).toHaveBeenNthCalledWith(
-      2,
-      testingProduct.id,
-      expect.objectContaining({ displaySequence: 20 })
-    );
+    await waitFor(() => expect(apiMocks.reorderProducts).toHaveBeenCalledTimes(1));
+    expect(apiMocks.reorderProducts).toHaveBeenCalledWith([
+      { id: chocolateProduct.id, displaySequence: 10 },
+      { id: testingProduct.id, displaySequence: 20 },
+    ]);
+    expect(apiMocks.updateProduct).not.toHaveBeenCalled();
     expect(await screen.findByText("商品排序已儲存")).toBeInTheDocument();
   });
 });
