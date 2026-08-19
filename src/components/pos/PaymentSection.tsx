@@ -133,18 +133,23 @@ const PaymentSection = ({
             {paymentOptionsError || "Odoo Accounting 收款設定尚未準備好"}
           </p>
         )}
+        {!paymentOptionsLoading && paymentOptions.length > 0 && paymentOptionsError && (
+          <p className="text-xs text-amber-700">
+            {paymentOptionsError}；現正沿用上次成功取得嘅付款方式，你仍然可以繼續收款。
+          </p>
+        )}
         <div className="space-y-1 pt-1">
-          <Label className="text-xs">
-            付款參考編號 <span className="text-destructive" aria-hidden="true">*</span>
-          </Label>
+          <Label htmlFor="payment-reference" className="text-xs">付款參考編號（建議填寫）</Label>
           <Input
-            aria-label="付款參考編號"
+            id="payment-reference"
             value={paymentReference}
             onChange={(event) => onPaymentReferenceChange(event.target.value)}
             placeholder="收據、卡機、FPS 或銀行參考編號"
             maxLength={120}
-            required
           />
+          <p className="text-xs text-muted-foreground">
+            留空時系統會自動產生 POS 參考編號，唔會阻礙收款。
+          </p>
         </div>
       </div>
     )}

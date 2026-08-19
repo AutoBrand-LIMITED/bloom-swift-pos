@@ -92,6 +92,11 @@ import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pri
 import { parseDeliveryAddress } from "@/lib/hk-address";
 import { checkoutBarLeftOffset } from "@/lib/pos-layout";
 import {
+  loadCachedPaymentOptions,
+  resolvePaymentReference,
+  saveCachedPaymentOptions,
+} from "@/lib/payment-options";
+import {
   hongKongBusinessDate,
   loadUnsyncedOrders,
   mergeOrderRecords,
@@ -235,7 +240,7 @@ const Index = () => {
   const [checkoutId, setCheckoutId] = useState(
     () => restoredEmployeePendingSubmission?.order.id || crypto.randomUUID(),
   );
-  const [paymentOptions, setPaymentOptions] = useState<AccountingPaymentOption[]>([]);
+  const [paymentOptions, setPaymentOptions] = useState<AccountingPaymentOption[]>(loadCachedPaymentOptions);
   const [paymentOptionsLoading, setPaymentOptionsLoading] = useState(false);
   const [paymentOptionsError, setPaymentOptionsError] = useState<string | null>(null);
   const [salesId, setSalesId] = useState(employee?.salesLabel || "");
@@ -393,7 +398,6 @@ const Index = () => {
         !receivesPayment
         || (
           paymentMethod
-          && paymentReference.trim()
           && (
             paymentStatus !== "deposit"
             || (depositAmount > 0 && depositAmount < finalPrice)
@@ -443,17 +447,30 @@ const Index = () => {
     setPaymentOptionsLoading(true);
     setPaymentOptionsError(null);
     getAccountingPaymentOptions(controller.signal)
-      .then(setPaymentOptions)
+      .then((options) => {
+        if (options.length === 0) {
+          setPaymentOptionsError("暫時未能更新 Odoo 付款方式；已保留上次可用設定");
+          return;
+        }
+        setPaymentOptions(options);
+        saveCachedPaymentOptions(options);
+      })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        setPaymentOptions([]);
-        setPaymentOptionsError(error instanceof Error ? error.message : "未能檢查 Odoo 收款設定");
+        const reason = error instanceof Error ? error.message : "未能檢查 Odoo 收款設定";
+        setPaymentOptionsError(`暫時未能更新 Odoo 付款方式；已保留上次可用設定（${reason}）`);
       })
       .finally(() => {
         if (!controller.signal.aborted) setPaymentOptionsLoading(false);
       });
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (!receivesPayment || paymentOptions.length === 0) return;
+    if (paymentOptions.some((option) => option.code === paymentMethod)) return;
+    setPaymentMethod(paymentOptions[0].code);
+  }, [paymentMethod, paymentOptions, receivesPayment]);
 
   useEffect(() => {
     if (!hasOdooBackend) {
@@ -1124,10 +1141,11 @@ const Index = () => {
       scrollToWorkflowSection("payment");
       return;
     }
+    const resolvedPaymentReference = receivesPayment
+      ? resolvePaymentReference(paymentReference, checkoutId)
+      : "";
     if (receivesPayment && !paymentReference.trim()) {
-      toast.error("請輸入付款參考編號");
-      scrollToWorkflowSection("payment");
-      return;
+      toast.warning(`未填付款參考編號；系統已使用 ${resolvedPaymentReference} 方便後補核對`);
     }
     if (paymentStatus === "deposit" && (depositAmount <= 0 || depositAmount >= finalPrice)) {
       toast.error("訂金必須大過 $0 並少過訂單總額");
@@ -1210,7 +1228,7 @@ const Index = () => {
       paymentStatus,
       depositAmount: paymentStatus === "deposit" ? depositAmount : 0,
       paymentMethod,
-      paymentReference: receivesPayment ? paymentReference.trim() : "",
+      paymentReference: resolvedPaymentReference,
       paymentReceivedAt: receiptTimestamp,
       paymentIdempotencyKey: pendingSubmission?.order.paymentIdempotencyKey || receiptIdempotencyKey,
       fulfillmentType,

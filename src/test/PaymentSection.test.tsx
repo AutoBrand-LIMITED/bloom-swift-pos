@@ -9,7 +9,10 @@ const paymentOptions = [
   { code: "card_terminal", label: "Card Terminal" },
 ];
 
-const renderPaymentSection = (paymentStatus: "unpaid" | "paid" | "deposit" = "paid") => {
+const renderPaymentSection = (
+  paymentStatus: "unpaid" | "paid" | "deposit" = "paid",
+  paymentOptionsError: string | null = null,
+) => {
   const onPaymentMethodChange = vi.fn();
   render(
     <PaymentSection
@@ -27,7 +30,7 @@ const renderPaymentSection = (paymentStatus: "unpaid" | "paid" | "deposit" = "pa
       onPaymentReferenceChange={vi.fn()}
       paymentOptions={paymentOptions}
       paymentOptionsLoading={false}
-      paymentOptionsError={null}
+      paymentOptionsError={paymentOptionsError}
       depositAmount={0}
       onDepositAmountChange={vi.fn()}
       priceWarning={false}
@@ -46,7 +49,8 @@ describe("PaymentSection accounting payment options", () => {
 
     expect(onPaymentMethodChange).toHaveBeenNthCalledWith(1, "cash");
     expect(onPaymentMethodChange).toHaveBeenNthCalledWith(2, "card_terminal");
-    expect(screen.getByLabelText("付款參考編號")).toBeRequired();
+    expect(screen.getByLabelText("付款參考編號（建議填寫）")).not.toBeRequired();
+    expect(screen.getByText("留空時系統會自動產生 POS 參考編號，唔會阻礙收款。")).toBeVisible();
   });
 
   it("does not show receipt methods for an unpaid order", () => {
@@ -54,5 +58,12 @@ describe("PaymentSection accounting payment options", () => {
 
     expect(screen.queryByRole("button", { name: "Cash" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("付款參考編號")).not.toBeInTheDocument();
+  });
+
+  it("warns without blocking when cached payment choices are being used", () => {
+    renderPaymentSection("paid", "暫時未能更新 Odoo 收款設定");
+
+    expect(screen.getByText(/現正沿用上次成功取得嘅付款方式/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
   });
 });
