@@ -1,7 +1,29 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ProductManagementDialog from "@/components/pos/ProductManagementDialog";
+
+const originalAnimateDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "animate");
+const originalSetPointerCaptureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "setPointerCapture",
+);
+const originalHasPointerCaptureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "hasPointerCapture",
+);
+const originalReleasePointerCaptureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "releasePointerCapture",
+);
+
+const restorePrototypeProperty = (
+  property: string,
+  descriptor: PropertyDescriptor | undefined,
+) => {
+  if (descriptor) Object.defineProperty(HTMLElement.prototype, property, descriptor);
+  else Reflect.deleteProperty(HTMLElement.prototype, property);
+};
 
 const apiMocks = vi.hoisted(() => ({
   searchProducts: vi.fn(),
@@ -45,6 +67,53 @@ const chocolateProduct = {
   displaySequence: 100,
 };
 
+const gridProducts = Array.from({ length: 6 }, (_, index) => ({
+  ...testingProduct,
+  id: 4401 + index,
+  templateId: 4401 + index,
+  name: `Grid product ${index + 1}`,
+  productCode: `GRID-${index + 1}`,
+}));
+
+const rect = (left: number, top: number, width = 100, height = 120): DOMRect => ({
+  x: left,
+  y: top,
+  left,
+  top,
+  right: left + width,
+  bottom: top + height,
+  width,
+  height,
+  toJSON: () => ({}),
+} as DOMRect);
+
+const setThreeColumnCardGeometry = () => {
+  const cards = screen.getAllByRole("button", { name: /^移動 Grid product/ })
+    .map((handle) => handle.closest<HTMLElement>("[data-product-sort-id]")!);
+  cards.forEach((card) => {
+    vi.spyOn(card, "getBoundingClientRect").mockImplementation(() => {
+      const currentCards = Array.from(card.parentElement!.children);
+      const index = currentCards.indexOf(card);
+      return rect((index % 3) * 120, Math.floor(index / 3) * 150);
+    });
+  });
+};
+
+const startGridSorting = async () => {
+  apiMocks.searchProducts.mockResolvedValue(gridProducts);
+  const view = renderDialog();
+  await screen.findByText("Grid product 6");
+  fireEvent.click(screen.getByRole("button", { name: "花束 Bouquets" }));
+  await waitFor(() => expect(apiMocks.searchProducts).toHaveBeenCalledTimes(2));
+  fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
+  setThreeColumnCardGeometry();
+  return view;
+};
+
+const orderedDragHandleNames = () => screen
+  .getAllByRole("button", { name: /^移動 Grid product/ })
+  .map((button) => button.getAttribute("aria-label"));
+
 const renderDialog = () => render(
   <ProductManagementDialog
     open
@@ -56,6 +125,16 @@ const renderDialog = () => render(
 
 describe("ProductManagementDialog", () => {
   beforeEach(() => {
+    vi.stubGlobal("PointerEvent", class extends MouseEvent {
+      pointerId: number;
+      pointerType: string;
+
+      constructor(type: string, init: PointerEventInit = {}) {
+        super(type, init);
+        this.pointerId = init.pointerId ?? 0;
+        this.pointerType = init.pointerType ?? "";
+      }
+    });
     apiMocks.searchProducts.mockReset();
     apiMocks.createProduct.mockReset();
     apiMocks.updateProduct.mockReset();
@@ -67,6 +146,16 @@ describe("ProductManagementDialog", () => {
       id,
     }));
     apiMocks.reorderProducts.mockResolvedValue({ updated: 2 });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    restorePrototypeProperty("animate", originalAnimateDescriptor);
+    restorePrototypeProperty("setPointerCapture", originalSetPointerCaptureDescriptor);
+    restorePrototypeProperty("hasPointerCapture", originalHasPointerCaptureDescriptor);
+    restorePrototypeProperty("releasePointerCapture", originalReleasePointerCaptureDescriptor);
   });
 
   it("keeps the management panel fixed and visible above the modal overlay", async () => {
@@ -145,4 +234,207 @@ describe("ProductManagementDialog", () => {
     expect(apiMocks.updateProduct).not.toHaveBeenCalled();
     expect(await screen.findByText("商品排序已儲存")).toBeInTheDocument();
   });
+
+  it("targets the nearest card center when dragging diagonally across a three-column grid", async () => {
+    await startGridSorting();
+    const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
+
+    fireEvent.pointerDown(bottomRightHandle, {
+      pointerId: 7,
+      pointerType: "mouse",
+      clientX: 290,
+      clientY: 210,
+    });
+    fireEvent.pointerMove(bottomRightHandle, {
+      pointerId: 7,
+      pointerType: "mouse",
+      clientX: 52,
+      clientY: 62,
+    });
+
+    expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 6");
+    expect(screen.getByText("拖拉商品到新位置，完成後儲存排序。")).toBeInTheDocument();
+  });
+
+  it("keeps capture on the stable scroll container across consecutive DOM reorders", async () => {
+    const setPointerCapture = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
+      configurable: true,
+      value: setPointerCapture,
+    });
+    Object.defineProperty(HTMLElement.prototype, "hasPointerCapture", {
+      configurable: true,
+      value: vi.fn(() => true),
+    });
+    Object.defineProperty(HTMLElement.prototype, "releasePointerCapture", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    await startGridSorting();
+    const draggedHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
+    const scrollContainer = draggedHandle.closest<HTMLElement>(".overflow-y-auto")!;
+
+    fireEvent.pointerDown(draggedHandle, {
+      pointerId: 71,
+      pointerType: "mouse",
+      clientX: 290,
+      clientY: 210,
+    });
+    expect(setPointerCapture).toHaveBeenCalledWith(71);
+    expect(setPointerCapture.mock.contexts[0]).toBe(scrollContainer);
+    expect(setPointerCapture.mock.contexts[0]).not.toBe(draggedHandle);
+
+    fireEvent.pointerMove(scrollContainer, {
+      pointerId: 71,
+      pointerType: "mouse",
+      clientX: 52,
+      clientY: 62,
+    });
+    expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 6");
+
+    fireEvent.pointerMove(scrollContainer, {
+      pointerId: 71,
+      pointerType: "mouse",
+      clientX: 172,
+      clientY: 212,
+    });
+    expect(orderedDragHandleNames()).toEqual([
+      "移動 Grid product 1",
+      "移動 Grid product 2",
+      "移動 Grid product 3",
+      "移動 Grid product 4",
+      "移動 Grid product 6",
+      "移動 Grid product 5",
+    ]);
+    expect(setPointerCapture).toHaveBeenCalledTimes(1);
+  });
+
+  it("FLIP-animates displaced siblings after a drag reorder", async () => {
+    const animate = vi.fn(() => ({ cancel: vi.fn() } as unknown as Animation));
+    Object.defineProperty(HTMLElement.prototype, "animate", {
+      configurable: true,
+      value: animate,
+    });
+    await startGridSorting();
+    const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
+
+    fireEvent.pointerDown(bottomRightHandle, {
+      pointerId: 8,
+      pointerType: "mouse",
+      clientX: 290,
+      clientY: 210,
+    });
+    fireEvent.pointerMove(bottomRightHandle, {
+      pointerId: 8,
+      pointerType: "mouse",
+      clientX: 52,
+      clientY: 62,
+    });
+
+    expect(animate).toHaveBeenCalled();
+    expect(animate.mock.contexts).not.toContain(bottomRightHandle.closest("article"));
+    expect(animate).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ transform: expect.stringContaining("translate3d(") }),
+        { transform: "translate3d(0, 0, 0)" },
+      ]),
+      expect.objectContaining({ duration: 220 }),
+    );
+  });
+
+  it("does not animate reflow when reduced motion is requested", async () => {
+    const animate = vi.fn(() => ({ cancel: vi.fn() } as unknown as Animation));
+    Object.defineProperty(HTMLElement.prototype, "animate", {
+      configurable: true,
+      value: animate,
+    });
+    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    await startGridSorting();
+    const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
+
+    fireEvent.pointerDown(bottomRightHandle, {
+      pointerId: 9,
+      pointerType: "mouse",
+      clientX: 290,
+      clientY: 210,
+    });
+    fireEvent.pointerMove(bottomRightHandle, {
+      pointerId: 9,
+      pointerType: "mouse",
+      clientX: 52,
+      clientY: 62,
+    });
+
+    expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 6");
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it.each(["pointerup", "pointercancel", "lostpointercapture", "blur"])(
+    "ends an active drag on %s and ignores later pointer movement",
+    async (endEvent) => {
+      await startGridSorting();
+      const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
+      fireEvent.pointerDown(bottomRightHandle, {
+        pointerId: 10,
+        pointerType: "mouse",
+        clientX: 290,
+        clientY: 210,
+      });
+
+      if (endEvent === "blur") {
+        fireEvent.blur(window);
+      } else {
+        const event = new Event(endEvent, { bubbles: true });
+        Object.defineProperty(event, "pointerId", { value: 10 });
+        fireEvent(bottomRightHandle, event);
+      }
+      fireEvent.pointerMove(bottomRightHandle, {
+        pointerId: 10,
+        pointerType: "mouse",
+        clientX: 52,
+        clientY: 62,
+      });
+
+      expect(orderedDragHandleNames()).toEqual(gridProducts.map((product) => `移動 ${product.name}`));
+      expect(bottomRightHandle.closest("article")).not.toHaveClass("opacity-70");
+    },
+  );
+
+  it.each(["dialog close", "unmount"])(
+    "clears a pending touch long-press on %s",
+    async (cleanup) => {
+      const view = await startGridSorting();
+      const handle = screen.getByRole("button", { name: "移動 Grid product 1" });
+      const setTimeout = vi.spyOn(window, "setTimeout");
+
+      fireEvent.pointerDown(handle, { pointerId: 11, pointerType: "touch", clientX: 50, clientY: 60 });
+      const dragTimer = setTimeout.mock.results.at(-1)?.value;
+      const clearTimeout = vi.spyOn(window, "clearTimeout");
+      act(() => {
+        if (cleanup === "dialog close") {
+          view.rerender(
+            <ProductManagementDialog
+              open={false}
+              onOpenChange={vi.fn()}
+              categories={[{ id: 1, name: "花束 Bouquets", parent_id: null, sequence: 1 }]}
+              onCatalogChanged={vi.fn()}
+            />,
+          );
+        } else {
+          view.unmount();
+        }
+      });
+
+      expect(clearTimeout).toHaveBeenCalledWith(dragTimer);
+    },
+  );
 });

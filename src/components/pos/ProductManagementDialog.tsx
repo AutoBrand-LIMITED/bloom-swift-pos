@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -76,6 +77,7 @@ interface ProductFormState {
 interface DragSession {
   productId: number;
   pointerId: number;
+  captureTarget: HTMLDivElement;
   startX: number;
   startY: number;
   active: boolean;
@@ -133,6 +135,8 @@ const ProductManagementDialog = ({
   const dragSessionRef = useRef<DragSession | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const autoScrollFrameRef = useRef<number | null>(null);
+  const productCardRefs = useRef(new Map<number, HTMLElement>());
+  const flipPositionsRef = useRef<Map<number, DOMRect> | null>(null);
 
   const loadProducts = useCallback(async (
     signal?: AbortSignal,
@@ -171,12 +175,6 @@ const ProductManagementDialog = ({
     void loadProducts(controller.signal, "", "all");
     return () => controller.abort();
   }, [loadProducts, open]);
-
-  useEffect(() => () => {
-    const session = dragSessionRef.current;
-    if (session?.timer) window.clearTimeout(session.timer);
-    if (autoScrollFrameRef.current !== null) window.cancelAnimationFrame(autoScrollFrameRef.current);
-  }, []);
 
   const selectCategory = (categoryKey: string) => {
     if (sortMode || categoryKey === activeCategory) return;
@@ -277,34 +275,43 @@ const ProductManagementDialog = ({
   };
 
   const cancelSorting = () => {
+    finishDrag();
     setProducts(sortSnapshotRef.current);
     setSortMode(false);
-    setDraggedProductId(null);
     setSavedMessage(null);
-    if (autoScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(autoScrollFrameRef.current);
-      autoScrollFrameRef.current = null;
-    }
   };
+
+  const captureProductPositions = useCallback(() => {
+    const positions = new Map<number, DOMRect>();
+    productCardRefs.current.forEach((element, productId) => {
+      positions.set(productId, element.getBoundingClientRect());
+      element.getAnimations?.().forEach((animation) => animation.cancel());
+    });
+    return positions;
+  }, []);
 
   const moveProductTo = useCallback((productId: number, targetId: number) => {
     if (productId === targetId) return;
+    const positions = captureProductPositions();
     setProducts((current) => {
       const fromIndex = current.findIndex((product) => product.id === productId);
       const toIndex = current.findIndex((product) => product.id === targetId);
       if (fromIndex < 0 || toIndex < 0) return current;
+      flipPositionsRef.current = positions;
       const reordered = [...current];
       const [moved] = reordered.splice(fromIndex, 1);
       reordered.splice(toIndex, 0, moved);
       return reordered;
     });
-  }, []);
+  }, [captureProductPositions]);
 
   const moveProductBy = (productId: number, delta: number) => {
+    const positions = captureProductPositions();
     setProducts((current) => {
       const fromIndex = current.findIndex((product) => product.id === productId);
       const toIndex = Math.max(0, Math.min(current.length - 1, fromIndex + delta));
       if (fromIndex < 0 || fromIndex === toIndex) return current;
+      flipPositionsRef.current = positions;
       const reordered = [...current];
       const [moved] = reordered.splice(fromIndex, 1);
       reordered.splice(toIndex, 0, moved);
@@ -313,18 +320,108 @@ const ProductManagementDialog = ({
   };
 
   const activateDrag = (session: DragSession) => {
+    if (dragSessionRef.current !== session) return;
     session.active = true;
     session.timer = null;
     setDraggedProductId(session.productId);
     setSavedMessage("拖拉商品到新位置，完成後儲存排序。");
   };
 
+  useLayoutEffect(() => {
+    const previousPositions = flipPositionsRef.current;
+    if (!previousPositions) return;
+    flipPositionsRef.current = null;
+
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    const activeProductId = dragSessionRef.current?.productId;
+    productCardRefs.current.forEach((element, productId) => {
+      if (productId === activeProductId) return;
+      const previous = previousPositions.get(productId);
+      if (!previous) return;
+      const current = element.getBoundingClientRect();
+      const deltaX = previous.left - current.left;
+      const deltaY = previous.top - current.top;
+      if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+
+      element.animate?.(
+        [
+          { transform: `translate3d(${deltaX}px, ${deltaY}px, 0)` },
+          { transform: "translate3d(0, 0, 0)" },
+        ],
+        { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+      );
+    });
+  }, [products]);
+
+  const finishDrag = useCallback((pointerId?: number, updateState = true) => {
+    const session = dragSessionRef.current;
+    if (!session || (pointerId !== undefined && session.pointerId !== pointerId)) return;
+
+    dragSessionRef.current = null;
+    if (session.timer !== null) window.clearTimeout(session.timer);
+    if (
+      typeof session.captureTarget.hasPointerCapture === "function"
+      && session.captureTarget.hasPointerCapture(session.pointerId)
+    ) {
+      try {
+        session.captureTarget.releasePointerCapture(session.pointerId);
+      } catch {
+        // Pointer capture may already have been released by the browser.
+      }
+    }
+    if (autoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
+    if (updateState) setDraggedProductId(null);
+  }, []);
+
+  useEffect(() => {
+    if (!open) finishDrag();
+  }, [finishDrag, open]);
+
+  useEffect(() => {
+    const handlePointerEnd = (event: PointerEvent) => finishDrag(event.pointerId);
+    const handleWindowBlur = () => finishDrag();
+    window.addEventListener("pointerup", handlePointerEnd);
+    window.addEventListener("pointercancel", handlePointerEnd);
+    window.addEventListener("blur", handleWindowBlur);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerEnd);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+      window.removeEventListener("blur", handleWindowBlur);
+      finishDrag(undefined, false);
+    };
+  }, [finishDrag]);
+
   const moveToPointerTarget = useCallback((session: DragSession) => {
-    const target = document
-      .elementFromPoint(session.clientX, session.clientY)
-      ?.closest<HTMLElement>("[data-product-sort-id]");
-    const targetId = Number(target?.dataset.productSortId);
-    if (targetId) moveProductTo(session.productId, targetId);
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const containerBounds = container.getBoundingClientRect();
+    const hasContainerBounds = containerBounds.width > 0 && containerBounds.height > 0;
+    let nearestProductId: number | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    productCardRefs.current.forEach((element, productId) => {
+      const bounds = element.getBoundingClientRect();
+      const visible = !hasContainerBounds || (
+        bounds.right > containerBounds.left
+        && bounds.left < containerBounds.right
+        && bounds.bottom > containerBounds.top
+        && bounds.top < containerBounds.bottom
+      );
+      if (!visible || bounds.width <= 0 || bounds.height <= 0) return;
+      const deltaX = session.clientX - (bounds.left + bounds.width / 2);
+      const deltaY = session.clientY - (bounds.top + bounds.height / 2);
+      const distance = deltaX * deltaX + deltaY * deltaY;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestProductId = productId;
+      }
+    });
+
+    if (nearestProductId !== null) moveProductTo(session.productId, nearestProductId);
   }, [moveProductTo]);
 
   const startAutoScroll = useCallback(() => {
@@ -359,10 +456,20 @@ const ProductManagementDialog = ({
 
   const handleDragPointerDown = (productId: number, event: ReactPointerEvent<HTMLButtonElement>) => {
     if (!sortMode) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    const captureTarget = scrollContainerRef.current;
+    if (!captureTarget) return;
+    finishDrag();
+    if (typeof captureTarget.setPointerCapture === "function") {
+      try {
+        captureTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Capture can fail if the pointer ended between dispatch and this handler.
+      }
+    }
     const session: DragSession = {
       productId,
       pointerId: event.pointerId,
+      captureTarget,
       startX: event.clientX,
       startY: event.clientY,
       active: false,
@@ -378,7 +485,7 @@ const ProductManagementDialog = ({
     session.timer = window.setTimeout(() => activateDrag(session), 450);
   };
 
-  const handleDragPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const handleDragPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const session = dragSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
     session.clientX = event.clientX;
@@ -396,21 +503,6 @@ const ProductManagementDialog = ({
     startAutoScroll();
   };
 
-  const finishDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    const session = dragSessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) return;
-    if (session.timer) window.clearTimeout(session.timer);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    dragSessionRef.current = null;
-    setDraggedProductId(null);
-    if (autoScrollFrameRef.current !== null) {
-      window.cancelAnimationFrame(autoScrollFrameRef.current);
-      autoScrollFrameRef.current = null;
-    }
-  };
-
   const handleDragKeyDown = (productId: number, event: ReactKeyboardEvent<HTMLButtonElement>) => {
     const keyDelta: Record<string, number> = {
       ArrowLeft: -1,
@@ -426,6 +518,7 @@ const ProductManagementDialog = ({
   };
 
   const saveSorting = async () => {
+    finishDrag();
     const originalSequence = new Map(
       sortSnapshotRef.current.map((product) => [product.id, product.displaySequence])
     );
@@ -469,7 +562,13 @@ const ProductManagementDialog = ({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) finishDrag();
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="block h-[92vh] max-h-[980px] w-[calc(100vw-1rem)] max-w-[1240px] overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-5 py-4 pr-14">
           <DialogTitle className="flex items-center gap-2">
@@ -584,6 +683,10 @@ const ProductManagementDialog = ({
           <div
             ref={scrollContainerRef}
             className="min-h-0 flex-1 overflow-y-auto bg-secondary/15 px-4 py-4 sm:px-5"
+            onPointerMove={handleDragPointerMove}
+            onPointerUp={(event) => finishDrag(event.pointerId)}
+            onPointerCancel={(event) => finishDrag(event.pointerId)}
+            onLostPointerCapture={(event) => finishDrag(event.pointerId)}
           >
             {error && !editorOpen && (
               <div className="mb-3 rounded-lg border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
@@ -602,6 +705,10 @@ const ProductManagementDialog = ({
                 {products.map((product, index) => (
                   <article
                     key={product.id}
+                    ref={(element) => {
+                      if (element) productCardRefs.current.set(product.id, element);
+                      else productCardRefs.current.delete(product.id);
+                    }}
                     data-product-sort-id={product.id}
                     className={cn(
                       "group relative flex min-h-36 flex-col rounded-xl border border-border bg-background p-4 shadow-sm transition-[border-color,box-shadow,transform,opacity]",
@@ -626,9 +733,6 @@ const ProductManagementDialog = ({
                           aria-label={`移動 ${product.name}`}
                           className="flex h-11 w-11 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground active:cursor-grabbing active:bg-primary/10 active:text-primary"
                           onPointerDown={(event) => handleDragPointerDown(product.id, event)}
-                          onPointerMove={handleDragPointerMove}
-                          onPointerUp={finishDrag}
-                          onPointerCancel={finishDrag}
                           onKeyDown={(event) => handleDragKeyDown(product.id, event)}
                         >
                           <GripVertical className="h-5 w-5" />
