@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -10,6 +11,10 @@ import {
 } from "react";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ChevronsDown,
+  ChevronsUp,
   Eye,
   EyeOff,
   GripVertical,
@@ -84,9 +89,8 @@ interface DragSession {
   timer: number | null;
   clientX: number;
   clientY: number;
+  destinationIndex: number | null;
 }
-
-const DRAG_TARGET_INSET_RATIO = 0.18;
 
 const mergeCategoryOrderIntoGlobal = (
   globalProducts: OdooProduct[],
@@ -149,6 +153,9 @@ const ProductManagementDialog = ({
   const [sortSaving, setSortSaving] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
   const [draggedProductId, setDraggedProductId] = useState<number | null>(null);
+  const [dragDestinationIndex, setDragDestinationIndex] = useState<number | null>(null);
+  const [positionEditorProductId, setPositionEditorProductId] = useState<number | null>(null);
+  const [positionInput, setPositionInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const creatingProductRef = useRef(false);
@@ -301,6 +308,7 @@ const ProductManagementDialog = ({
 
     sortSnapshotRef.current = [...sortableProducts];
     globalSortSnapshotRef.current = [...globalProducts];
+    setPositionEditorProductId(null);
     setSortMode(true);
   };
 
@@ -308,6 +316,7 @@ const ProductManagementDialog = ({
     finishDrag();
     setProducts(sortSnapshotRef.current);
     setSortMode(false);
+    setPositionEditorProductId(null);
     setSavedMessage(null);
   };
 
@@ -320,33 +329,50 @@ const ProductManagementDialog = ({
     return positions;
   }, []);
 
-  const moveProductTo = useCallback((productId: number, targetId: number) => {
-    if (productId === targetId) return;
+  const moveProductToIndex = useCallback((productId: number, destinationIndex: number) => {
     const positions = captureProductPositions();
     setProducts((current) => {
       const fromIndex = current.findIndex((product) => product.id === productId);
-      const toIndex = current.findIndex((product) => product.id === targetId);
-      if (fromIndex < 0 || toIndex < 0) return current;
-      flipPositionsRef.current = positions;
+      if (fromIndex < 0) return current;
       const reordered = [...current];
       const [moved] = reordered.splice(fromIndex, 1);
+      const toIndex = Math.max(0, Math.min(reordered.length, destinationIndex));
+      if (fromIndex === toIndex) return current;
+      flipPositionsRef.current = positions;
       reordered.splice(toIndex, 0, moved);
       return reordered;
     });
   }, [captureProductPositions]);
 
   const moveProductBy = (productId: number, delta: number) => {
-    const positions = captureProductPositions();
-    setProducts((current) => {
-      const fromIndex = current.findIndex((product) => product.id === productId);
-      const toIndex = Math.max(0, Math.min(current.length - 1, fromIndex + delta));
-      if (fromIndex < 0 || fromIndex === toIndex) return current;
-      flipPositionsRef.current = positions;
-      const reordered = [...current];
-      const [moved] = reordered.splice(fromIndex, 1);
-      reordered.splice(toIndex, 0, moved);
-      return reordered;
-    });
+    const fromIndex = products.findIndex((product) => product.id === productId);
+    if (fromIndex < 0) return;
+    moveProductToIndex(productId, fromIndex + delta);
+    setSavedMessage("商品位置已調整，完成後請儲存排序。");
+  };
+
+  const moveProductToEdge = (productId: number, destinationIndex: number) => {
+    moveProductToIndex(productId, destinationIndex);
+    setSavedMessage("商品位置已調整，完成後請儲存排序。");
+  };
+
+  const openPositionEditor = (productId: number) => {
+    const currentIndex = products.findIndex((product) => product.id === productId);
+    setPositionEditorProductId(productId);
+    setPositionInput(currentIndex >= 0 ? String(currentIndex + 1) : "");
+  };
+
+  const applyPositionEditor = () => {
+    if (positionEditorProductId === null) return;
+    const requestedPosition = Number.parseInt(positionInput, 10);
+    if (!Number.isFinite(requestedPosition) || requestedPosition < 1 || requestedPosition > products.length) {
+      setError(`請輸入 1 至 ${products.length} 之間嘅位置。`);
+      return;
+    }
+    moveProductToIndex(positionEditorProductId, requestedPosition - 1);
+    setPositionEditorProductId(null);
+    setError(null);
+    setSavedMessage("商品位置已調整，完成後請儲存排序。");
   };
 
   const activateDrag = (session: DragSession) => {
@@ -354,7 +380,8 @@ const ProductManagementDialog = ({
     session.active = true;
     session.timer = null;
     setDraggedProductId(session.productId);
-    setSavedMessage("拖拉商品到新位置，完成後儲存排序。");
+    setDragDestinationIndex(session.destinationIndex);
+    setSavedMessage("放開後先套用新位置，完成後請儲存排序。");
   };
 
   useLayoutEffect(() => {
@@ -384,11 +411,14 @@ const ProductManagementDialog = ({
     });
   }, [products]);
 
-  const finishDrag = useCallback((pointerId?: number, updateState = true) => {
+  const finishDrag = useCallback((pointerId?: number, commitMove = false, updateState = true) => {
     const session = dragSessionRef.current;
     if (!session || (pointerId !== undefined && session.pointerId !== pointerId)) return;
 
     dragSessionRef.current = null;
+    if (commitMove && session.active && session.destinationIndex !== null) {
+      moveProductToIndex(session.productId, session.destinationIndex);
+    }
     if (session.timer !== null) window.clearTimeout(session.timer);
     if (
       typeof session.captureTarget.hasPointerCapture === "function"
@@ -404,65 +434,46 @@ const ProductManagementDialog = ({
       window.cancelAnimationFrame(autoScrollFrameRef.current);
       autoScrollFrameRef.current = null;
     }
-    if (updateState) setDraggedProductId(null);
-  }, []);
+    if (updateState) {
+      setDraggedProductId(null);
+      setDragDestinationIndex(null);
+    }
+  }, [moveProductToIndex]);
 
   useEffect(() => {
     if (!open) finishDrag();
   }, [finishDrag, open]);
 
   useEffect(() => {
-    const handlePointerEnd = (event: PointerEvent) => finishDrag(event.pointerId);
+    const handlePointerUp = (event: PointerEvent) => finishDrag(event.pointerId, true);
+    const handlePointerCancel = (event: PointerEvent) => finishDrag(event.pointerId);
     const handleWindowBlur = () => finishDrag();
-    window.addEventListener("pointerup", handlePointerEnd);
-    window.addEventListener("pointercancel", handlePointerEnd);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerCancel);
     window.addEventListener("blur", handleWindowBlur);
     return () => {
-      window.removeEventListener("pointerup", handlePointerEnd);
-      window.removeEventListener("pointercancel", handlePointerEnd);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
       window.removeEventListener("blur", handleWindowBlur);
-      finishDrag(undefined, false);
+      finishDrag(undefined, false, false);
     };
   }, [finishDrag]);
 
   const moveToPointerTarget = useCallback((session: DragSession) => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    const containerBounds = container.getBoundingClientRect();
-    const hasContainerBounds = containerBounds.width > 0 && containerBounds.height > 0;
-    let nearestProductId: number | null = null;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-
-    productCardRefs.current.forEach((element, productId) => {
+    const candidates = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-product-sort-id]"),
+    ).filter((element) => Number(element.dataset.productSortId) !== session.productId);
+    let destinationIndex = candidates.findIndex((element) => {
       const bounds = element.getBoundingClientRect();
-      const visible = !hasContainerBounds || (
-        bounds.right > containerBounds.left
-        && bounds.left < containerBounds.right
-        && bounds.bottom > containerBounds.top
-        && bounds.top < containerBounds.bottom
-      );
-      if (!visible || bounds.width <= 0 || bounds.height <= 0) return;
-      const deltaX = session.clientX - (bounds.left + bounds.width / 2);
-      const deltaY = session.clientY - (bounds.top + bounds.height / 2);
-      const horizontalInset = bounds.width * DRAG_TARGET_INSET_RATIO;
-      const verticalInset = bounds.height * DRAG_TARGET_INSET_RATIO;
-      const insideStableTarget = session.clientX >= bounds.left + horizontalInset
-        && session.clientX <= bounds.right - horizontalInset
-        && session.clientY >= bounds.top + verticalInset
-        && session.clientY <= bounds.bottom - verticalInset;
-      if (!insideStableTarget) return;
-
-      const normalizedX = deltaX / Math.max(1, bounds.width);
-      const normalizedY = deltaY / Math.max(1, bounds.height);
-      const distance = normalizedX * normalizedX + normalizedY * normalizedY;
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestProductId = productId;
-      }
+      return bounds.height > 0 && session.clientY < bounds.top + bounds.height / 2;
     });
-
-    if (nearestProductId !== null) moveProductTo(session.productId, nearestProductId);
-  }, [moveProductTo]);
+    if (destinationIndex < 0) destinationIndex = candidates.length;
+    if (session.destinationIndex === destinationIndex) return;
+    session.destinationIndex = destinationIndex;
+    setDragDestinationIndex(destinationIndex);
+  }, []);
 
   const startAutoScroll = useCallback(() => {
     if (autoScrollFrameRef.current !== null) return;
@@ -516,6 +527,7 @@ const ProductManagementDialog = ({
       timer: null,
       clientX: event.clientX,
       clientY: event.clientY,
+      destinationIndex: products.findIndex((product) => product.id === productId),
     };
     dragSessionRef.current = session;
     if (event.pointerType === "mouse") {
@@ -545,16 +557,19 @@ const ProductManagementDialog = ({
 
   const handleDragKeyDown = (productId: number, event: ReactKeyboardEvent<HTMLButtonElement>) => {
     const keyDelta: Record<string, number> = {
-      ArrowLeft: -1,
-      ArrowRight: 1,
-      ArrowUp: -3,
-      ArrowDown: 3,
+      ArrowUp: -1,
+      ArrowDown: 1,
     };
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      moveProductToIndex(productId, event.key === "Home" ? 0 : products.length - 1);
+      setSavedMessage("商品位置已調整，完成後請儲存排序。");
+      return;
+    }
     const delta = keyDelta[event.key];
-    if (!delta) return;
+    if (delta === undefined) return;
     event.preventDefault();
     moveProductBy(productId, delta);
-    setSavedMessage("商品位置已調整，完成後請儲存排序。");
   };
 
   const saveSorting = async () => {
@@ -589,6 +604,7 @@ const ProductManagementDialog = ({
         displaySequence: savedSequences.get(product.id) ?? product.displaySequence,
       })));
       setSortMode(false);
+      setPositionEditorProductId(null);
       setSavedMessage("商品排序已儲存");
       onCatalogChanged();
     } catch (sortError) {
@@ -717,8 +733,8 @@ const ProductManagementDialog = ({
               <span>
                 {sortMode
                   ? activeCategory === "all"
-                    ? "正在調整全域商品順序：拖入商品卡中央位置即可換位。"
-                    : `正在調整「${activeCategoryLabel}」相對次序：拖入商品卡中央位置即可換位。`
+                    ? "正在調整全域次序：拖住手柄上下移動，或用按鈕指定位置。"
+                    : `正在調整「${activeCategoryLabel}」相對次序：拖住手柄上下移動，或用按鈕指定位置。`
                   : productCountLabel}
               </span>
               {savedMessage && !editorOpen && (
@@ -734,7 +750,7 @@ const ProductManagementDialog = ({
             ref={scrollContainerRef}
             className="min-h-0 flex-1 overflow-y-auto bg-secondary/15 px-4 py-4 sm:px-5"
             onPointerMove={handleDragPointerMove}
-            onPointerUp={(event) => finishDrag(event.pointerId)}
+            onPointerUp={(event) => finishDrag(event.pointerId, true)}
             onPointerCancel={(event) => finishDrag(event.pointerId)}
             onLostPointerCapture={(event) => finishDrag(event.pointerId)}
           >
@@ -750,9 +766,175 @@ const ProductManagementDialog = ({
                   <div key={index} className="h-36 animate-pulse rounded-xl border border-border bg-background" />
                 ))}
               </div>
+            ) : products.length > 0 && sortMode ? (
+              <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
+                {products.map((product, index) => {
+                  const insertionIndex = products
+                    .slice(0, index)
+                    .filter((candidate) => candidate.id !== draggedProductId).length;
+                  const showIndicator = draggedProductId !== null
+                    && product.id !== draggedProductId
+                    && dragDestinationIndex === insertionIndex;
+                  const isFirst = index === 0;
+                  const isLast = index === products.length - 1;
+
+                  return (
+                    <Fragment key={product.id}>
+                      {showIndicator && (
+                        <div
+                          data-testid="product-drop-indicator"
+                          className="h-1 rounded-full bg-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]"
+                        />
+                      )}
+                      <article
+                        ref={(element) => {
+                          if (element) productCardRefs.current.set(product.id, element);
+                          else productCardRefs.current.delete(product.id);
+                        }}
+                        data-product-sort-id={product.id}
+                        className={cn(
+                          "rounded-xl border border-border bg-background p-3 shadow-sm transition-[border-color,box-shadow,opacity]",
+                          draggedProductId === product.id && "border-primary opacity-55 shadow-md",
+                        )}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <span className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 px-2 text-sm font-semibold text-primary">
+                              {index + 1}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`移動 ${product.name}`}
+                              className="flex h-11 w-11 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground active:cursor-grabbing active:bg-primary/10 active:text-primary"
+                              onPointerDown={(event) => handleDragPointerDown(product.id, event)}
+                              onKeyDown={(event) => handleDragKeyDown(product.id, event)}
+                            >
+                              <GripVertical className="h-5 w-5" />
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-foreground">{product.name}</span>
+                              <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
+                                {product.productCode || "未有 code"} · {product.categoryName || "未分類"}
+                              </span>
+                            </div>
+                            <div className="hidden shrink-0 text-right md:block">
+                              <span className="block font-mono text-sm font-semibold">${product.price.toLocaleString()}</span>
+                              <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                {product.availableInPos ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                                {product.availableInPos ? "顯示" : "隱藏"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-11 w-11"
+                              aria-label={`置頂 ${product.name}`}
+                              title="置頂"
+                              disabled={isFirst}
+                              onClick={() => moveProductToEdge(product.id, 0)}
+                            >
+                              <ChevronsUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-11 w-11"
+                              aria-label={`向上移動 ${product.name}`}
+                              title="向上移一格"
+                              disabled={isFirst}
+                              onClick={() => moveProductBy(product.id, -1)}
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-11 w-11"
+                              aria-label={`向下移動 ${product.name}`}
+                              title="向下移一格"
+                              disabled={isLast}
+                              onClick={() => moveProductBy(product.id, 1)}
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-11 w-11"
+                              aria-label={`置底 ${product.name}`}
+                              title="置底"
+                              disabled={isLast}
+                              onClick={() => moveProductToEdge(product.id, products.length - 1)}
+                            >
+                              <ChevronsDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-11 px-3"
+                              aria-label={`移到指定位置 ${product.name}`}
+                              onClick={() => openPositionEditor(product.id)}
+                            >
+                              移到…
+                            </Button>
+                          </div>
+                        </div>
+
+                        {positionEditorProductId === product.id && (
+                          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                            <Label htmlFor={`product-position-${product.id}`} className="text-sm">
+                              移到第
+                            </Label>
+                            <Input
+                              id={`product-position-${product.id}`}
+                              aria-label={`移動 ${product.name} 至位置`}
+                              type="number"
+                              min={1}
+                              max={products.length}
+                              value={positionInput}
+                              onChange={(event) => setPositionInput(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") applyPositionEditor();
+                                if (event.key === "Escape") setPositionEditorProductId(null);
+                              }}
+                              className="h-11 w-24"
+                              autoFocus
+                            />
+                            <span className="text-sm text-muted-foreground">位（共 {products.length} 件）</span>
+                            <Button type="button" className="h-11" onClick={applyPositionEditor}>確定</Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="h-11"
+                              onClick={() => setPositionEditorProductId(null)}
+                            >
+                              取消
+                            </Button>
+                          </div>
+                        )}
+                      </article>
+                    </Fragment>
+                  );
+                })}
+                {draggedProductId !== null
+                  && dragDestinationIndex === products.length - 1
+                  && (
+                    <div
+                      data-testid="product-drop-indicator"
+                      className="h-1 rounded-full bg-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]"
+                    />
+                  )}
+              </div>
             ) : products.length > 0 ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {products.map((product, index) => (
+                {products.map((product) => (
                   <article
                     key={product.id}
                     ref={(element) => {
@@ -777,26 +959,14 @@ const ProductManagementDialog = ({
                         </span>
                       </div>
 
-                      {sortMode ? (
-                        <button
-                          type="button"
-                          aria-label={`移動 ${product.name}`}
-                          className="flex h-11 w-11 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground active:cursor-grabbing active:bg-primary/10 active:text-primary"
-                          onPointerDown={(event) => handleDragPointerDown(product.id, event)}
-                          onKeyDown={(event) => handleDragKeyDown(product.id, event)}
-                        >
-                          <GripVertical className="h-5 w-5" />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          aria-label={`商品設定 ${product.name}`}
-                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          onClick={() => selectProduct(product)}
-                        >
-                          <MoreHorizontal className="h-5 w-5" />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        aria-label={`商品設定 ${product.name}`}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => selectProduct(product)}
+                      >
+                        <MoreHorizontal className="h-5 w-5" />
+                      </button>
                     </div>
 
                     <div className="mt-auto flex items-end justify-between gap-3 pt-4">
@@ -815,12 +985,6 @@ const ProductManagementDialog = ({
                         ${product.price.toLocaleString()}
                       </span>
                     </div>
-
-                    {sortMode && (
-                      <span className="pointer-events-none absolute left-3 top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
-                        {index + 1}
-                      </span>
-                    )}
                   </article>
                 ))}
               </div>

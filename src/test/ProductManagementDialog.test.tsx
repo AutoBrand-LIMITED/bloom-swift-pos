@@ -97,7 +97,7 @@ const gridProducts = Array.from({ length: 6 }, (_, index) => ({
   productCode: `GRID-${index + 1}`,
 }));
 
-const rect = (left: number, top: number, width = 100, height = 120): DOMRect => ({
+const rect = (left: number, top: number, width = 720, height = 72): DOMRect => ({
   x: left,
   y: top,
   left,
@@ -109,19 +109,20 @@ const rect = (left: number, top: number, width = 100, height = 120): DOMRect => 
   toJSON: () => ({}),
 } as DOMRect);
 
-const setThreeColumnCardGeometry = () => {
+const setVerticalListGeometry = () => {
   const cards = screen.getAllByRole("button", { name: /^移動 Grid product/ })
     .map((handle) => handle.closest<HTMLElement>("[data-product-sort-id]")!);
   cards.forEach((card) => {
     vi.spyOn(card, "getBoundingClientRect").mockImplementation(() => {
       const currentCards = Array.from(card.parentElement!.children);
-      const index = currentCards.indexOf(card);
-      return rect((index % 3) * 120, Math.floor(index / 3) * 150);
+      const productCards = currentCards.filter((element) => (element as HTMLElement).dataset.productSortId);
+      const index = productCards.indexOf(card);
+      return rect(20, index * 84);
     });
   });
 };
 
-const startGridSorting = async () => {
+const startListSorting = async () => {
   apiMocks.searchProducts.mockResolvedValue(gridProducts);
   const view = renderDialog();
   await screen.findByText("Grid product 6");
@@ -129,7 +130,7 @@ const startGridSorting = async () => {
   await waitFor(() => expect(apiMocks.searchProducts).toHaveBeenCalledTimes(2));
   fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
   await screen.findByRole("button", { name: "移動 Grid product 1" });
-  setThreeColumnCardGeometry();
+  setVerticalListGeometry();
   return view;
 };
 
@@ -247,7 +248,7 @@ describe("ProductManagementDialog", () => {
     await waitFor(() => expect(apiMocks.searchProducts).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
     await screen.findByRole("button", { name: "移動 testing" });
-    fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowDown" });
     fireEvent.click(screen.getByRole("button", { name: "儲存排序" }));
 
     await waitFor(() => expect(apiMocks.reorderProducts).toHaveBeenCalledTimes(1));
@@ -269,7 +270,7 @@ describe("ProductManagementDialog", () => {
     await screen.findByText("Chocolate");
     fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
     expect(screen.getByText("「全部」係全域順序；各分類會沿用同一套次序。")).toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowDown" });
     fireEvent.click(screen.getByRole("button", { name: "儲存排序" }));
 
     await waitFor(() => expect(apiMocks.reorderProducts).toHaveBeenCalledTimes(1));
@@ -295,7 +296,7 @@ describe("ProductManagementDialog", () => {
     await waitFor(() => expect(screen.queryByText("Vase")).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
     await screen.findByRole("button", { name: "移動 testing" });
-    fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowDown" });
     fireEvent.click(screen.getByRole("button", { name: "儲存排序" }));
 
     await waitFor(() => expect(apiMocks.reorderProducts).toHaveBeenCalledTimes(1));
@@ -305,49 +306,53 @@ describe("ProductManagementDialog", () => {
     ]);
   });
 
-  it("targets the nearest card center when dragging diagonally across a three-column grid", async () => {
-    await startGridSorting();
+  it("uses vertical insertion only and applies the reorder after pointer release", async () => {
+    await startListSorting();
     const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
+    const scrollContainer = bottomRightHandle.closest<HTMLElement>(".overflow-y-auto")!;
 
     fireEvent.pointerDown(bottomRightHandle, {
       pointerId: 7,
       pointerType: "mouse",
-      clientX: 290,
-      clientY: 210,
+      clientX: 700,
+      clientY: 450,
     });
-    fireEvent.pointerMove(bottomRightHandle, {
+    fireEvent.pointerMove(scrollContainer, {
       pointerId: 7,
       pointerType: "mouse",
-      clientX: 52,
-      clientY: 62,
+      clientX: -500,
+      clientY: 10,
     });
 
+    expect(orderedDragHandleNames()).toEqual(gridProducts.map((product) => `移動 ${product.name}`));
+    expect(screen.getByTestId("product-drop-indicator")).toBeInTheDocument();
+    fireEvent.pointerUp(scrollContainer, { pointerId: 7, pointerType: "mouse", clientX: -500, clientY: 10 });
     expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 6");
-    expect(screen.getByText("拖拉商品到新位置，完成後儲存排序。")).toBeInTheDocument();
+    expect(screen.getByText("放開後先套用新位置，完成後請儲存排序。")).toBeInTheDocument();
   });
 
-  it("does not reorder repeatedly while the pointer is in the gap between cards", async () => {
-    await startGridSorting();
+  it("keeps one stable preview while the pointer moves horizontally at the same list position", async () => {
+    await startListSorting();
     const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
     const scrollContainer = bottomRightHandle.closest<HTMLElement>(".overflow-y-auto")!;
 
     fireEvent.pointerDown(bottomRightHandle, {
       pointerId: 72,
       pointerType: "mouse",
-      clientX: 290,
-      clientY: 210,
+      clientX: 700,
+      clientY: 450,
     });
     fireEvent.pointerMove(scrollContainer, {
       pointerId: 72,
       pointerType: "mouse",
-      clientX: 110,
-      clientY: 60,
+      clientX: -1000,
+      clientY: 170,
     });
     fireEvent.pointerMove(scrollContainer, {
       pointerId: 72,
       pointerType: "mouse",
-      clientX: 111,
-      clientY: 61,
+      clientX: 2000,
+      clientY: 170,
     });
 
     expect(orderedDragHandleNames()).toEqual([
@@ -359,13 +364,9 @@ describe("ProductManagementDialog", () => {
       "移動 Grid product 6",
     ]);
 
-    fireEvent.pointerMove(scrollContainer, {
-      pointerId: 72,
-      pointerType: "mouse",
-      clientX: 52,
-      clientY: 62,
-    });
-    expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 6");
+    expect(screen.getAllByTestId("product-drop-indicator")).toHaveLength(1);
+    fireEvent.pointerUp(scrollContainer, { pointerId: 72, pointerType: "mouse", clientX: 2000, clientY: 170 });
+    expect(orderedDragHandleNames()[2]).toBe("移動 Grid product 6");
   });
 
   it("keeps capture on the stable scroll container across consecutive DOM reorders", async () => {
@@ -382,15 +383,15 @@ describe("ProductManagementDialog", () => {
       configurable: true,
       value: vi.fn(),
     });
-    await startGridSorting();
+    await startListSorting();
     const draggedHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
     const scrollContainer = draggedHandle.closest<HTMLElement>(".overflow-y-auto")!;
 
     fireEvent.pointerDown(draggedHandle, {
       pointerId: 71,
       pointerType: "mouse",
-      clientX: 290,
-      clientY: 210,
+      clientX: 700,
+      clientY: 450,
     });
     expect(setPointerCapture).toHaveBeenCalledWith(71);
     expect(setPointerCapture.mock.contexts[0]).toBe(scrollContainer);
@@ -399,25 +400,20 @@ describe("ProductManagementDialog", () => {
     fireEvent.pointerMove(scrollContainer, {
       pointerId: 71,
       pointerType: "mouse",
-      clientX: 52,
-      clientY: 62,
+      clientX: 50,
+      clientY: 10,
     });
-    expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 6");
+    expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 1");
 
     fireEvent.pointerMove(scrollContainer, {
       pointerId: 71,
       pointerType: "mouse",
-      clientX: 172,
-      clientY: 212,
+      clientX: 700,
+      clientY: 170,
     });
-    expect(orderedDragHandleNames()).toEqual([
-      "移動 Grid product 1",
-      "移動 Grid product 2",
-      "移動 Grid product 3",
-      "移動 Grid product 4",
-      "移動 Grid product 6",
-      "移動 Grid product 5",
-    ]);
+    expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 1");
+    fireEvent.pointerUp(scrollContainer, { pointerId: 71, pointerType: "mouse", clientX: 700, clientY: 170 });
+    expect(orderedDragHandleNames()[2]).toBe("移動 Grid product 6");
     expect(setPointerCapture).toHaveBeenCalledTimes(1);
   });
 
@@ -427,24 +423,26 @@ describe("ProductManagementDialog", () => {
       configurable: true,
       value: animate,
     });
-    await startGridSorting();
+    await startListSorting();
     const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
+    const scrollContainer = bottomRightHandle.closest<HTMLElement>(".overflow-y-auto")!;
 
     fireEvent.pointerDown(bottomRightHandle, {
       pointerId: 8,
       pointerType: "mouse",
-      clientX: 290,
-      clientY: 210,
+      clientX: 700,
+      clientY: 450,
     });
-    fireEvent.pointerMove(bottomRightHandle, {
+    fireEvent.pointerMove(scrollContainer, {
       pointerId: 8,
       pointerType: "mouse",
-      clientX: 52,
-      clientY: 62,
+      clientX: 50,
+      clientY: 10,
     });
+    expect(animate).not.toHaveBeenCalled();
+    fireEvent.pointerUp(scrollContainer, { pointerId: 8, pointerType: "mouse", clientX: 50, clientY: 10 });
 
     expect(animate).toHaveBeenCalled();
-    expect(animate.mock.contexts).not.toContain(bottomRightHandle.closest("article"));
     expect(animate).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({ transform: expect.stringContaining("translate3d(") }),
@@ -452,6 +450,27 @@ describe("ProductManagementDialog", () => {
       ]),
       expect.objectContaining({ duration: 220 }),
     );
+  });
+
+  it("offers precise row controls and direct position entry", async () => {
+    await startListSorting();
+
+    fireEvent.click(screen.getByRole("button", { name: "置底 Grid product 1" }));
+    expect(orderedDragHandleNames().at(-1)).toBe("移動 Grid product 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "置頂 Grid product 1" }));
+    expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "向下移動 Grid product 1" }));
+    expect(orderedDragHandleNames()[1]).toBe("移動 Grid product 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "移到指定位置 Grid product 1" }));
+    const positionInput = screen.getByRole("spinbutton", { name: "移動 Grid product 1 至位置" });
+    fireEvent.change(positionInput, { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "確定" }));
+
+    expect(orderedDragHandleNames()[3]).toBe("移動 Grid product 1");
+    expect(screen.getByText("商品位置已調整，完成後請儲存排序。")).toBeInTheDocument();
   });
 
   it("does not animate reflow when reduced motion is requested", async () => {
@@ -470,21 +489,23 @@ describe("ProductManagementDialog", () => {
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }));
-    await startGridSorting();
+    await startListSorting();
     const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
+    const scrollContainer = bottomRightHandle.closest<HTMLElement>(".overflow-y-auto")!;
 
     fireEvent.pointerDown(bottomRightHandle, {
       pointerId: 9,
       pointerType: "mouse",
-      clientX: 290,
-      clientY: 210,
+      clientX: 700,
+      clientY: 450,
     });
-    fireEvent.pointerMove(bottomRightHandle, {
+    fireEvent.pointerMove(scrollContainer, {
       pointerId: 9,
       pointerType: "mouse",
-      clientX: 52,
-      clientY: 62,
+      clientX: 50,
+      clientY: 10,
     });
+    fireEvent.pointerUp(scrollContainer, { pointerId: 9, pointerType: "mouse", clientX: 50, clientY: 10 });
 
     expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 6");
     expect(animate).not.toHaveBeenCalled();
@@ -493,7 +514,7 @@ describe("ProductManagementDialog", () => {
   it.each(["pointerup", "pointercancel", "lostpointercapture", "blur"])(
     "ends an active drag on %s and ignores later pointer movement",
     async (endEvent) => {
-      await startGridSorting();
+      await startListSorting();
       const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
       fireEvent.pointerDown(bottomRightHandle, {
         pointerId: 10,
@@ -524,7 +545,7 @@ describe("ProductManagementDialog", () => {
   it.each(["dialog close", "unmount"])(
     "clears a pending touch long-press on %s",
     async (cleanup) => {
-      const view = await startGridSorting();
+      const view = await startListSorting();
       const handle = screen.getByRole("button", { name: "移動 Grid product 1" });
       const setTimeout = vi.spyOn(window, "setTimeout");
 
