@@ -396,11 +396,24 @@ export async function reorderOdooProducts(
     throw new Error("Odoo backend is not configured");
   }
 
-  const res = await authenticatedFetch(`${BACKEND_URL}/products/reorder`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ products }),
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 30_000);
+  let res: Response;
+  try {
+    res = await authenticatedFetch(`${BACKEND_URL}/products/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ products }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error("儲存排序逾時，請稍後再試。系統未有確認排序變更。");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);

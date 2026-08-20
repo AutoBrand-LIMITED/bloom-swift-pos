@@ -8,12 +8,33 @@ const jsonResponse = (body: unknown, status = 200) =>
   });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.resetModules();
 });
 
 describe("odoo-api note contracts", () => {
+  it("stops a stalled product reorder instead of leaving the UI saving forever", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    vi.stubGlobal("fetch", vi.fn((_input: RequestInfo | URL, init?: RequestInit) => (
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      })
+    )));
+    const { reorderOdooProducts } = await import("@/lib/odoo-api");
+
+    const request = reorderOdooProducts([{ id: 9, displaySequence: 10 }]);
+    const assertion = expect(request).rejects.toThrow(
+      "儲存排序逾時，請稍後再試。系統未有確認排序變更。",
+    );
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    await assertion;
+    vi.useRealTimers();
+  });
+
   it("loads typed delivery slots through the backend boundary", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const slots = [{
