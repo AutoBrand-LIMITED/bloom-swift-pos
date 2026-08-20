@@ -67,6 +67,28 @@ const chocolateProduct = {
   displaySequence: 100,
 };
 
+const giftProduct = {
+  ...testingProduct,
+  id: 4340,
+  name: "Gift",
+  productCode: "GIFT",
+  templateId: 4340,
+  barcode: "4340",
+  categoryId: 2,
+  categoryName: "禮物 Gifts",
+  displaySequence: 20,
+};
+
+const vaseProduct = {
+  ...giftProduct,
+  id: 4341,
+  name: "Vase",
+  productCode: "VASE",
+  templateId: 4341,
+  barcode: "4341",
+  displaySequence: 40,
+};
+
 const gridProducts = Array.from({ length: 6 }, (_, index) => ({
   ...testingProduct,
   id: 4401 + index,
@@ -106,6 +128,7 @@ const startGridSorting = async () => {
   fireEvent.click(screen.getByRole("button", { name: "花束 Bouquets" }));
   await waitFor(() => expect(apiMocks.searchProducts).toHaveBeenCalledTimes(2));
   fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
+  await screen.findByRole("button", { name: "移動 Grid product 1" });
   setThreeColumnCardGeometry();
   return view;
 };
@@ -223,6 +246,7 @@ describe("ProductManagementDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "花束 Bouquets" }));
     await waitFor(() => expect(apiMocks.searchProducts).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
+    await screen.findByRole("button", { name: "移動 testing" });
     fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowRight" });
     fireEvent.click(screen.getByRole("button", { name: "儲存排序" }));
 
@@ -233,6 +257,52 @@ describe("ProductManagementDialog", () => {
     ]);
     expect(apiMocks.updateProduct).not.toHaveBeenCalled();
     expect(await screen.findByText("商品排序已儲存")).toBeInTheDocument();
+  });
+
+  it("allows the All view to define the shared global product order", async () => {
+    apiMocks.searchProducts.mockResolvedValue([
+      { ...testingProduct, displaySequence: 10 },
+      { ...chocolateProduct, displaySequence: 20 },
+    ]);
+    renderDialog();
+
+    await screen.findByText("Chocolate");
+    fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
+    expect(screen.getByText("「全部」係全域順序；各分類會沿用同一套次序。")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("button", { name: "儲存排序" }));
+
+    await waitFor(() => expect(apiMocks.reorderProducts).toHaveBeenCalledTimes(1));
+    expect(apiMocks.reorderProducts).toHaveBeenCalledWith([
+      { id: chocolateProduct.id, displaySequence: 10 },
+      { id: testingProduct.id, displaySequence: 20 },
+    ]);
+  });
+
+  it("merges a category reorder into the shared global order without colliding with other categories", async () => {
+    const firstBouquet = { ...testingProduct, displaySequence: 10 };
+    const secondBouquet = { ...chocolateProduct, displaySequence: 30 };
+    const allProducts = [firstBouquet, giftProduct, secondBouquet, vaseProduct];
+    apiMocks.searchProducts.mockImplementation(async (
+      _query: string,
+      _signal?: AbortSignal,
+      categoryId?: number,
+    ) => categoryId === 1 ? [firstBouquet, secondBouquet] : allProducts);
+    renderDialog();
+
+    await screen.findByText("Vase");
+    fireEvent.click(screen.getByRole("button", { name: "花束 Bouquets" }));
+    await waitFor(() => expect(screen.queryByText("Vase")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "調整排序" }));
+    await screen.findByRole("button", { name: "移動 testing" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "移動 testing" }), { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("button", { name: "儲存排序" }));
+
+    await waitFor(() => expect(apiMocks.reorderProducts).toHaveBeenCalledTimes(1));
+    expect(apiMocks.reorderProducts).toHaveBeenCalledWith([
+      { id: chocolateProduct.id, displaySequence: 10 },
+      { id: testingProduct.id, displaySequence: 30 },
+    ]);
   });
 
   it("targets the nearest card center when dragging diagonally across a three-column grid", async () => {
@@ -254,6 +324,48 @@ describe("ProductManagementDialog", () => {
 
     expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 6");
     expect(screen.getByText("拖拉商品到新位置，完成後儲存排序。")).toBeInTheDocument();
+  });
+
+  it("does not reorder repeatedly while the pointer is in the gap between cards", async () => {
+    await startGridSorting();
+    const bottomRightHandle = screen.getByRole("button", { name: "移動 Grid product 6" });
+    const scrollContainer = bottomRightHandle.closest<HTMLElement>(".overflow-y-auto")!;
+
+    fireEvent.pointerDown(bottomRightHandle, {
+      pointerId: 72,
+      pointerType: "mouse",
+      clientX: 290,
+      clientY: 210,
+    });
+    fireEvent.pointerMove(scrollContainer, {
+      pointerId: 72,
+      pointerType: "mouse",
+      clientX: 110,
+      clientY: 60,
+    });
+    fireEvent.pointerMove(scrollContainer, {
+      pointerId: 72,
+      pointerType: "mouse",
+      clientX: 111,
+      clientY: 61,
+    });
+
+    expect(orderedDragHandleNames()).toEqual([
+      "移動 Grid product 1",
+      "移動 Grid product 2",
+      "移動 Grid product 3",
+      "移動 Grid product 4",
+      "移動 Grid product 5",
+      "移動 Grid product 6",
+    ]);
+
+    fireEvent.pointerMove(scrollContainer, {
+      pointerId: 72,
+      pointerType: "mouse",
+      clientX: 52,
+      clientY: 62,
+    });
+    expect(orderedDragHandleNames()[0]).toBe("移動 Grid product 6");
   });
 
   it("keeps capture on the stable scroll container across consecutive DOM reorders", async () => {

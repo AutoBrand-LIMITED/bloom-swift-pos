@@ -86,6 +86,27 @@ interface DragSession {
   clientY: number;
 }
 
+const DRAG_TARGET_INSET_RATIO = 0.18;
+
+const mergeCategoryOrderIntoGlobal = (
+  globalProducts: OdooProduct[],
+  categoryProducts: OdooProduct[],
+) => {
+  const categoryProductIds = new Set(categoryProducts.map((product) => product.id));
+  let categoryIndex = 0;
+  const merged = globalProducts.map((product) => {
+    if (!categoryProductIds.has(product.id)) return product;
+    const replacement = categoryProducts[categoryIndex];
+    categoryIndex += 1;
+    return replacement ?? product;
+  });
+
+  if (categoryIndex < categoryProducts.length) {
+    merged.push(...categoryProducts.slice(categoryIndex));
+  }
+  return merged;
+};
+
 const EMPTY_FORM: ProductFormState = {
   id: null,
   name: "",
@@ -132,6 +153,7 @@ const ProductManagementDialog = ({
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const creatingProductRef = useRef(false);
   const sortSnapshotRef = useRef<OdooProduct[]>([]);
+  const globalSortSnapshotRef = useRef<OdooProduct[]>([]);
   const dragSessionRef = useRef<DragSession | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const autoScrollFrameRef = useRef<number | null>(null);
@@ -261,16 +283,24 @@ const ProductManagementDialog = ({
   const startSorting = async () => {
     setError(null);
     setSavedMessage(null);
-    if (activeCategory === "all") {
-      setError("請先揀一個商品分類，再調整該分類內嘅排序。");
-      return;
-    }
     let sortableProducts = products;
     if (query.trim()) {
       setQuery("");
       sortableProducts = await loadProducts(undefined, "", activeCategory);
     }
+
+    let globalProducts = sortableProducts;
+    if (activeCategory !== "all") {
+      try {
+        globalProducts = await searchManageableOdooProducts("", undefined, undefined);
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "未能載入全域商品排序");
+        return;
+      }
+    }
+
     sortSnapshotRef.current = [...sortableProducts];
+    globalSortSnapshotRef.current = [...globalProducts];
     setSortMode(true);
   };
 
@@ -414,7 +444,17 @@ const ProductManagementDialog = ({
       if (!visible || bounds.width <= 0 || bounds.height <= 0) return;
       const deltaX = session.clientX - (bounds.left + bounds.width / 2);
       const deltaY = session.clientY - (bounds.top + bounds.height / 2);
-      const distance = deltaX * deltaX + deltaY * deltaY;
+      const horizontalInset = bounds.width * DRAG_TARGET_INSET_RATIO;
+      const verticalInset = bounds.height * DRAG_TARGET_INSET_RATIO;
+      const insideStableTarget = session.clientX >= bounds.left + horizontalInset
+        && session.clientX <= bounds.right - horizontalInset
+        && session.clientY >= bounds.top + verticalInset
+        && session.clientY <= bounds.bottom - verticalInset;
+      if (!insideStableTarget) return;
+
+      const normalizedX = deltaX / Math.max(1, bounds.width);
+      const normalizedY = deltaY / Math.max(1, bounds.height);
+      const distance = normalizedX * normalizedX + normalizedY * normalizedY;
       if (distance < nearestDistance) {
         nearestDistance = distance;
         nearestProductId = productId;
@@ -519,12 +559,17 @@ const ProductManagementDialog = ({
 
   const saveSorting = async () => {
     finishDrag();
+    const globallyOrderedProducts = activeCategory === "all"
+      ? products
+      : mergeCategoryOrderIntoGlobal(globalSortSnapshotRef.current, products);
     const originalSequence = new Map(
-      sortSnapshotRef.current.map((product) => [product.id, product.displaySequence])
+      globalSortSnapshotRef.current.map((product) => [product.id, product.displaySequence])
     );
-    const updates = products
+    const sequencedProducts = globallyOrderedProducts
       .map((product, index) => ({ product, displaySequence: (index + 1) * 10 }))
-      .filter(({ product, displaySequence }) => originalSequence.get(product.id) !== displaySequence);
+    const updates = sequencedProducts.filter(
+      ({ product, displaySequence }) => originalSequence.get(product.id) !== displaySequence,
+    );
 
     setSortSaving(true);
     setError(null);
@@ -536,9 +581,12 @@ const ProductManagementDialog = ({
           displaySequence,
         })));
       }
-      setProducts((current) => current.map((product, index) => ({
+      const savedSequences = new Map(
+        sequencedProducts.map(({ product, displaySequence }) => [product.id, displaySequence]),
+      );
+      setProducts((current) => current.map((product) => ({
         ...product,
-        displaySequence: (index + 1) * 10,
+        displaySequence: savedSequences.get(product.id) ?? product.displaySequence,
       })));
       setSortMode(false);
       setSavedMessage("商品排序已儲存");
@@ -668,7 +716,9 @@ const ProductManagementDialog = ({
             <div className="mt-2 flex min-h-6 items-center justify-between gap-3 text-xs text-muted-foreground">
               <span>
                 {sortMode
-                  ? `正在調整「${activeCategoryLabel}」：拖到畫面頂部或底部可自動捲動。`
+                  ? activeCategory === "all"
+                    ? "正在調整全域商品順序：拖入商品卡中央位置即可換位。"
+                    : `正在調整「${activeCategoryLabel}」相對次序：拖入商品卡中央位置即可換位。`
                   : productCountLabel}
               </span>
               {savedMessage && !editorOpen && (
@@ -786,7 +836,9 @@ const ProductManagementDialog = ({
           {sortMode && (
             <div className="flex items-center justify-between gap-3 border-t border-border bg-background px-4 py-3 sm:px-5">
               <p className="hidden text-sm text-muted-foreground sm:block">
-                只會更新「{activeCategoryLabel}」入面嘅 POS 商品順序。
+                {activeCategory === "all"
+                  ? "「全部」係全域順序；各分類會沿用同一套次序。"
+                  : `只會改「${activeCategoryLabel}」商品之間嘅相對次序，唔會建立另一套排序。`}
               </p>
               <div className="ml-auto flex gap-2">
                 <Button type="button" variant="outline" className="h-11" onClick={cancelSorting} disabled={sortSaving}>
