@@ -364,13 +364,17 @@ export async function getOdooProducts(signal?: AbortSignal): Promise<OdooProduct
 
 export async function searchManageableOdooProducts(
   query = "",
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  categoryId?: number | null,
 ): Promise<OdooProduct[]> {
   if (!BACKEND_URL) return [];
 
   const params = new URLSearchParams();
   if (query.trim()) params.set("q", query.trim());
-  params.set("limit", "180");
+  if (categoryId !== undefined && categoryId !== null) {
+    params.set("category_id", String(categoryId));
+  }
+  params.set("limit", "300");
 
   const res = await authenticatedFetch(`${BACKEND_URL}/products/manage?${params.toString()}`, {
     headers: { "Content-Type": "application/json" },
@@ -383,6 +387,40 @@ export async function searchManageableOdooProducts(
   }
 
   return (await res.json()) as OdooProduct[];
+}
+
+export async function reorderOdooProducts(
+  products: Array<{ id: number; displaySequence: number }>,
+): Promise<{ updated: number }> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 30_000);
+  let res: Response;
+  try {
+    res = await authenticatedFetch(`${BACKEND_URL}/products/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ products }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error("儲存排序逾時，請稍後再試。系統未有確認排序變更。");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Odoo product reorder failed: ${res.status}`);
+  }
+
+  return (await res.json()) as { updated: number };
 }
 
 export async function createOdooProduct(payload: OdooProductWritePayload): Promise<OdooProduct> {
