@@ -15,6 +15,71 @@ afterEach(() => {
 });
 
 describe("odoo-api note contracts", () => {
+  it("treats HTTP 202 as a durably saved order waiting for Odoo", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const pendingResponse = {
+      operationalOrderId: "43e81d2e-ccfb-415b-8799-12a2e7a528d4",
+      syncState: "pending_odoo",
+      reviewError: null,
+      id: null,
+      name: null,
+      clientOrderRef: "POS-43e81d2e-ccfb-415b-8799-12a2e7a528d4",
+      amountTotal: 680,
+      partnerId: null,
+      accounting: null,
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(pendingResponse, 202)));
+    const { submitOdooOrder } = await import("@/lib/odoo-api");
+
+    await expect(submitOdooOrder({
+      id: pendingResponse.operationalOrderId,
+      notes: "legacy note is removed",
+    } as Order)).resolves.toEqual(pendingResponse);
+  });
+
+  it("returns a durable review record from HTTP 409 instead of losing its identity", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const reviewResponse = {
+      operationalOrderId: "a88ab0bc-d334-4482-8a1a-8a754132310f",
+      syncState: "needs_review",
+      reviewError: "customer_conflict",
+      id: null,
+      name: null,
+      clientOrderRef: null,
+      amountTotal: 123,
+      partnerId: null,
+      accounting: null,
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(reviewResponse, 409)));
+    const { submitOdooOrder } = await import("@/lib/odoo-api");
+
+    await expect(submitOdooOrder({ id: reviewResponse.operationalOrderId } as Order))
+      .resolves.toEqual(reviewResponse);
+  });
+
+  it("loads the authenticated operational status by encoded checkout ID", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const status = {
+      operationalOrderId: "order / 42",
+      syncState: "syncing",
+      odooOrderId: null,
+      odooOrderName: null,
+      odooPartnerId: null,
+      reviewError: null,
+      lastError: null,
+      attemptCount: 1,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(status));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOperationalOrderStatus } = await import("@/lib/odoo-api");
+
+    await expect(getOperationalOrderStatus(status.operationalOrderId)).resolves.toEqual(status);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders/operational/order%20%2F%2042",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
   it("stops a stalled product reorder instead of leaving the UI saving forever", async () => {
     vi.useFakeTimers();
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");

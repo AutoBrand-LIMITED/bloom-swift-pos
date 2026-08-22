@@ -1,15 +1,25 @@
 import type { Order } from "@/types/order";
+import type { OperationalOrderRecord } from "@/lib/operational-orders";
 
 export const LEGACY_ORDERS_KEY = "florist-pos-orders";
 export const UNSYNCED_ORDERS_KEY = "florist-pos-unsynced-orders-v1";
 export const UNSYNCED_ORDER_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 
-export type OrderRecordSource = "odoo" | "local";
-export type OrderRecordSyncState = "synced" | "unsynced" | "pending_confirmation";
+export type OrderRecordSource = "odoo" | "local" | "operational";
+export type OrderRecordSyncState =
+  | "synced"
+  | "unsynced"
+  | "pending_confirmation"
+  | "pending_odoo"
+  | "syncing"
+  | "operational_synced"
+  | "needs_review";
 
 export type OrderRecordView = Order & {
   source: OrderRecordSource;
   syncState: OrderRecordSyncState;
+  operationalReviewError?: string | null;
+  operationalLastError?: string | null;
 };
 
 const isOrder = (value: unknown): value is Order => {
@@ -114,6 +124,7 @@ export const mergeOrderRecords = (
   remoteOrders: Order[],
   localOrders: Order[],
   pendingOrder?: Order | null,
+  operationalOrders: OperationalOrderRecord[] = [],
 ): OrderRecordView[] => {
   const remoteByOdooId = new Set<number>();
   const remoteByOdooName = new Set<string>();
@@ -155,7 +166,23 @@ export const mergeOrderRecords = (
     });
   }
 
-  return [...remote, ...local].sort((left, right) => {
+  const operational: OrderRecordView[] = [];
+  for (const record of operationalOrders) {
+    const order = record.order;
+    const remoteMatch = remoteByLocalId.has(order.id)
+      || Boolean(order.odooOrderId && remoteByOdooId.has(order.odooOrderId))
+      || Boolean(order.odooOrderName && remoteByOdooName.has(order.odooOrderName));
+    if (remoteMatch || seenLocal.has(order.id)) continue;
+    operational.push({
+      ...order,
+      source: "operational",
+      syncState: record.syncState === "synced" ? "operational_synced" : record.syncState,
+      operationalReviewError: record.reviewError,
+      operationalLastError: record.lastError,
+    });
+  }
+
+  return [...remote, ...operational, ...local].sort((left, right) => {
     const dateDifference = validTimestamp(right.createdAt) - validTimestamp(left.createdAt);
     if (dateDifference) return dateDifference;
     if (left.source !== right.source) return left.source === "odoo" ? -1 : 1;

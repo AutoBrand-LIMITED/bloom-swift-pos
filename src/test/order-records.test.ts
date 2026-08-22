@@ -9,6 +9,7 @@ import {
   orderMatchesSearch,
   removeSyncedLocalOrders,
 } from "@/lib/order-records";
+import type { OperationalOrderRecord } from "@/lib/operational-orders";
 import type { Order } from "@/types/order";
 
 const order = (id: string, overrides: Partial<Order> = {}): Order => ({
@@ -57,6 +58,50 @@ describe("order record sources", () => {
 
   it("keeps genuinely distinct orders even when amount and date match", () => {
     expect(mergeOrderRecords([order("one"), order("two")], [])).toHaveLength(2);
+  });
+
+  it("shows a durably accepted Supabase order while Odoo is pending", () => {
+    const pendingOrder = order("operational-pending");
+    const operational: OperationalOrderRecord = {
+      operationalOrderId: pendingOrder.id,
+      operatorEmployeeId: 17,
+      order: pendingOrder,
+      syncState: "pending_odoo",
+      reviewError: null,
+      lastError: "Odoo temporarily unavailable",
+      attemptCount: 2,
+      updatedAt: new Date().toISOString(),
+    };
+
+    expect(mergeOrderRecords([], [], null, [operational])).toEqual([
+      expect.objectContaining({
+        id: pendingOrder.id,
+        source: "operational",
+        syncState: "pending_odoo",
+        operationalLastError: "Odoo temporarily unavailable",
+      }),
+    ]);
+  });
+
+  it("removes the temporary operational view when the Odoo record arrives", () => {
+    const remote = order("same-operational", {
+      odooOrderId: 77,
+      odooOrderName: "S00077",
+    });
+    const operational: OperationalOrderRecord = {
+      operationalOrderId: remote.id,
+      operatorEmployeeId: 17,
+      order: order(remote.id, { odooOrderId: 77, odooOrderName: "S00077" }),
+      syncState: "synced",
+      reviewError: null,
+      lastError: null,
+      attemptCount: 1,
+      updatedAt: new Date().toISOString(),
+    };
+
+    expect(mergeOrderRecords([remote], [], null, [operational])).toEqual([
+      expect.objectContaining({ id: remote.id, source: "odoo", syncState: "synced" }),
+    ]);
   });
 
   it("shows an unresolved pending submission only once", () => {

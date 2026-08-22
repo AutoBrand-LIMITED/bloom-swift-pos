@@ -51,12 +51,20 @@ interface OdooEmployee {
   barcode: string | null;
 }
 
-interface OdooOrderResponse {
-  id: number;
-  name: string;
+export type OperationalOrderSyncState = "synced" | "pending_odoo" | "needs_review";
+
+export type OperationalOrderStatusSyncState = OperationalOrderSyncState | "syncing";
+
+export interface OdooOrderResponse {
+  // These fields are present only when the backend durable checkout mode is enabled.
+  operationalOrderId?: string | null;
+  syncState?: OperationalOrderSyncState | null;
+  reviewError?: string | null;
+  id: number | null;
+  name: string | null;
   clientOrderRef: string | null;
   amountTotal: number;
-  partnerId: number;
+  partnerId: number | null;
   accounting?: {
     source: "odoo_accounting";
     idempotentReplay: boolean;
@@ -65,6 +73,17 @@ interface OdooOrderResponse {
     amountReceivedMinor: number;
     amountResidualMinor: number;
   } | null;
+}
+
+export interface OperationalOrderStatusResponse {
+  operationalOrderId: string;
+  syncState: OperationalOrderStatusSyncState;
+  odooOrderId: number | null;
+  odooOrderName: string | null;
+  odooPartnerId: number | null;
+  reviewError: string | null;
+  lastError: string | null;
+  attemptCount: number;
 }
 
 export interface AccountingPaymentOption {
@@ -325,12 +344,16 @@ async function throwApiError<T>(res: Response, fallback: string): Promise<never>
       recovery?: OdooRecoveryMetadata;
     };
     message?: string;
+    reviewError?: string;
+    syncState?: OperationalOrderSyncState;
+    operationalOrderId?: string;
     current?: T;
     latest?: T;
   } | null;
   const detail = body?.detail;
   const message =
     (typeof detail === "string" ? detail : detail?.message) ||
+    body?.reviewError ||
     body?.message ||
     fallback;
 
@@ -502,11 +525,35 @@ export async function submitOdooOrder(
     signal,
   });
 
+  if (res.status === 409) {
+    const replay = await res.clone().json().catch(() => null) as OdooOrderResponse | null;
+    if (replay?.syncState === "needs_review" && replay.operationalOrderId) {
+      return replay;
+    }
+  }
+
   if (!res.ok) {
     return throwApiError(res, `Odoo order sync failed: ${res.status}`);
   }
 
   return (await res.json()) as OdooOrderResponse;
+}
+
+export async function getOperationalOrderStatus(
+  operationalOrderId: string,
+  signal?: AbortSignal,
+): Promise<OperationalOrderStatusResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(
+    `${BACKEND_URL}/orders/operational/${encodeURIComponent(operationalOrderId)}`,
+    { headers: { "Content-Type": "application/json" }, signal },
+  );
+  if (!res.ok) {
+    return throwApiError(res, `Operational order status failed: ${res.status}`);
+  }
+  return (await res.json()) as OperationalOrderStatusResponse;
 }
 
 export async function updateOdooOrderOperationalDetails(

@@ -231,6 +231,19 @@ const OrderHistory = ({
                           : "只儲存在本機，尚未同步 Odoo"}
                       </p>
                     )}
+                    {order.source === "operational" && (
+                      <p className={`text-[11px] font-medium ${
+                        order.syncState === "needs_review" ? "text-destructive" : "text-amber-700"
+                      }`}>
+                        {order.syncState === "pending_odoo"
+                          ? "已安全保存，等候 Odoo 自動同步"
+                          : order.syncState === "syncing"
+                            ? "Odoo 同步處理中"
+                          : order.syncState === "needs_review"
+                            ? order.operationalReviewError || "訂單需要管理員核對"
+                            : "已同步 Odoo，正在更新訂單記錄"}
+                      </p>
+                    )}
                     {order.source === "odoo"
                       && order.odooOrderId
                       && order.writeDate

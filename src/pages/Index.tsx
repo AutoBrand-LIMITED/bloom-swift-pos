@@ -60,6 +60,7 @@ import {
   getDeliverySlots,
   getOdooCustomer,
   getOdooPartnerNotes,
+  getOperationalOrderStatus,
   getOdooOrderRecords,
   searchOdooOrderRecords,
   getAccountingPaymentOptions,
@@ -104,6 +105,11 @@ import {
   removeSyncedLocalOrders,
   saveUnsyncedOrders,
 } from "@/lib/order-records";
+import {
+  loadOperationalOrders,
+  saveOperationalOrdersForEmployee,
+  type OperationalOrderRecord,
+} from "@/lib/operational-orders";
 
 type RecipientSelectionDetails = Pick<
   RecipientSuggestion,
@@ -250,6 +256,10 @@ const Index = () => {
 
   // History
   const [localOrders, setLocalOrders] = useState<Order[]>(loadUnsyncedOrders);
+  const [operationalOrders, setOperationalOrders] = useState<OperationalOrderRecord[]>(
+    () => loadOperationalOrders(employee?.id),
+  );
+  const operationalOrdersRef = useRef(operationalOrders);
   const [remoteOrders, setRemoteOrders] = useState<Order[]>([]);
   const [remoteOrdersQuery, setRemoteOrdersQuery] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -285,15 +295,104 @@ const Index = () => {
     const matchingRemoteOrders = remoteOrdersQuery === normalizedOrderSearchQuery
       ? remoteOrders
       : [];
-    return mergeOrderRecords(matchingRemoteOrders, matchingLocalOrders, matchingPendingOrder);
+    const matchingOperationalOrders = orderSearchActive
+      ? operationalOrders.filter((record) => (
+          orderMatchesSearch(record.order, normalizedOrderSearchQuery)
+        ))
+      : operationalOrders;
+    return mergeOrderRecords(
+      matchingRemoteOrders,
+      matchingLocalOrders,
+      matchingPendingOrder,
+      matchingOperationalOrders,
+    );
   }, [
     employeePendingSubmission,
     localOrders,
     normalizedOrderSearchQuery,
     orderSearchActive,
+    operationalOrders,
     remoteOrders,
     remoteOrdersQuery,
   ]);
+
+  useEffect(() => {
+    operationalOrdersRef.current = operationalOrders;
+  }, [operationalOrders]);
+
+  useEffect(() => {
+    if (employee?.id === undefined) {
+      setOperationalOrders([]);
+      return;
+    }
+    setOperationalOrders(loadOperationalOrders(employee.id));
+  }, [employee?.id]);
+
+  useEffect(() => {
+    if (!hasOdooBackend || employee?.id === undefined) return;
+    let stopped = false;
+    let timer: number | undefined;
+    let controller: AbortController | undefined;
+
+    const poll = async () => {
+      const current = operationalOrdersRef.current;
+      const pending = current.filter(
+        (record) => record.syncState === "pending_odoo" || record.syncState === "syncing",
+      );
+      if (pending.length > 0) {
+        controller = new AbortController();
+        const results = await Promise.allSettled(
+          pending.map((record) => getOperationalOrderStatus(
+            record.operationalOrderId,
+            controller?.signal,
+          )),
+        );
+        if (!stopped) {
+          let transitionedToSynced = false;
+          const byId = new Map(results.flatMap((result, index) => {
+            if (result.status !== "fulfilled") return [];
+            return [[pending[index].operationalOrderId, result.value] as const];
+          }));
+          if (byId.size > 0) {
+            const next = current.map((record) => {
+              const status = byId.get(record.operationalOrderId);
+              if (!status) return record;
+              if (record.syncState !== "synced" && status.syncState === "synced") {
+                transitionedToSynced = true;
+              }
+              return {
+                ...record,
+                syncState: status.syncState,
+                reviewError: status.reviewError,
+                lastError: status.lastError,
+                attemptCount: status.attemptCount,
+                updatedAt: new Date().toISOString(),
+                order: {
+                  ...record.order,
+                  odooOrderId: status.odooOrderId ?? record.order.odooOrderId,
+                  odooOrderName: status.odooOrderName ?? record.order.odooOrderName,
+                },
+              };
+            });
+            operationalOrdersRef.current = next;
+            setOperationalOrders(next);
+            saveOperationalOrdersForEmployee(employee.id, next);
+            if (transitionedToSynced) {
+              setOrderRecordsRefreshKey((key) => key + 1);
+            }
+          }
+        }
+      }
+      if (!stopped) timer = window.setTimeout(poll, 10_000);
+    };
+
+    timer = window.setTimeout(poll, 1_500);
+    return () => {
+      stopped = true;
+      controller?.abort();
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [employee?.id]);
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -325,6 +424,27 @@ const Index = () => {
       .then((response) => {
         setRemoteOrdersQuery(debouncedOrderSearchQuery);
         setRemoteOrders(response.orders);
+        if (employee?.id !== undefined) {
+          setOperationalOrders((current) => {
+            const remaining = current.filter((record) => !response.orders.some((remote) => (
+              remote.id === record.order.id
+              || Boolean(
+                remote.odooOrderId
+                && record.order.odooOrderId
+                && remote.odooOrderId === record.order.odooOrderId,
+              )
+              || Boolean(
+                remote.odooOrderName
+                && record.order.odooOrderName
+                && remote.odooOrderName === record.order.odooOrderName,
+              )
+            )));
+            if (remaining.length === current.length) return current;
+            operationalOrdersRef.current = remaining;
+            saveOperationalOrdersForEmployee(employee.id, remaining);
+            return remaining;
+          });
+        }
         setLocalOrders((current) => {
           const remaining = removeSyncedLocalOrders(response.orders, current);
           if (remaining.length === current.length) return current;
@@ -343,7 +463,7 @@ const Index = () => {
       });
 
     return () => controller.abort();
-  }, [debouncedOrderSearchQuery, historyOpen, orderRecordsRefreshKey]);
+  }, [debouncedOrderSearchQuery, employee?.id, historyOpen, orderRecordsRefreshKey]);
 
   const subtotal = useMemo(() => {
     const itemsTotal = orderItemsTotal(items);
@@ -1329,32 +1449,70 @@ const Index = () => {
     const order = submission.order;
 
     let syncedOrder: Order = order;
+    let isPendingOdooSync = false;
+    let needsOdooReview = false;
 
     try {
       if (hasOdooBackend) {
         setPendingSubmission(submission);
         const odooOrder = await submitPersistedOrder(submission, submitOdooOrder);
         setPendingSubmission(null);
+        isPendingOdooSync = odooOrder.syncState === "pending_odoo";
+        needsOdooReview = odooOrder.syncState === "needs_review";
         syncedOrder = {
           ...order,
-          odooOrderId: odooOrder.id,
-          odooOrderName: odooOrder.name,
+          odooOrderId: odooOrder.id ?? undefined,
+          odooOrderName: odooOrder.name ?? undefined,
           odooInvoiceId: odooOrder.accounting?.invoice.id,
           odooInvoiceName: odooOrder.accounting?.invoice.name,
           odooPaymentId: odooOrder.accounting?.payment?.id,
           odooPaymentName: odooOrder.accounting?.payment?.name,
         };
-        const references = [
-          `訂單 ${odooOrder.name}`,
-          odooOrder.accounting?.invoice.name ? `發票 ${odooOrder.accounting.invoice.name}` : null,
-          odooOrder.accounting?.payment?.name ? `收款 ${odooOrder.accounting.payment.name}` : null,
-        ].filter(Boolean).join(" · ");
-        toast.success(`已同步到 Odoo staging：${references}`);
+        if ((isPendingOdooSync || needsOdooReview) && operatorEmployeeId !== undefined) {
+          const tracked: OperationalOrderRecord = {
+            operationalOrderId: odooOrder.operationalOrderId || order.id,
+            operatorEmployeeId,
+            order: syncedOrder,
+            syncState: odooOrder.syncState,
+            reviewError: odooOrder.reviewError,
+            lastError: null,
+            attemptCount: 0,
+            updatedAt: new Date().toISOString(),
+          };
+          const next = [
+            tracked,
+            ...operationalOrdersRef.current.filter(
+              (record) => record.operationalOrderId !== tracked.operationalOrderId,
+            ),
+          ];
+          operationalOrdersRef.current = next;
+          setOperationalOrders(next);
+          saveOperationalOrdersForEmployee(operatorEmployeeId, next);
+        }
+        if (isPendingOdooSync) {
+          toast.success("訂單已安全保存，等候 Odoo 自動同步", { duration: 7000 });
+        } else if (needsOdooReview) {
+          toast.warning(odooOrder.reviewError || "訂單已安全保存，需要管理員核對", {
+            duration: 9000,
+          });
+        } else {
+          const references = [
+            odooOrder.name ? `訂單 ${odooOrder.name}` : null,
+            odooOrder.accounting?.invoice.name ? `發票 ${odooOrder.accounting.invoice.name}` : null,
+            odooOrder.accounting?.payment?.name ? `收款 ${odooOrder.accounting.payment.name}` : null,
+          ].filter(Boolean).join(" · ");
+          toast.success(`已同步到 Odoo staging：${references}`);
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "未知錯誤";
       if (isDeterministicSubmissionFailure(err)) {
         setPendingSubmission(null);
+        // Supabase keeps the rejected checkout as an immutable audit record. A corrected
+        // submission therefore needs fresh idempotency identities instead of reusing the
+        // checkout that was already marked for review.
+        setCheckoutId(crypto.randomUUID());
+        setPaymentIdempotencyKey(crypto.randomUUID());
         toast.error(`Odoo 驗證失敗：${message}。訂單已解鎖，可以修改後再提交。`, { duration: 9000 });
       } else {
         toast.error(`Odoo 同步失敗：${message}`, { duration: 8000 });
@@ -1371,7 +1529,13 @@ const Index = () => {
       saveUnsyncedOrders(updated);
     }
 
-    if (order.paymentStatus === "unpaid") {
+    if (isPendingOdooSync) {
+      toast.info("付款資料已保存；Odoo 入帳會由後台自動重試", { duration: 7000 });
+    } else if (needsOdooReview) {
+      toast.info("這張訂單不會阻塞下一張單；可在訂單記錄查看核對狀態", {
+        duration: 7000,
+      });
+    } else if (order.paymentStatus === "unpaid") {
       toast.warning("訂單已建立 — 未付款", { duration: 5000 });
     } else if (order.paymentStatus === "deposit") {
       toast.info(
