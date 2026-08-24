@@ -211,6 +211,28 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onRecipientSuggestionSelect).toHaveBeenCalledWith(suggestion);
   });
 
+  it("offers an explicit new-recipient action when the search has no matches", async () => {
+    recipientSearchMocks.searchOdooRecipients.mockResolvedValue([]);
+    const onConfirmNewRecipient = vi.fn();
+    renderSection({
+      recipientName: "Wong Ng",
+      recipientPhone: "67610705",
+      onConfirmNewRecipient,
+    });
+
+    fireEvent.focus(screen.getByLabelText(/收貨人姓名/));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+
+    expect(screen.getByText("未找到過往收貨人")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "確認新增收貨人" }));
+
+    expect(onConfirmNewRecipient).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status")).toHaveTextContent("已確認新增收貨人");
+    expect(screen.queryByRole("listbox", { name: "過往收貨人搜尋結果" })).not.toBeInTheDocument();
+  });
+
   it("searches historical recipients by recipient company name", async () => {
     const suggestion = {
       id: 92,

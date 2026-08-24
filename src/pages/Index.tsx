@@ -1950,6 +1950,10 @@ const Index = () => {
           onRecipientAndCustomerSuggestionSelect={(suggestion) => {
             void applyRecipientAndLinkedCustomer(suggestion);
           }}
+          onConfirmNewRecipient={() => {
+            clearRecipientPersistenceBinding();
+            toast.success("已確認新增收貨人");
+          }}
           onDeliveryPersonChange={setDeliveryPerson}
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}

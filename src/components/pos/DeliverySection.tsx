@@ -98,6 +98,7 @@ interface DeliverySectionProps {
   onRecipientPhoneChange: (v: string) => void;
   onRecipientSuggestionSelect: (suggestion: RecipientSuggestion) => void;
   onRecipientAndCustomerSuggestionSelect: (suggestion: RecipientSuggestion) => void;
+  onConfirmNewRecipient?: () => void;
   onDeliveryPersonChange: (v: string) => void;
   onFailedDeliveryActionChange: (v: string) => void;
 }
@@ -133,6 +134,7 @@ const DeliverySection = ({
   onRecipientTypeChange, onRecipientCompanyNameChange,
   onRecipientNameChange, onRecipientPhoneChange, onRecipientSuggestionSelect,
   onRecipientAndCustomerSuggestionSelect,
+  onConfirmNewRecipient,
   onDeliveryPersonChange,
   onFailedDeliveryActionChange,
 }: DeliverySectionProps) => {
@@ -162,6 +164,7 @@ const DeliverySection = ({
     field: RecipientLookupField;
     query: string;
   } | null>(null);
+  const [confirmedNewRecipientSignature, setConfirmedNewRecipientSignature] = useState<string | null>(null);
   const lastManualAddressSignatureRef = useRef<string | null>(null);
   const authorizedAddressSignatureRef = useRef<string | null>(null);
   const previousAddressSignatureRef = useRef(currentAddressSignature);
@@ -235,6 +238,13 @@ const DeliverySection = ({
   const visibleRecipientSuggestions = completedCurrentRecipientSearch
     ? recipientSuggestions
     : [];
+  const recipientIdentitySignature = JSON.stringify([
+    recipientType,
+    recipientCompanyName.trim(),
+    recipientName.trim(),
+    recipientPhone.trim(),
+  ]);
+  const newRecipientConfirmed = confirmedNewRecipientSignature === recipientIdentitySignature;
   const canUseSenderAsRecipient = Boolean(senderName.trim() && senderPhone.trim());
   const recipientMatchesSender = canUseSenderAsRecipient
     && recipientType === senderType
@@ -265,6 +275,14 @@ const DeliverySection = ({
     onRecipientNameChange(previousRecipient?.name ?? "");
     onRecipientPhoneChange(previousRecipient?.phone ?? "");
     recipientBeforeSenderCopyRef.current = null;
+    setRecipientLookupField(null);
+    setRecipientSuggestions([]);
+    setCompletedRecipientSearch(null);
+  };
+
+  const handleConfirmNewRecipient = () => {
+    onConfirmNewRecipient?.();
+    setConfirmedNewRecipientSignature(recipientIdentitySignature);
     setRecipientLookupField(null);
     setRecipientSuggestions([]);
     setCompletedRecipientSearch(null);
@@ -494,9 +512,24 @@ const DeliverySection = ({
         ) : !activeRecipientQuery ? (
           <p className="p-3 text-xs text-muted-foreground">輸入公司、姓名或電話搜尋過往收貨人</p>
         ) : visibleRecipientSuggestions.length === 0 ? (
-          <p className="p-3 text-xs text-muted-foreground">
-            {completedCurrentRecipientSearch ? "未找到過往收貨人" : "正在準備搜尋..."}
-          </p>
+          completedCurrentRecipientSearch ? (
+            <div className="space-y-2 p-3">
+              <p className="text-xs text-muted-foreground">未找到過往收貨人</p>
+              <Button
+                type="button"
+                size="sm"
+                className="min-h-11 w-full"
+                onClick={handleConfirmNewRecipient}
+              >
+                確認新增收貨人
+              </Button>
+              <p className="text-[11px] text-muted-foreground">
+                提交訂單時會將呢位新收貨人儲存到 Odoo 訂單。
+              </p>
+            </div>
+          ) : (
+            <p className="p-3 text-xs text-muted-foreground">正在準備搜尋...</p>
+          )
         ) : (
           visibleRecipientSuggestions.map((suggestion) => (
             <div key={suggestion.id} className="border-b border-border last:border-0">
@@ -511,6 +544,7 @@ const DeliverySection = ({
                   } else {
                     onRecipientSuggestionSelect(suggestion);
                   }
+                  setConfirmedNewRecipientSignature(null);
                   setRecipientLookupField(null);
                   setRecipientSuggestions([]);
                   setCompletedRecipientSearch(null);
@@ -527,6 +561,7 @@ const DeliverySection = ({
                   className="min-h-11 w-full border-t border-border/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground hover:bg-accent/30 touch-manipulation"
                   onClick={() => {
                     onRecipientSuggestionSelect(suggestion);
+                    setConfirmedNewRecipientSignature(null);
                     setRecipientLookupField(null);
                     setRecipientSuggestions([]);
                     setCompletedRecipientSearch(null);
@@ -1073,6 +1108,11 @@ const DeliverySection = ({
           {recipientDropdown("phone")}
           </div>
         </div>
+        {newRecipientConfirmed && (
+          <p role="status" className="text-xs font-medium text-primary">
+            已確認新增收貨人；提交訂單時會儲存到 Odoo 訂單。
+          </p>
+        )}
       </div>
 
       {/* Delivery person */}
