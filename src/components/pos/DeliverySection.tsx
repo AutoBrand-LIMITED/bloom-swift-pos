@@ -42,6 +42,13 @@ import {
   UserCheck,
 } from "lucide-react";
 
+interface RecipientDraft {
+  type: RecipientType;
+  companyName: string;
+  name: string;
+  phone: string;
+}
+
 interface DeliverySectionProps {
   showFulfillmentSelector?: boolean;
   sectionTitle?: string;
@@ -96,6 +103,8 @@ interface DeliverySectionProps {
   onRecipientCompanyNameChange: (v: string) => void;
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
+  /** Applies all recipient identity fields in one state update when the parent stores them together. */
+  onRecipientDetailsChange?: (recipient: RecipientDraft) => void;
   onRecipientSuggestionSelect: (suggestion: RecipientSuggestion) => void;
   onRecipientAndCustomerSuggestionSelect: (suggestion: RecipientSuggestion) => void;
   onConfirmNewRecipient?: () => void;
@@ -105,12 +114,6 @@ interface DeliverySectionProps {
 
 const RECIPIENT_SUGGESTION_CACHE_LIMIT = 100;
 type RecipientLookupField = "company" | "name" | "phone";
-interface RecipientDraft {
-  type: RecipientType;
-  companyName: string;
-  name: string;
-  phone: string;
-}
 
 const DeliverySection = ({
   showFulfillmentSelector = true,
@@ -132,7 +135,7 @@ const DeliverySection = ({
   onBuildingChange, onFloorChange, onUnitChange,
   onGoogleAddressSelect,
   onRecipientTypeChange, onRecipientCompanyNameChange,
-  onRecipientNameChange, onRecipientPhoneChange, onRecipientSuggestionSelect,
+  onRecipientNameChange, onRecipientPhoneChange, onRecipientDetailsChange, onRecipientSuggestionSelect,
   onRecipientAndCustomerSuggestionSelect,
   onConfirmNewRecipient,
   onDeliveryPersonChange,
@@ -252,6 +255,17 @@ const DeliverySection = ({
     && recipientName.trim() === senderName.trim()
     && recipientPhone.trim() === senderPhone.trim();
 
+  const applyRecipientDraft = (recipient: RecipientDraft) => {
+    if (onRecipientDetailsChange) {
+      onRecipientDetailsChange(recipient);
+      return;
+    }
+    onRecipientTypeChange(recipient.type);
+    onRecipientCompanyNameChange(recipient.companyName);
+    onRecipientNameChange(recipient.name);
+    onRecipientPhoneChange(recipient.phone);
+  };
+
   const handleUseSenderAsRecipient = () => {
     recipientBeforeSenderCopyRef.current = {
       type: recipientType,
@@ -259,10 +273,12 @@ const DeliverySection = ({
       name: recipientName,
       phone: recipientPhone,
     };
-    onRecipientTypeChange(senderType);
-    onRecipientCompanyNameChange(senderType === "company" ? senderCompanyName.trim() : "");
-    onRecipientNameChange(senderName.trim());
-    onRecipientPhoneChange(senderPhone.trim());
+    applyRecipientDraft({
+      type: senderType,
+      companyName: senderType === "company" ? senderCompanyName.trim() : "",
+      name: senderName.trim(),
+      phone: senderPhone.trim(),
+    });
     setRecipientLookupField(null);
     setRecipientSuggestions([]);
     setCompletedRecipientSearch(null);
@@ -270,10 +286,12 @@ const DeliverySection = ({
 
   const handleStopUsingSenderAsRecipient = () => {
     const previousRecipient = recipientBeforeSenderCopyRef.current;
-    onRecipientTypeChange(previousRecipient?.type ?? "personal");
-    onRecipientCompanyNameChange(previousRecipient?.companyName ?? "");
-    onRecipientNameChange(previousRecipient?.name ?? "");
-    onRecipientPhoneChange(previousRecipient?.phone ?? "");
+    applyRecipientDraft({
+      type: previousRecipient?.type ?? "personal",
+      companyName: previousRecipient?.companyName ?? "",
+      name: previousRecipient?.name ?? "",
+      phone: previousRecipient?.phone ?? "",
+    });
     recipientBeforeSenderCopyRef.current = null;
     setRecipientLookupField(null);
     setRecipientSuggestions([]);

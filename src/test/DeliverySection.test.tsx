@@ -129,6 +129,31 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onRecipientPhoneChange).toHaveBeenCalledWith("+852 6123 4567");
   });
 
+  it("copies all sender fields through one atomic recipient update when provided", () => {
+    const onRecipientDetailsChange = vi.fn();
+    const props = renderSection({
+      senderType: "company",
+      senderCompanyName: "Sender Limited",
+      senderName: "Ms Chan",
+      senderPhone: "+852 6123 4567",
+      onRecipientDetailsChange,
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "收貨人同送花人相同" }));
+
+    expect(onRecipientDetailsChange).toHaveBeenCalledTimes(1);
+    expect(onRecipientDetailsChange).toHaveBeenCalledWith({
+      type: "company",
+      companyName: "Sender Limited",
+      name: "Ms Chan",
+      phone: "+852 6123 4567",
+    });
+    expect(props.onRecipientTypeChange).not.toHaveBeenCalled();
+    expect(props.onRecipientCompanyNameChange).not.toHaveBeenCalled();
+    expect(props.onRecipientNameChange).not.toHaveBeenCalled();
+    expect(props.onRecipientPhoneChange).not.toHaveBeenCalled();
+  });
+
   it("restores the previous recipient when same-as-sender is cancelled", () => {
     const props = renderSectionProps({
       recipientType: "personal",

@@ -216,6 +216,12 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
             onRecipientCompanyNameChange={(recipientCompanyName) => update(split.id, { recipientCompanyName })}
             onRecipientNameChange={(recipientName) => update(split.id, { recipientName })}
             onRecipientPhoneChange={(recipientPhone) => update(split.id, { recipientPhone })}
+            onRecipientDetailsChange={(recipient) => update(split.id, {
+              recipientType: recipient.type,
+              recipientCompanyName: recipient.companyName,
+              recipientName: recipient.name,
+              recipientPhone: recipient.phone,
+            })}
             onRecipientSuggestionSelect={(suggestion) => applyRecipient(split, suggestion)}
             onRecipientAndCustomerSuggestionSelect={(suggestion) => applyRecipient(split, suggestion)}
             onDeliveryPersonChange={(deliveryPerson) => update(split.id, { deliveryPerson })}
