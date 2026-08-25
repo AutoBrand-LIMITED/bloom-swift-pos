@@ -8,6 +8,7 @@ import {
   validateCheckout,
 } from "@/lib/checkout-validation";
 import type { DeliverySlot } from "@/lib/odoo-api";
+import { customerResolutionIdentityKey } from "@/lib/customer-profile";
 
 const slots: DeliverySlot[] = [
   { id: 11, displayLabel: "上午 09:00-13:00", startTime: "09:00", endTime: "13:00" },
@@ -243,6 +244,36 @@ describe("checkout required-field validation", () => {
       selectedCustomerPhone: "9123 4567",
       confirmedNewCustomerName: validCheckout.customerName,
       confirmedNewCustomerPhone: "91234567",
+    }).phone).toBe("請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人");
+  });
+
+  it("reports the current customer lookup phase instead of a generic resolution error", () => {
+    const identityKey = customerResolutionIdentityKey(
+      validCheckout.phone,
+      validCheckout.customerName,
+    );
+
+    expect(validateCheckout({
+      ...validCheckout,
+      requiresCustomerResolution: true,
+      customerResolution: { phase: "searching", identityKey },
+    }).phone).toBe("正在確認這位客戶，請等搜尋完成後選擇現有客戶或確認新增聯絡人");
+
+    expect(validateCheckout({
+      ...validCheckout,
+      requiresCustomerResolution: true,
+      customerResolution: { phase: "error", identityKey },
+    }).phone).toBe("客戶搜尋暫時失敗，請按重試完成確認後再下單");
+  });
+
+  it("ignores a stale lookup phase from a previous customer identity", () => {
+    expect(validateCheckout({
+      ...validCheckout,
+      requiresCustomerResolution: true,
+      customerResolution: {
+        phase: "searching",
+        identityKey: customerResolutionIdentityKey("9234 5678", "Previous Contact"),
+      },
     }).phone).toBe("請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人");
   });
 

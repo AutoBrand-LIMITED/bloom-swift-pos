@@ -162,6 +162,39 @@ describe("order record sources", () => {
     expect(orderMatchesSearch(record, "not present")).toBe(false);
   });
 
+  it("matches local and operational orders by every secondary destination", () => {
+    const record = order("split-searchable", {
+      deliverySplits: [{
+        id: "split-2",
+        fulfillmentType: "delivery",
+        deliveryDate: "2026-08-27",
+        deliveryTimeMode: "specified",
+        deliveryTime: "10:00",
+        deliveryRegion: "九龍",
+        deliveryDistrict: "觀塘區",
+        deliveryArea: "觀塘",
+        deliveryDetail: "Secondary Tower",
+        deliveryAddress: "Secondary Tower, Kwun Tong",
+        deliveryGoogleAddress: "Secondary Tower",
+        deliveryBuilding: "Block B",
+        deliveryFloor: "18",
+        deliveryUnit: "A",
+        recipientType: "company",
+        recipientCompanyName: "Secondary Flowers Limited",
+        recipientName: "Ms Secondary",
+        recipientPhone: "+853 6333 4444",
+        deliveryPerson: "",
+        failedDeliveryAction: "none",
+        deliveryNote: "",
+        itemAllocations: [{ itemId: "line-1", itemName: "Bouquet", quantity: 1 }],
+      }],
+    });
+
+    expect(orderMatchesSearch(record, "Secondary Flowers")).toBe(true);
+    expect(orderMatchesSearch(record, "Secondary Tower")).toBe(true);
+    expect(orderMatchesSearch(record, "63334444")).toBe(true);
+  });
+
   it("migrates only unsynced legacy orders into durable local storage", () => {
     localStorage.setItem(LEGACY_ORDERS_KEY, JSON.stringify([
       order("local"),
