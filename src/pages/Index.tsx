@@ -1489,13 +1489,11 @@ const Index = () => {
           setOperationalOrders(next);
           saveOperationalOrdersForEmployee(operatorEmployeeId, next);
         }
-        if (isPendingOdooSync) {
-          toast.success("訂單已安全保存，等候 Odoo 自動同步", { duration: 7000 });
-        } else if (needsOdooReview) {
+        if (needsOdooReview) {
           toast.warning(odooOrder.reviewError || "訂單已安全保存，需要管理員核對", {
             duration: 9000,
           });
-        } else {
+        } else if (!isPendingOdooSync) {
           const references = [
             odooOrder.name ? `訂單 ${odooOrder.name}` : null,
             odooOrder.accounting?.invoice.name ? `發票 ${odooOrder.accounting.invoice.name}` : null,
@@ -1529,19 +1527,17 @@ const Index = () => {
       saveUnsyncedOrders(updated);
     }
 
-    if (isPendingOdooSync) {
-      toast.info("付款資料已保存；Odoo 入帳會由後台自動重試", { duration: 7000 });
-    } else if (needsOdooReview) {
+    if (needsOdooReview) {
       toast.info("這張訂單不會阻塞下一張單；可在訂單記錄查看核對狀態", {
         duration: 7000,
       });
-    } else if (order.paymentStatus === "unpaid") {
+    } else if (!isPendingOdooSync && order.paymentStatus === "unpaid") {
       toast.warning("訂單已建立 — 未付款", { duration: 5000 });
-    } else if (order.paymentStatus === "deposit") {
+    } else if (!isPendingOdooSync && order.paymentStatus === "deposit") {
       toast.info(
         `訂單已建立 — 已收訂金 $${order.depositAmount}，尚欠 $${order.finalPrice - order.depositAmount}`,
       );
-    } else {
+    } else if (!isPendingOdooSync) {
       toast.success("訂單已建立 ✓");
     }
 

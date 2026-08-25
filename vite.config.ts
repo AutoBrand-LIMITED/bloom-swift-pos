@@ -2,7 +2,10 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { createFrontendReleaseManifest } from "./release-manifest";
+import {
+  assertBrowserBuildEnvIsUsable,
+  createFrontendReleaseManifest,
+} from "./release-manifest";
 
 const releaseManifestPlugin = (
   env: Record<string, string | undefined>,
@@ -21,6 +24,7 @@ const releaseManifestPlugin = (
 export default defineConfig(({ mode }) => {
   const fileEnv = loadEnv(mode, process.cwd(), "");
   const releaseEnv = { ...fileEnv, ...process.env };
+  assertBrowserBuildEnvIsUsable(releaseEnv);
 
   return {
     server: {
