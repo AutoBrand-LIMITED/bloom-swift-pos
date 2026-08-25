@@ -6,17 +6,48 @@ export interface FrontendReleaseManifest {
   releaseId: string;
   requiredBackendContract: string;
   backendUrl: string;
+  googleMapsConfigured: boolean;
 }
 
-const MASKED_BROWSER_ENV_VALUES = new Set(["[SENSITIVE]", "[REDACTED]"]);
+const MASKED_BROWSER_ENV_VALUES = new Set([
+  "[SENSITIVE]",
+  "SENSITIVE",
+  "[REDACTED]",
+  "REDACTED",
+  "***",
+]);
+
+const hasUsableGoogleMapsApiKey = (
+  env: Record<string, string | undefined>,
+): boolean => {
+  const value = env.VITE_GOOGLE_MAPS_API_KEY?.trim();
+  return Boolean(value && !MASKED_BROWSER_ENV_VALUES.has(value.toUpperCase()));
+};
 
 export const assertBrowserBuildEnvIsUsable = (
   env: Record<string, string | undefined>,
 ): void => {
+  const releaseId = env.VITE_POS_RELEASE_ID?.trim();
   const googleMapsApiKey = env.VITE_GOOGLE_MAPS_API_KEY?.trim();
   if (googleMapsApiKey && MASKED_BROWSER_ENV_VALUES.has(googleMapsApiKey.toUpperCase())) {
     throw new Error(
       "VITE_GOOGLE_MAPS_API_KEY contains a redacted placeholder. Build on Vercel with the real browser key instead of using a pulled sensitive value.",
+    );
+  }
+
+  if (env.VERCEL && (!releaseId || releaseId === "unmanaged")) {
+    throw new Error(
+      "VITE_POS_RELEASE_ID is required for Vercel releases. Use the aligned release command instead of an automatic or raw Vercel deployment.",
+    );
+  }
+
+  const isManagedRelease = Boolean(
+    env.VERCEL ||
+      (releaseId && releaseId !== "unmanaged"),
+  );
+  if (isManagedRelease && !hasUsableGoogleMapsApiKey(env)) {
+    throw new Error(
+      "VITE_GOOGLE_MAPS_API_KEY is required for managed releases. Build remotely on Vercel so the configured Preview/Production value is injected.",
     );
   }
 };
@@ -39,4 +70,5 @@ export const createFrontendReleaseManifest = (
     DEFAULT_API_CONTRACT_VERSION,
   ),
   backendUrl: readValue(env, "VITE_BACKEND_URL", "").replace(/\/$/, ""),
+  googleMapsConfigured: hasUsableGoogleMapsApiKey(env),
 });
