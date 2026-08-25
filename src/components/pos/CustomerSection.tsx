@@ -2,7 +2,18 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { User, ChevronDown, Building2, UserRoundCheck, Hash, Mail, MapPin } from "lucide-react";
+import {
+  AlertCircle,
+  Building2,
+  ChevronDown,
+  Hash,
+  LoaderCircle,
+  Mail,
+  MapPin,
+  RefreshCw,
+  User,
+  UserRoundCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DemoCustomer } from "@/data/demo-customers";
 import CustomerFlags from "@/components/pos/CustomerFlags";
@@ -20,6 +31,10 @@ import {
   normalizePhoneNumber,
 } from "@/lib/checkout-validation";
 import { phoneLocalDigits, phoneMatchesQuery, phoneSearchRank } from "@/lib/phone-utils";
+import {
+  customerResolutionIdentityKey,
+  type CustomerResolutionState,
+} from "@/lib/customer-profile";
 
 export type CustomerType = "personal" | "company";
 type CustomerLookupSource = "phone" | "name" | "email" | "customerCode";
@@ -57,6 +72,7 @@ interface CustomerSectionProps {
   confirmedNewCustomerName?: string | null;
   confirmedNewCustomerPhone?: string | null;
   onConfirmNewCustomer?: (normalizedPhone: string, normalizedName: string) => void;
+  onResolutionStateChange?: (state: CustomerResolutionState) => void;
   refreshKey?: number;
 }
 
@@ -68,6 +84,7 @@ const CustomerSection = ({
   phoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
   confirmedNewCustomerName, confirmedNewCustomerPhone, onConfirmNewCustomer,
+  onResolutionStateChange,
 }: CustomerSectionProps) => {
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
   const [search, setSearch] = useState("");
@@ -75,7 +92,12 @@ const CustomerSection = ({
   const [odooCustomers, setOdooCustomers] = useState<DemoCustomer[]>([]);
   const [customerAccount, setCustomerAccount] = useState<CustomerAccountLookup | null>(null);
   const [odooLoading, setOdooLoading] = useState(false);
-  const [odooError, setOdooError] = useState<string | null>(null);
+  const [odooError, setOdooError] = useState<{
+    source: CustomerLookupSource;
+    query: string;
+    message: string;
+  } | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [completedOdooSearch, setCompletedOdooSearch] = useState<{
     source: CustomerLookupSource;
     query: string;
@@ -134,14 +156,21 @@ const CustomerSection = ({
             : trimmed.length >= 2;
 
     if (!activeDropdown || !hasOdooBackend || !canSearch) {
-      setOdooCustomers([]);
-      setCustomerAccount(null);
       setOdooLoading(false);
-      setOdooError(null);
+      if (activeDropdown && !canSearch) {
+        setOdooCustomers([]);
+        setCustomerAccount(null);
+        setCompletedOdooSearch(null);
+        setOdooError(null);
+      }
       return;
     }
 
     const controller = new AbortController();
+    const source = activeDropdown;
+    const requestQuery = source === "phone"
+      ? normalizedDebouncedPhone
+      : trimmed.toLocaleLowerCase();
     const requestId = searchRequestRef.current + 1;
     searchRequestRef.current = requestId;
     setOdooLoading(true);
@@ -164,10 +193,8 @@ const CustomerSection = ({
         setCustomerAccount(account);
         setOdooCustomers(customers);
         setCompletedOdooSearch({
-          source: activeDropdown,
-          query: activeDropdown === "phone"
-            ? normalizedDebouncedPhone
-            : trimmed.toLocaleLowerCase(),
+          source,
+          query: requestQuery,
         });
       })
       .catch((err: unknown) => {
@@ -175,7 +202,11 @@ const CustomerSection = ({
         setOdooCustomers([]);
         setCustomerAccount(null);
         setCompletedOdooSearch(null);
-        setOdooError(err instanceof Error ? err.message : "未能連接 Odoo 客戶資料");
+        setOdooError({
+          source,
+          query: requestQuery,
+          message: err instanceof Error ? err.message : "未能連接 Odoo 客戶資料",
+        });
       })
       .finally(() => {
         if (!controller.signal.aborted && searchRequestRef.current === requestId) {
@@ -184,7 +215,7 @@ const CustomerSection = ({
       });
 
     return () => controller.abort();
-  }, [activeDropdown, debouncedSearch, normalizedDebouncedPhone]);
+  }, [activeDropdown, debouncedSearch, normalizedDebouncedPhone, retryKey]);
 
   const currentSearchKey = activeDropdown === "phone"
     ? normalizedSearchPhone
@@ -235,29 +266,6 @@ const CustomerSection = ({
   const normalizedCurrentPhone = normalizePhoneNumber(phone);
   const currentPhoneSearchKey = phoneLocalDigits(phone);
   const normalizedCurrentCustomerName = normalizeCustomerIdentityName(customerName);
-  const currentSearchMatchesField = activeDropdown === "phone"
-    ? normalizedSearchPhone === currentPhoneSearchKey
-    : activeDropdown === "name"
-      ? normalizeCustomerIdentityName(search) === normalizedCurrentCustomerName
-      : activeDropdown === "email"
-        ? search.trim().toLocaleLowerCase() === customerEmail.trim().toLocaleLowerCase()
-        : false;
-  const hasExactCustomerIdentity = customerOptions.some((customer) => (
-    normalizePhoneNumber(customer.phone) === normalizedCurrentPhone
-      && normalizeCustomerIdentityName(customer.name) === normalizedCurrentCustomerName
-  ));
-  const canConfirmNewCustomer = Boolean(
-    hasOdooBackend
-      && !selectedCustomer
-      && activeDropdown !== "customerCode"
-      && isValidPhoneNumber(phone)
-      && normalizedCurrentCustomerName
-      && currentSearchMatchesField
-      && completedCurrentSearch
-      && !odooLoading
-      && !odooError
-      && !hasExactCustomerIdentity,
-  );
   const canStartNewCustomerWithCode = Boolean(
     hasOdooBackend
       && activeDropdown === "customerCode"
@@ -279,6 +287,73 @@ const CustomerSection = ({
       && confirmedNewCustomerPhone === normalizedCurrentPhone
       && normalizeCustomerIdentityName(confirmedNewCustomerName || "") === normalizedCurrentCustomerName,
   );
+  const selectedCustomerConfirmed = Boolean(
+    selectedCustomer
+      && normalizePhoneNumber(selectedCustomer.phone) === normalizedCurrentPhone
+      && normalizeCustomerIdentityName(selectedCustomer.name) === normalizedCurrentCustomerName,
+  );
+  const currentIdentityKey = customerResolutionIdentityKey(phone, customerName);
+  const queryForSource = (source: CustomerLookupSource) => {
+    if (source === "phone") return currentPhoneSearchKey;
+    if (source === "name") return normalizedCurrentCustomerName;
+    if (source === "email") return customerEmail.trim().toLocaleLowerCase();
+    return customerCode.trim().toLocaleLowerCase();
+  };
+  const completedSearchMatchesCurrentIdentity = Boolean(
+    completedOdooSearch
+      && completedOdooSearch.source !== "customerCode"
+      && completedOdooSearch.query === queryForSource(completedOdooSearch.source),
+  );
+  const currentOdooError = odooError
+    && odooError.query === queryForSource(odooError.source)
+    ? odooError
+    : null;
+  const activeOdooError = odooError
+    && odooError.source === activeDropdown
+    && odooError.query === currentSearchKey
+    ? odooError
+    : null;
+  const hasExactCustomerIdentity = completedSearchMatchesCurrentIdentity && odooCustomers.some((customer) => (
+    normalizePhoneNumber(customer.phone) === normalizedCurrentPhone
+      && normalizeCustomerIdentityName(customer.name) === normalizedCurrentCustomerName
+  ));
+  const activeLookupMatchesCurrentIdentity = Boolean(
+    activeDropdown
+      && activeDropdown !== "customerCode"
+      && currentSearchKey === queryForSource(activeDropdown),
+  );
+  const activeDebouncedKey = activeDropdown === "phone"
+    ? normalizedDebouncedPhone
+    : debouncedSearch.trim().toLocaleLowerCase();
+  let customerResolutionPhase: CustomerResolutionState["phase"] = "idle";
+  if (!hasOdooBackend || selectedCustomerConfirmed || isNewCustomerConfirmed) {
+    customerResolutionPhase = "confirmed";
+  } else if (currentIdentityKey && isValidPhoneNumber(phone)) {
+    if (activeLookupMatchesCurrentIdentity && activeDebouncedKey !== currentSearchKey) {
+      customerResolutionPhase = "debouncing";
+    } else if (activeLookupMatchesCurrentIdentity && odooLoading) {
+      customerResolutionPhase = "searching";
+    } else if (currentOdooError) {
+      customerResolutionPhase = "error";
+    } else if (completedSearchMatchesCurrentIdentity) {
+      customerResolutionPhase = hasExactCustomerIdentity ? "matches" : "no_match";
+    }
+  }
+  const canConfirmNewCustomer = Boolean(
+    !selectedCustomer
+      && customerResolutionPhase === "no_match",
+  );
+
+  useEffect(() => {
+    onResolutionStateChange?.({
+      phase: customerResolutionPhase,
+      identityKey: currentIdentityKey,
+    });
+  }, [
+    currentIdentityKey,
+    customerResolutionPhase,
+    onResolutionStateChange,
+  ]);
   const isNewCustomerDraft = Boolean(
     isNewCustomerConfirmed
       || (!selectedCustomer && customerCode.trim()),
@@ -288,6 +363,20 @@ const CustomerSection = ({
       && !selectedCustomer.customerCode?.trim(),
   );
   const isCustomerCodeEntry = isNewCustomerDraft || canBackfillSelectedCustomerCode;
+
+  const retryCurrentCustomerLookup = () => {
+    const source = currentOdooError?.source || completedOdooSearch?.source || "phone";
+    const value = source === "phone"
+      ? phone
+      : source === "name"
+        ? customerName
+        : source === "email"
+          ? customerEmail
+          : customerCode;
+    setSearch(value);
+    setActiveDropdown(source);
+    setRetryKey((key) => key + 1);
+  };
 
   const handleSelect = (c: DemoCustomer) => {
     const customer = { ...c };
@@ -388,19 +477,16 @@ const CustomerSection = ({
         <p className="text-xs text-muted-foreground p-3">正在搜尋 Odoo 客戶及收件人...</p>
       ) : customerOptions.length === 0 && !hasExistingCustomerAccount ? (
         <div className="p-3 space-y-2">
-          {odooError ? (
-            <p className="text-xs text-destructive">{odooError}</p>
+          {activeOdooError ? (
+            <p className="text-xs text-destructive">{activeOdooError.message}</p>
           ) : source === "email" && selectedCustomer?.odooPartnerId ? (
             <p className="text-xs leading-relaxed text-foreground">
               未有其他客戶使用呢個電郵；提交訂單時會補填到已選客戶，不會新增另一位客戶。
             </p>
           ) : canConfirmNewCustomer ? (
-            <>
-              <p className="text-xs leading-relaxed text-foreground">
-                系統未有符合此電話及聯絡人名稱嘅客戶。
-              </p>
-              {confirmNewCustomerAction}
-            </>
+            <p className="text-xs leading-relaxed text-foreground">
+              系統未有符合此電話及聯絡人名稱嘅客戶。
+            </p>
           ) : canStartNewCustomerWithCode ? (
             <>
               <p className="text-xs leading-relaxed text-foreground">
@@ -453,7 +539,7 @@ const CustomerSection = ({
               </Button>
             </div>
           )}
-          {odooError && (
+          {activeOdooError && (
             <p className="px-3 py-2 text-[10px] text-destructive border-b border-border">
               Odoo 搜尋暫時不可用，以下顯示本機記錄
             </p>
@@ -494,7 +580,6 @@ const CustomerSection = ({
               {customerOptionContent(c)}
             </button>
           ))}
-          {confirmNewCustomerAction}
         </div>
       )}
     </div>
@@ -717,6 +802,65 @@ const CustomerSection = ({
             )}
           </div>
         </div>
+
+        {customerResolutionPhase !== "idle" && (
+          <div
+            data-testid="customer-resolution-panel"
+            aria-live="polite"
+            className="rounded-lg border border-border bg-muted/20 p-3"
+          >
+            {customerResolutionPhase === "debouncing" && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                等待確認當前電話及聯絡人...
+              </p>
+            )}
+            {customerResolutionPhase === "searching" && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                正在 Odoo 確認當前電話及聯絡人...
+              </p>
+            )}
+            {customerResolutionPhase === "matches" && (
+              <div className="space-y-2">
+                <p className="text-xs">找到符合資料的現有客戶，請選擇正確聯絡人完成確認。</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-11 w-full touch-manipulation"
+                  onClick={retryCurrentCustomerLookup}
+                >
+                  顯示客戶結果
+                </Button>
+              </div>
+            )}
+            {customerResolutionPhase === "no_match" && confirmNewCustomerAction}
+            {customerResolutionPhase === "error" && (
+              <div className="space-y-2">
+                <p className="flex items-start gap-2 text-xs text-destructive">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  未能完成當前客戶確認。請重試；搜尋完成前不會將此聯絡人當作新客戶。
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-11 w-full gap-2 touch-manipulation"
+                  onClick={retryCurrentCustomerLookup}
+                >
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" /> 重試客戶搜尋
+                </Button>
+              </div>
+            )}
+            {customerResolutionPhase === "confirmed" && (
+              <p className="flex items-center gap-2 text-xs font-medium text-emerald-700">
+                <UserRoundCheck className="h-4 w-4" aria-hidden="true" />
+                已確認當前電話及聯絡人，可以繼續下單。
+              </p>
+            )}
+          </div>
+        )}
 
       <div className="space-y-1.5 relative">
         <Label htmlFor="customer-email" className="text-xs font-medium flex items-center gap-1.5">

@@ -1,5 +1,5 @@
 import type { CustomerTag, DemoCustomer, PurchaseRecord } from "@/data/demo-customers";
-import type { Order, SalesStaff } from "@/types/order";
+import type { DeliverySplit, Order, SalesStaff } from "@/types/order";
 import { authenticatedFetch } from "@/lib/pos-auth";
 
 interface OdooPartner {
@@ -183,6 +183,7 @@ export interface OrderOperationalUpdate {
   deliveryBuilding: string;
   deliveryFloor: string;
   deliveryUnit: string;
+  deliverySplits?: DeliverySplit[];
   recipientType: "personal" | "company";
   recipientCompanyName: string;
   recipientName: string;

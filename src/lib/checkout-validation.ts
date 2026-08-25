@@ -5,6 +5,10 @@ import {
 import type { DeliverySlot } from "@/lib/odoo-api";
 import type { DeliveryTimeMode, FulfillmentType, RecipientType } from "@/types/order";
 import { canonicalPhoneValue, isValidSupportedPhone } from "@/lib/phone-utils";
+import {
+  customerResolutionIdentityKey,
+  type CustomerResolutionState,
+} from "@/lib/customer-profile";
 
 export type CheckoutField =
   | "customerName"
@@ -37,6 +41,7 @@ interface CheckoutValidationInput {
   confirmedNewCustomerPhone?: string | null;
   restoredPendingSubmission?: boolean;
   requiresCustomerResolution?: boolean;
+  customerResolution?: CustomerResolutionState;
   senderName: string;
   recipientType: RecipientType;
   recipientCompanyName: string;
@@ -109,7 +114,18 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
   } else if (!isValidPhoneNumber(input.phone)) {
     errors.phone = "請輸入有效電話號碼";
   } else if (input.requiresCustomerResolution && !hasResolvedCustomer(input)) {
-    errors.phone = "請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人";
+    const resolutionIsCurrent = input.customerResolution?.identityKey
+      === customerResolutionIdentityKey(input.phone, input.customerName);
+    if (
+      resolutionIsCurrent
+      && ["debouncing", "searching"].includes(input.customerResolution?.phase || "")
+    ) {
+      errors.phone = "正在確認這位客戶，請等搜尋完成後選擇現有客戶或確認新增聯絡人";
+    } else if (resolutionIsCurrent && input.customerResolution?.phase === "error") {
+      errors.phone = "客戶搜尋暫時失敗，請按重試完成確認後再下單";
+    } else {
+      errors.phone = "請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人";
+    }
   }
   if (!input.senderName.trim()) errors.senderName = "請輸入送花人名稱";
   if ((input.fulfillmentType || "delivery") === "delivery") {

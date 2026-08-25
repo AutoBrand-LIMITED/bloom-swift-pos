@@ -22,7 +22,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import OrderDestinationEditCard from "@/components/pos/OrderDestinationEditCard";
 import { isValidPhoneNumber } from "@/lib/checkout-validation";
+import {
+  normalizeDeliverySplitsForOperationalUpdate,
+  operationalSplitIdentityIsUnchanged,
+  validateOperationalDeliverySplits,
+} from "@/lib/split-delivery";
 import {
   getAccountingPaymentOptions,
   getDeliverySlots,
@@ -65,6 +71,10 @@ const formFromOrder = (order: OrderRecordView): OrderOperationalUpdate => ({
   deliveryBuilding: order.deliveryBuilding || "",
   deliveryFloor: order.deliveryFloor || "",
   deliveryUnit: order.deliveryUnit || "",
+  deliverySplits: (order.deliverySplits || []).map((split) => ({
+    ...split,
+    itemAllocations: split.itemAllocations.map((allocation) => ({ ...allocation })),
+  })),
   recipientType: order.recipientType || "personal",
   recipientCompanyName: order.recipientCompanyName || "",
   recipientName: order.recipientName || "",
@@ -200,11 +210,24 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
         return;
       }
     }
+    const deliverySplits = normalizeDeliverySplitsForOperationalUpdate(form.deliverySplits || []);
+    const splitValidationError = validateOperationalDeliverySplits(deliverySplits);
+    if (splitValidationError) {
+      setError(splitValidationError);
+      return;
+    }
+    if (!operationalSplitIdentityIsUnchanged(order.deliverySplits || [], deliverySplits)) {
+      setError("額外收貨點識別或商品分配已改變，請重新整理訂單後再試。");
+      return;
+    }
 
     setSaving(true);
     setError(null);
     try {
-      await updateOdooOrderOperationalDetails(order.odooOrderId, form);
+      await updateOdooOrderOperationalDetails(order.odooOrderId, {
+        ...form,
+        deliverySplits,
+      });
       toast.success("訂單資料已更新到 Odoo");
       onOpenChange(false);
       onSaved();
@@ -259,6 +282,12 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
     }
   };
 
+  const splitIdentityUnchanged = Boolean(
+    order
+    && form
+    && operationalSplitIdentityIsUnchanged(order.deliverySplits || [], form.deliverySplits || []),
+  );
+
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !saving && !recordingPayment && onOpenChange(nextOpen)}>
       <DialogContent className="h-[92dvh] max-h-[92dvh] max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
@@ -289,6 +318,38 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                 </div>
                 <TextField label="帳單地址" value={form.billingAddress} onChange={(value) => setField("billingAddress", value)} />
               </section>
+
+              {form.deliverySplits && form.deliverySplits.length > 0 && (
+                <section className="space-y-3 border-t pt-5" aria-label="額外收貨點">
+                  <div>
+                    <h3 className="text-sm font-semibold">額外收貨點</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      只可更新現有收貨點的履約及聯絡資料；數量、順序及商品分配不會改變。
+                    </p>
+                  </div>
+                  {form.deliverySplits.map((split, index) => (
+                    <OrderDestinationEditCard
+                      key={split.id}
+                      index={index}
+                      split={split}
+                      deliverySlots={deliverySlots}
+                      onChange={(updated) => {
+                        setForm((current) => current ? {
+                          ...current,
+                          deliverySplits: (current.deliverySplits || []).map((entry, entryIndex) => (
+                            entryIndex === index ? updated : entry
+                          )),
+                        } : current);
+                      }}
+                    />
+                  ))}
+                  {!splitIdentityUnchanged && (
+                    <p role="alert" className="text-xs text-destructive">
+                      收貨點識別或商品分配已改變，儲存已停用。
+                    </p>
+                  )}
+                </section>
+              )}
 
               <section className="space-y-3 border-t pt-5" aria-label="送貨資料">
                 <h3 className="text-sm font-semibold">送貨及收貨人資料</h3>
@@ -482,7 +543,7 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving || recordingPayment}>
             取消
           </Button>
-          <Button type="button" onClick={handleSave} disabled={saving || recordingPayment || !form} className="min-h-11 gap-2">
+          <Button type="button" onClick={handleSave} disabled={saving || recordingPayment || !form || !splitIdentityUnchanged} className="min-h-11 gap-2">
             <Save className="h-4 w-4" /> {saving ? "儲存中..." : "儲存到 Odoo"}
           </Button>
         </DialogFooter>

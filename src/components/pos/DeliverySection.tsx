@@ -114,6 +114,13 @@ interface DeliverySectionProps {
 
 const RECIPIENT_SUGGESTION_CACHE_LIMIT = 100;
 type RecipientLookupField = "company" | "name" | "phone";
+type RecipientLookupPhase = "idle" | "debouncing" | "searching" | "matches" | "no_match" | "error" | "confirmed";
+
+const normalizeRecipientLookupQuery = (field: RecipientLookupField, value: string) => (
+  field === "phone"
+    ? value.replace(/\D/g, "")
+    : value.trim().toLocaleLowerCase()
+);
 
 const DeliverySection = ({
   showFulfillmentSelector = true,
@@ -162,7 +169,12 @@ const DeliverySection = ({
   const [debouncedRecipientQuery, setDebouncedRecipientQuery] = useState("");
   const [recipientSuggestions, setRecipientSuggestions] = useState<RecipientSuggestion[]>([]);
   const [recipientSuggestionsLoading, setRecipientSuggestionsLoading] = useState(false);
-  const [recipientSuggestionsError, setRecipientSuggestionsError] = useState<string | null>(null);
+  const [recipientSuggestionsError, setRecipientSuggestionsError] = useState<{
+    field: RecipientLookupField;
+    query: string;
+    message: string;
+  } | null>(null);
+  const [recipientRetryKey, setRecipientRetryKey] = useState(0);
   const [completedRecipientSearch, setCompletedRecipientSearch] = useState<{
     field: RecipientLookupField;
     query: string;
@@ -236,8 +248,11 @@ const DeliverySection = ({
           ? recipientPhone
           : ""
   ).trim();
+  const activeRecipientQueryKey = recipientLookupField
+    ? normalizeRecipientLookupQuery(recipientLookupField, activeRecipientQuery)
+    : "";
   const completedCurrentRecipientSearch = completedRecipientSearch?.field === recipientLookupField
-    && completedRecipientSearch.query === activeRecipientQuery;
+    && completedRecipientSearch.query === activeRecipientQueryKey;
   const visibleRecipientSuggestions = completedCurrentRecipientSearch
     ? recipientSuggestions
     : [];
@@ -331,20 +346,23 @@ const DeliverySection = ({
     const field = recipientLookupField;
     const query = debouncedRecipientQuery.trim();
     if (!field || !query || !hasOdooBackend) {
-      setRecipientSuggestions([]);
       setRecipientSuggestionsLoading(false);
-      setRecipientSuggestionsError(null);
-      setCompletedRecipientSearch(null);
+      if (field && !query) {
+        setRecipientSuggestions([]);
+        setRecipientSuggestionsError(null);
+        setCompletedRecipientSearch(null);
+      }
       return;
     }
 
-    const cacheKey = query.toLocaleLowerCase();
+    const queryKey = normalizeRecipientLookupQuery(field, query);
+    const cacheKey = `${field}:${queryKey}`;
     const cached = recipientSuggestionCacheRef.current.get(cacheKey);
     if (cached) {
       setRecipientSuggestions(cached);
       setRecipientSuggestionsLoading(false);
       setRecipientSuggestionsError(null);
-      setCompletedRecipientSearch({ field, query });
+      setCompletedRecipientSearch({ field, query: queryKey });
       return;
     }
 
@@ -364,15 +382,17 @@ const DeliverySection = ({
         }
         recipientSuggestionCacheRef.current.set(cacheKey, suggestions);
         setRecipientSuggestions(suggestions);
-        setCompletedRecipientSearch({ field, query });
+        setCompletedRecipientSearch({ field, query: queryKey });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted || recipientSearchRequestRef.current !== requestId) return;
         setRecipientSuggestions([]);
-        setCompletedRecipientSearch({ field, query });
-        setRecipientSuggestionsError(
-          error instanceof Error ? error.message : "未能搜尋過往收貨人",
-        );
+        setCompletedRecipientSearch(null);
+        setRecipientSuggestionsError({
+          field,
+          query: queryKey,
+          message: error instanceof Error ? error.message : "未能搜尋過往收貨人",
+        });
       })
       .finally(() => {
         if (!controller.signal.aborted && recipientSearchRequestRef.current === requestId) {
@@ -381,7 +401,58 @@ const DeliverySection = ({
       });
 
     return () => controller.abort();
-  }, [debouncedRecipientQuery, recipientLookupField]);
+  }, [debouncedRecipientQuery, recipientLookupField, recipientRetryKey]);
+
+  const recipientQueryForField = (field: RecipientLookupField) => normalizeRecipientLookupQuery(
+    field,
+    field === "company"
+      ? recipientCompanyName
+      : field === "name"
+        ? recipientName
+        : recipientPhone,
+  );
+  const completedRecipientSearchMatchesIdentity = Boolean(
+    completedRecipientSearch
+      && completedRecipientSearch.query === recipientQueryForField(completedRecipientSearch.field),
+  );
+  const currentRecipientError = recipientSuggestionsError
+    && recipientSuggestionsError.query === recipientQueryForField(recipientSuggestionsError.field)
+    ? recipientSuggestionsError
+    : null;
+  const debouncedRecipientQueryKey = recipientLookupField
+    ? normalizeRecipientLookupQuery(recipientLookupField, debouncedRecipientQuery)
+    : "";
+  let recipientLookupPhase: RecipientLookupPhase = "idle";
+  if (newRecipientConfirmed) {
+    recipientLookupPhase = "confirmed";
+  } else if (recipientLookupField && activeRecipientQueryKey) {
+    if (debouncedRecipientQueryKey !== activeRecipientQueryKey) {
+      recipientLookupPhase = "debouncing";
+    } else if (recipientSuggestionsLoading) {
+      recipientLookupPhase = "searching";
+    } else if (currentRecipientError) {
+      recipientLookupPhase = "error";
+    } else if (completedRecipientSearchMatchesIdentity) {
+      recipientLookupPhase = recipientSuggestions.length > 0 ? "matches" : "no_match";
+    }
+  } else if (currentRecipientError) {
+    recipientLookupPhase = "error";
+  } else if (completedRecipientSearchMatchesIdentity) {
+    recipientLookupPhase = recipientSuggestions.length > 0 ? "matches" : "no_match";
+  }
+
+  const retryCurrentRecipientLookup = () => {
+    const field = currentRecipientError?.field || completedRecipientSearch?.field || "phone";
+    setRecipientLookupField(field);
+    setDebouncedRecipientQuery(
+      field === "company"
+        ? recipientCompanyName
+        : field === "name"
+          ? recipientName
+          : recipientPhone,
+    );
+    setRecipientRetryKey((key) => key + 1);
+  };
 
   const handleTimeSelectionChange = (value: string) => {
     if (value === "specified") {
@@ -525,24 +596,16 @@ const DeliverySection = ({
       >
         {recipientSuggestionsLoading ? (
           <p className="p-3 text-xs text-muted-foreground">正在搜尋過往收貨人...</p>
-        ) : recipientSuggestionsError ? (
-          <p className="p-3 text-xs text-destructive">{recipientSuggestionsError}</p>
+        ) : currentRecipientError ? (
+          <p className="p-3 text-xs text-destructive">{currentRecipientError.message}</p>
         ) : !activeRecipientQuery ? (
           <p className="p-3 text-xs text-muted-foreground">輸入公司、姓名或電話搜尋過往收貨人</p>
         ) : visibleRecipientSuggestions.length === 0 ? (
           completedCurrentRecipientSearch ? (
             <div className="space-y-2 p-3">
               <p className="text-xs text-muted-foreground">未找到過往收貨人</p>
-              <Button
-                type="button"
-                size="sm"
-                className="min-h-11 w-full"
-                onClick={handleConfirmNewRecipient}
-              >
-                確認新增收貨人
-              </Button>
               <p className="text-[11px] text-muted-foreground">
-                提交訂單時會將呢位新收貨人儲存到 Odoo 訂單。
+                可在下方確認新增；當前資料有效時亦可繼續下單。
               </p>
             </div>
           ) : (
@@ -1126,10 +1189,71 @@ const DeliverySection = ({
           {recipientDropdown("phone")}
           </div>
         </div>
-        {newRecipientConfirmed && (
-          <p role="status" className="text-xs font-medium text-primary">
-            已確認新增收貨人；提交訂單時會儲存到 Odoo 訂單。
-          </p>
+        {recipientLookupPhase !== "idle" && (
+          <div
+            data-testid="recipient-resolution-panel"
+            aria-live="polite"
+            className="rounded-lg border border-border bg-muted/20 p-3"
+          >
+            {recipientLookupPhase === "debouncing" && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                等待搜尋當前收貨人資料...
+              </p>
+            )}
+            {recipientLookupPhase === "searching" && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                正在 Odoo 搜尋當前收貨人...
+              </p>
+            )}
+            {recipientLookupPhase === "matches" && (
+              <div className="space-y-2">
+                <p className="text-xs">找到過往收貨人；可從結果套用資料，亦可保留當前有效資料繼續。</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-11 w-full"
+                  onClick={retryCurrentRecipientLookup}
+                >
+                  顯示收貨人結果
+                </Button>
+              </div>
+            )}
+            {recipientLookupPhase === "no_match" && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  未找到過往收貨人。當前資料有效時仍可繼續下單；亦可先確認新增。
+                </p>
+                <Button type="button" size="sm" className="min-h-11 w-full" onClick={handleConfirmNewRecipient}>
+                  確認新增收貨人
+                </Button>
+              </div>
+            )}
+            {recipientLookupPhase === "error" && (
+              <div className="space-y-2">
+                <p className="flex items-start gap-2 text-xs text-destructive">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  收貨人搜尋暫時失敗。可重試；當前有效收貨資料不會因此被阻擋。
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-11 w-full gap-2"
+                  onClick={retryCurrentRecipientLookup}
+                >
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" /> 重試收貨人搜尋
+                </Button>
+              </div>
+            )}
+            {recipientLookupPhase === "confirmed" && (
+              <p className="text-xs font-medium text-primary">
+                已確認當前收貨人；提交訂單時會儲存到 Odoo 訂單。
+              </p>
+            )}
+          </div>
         )}
       </div>
 

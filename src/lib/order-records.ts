@@ -80,12 +80,26 @@ export const orderMatchesSearch = (order: Order, query: string): boolean => {
     order.recipientCompanyName,
     order.recipientName,
     order.recipientPhone,
+    ...(order.deliverySplits || []).flatMap((split) => [
+      split.recipientCompanyName,
+      split.recipientName,
+      split.recipientPhone,
+      split.deliveryAddress,
+      split.deliveryGoogleAddress,
+      split.deliveryBuilding,
+      split.deliveryFloor,
+      split.deliveryUnit,
+    ]),
   ];
   if (values.some((value) => value?.toLocaleLowerCase().includes(normalizedQuery))) return true;
 
   const queryDigits = normalizedQuery.replace(/\D/g, "");
   if (queryDigits.length < 4) return false;
-  return [order.phone, order.recipientPhone].some((value) => (
+  return [
+    order.phone,
+    order.recipientPhone,
+    ...(order.deliverySplits || []).map((split) => split.recipientPhone),
+  ].some((value) => (
     value?.replace(/\D/g, "").includes(queryDigits)
   ));
 };

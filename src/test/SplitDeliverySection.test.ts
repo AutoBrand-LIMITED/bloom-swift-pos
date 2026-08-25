@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizeDeliverySplitsForSubmission,
+  normalizeDeliverySplitsForOperationalUpdate,
+  operationalSplitIdentityIsUnchanged,
   validateDeliverySplits,
+  validateOperationalDeliverySplits,
 } from "@/lib/split-delivery";
 import { PICKUP_LOCATION_ADDRESS } from "@/lib/fulfillment";
 import type { DeliverySplit, OrderItem } from "@/types/order";
@@ -75,5 +78,38 @@ describe("validateDeliverySplits", () => {
       recipientPhone: "",
       itemAllocations: [{ itemId: "line-1", quantity: 1 }],
     });
+  });
+
+  it("preserves pickup contact details and historical allocations during operational edits", () => {
+    const original = [{
+      ...split(),
+      fulfillmentType: "pickup" as const,
+      deliveryAddress: "",
+      recipientName: "Pickup Contact",
+      recipientPhone: "63334444",
+    }];
+    const normalized = normalizeDeliverySplitsForOperationalUpdate(original);
+
+    expect(normalized[0]).toMatchObject({
+      id: "split-2",
+      fulfillmentType: "pickup",
+      deliveryAddress: PICKUP_LOCATION_ADDRESS,
+      recipientName: "Pickup Contact",
+      recipientPhone: "63334444",
+      itemAllocations: original[0].itemAllocations,
+    });
+    expect(operationalSplitIdentityIsUnchanged(original, normalized)).toBe(true);
+    expect(validateOperationalDeliverySplits(normalized)).toBeNull();
+  });
+
+  it("rejects changed destination IDs or allocations during operational edits", () => {
+    const original = [split()];
+
+    expect(operationalSplitIdentityIsUnchanged(original, [{ ...split(), id: "replacement" }]))
+      .toBe(false);
+    expect(operationalSplitIdentityIsUnchanged(original, [{
+      ...split(),
+      itemAllocations: [{ ...split().itemAllocations[0], quantity: 2 }],
+    }])).toBe(false);
   });
 });

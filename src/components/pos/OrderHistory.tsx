@@ -18,6 +18,7 @@ interface OrderHistoryProps {
   onSearchQueryChange?: (value: string) => void;
   loading?: boolean;
   loaded?: boolean;
+  searchPhase?: "idle" | "too_short" | "debouncing" | "searching" | "success" | "error";
   error?: string | null;
   stale?: boolean;
   truncated?: boolean;
@@ -39,6 +40,7 @@ const OrderHistory = ({
   onSearchQueryChange,
   loading = false,
   loaded = true,
+  searchPhase = "idle",
   error,
   stale = false,
   truncated = false,
@@ -50,6 +52,8 @@ const OrderHistory = ({
   const normalizedSearch = searchQuery.trim();
   const searchNeedsMoreInput = normalizedSearch.length > 0 && normalizedSearch.length < 2;
   const searchActive = normalizedSearch.length >= 2;
+  const searchSettled = searchActive && searchPhase === "success";
+  const showOrderCount = !searchActive || searchSettled;
 
   return (
     <div className="fixed inset-0 z-50 bg-foreground/40 flex justify-end" onClick={onClose}>
@@ -60,7 +64,7 @@ const OrderHistory = ({
         <div className="shrink-0 flex items-center justify-between p-4 border-b border-border">
           <h2 className="font-semibold flex items-center gap-2">
             <ClipboardList className="w-5 h-5" />
-            訂單記錄 ({orders.length})
+            訂單記錄{showOrderCount ? ` (${orders.length})` : ""}
           </h2>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="關閉訂單記錄">
             <X className="w-5 h-5" />
@@ -95,7 +99,15 @@ const OrderHistory = ({
             {searchNeedsMoreInput
               ? "請輸入至少 2 個字元"
               : searchActive
-                ? `跨日期搜尋結果：${orders.length} 筆`
+                ? searchPhase === "debouncing"
+                  ? "等待搜尋當前資料..."
+                  : searchPhase === "searching"
+                    ? "正在搜尋當前資料..."
+                    : searchSettled
+                      ? `跨日期搜尋結果：${orders.length} 筆`
+                      : searchPhase === "error"
+                        ? "搜尋未完成，請重試"
+                        : "準備搜尋..."
                 : "留空會顯示今日訂單；搜尋會跨日期查找。"}
           </p>
         </div>
@@ -103,7 +115,7 @@ const OrderHistory = ({
           {(loading || error || truncated) && (
             <div className="border-b border-border p-3 space-y-2">
               {loading && (
-                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <p aria-live="polite" className="flex items-center gap-2 text-xs text-muted-foreground">
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                   {searchActive ? "正在 Odoo 搜尋訂單" : "正在從 Odoo 載入今日訂單記錄"}
                 </p>
@@ -134,7 +146,13 @@ const OrderHistory = ({
               )}
             </div>
           )}
-          {orders.length === 0 && !loaded ? (
+          {searchActive && !searchSettled ? (
+            searchPhase === "error" ? null : (
+              <p aria-live="polite" className="text-center text-muted-foreground p-8">
+                {searchPhase === "debouncing" ? "等待搜尋當前資料..." : "正在搜尋當前資料..."}
+              </p>
+            )
+          ) : orders.length === 0 && !loaded ? (
             loading ? null : (
               <p className="text-center text-muted-foreground p-8">
                 未能確認 Odoo 訂單記錄，請重試

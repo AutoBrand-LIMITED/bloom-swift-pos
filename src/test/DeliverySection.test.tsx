@@ -251,11 +251,42 @@ describe("DeliverySection delivery time controls", () => {
     });
 
     expect(screen.getByText("未找到過往收貨人")).toBeVisible();
+    expect(screen.getByTestId("recipient-resolution-panel")).toHaveTextContent(
+      "當前資料有效時仍可繼續下單",
+    );
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("listbox", { name: "過往收貨人搜尋結果" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "確認新增收貨人" }));
 
     expect(onConfirmNewRecipient).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("status")).toHaveTextContent("已確認新增收貨人");
+    expect(screen.getByTestId("recipient-resolution-panel")).toHaveTextContent(
+      "已確認當前收貨人",
+    );
     expect(screen.queryByRole("listbox", { name: "過往收貨人搜尋結果" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a correlated recipient lookup error visible and retryable after the dropdown closes", async () => {
+    recipientSearchMocks.searchOdooRecipients.mockRejectedValue(new Error("Recipient timeout"));
+    renderSection({
+      recipientName: "Wong Ng",
+      recipientPhone: "67610705",
+    });
+
+    fireEvent.focus(screen.getByLabelText(/收貨人姓名/));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+
+    expect(screen.getByText("Recipient timeout")).toBeVisible();
+    fireEvent.mouseDown(document.body);
+    expect(screen.getByTestId("recipient-resolution-panel")).toHaveTextContent(
+      "當前有效收貨資料不會因此被阻擋",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /重試收貨人搜尋/ }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(recipientSearchMocks.searchOdooRecipients).toHaveBeenCalledTimes(2);
   });
 
   it("searches historical recipients by recipient company name", async () => {

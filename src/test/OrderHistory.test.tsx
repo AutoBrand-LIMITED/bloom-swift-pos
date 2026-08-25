@@ -99,6 +99,7 @@ describe("OrderHistory delivery summary", () => {
         onClose={vi.fn()}
         searchQuery="accounts@example.com"
         onSearchQueryChange={onSearchQueryChange}
+        searchPhase="success"
       />,
     );
 
@@ -107,6 +108,38 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText("未找到符合資料的訂單")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "清除訂單搜尋" }));
     expect(onSearchQueryChange).toHaveBeenCalledWith("");
+  });
+
+  it("does not show a stale count or false zero while a remote search is unsettled", () => {
+    const { rerender } = render(
+      <OrderHistory
+        orders={[]}
+        open
+        onClose={vi.fn()}
+        searchQuery="Wong"
+        onSearchQueryChange={vi.fn()}
+        searchPhase="debouncing"
+      />,
+    );
+
+    expect(screen.getByText("訂單記錄")).toBeVisible();
+    expect(screen.getAllByText("等待搜尋當前資料...").length).toBeGreaterThan(0);
+    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
+    expect(screen.queryByText(/跨日期搜尋結果/)).not.toBeInTheDocument();
+
+    rerender(
+      <OrderHistory
+        orders={[]}
+        open
+        onClose={vi.fn()}
+        searchQuery="Wong"
+        onSearchQueryChange={vi.fn()}
+        searchPhase="error"
+        error="Backend unavailable"
+      />,
+    );
+    expect(screen.getByText("搜尋未完成，請重試")).toBeVisible();
+    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
   });
 
   it("requires two characters before starting order search", () => {
@@ -170,6 +203,100 @@ describe("OrderHistory delivery summary", () => {
       );
     });
     expect(onOrderUpdated).toHaveBeenCalledTimes(1);
+  });
+
+  it("edits every existing split destination while preserving IDs and item allocations", async () => {
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    const deliverySplit = {
+      id: "destination-2",
+      fulfillmentType: "delivery" as const,
+      deliveryDate: "2026-07-19",
+      deliveryTimeMode: "specified" as const,
+      deliveryTime: "下午 4 時前",
+      deliveryRegion: "九龍",
+      deliveryDistrict: "觀塘區",
+      deliveryArea: "觀塘",
+      deliveryDetail: "巧明街 6 號",
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      deliveryGoogleAddress: "九龍觀塘巧明街 6 號",
+      deliveryBuilding: "巧運大廈",
+      deliveryFloor: "7",
+      deliveryUnit: "A",
+      recipientType: "personal" as const,
+      recipientCompanyName: "",
+      recipientName: "Second Recipient",
+      recipientPhone: "62345678",
+      deliveryPerson: "Driver B",
+      failedDeliveryAction: "none",
+      deliveryNote: "Call first",
+      itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+    };
+    const pickupSplit = {
+      id: "destination-3",
+      fulfillmentType: "pickup" as const,
+      deliveryDate: "2026-07-20",
+      deliveryTimeMode: "specified" as const,
+      deliveryTime: "下午 5 時",
+      deliveryRegion: "",
+      deliveryDistrict: "",
+      deliveryArea: "",
+      deliveryDetail: "",
+      deliveryAddress: "中西花店門市自取",
+      deliveryGoogleAddress: "",
+      deliveryBuilding: "",
+      deliveryFloor: "",
+      deliveryUnit: "",
+      recipientType: "personal" as const,
+      recipientCompanyName: "",
+      recipientName: "Pickup Contact",
+      recipientPhone: "63456789",
+      deliveryPerson: "",
+      failedDeliveryAction: "none",
+      deliveryNote: "Bring receipt",
+      itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+    };
+    render(
+      <OrderHistory
+        orders={[orderFixture({ deliverySplits: [deliverySplit, pickupSplit] })]}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    expect(screen.getByRole("region", { name: "額外收貨點 2" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "額外收貨點 3" })).toBeVisible();
+    fireEvent.change(screen.getByLabelText("額外收貨點 2 送貨地址 *"), {
+      target: { value: "九龍觀塘鴻圖道新地址" },
+    });
+    fireEvent.change(screen.getByLabelText("額外收貨點 3 收貨人／聯絡人"), {
+      target: { value: "Updated Pickup Contact" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => {
+      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+        17,
+        expect.objectContaining({
+          deliverySplits: [
+            expect.objectContaining({
+              id: "destination-2",
+              deliveryAddress: "九龍觀塘鴻圖道新地址",
+              itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+            }),
+            expect.objectContaining({
+              id: "destination-3",
+              fulfillmentType: "pickup",
+              recipientName: "Updated Pickup Contact",
+              itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+            }),
+          ],
+        }),
+      );
+    });
   });
 
   it("allows an existing order to select a different standard delivery slot", async () => {

@@ -236,6 +236,11 @@ describe("CustomerSection gift sender", () => {
     fireEvent.change(phoneInput, { target: { value: "9123 4567" } });
 
     expect(await screen.findByText(/系統未有符合此電話及聯絡人名稱/)).toBeInTheDocument();
+    expect(screen.getByTestId("customer-resolution-panel")).toHaveTextContent(
+      "搜尋結果唔係同一位聯絡人",
+    );
+    fireEvent.pointerDown(screen.getByText(/呢度用嚟搜尋客戶帳戶/));
+    expect(screen.queryByText(/系統未有符合此電話及聯絡人名稱/)).not.toBeInTheDocument();
     const confirmButton = screen.getByRole("button", { name: "確認新增聯絡人" });
     expect(confirmButton).toHaveClass("min-h-11");
 
@@ -422,10 +427,29 @@ describe("CustomerSection gift sender", () => {
     });
 
     expect(await screen.findByText("Odoo timeout")).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByText(/呢度用嚟搜尋客戶帳戶/));
+    expect(screen.getByTestId("customer-resolution-panel")).toHaveTextContent(
+      "未能完成當前客戶確認",
+    );
+    expect(screen.getByRole("button", { name: /重試客戶搜尋/ })).toBeVisible();
     expect(screen.queryByRole("button", { name: "確認新增聯絡人" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", {
       name: "確認用此 Customer ID 新增客戶",
     })).not.toBeInTheDocument();
+  });
+
+  it("shows the current identity as pending immediately while debounce is outstanding", () => {
+    searchOdooCustomers.mockImplementation(() => new Promise(() => undefined));
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText(/下單人電話/), {
+      target: { value: "9123 4567" },
+    });
+
+    expect(screen.getByTestId("customer-resolution-panel")).toHaveTextContent(
+      "等待確認當前電話及聯絡人",
+    );
+    expect(screen.queryByRole("button", { name: "確認新增聯絡人" })).not.toBeInTheDocument();
   });
 
   it("invalidates a confirmed new customer when the normalized phone changes", async () => {

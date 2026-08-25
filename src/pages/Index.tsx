@@ -38,6 +38,7 @@ import type { DemoCustomer } from "@/data/demo-customers";
 import { buildPartnerNoteMutation } from "@/lib/customer-notes";
 import {
   companyFieldsForCustomerType,
+  type CustomerResolutionState,
   detachedCustomerProfile,
 } from "@/lib/customer-profile";
 import {
@@ -172,6 +173,10 @@ const Index = () => {
   const [department, setDepartment] = useState("");
   const [terms, setTerms] = useState("");
   const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({});
+  const [customerResolution, setCustomerResolution] = useState<CustomerResolutionState>({
+    phase: "idle",
+    identityKey: "",
+  });
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
   const [customerHistoryOpen, setCustomerHistoryOpen] = useState(true);
   const [confirmedNewCustomerName, setConfirmedNewCustomerName] = useState<string | null>(null);
@@ -265,6 +270,11 @@ const Index = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [debouncedOrderSearchQuery, setDebouncedOrderSearchQuery] = useState("");
+  const [orderSearchPhase, setOrderSearchPhase] = useState<
+    "idle" | "too_short" | "debouncing" | "searching" | "success" | "error"
+  >("idle");
+  const orderSearchRequestRef = useRef(0);
+  const orderSearchQueryRef = useRef("");
   const [orderRecordsLoading, setOrderRecordsLoading] = useState(false);
   const [orderRecordsLoaded, setOrderRecordsLoaded] = useState(!hasOdooBackend);
   const [orderRecordsError, setOrderRecordsError] = useState<string | null>(null);
@@ -395,17 +405,32 @@ const Index = () => {
   }, [employee?.id]);
 
   useEffect(() => {
-    const timer = window.setTimeout(
-      () => setDebouncedOrderSearchQuery(orderSearchQuery.trim()),
-      300,
-    );
+    const normalizedQuery = orderSearchQuery.trim();
+    orderSearchQueryRef.current = normalizedQuery;
+    orderSearchRequestRef.current += 1;
+    if (!normalizedQuery) {
+      setOrderSearchPhase("idle");
+      setDebouncedOrderSearchQuery("");
+      return;
+    }
+    if (normalizedQuery.length < 2) {
+      setOrderSearchPhase("too_short");
+      setDebouncedOrderSearchQuery(normalizedQuery);
+      return;
+    }
+    setOrderSearchPhase("debouncing");
+    if (!hasOdooBackend) {
+      setDebouncedOrderSearchQuery(normalizedQuery);
+      setOrderSearchPhase("success");
+      return;
+    }
+    const timer = window.setTimeout(() => setDebouncedOrderSearchQuery(normalizedQuery), 300);
     return () => window.clearTimeout(timer);
   }, [orderSearchQuery]);
 
   useEffect(() => {
     if (!historyOpen || !hasOdooBackend) return;
     if (debouncedOrderSearchQuery && debouncedOrderSearchQuery.length < 2) {
-      setRemoteOrders([]);
       setOrderRecordsLoading(false);
       setOrderRecordsLoaded(true);
       setOrderRecordsError(null);
@@ -413,8 +438,12 @@ const Index = () => {
       return;
     }
     const controller = new AbortController();
+    const requestId = orderSearchRequestRef.current + 1;
+    orderSearchRequestRef.current = requestId;
+    const requestQuery = debouncedOrderSearchQuery;
     setOrderRecordsLoading(true);
     setOrderRecordsError(null);
+    if (requestQuery.length >= 2) setOrderSearchPhase("searching");
 
     const request = debouncedOrderSearchQuery.length >= 2
       ? searchOdooOrderRecords(debouncedOrderSearchQuery, controller.signal)
@@ -422,7 +451,12 @@ const Index = () => {
 
     request
       .then((response) => {
-        setRemoteOrdersQuery(debouncedOrderSearchQuery);
+        if (
+          controller.signal.aborted
+          || orderSearchRequestRef.current !== requestId
+          || orderSearchQueryRef.current !== requestQuery
+        ) return;
+        setRemoteOrdersQuery(requestQuery);
         setRemoteOrders(response.orders);
         if (employee?.id !== undefined) {
           setOperationalOrders((current) => {
@@ -453,13 +487,23 @@ const Index = () => {
         });
         setOrderRecordsTruncated(response.truncated);
         setOrderRecordsLoaded(true);
+        if (requestQuery.length >= 2) setOrderSearchPhase("success");
       })
       .catch((error) => {
-        if (controller.signal.aborted) return;
+        if (
+          controller.signal.aborted
+          || orderSearchRequestRef.current !== requestId
+          || orderSearchQueryRef.current !== requestQuery
+        ) return;
         setOrderRecordsError(error instanceof Error ? error.message : "未能載入 Odoo 訂單記錄");
+        if (requestQuery.length >= 2) setOrderSearchPhase("error");
       })
       .finally(() => {
-        if (!controller.signal.aborted) setOrderRecordsLoading(false);
+        if (
+          !controller.signal.aborted
+          && orderSearchRequestRef.current === requestId
+          && orderSearchQueryRef.current === requestQuery
+        ) setOrderRecordsLoading(false);
       });
 
     return () => controller.abort();
@@ -1178,6 +1222,7 @@ const Index = () => {
       confirmedNewCustomerPhone,
       restoredPendingSubmission: Boolean(pendingSubmission),
       requiresCustomerResolution: hasOdooBackend,
+      customerResolution,
       senderName,
       recipientType,
       recipientCompanyName,
@@ -1792,6 +1837,7 @@ const Index = () => {
             setConfirmedNewCustomerPhone(normalizedPhone);
             clearCheckoutErrors("customerName", "phone");
           }}
+          onResolutionStateChange={setCustomerResolution}
           refreshKey={customerRefreshKey}
         />
 
@@ -2125,12 +2171,12 @@ const Index = () => {
         searchQuery={orderSearchQuery}
         onSearchQueryChange={(value) => {
           setOrderSearchQuery(value);
-          setRemoteOrders([]);
           setOrderRecordsError(null);
           setOrderRecordsTruncated(false);
         }}
         loading={orderRecordsLoading}
         loaded={orderRecordsLoaded}
+        searchPhase={orderSearchPhase}
         error={orderRecordsError}
         stale={orderRecordsLoaded && Boolean(orderRecordsError) && remoteOrders.length > 0}
         truncated={orderRecordsTruncated}
