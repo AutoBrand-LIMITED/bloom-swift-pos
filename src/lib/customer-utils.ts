@@ -3,6 +3,22 @@ import type { Order } from "@/types/order";
 
 const CUSTOMERS_STORAGE_KEY = "florist-pos-customers";
 
+export function normalizePurchasePaymentStatus(
+  status: unknown,
+): PurchaseRecord["status"] {
+  const normalized = typeof status === "string"
+    ? status.trim().toLocaleLowerCase()
+    : "";
+
+  if (["paid", "full", "fully_paid", "settled"].includes(normalized)) {
+    return "paid";
+  }
+  if (["deposit", "partial", "partially_paid"].includes(normalized)) {
+    return "deposit";
+  }
+  return "unpaid";
+}
+
 export function customerIdentityKey(
   customer: Pick<DemoCustomer, "id" | "odooPartnerId">
 ): string {
@@ -44,7 +60,7 @@ export function extractCustomersFromOrders(orders: Order[]): DemoCustomer[] {
       date: order.createdAt ? order.createdAt.slice(0, 10) : "",
       items: itemNames || "訂單",
       total: order.finalPrice,
-      status: order.paymentStatus === "unpaid" ? "unpaid" : "paid",
+      status: normalizePurchasePaymentStatus(order.paymentStatus),
       deliveryAddress: order.deliveryAddress || "",
       recipientType: order.recipientType
         || (order.recipientCompanyName?.trim() ? "company" : "personal"),

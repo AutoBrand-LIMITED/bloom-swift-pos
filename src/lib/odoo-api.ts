@@ -1,6 +1,9 @@
 import type { CustomerTag, DemoCustomer, PurchaseRecord } from "@/data/demo-customers";
 import type { DeliverySplit, Order, SalesStaff } from "@/types/order";
 import { authenticatedFetch } from "@/lib/pos-auth";
+import { normalizePurchasePaymentStatus } from "@/lib/customer-utils";
+
+type OdooPurchaseRecord = Omit<PurchaseRecord, "status"> & { status?: unknown };
 
 interface OdooPartner {
   id: number;
@@ -23,7 +26,7 @@ interface OdooPartner {
   } | null;
   history_count: number | null;
   total_spent: number | null;
-  history: PurchaseRecord[];
+  history: OdooPurchaseRecord[];
   commentText?: string;
   tags?: CustomerTag[];
   writeDate?: string | null;
@@ -32,7 +35,7 @@ interface OdooPartner {
 interface OdooPartnerHistory {
   history_count: number;
   total_spent: number;
-  history: PurchaseRecord[];
+  history: OdooPurchaseRecord[];
 }
 
 export interface CustomerAccountLookup {
@@ -706,7 +709,7 @@ function mapOdooPartner(p: OdooPartner): DemoCustomer {
     companyName: p.companyName || undefined,
     billingAddress: p.billingAddress || undefined,
     customerCode: p.customerCode || undefined,
-    history: p.history || [],
+    history: normalizePurchaseRecords(p.history),
     historyCount: p.history_count ?? undefined,
     totalSpent: p.total_spent ?? undefined,
     commentText: p.commentText || "",
@@ -724,6 +727,13 @@ function mapOdooPartner(p: OdooPartner): DemoCustomer {
         }
       : undefined,
   };
+}
+
+function normalizePurchaseRecords(records?: OdooPurchaseRecord[]): PurchaseRecord[] {
+  return (records || []).map((record) => ({
+    ...record,
+    status: normalizePurchasePaymentStatus(record.status),
+  }));
 }
 
 export async function getOdooCustomer(
@@ -883,7 +893,7 @@ export async function getOdooCustomerHistory(
 
   const data = (await res.json()) as OdooPartnerHistory;
   return {
-    history: data.history || [],
+    history: normalizePurchaseRecords(data.history),
     historyCount: data.history_count,
     totalSpent: data.total_spent,
   };

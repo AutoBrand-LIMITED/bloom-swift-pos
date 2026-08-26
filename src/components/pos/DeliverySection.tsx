@@ -20,7 +20,7 @@ import {
 } from "@/lib/odoo-api";
 import {
   HK_DISTRICTS,
-  mergeAddressHierarchy,
+  hierarchyFromGoogleSelection,
   parseDeliveryAddress,
   type GoogleAddressSelection,
 } from "@/lib/hk-address";
@@ -201,15 +201,7 @@ const DeliverySection = ({
     enabled: addressInputFocused && addressAutocompleteDirty && !addressCompositionActive,
     onAddressSelect: (selection) => {
       const parsed = parseDeliveryAddress(selection.address);
-      const hierarchy = mergeAddressHierarchy({
-        region: selection.region || parsed.region,
-        district: selection.district || parsed.district,
-        area: selection.area || parsed.area,
-      }, {
-        region: deliveryRegion,
-        district: deliveryDistrict,
-        area: deliveryArea,
-      });
+      const hierarchy = hierarchyFromGoogleSelection(selection);
       const address = parsed.region ? parsed.detail : selection.address;
       authorizedAddressSignatureRef.current = JSON.stringify([
         hierarchy.region,

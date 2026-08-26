@@ -156,25 +156,25 @@ describe("resolveHongKongAddressHierarchy", () => {
 });
 
 describe("mergeAddressHierarchy", () => {
-  it("retains a complete valid manual hierarchy when Google is unresolved", () => {
+  it("clears a manual hierarchy when Google is unresolved", () => {
     expect(mergeAddressHierarchy(
       { region: "", district: "", area: "" },
       { region: "九龍", district: "觀塘區", area: "九龍灣" },
     )).toEqual({
-      region: "九龍",
-      district: "觀塘區",
-      area: "九龍灣",
+      region: "",
+      district: "",
+      area: "",
     });
   });
 
-  it("retains a compatible area when only the district is detected", () => {
+  it("clears a compatible manual area when only the district is detected", () => {
     expect(mergeAddressHierarchy(
       { region: "九龍", district: "觀塘區", area: "" },
       { region: "九龍", district: "觀塘區", area: "九龍灣" },
     )).toEqual({
       region: "九龍",
       district: "觀塘區",
-      area: "九龍灣",
+      area: "",
     });
   });
 
@@ -194,7 +194,7 @@ describe("mergeAddressHierarchy", () => {
       { region: "", district: "", area: "" },
       { region: "九龍", district: "中西區", area: "中環" },
     )).toEqual({
-      region: "九龍",
+      region: "",
       district: "",
       area: "",
     });

@@ -575,7 +575,7 @@ describe("DeliverySection delivery time controls", () => {
     });
   });
 
-  it("retains a compatible manual area for a district-only Google result", () => {
+  it("clears the previous area for a district-only Google result", () => {
     const props = renderSection({
       deliveryRegion: "九龍",
       deliveryDistrict: "觀塘區",
@@ -598,7 +598,7 @@ describe("DeliverySection delivery time controls", () => {
       address: "巧運工業大廈, 觀塘駿業街66號",
       region: "九龍",
       district: "觀塘區",
-      area: "九龍灣",
+      area: "",
     });
   });
 
@@ -629,7 +629,7 @@ describe("DeliverySection delivery time controls", () => {
     });
   });
 
-  it("retains valid manual controls when Google components are unresolved", () => {
+  it("clears manual hierarchy when Google components and legacy prefix are unresolved", () => {
     const props = renderSection({
       deliveryRegion: "九龍",
       deliveryDistrict: "觀塘區",
@@ -650,9 +650,9 @@ describe("DeliverySection delivery time controls", () => {
 
     expect(props.onGoogleAddressSelect).toHaveBeenCalledWith({
       address: "觀塘駿業街66號",
-      region: "九龍",
-      district: "觀塘區",
-      area: "觀塘",
+      region: "",
+      district: "",
+      area: "",
     });
   });
 
@@ -683,12 +683,14 @@ describe("DeliverySection delivery time controls", () => {
     });
   });
 
-  it("authorizes the map signature calculated from the merged hierarchy", () => {
+  it("authorizes the map signature calculated from the selected Google hierarchy", () => {
+    const onGoogleAddressSelect = vi.fn();
     const props = renderSectionProps({
       deliveryRegion: "九龍",
       deliveryDistrict: "觀塘區",
       deliveryArea: "九龍灣",
       deliveryDetail: "巧",
+      onGoogleAddressSelect,
     });
     const { rerender } = render(<DeliverySection {...props} />);
     const calls = addressHookMocks.useGoogleAddressSuggestions.mock.calls;
@@ -702,9 +704,19 @@ describe("DeliverySection delivery time controls", () => {
         area: "",
       });
     });
+    const selectedAddress = onGoogleAddressSelect.mock.calls.at(-1)?.[0];
+    expect(selectedAddress).toEqual({
+      address: "巧運工業大廈, 觀塘駿業街66號",
+      region: "九龍",
+      district: "觀塘區",
+      area: "",
+    });
     rerender(<DeliverySection
       {...props}
-      deliveryDetail="巧運工業大廈, 觀塘駿業街66號"
+      deliveryRegion={selectedAddress?.region ?? ""}
+      deliveryDistrict={selectedAddress?.district ?? ""}
+      deliveryArea={selectedAddress?.area ?? ""}
+      deliveryDetail={selectedAddress?.address ?? ""}
     />);
 
     const map = screen.getByTitle("Google Map");
@@ -712,7 +724,7 @@ describe("DeliverySection delivery time controls", () => {
     expect(map).toHaveAttribute(
       "src",
       `https://www.google.com/maps?q=${encodeURIComponent(
-        "九龍 觀塘區 九龍灣 巧運工業大廈, 觀塘駿業街66號 香港",
+        "九龍 觀塘區 巧運工業大廈, 觀塘駿業街66號 香港",
       )}&output=embed`,
     );
   });

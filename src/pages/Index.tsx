@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Calculator, ClipboardList, LogOut, RotateCcw, UserRound } from "lucide-react";
@@ -92,7 +92,7 @@ import {
 } from "@/lib/checkout-validation";
 import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pricing";
 import { parseDeliveryAddress } from "@/lib/hk-address";
-import { checkoutBarLeftOffset } from "@/lib/pos-layout";
+import { checkoutBarLeftOffset, mobileCheckoutBarClassName } from "@/lib/pos-layout";
 import {
   loadCachedPaymentOptions,
   resolvePaymentReference,
@@ -1654,7 +1654,7 @@ const Index = () => {
       </header>
 
       {/* Body: left panel + main */}
-      <div className="flex flex-1">
+      <div className="flex min-w-0 flex-1">
         {/* Left: Customer history panel */}
         {hasSalesperson && selectedCustomer && (
           <CustomerHistoryDock
@@ -2144,19 +2144,22 @@ const Index = () => {
       </div>
       {/* Sticky submit */}
       {hasSalesperson && <div
-        className="fixed bottom-0 right-0 z-40 bg-card/90 backdrop-blur-md border-t border-border transition-[left] xl:hidden"
-        style={{ left: checkoutBarLeftOffset(Boolean(selectedCustomer), customerHistoryOpen) }}
+        aria-label="流動版確認訂單列"
+        className={mobileCheckoutBarClassName}
+        style={{
+          "--checkout-bar-left": checkoutBarLeftOffset(Boolean(selectedCustomer), customerHistoryOpen),
+        } as CSSProperties}
       >
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="text-right">
+        <div className="mx-auto flex max-w-3xl min-w-0 items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-4">
+          <div className="min-w-0 text-right">
             <p className="text-xs text-muted-foreground">總計</p>
-            <p className="text-2xl font-bold font-mono tracking-tight">${finalPrice.toLocaleString()}</p>
+            <p className="truncate font-mono text-xl font-bold tracking-tight sm:text-2xl">${finalPrice.toLocaleString()}</p>
           </div>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
             size="lg"
-            className="px-8 text-base font-semibold shadow-lg"
+            className="shrink-0 px-4 text-base font-semibold shadow-lg sm:px-8"
           >
             {isSubmitting ? "下單中" : "確認訂單"}
           </Button>

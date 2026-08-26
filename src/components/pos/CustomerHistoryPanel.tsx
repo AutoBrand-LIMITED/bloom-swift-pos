@@ -166,7 +166,10 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
   if (!displayCustomer) return null;
 
   return (
-    <div className="w-[360px] max-w-[85vw] shrink-0 border-r border-border bg-card flex flex-col h-[calc(100vh-49px)] sticky top-[49px] overflow-hidden">
+    <aside
+      aria-label="客戶記錄面板"
+      className="fixed inset-y-0 left-0 z-50 flex h-dvh w-[360px] max-w-[85vw] shrink-0 flex-col overflow-hidden border-r border-border bg-card lg:sticky lg:top-[49px] lg:z-auto lg:h-[calc(100vh-49px)]"
+    >
       {/* Header */}
       <div className="p-3 border-b border-border flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
@@ -372,7 +375,11 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
               <div
                 key={recordKey}
                 className={`rounded-lg border p-2.5 space-y-2 ${
-                  h.status === "unpaid" ? "border-destructive/30 bg-destructive/5" : "border-border bg-background"
+                  h.status === "unpaid"
+                    ? "border-destructive/30 bg-destructive/5"
+                    : h.status === "deposit"
+                      ? "border-amber-500/30 bg-amber-500/5"
+                      : "border-border bg-background"
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -388,6 +395,8 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                   <div className="text-right shrink-0 space-y-1">
                     {h.status === "unpaid" ? (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">未付</span>
+                    ) : h.status === "deposit" ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 font-medium">已付訂金</span>
                     ) : (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">已付</span>
                     )}
@@ -569,7 +578,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
-    </div>
+    </aside>
   );
 };
 

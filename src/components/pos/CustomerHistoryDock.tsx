@@ -42,7 +42,7 @@ const CustomerHistoryDock = ({
   return (
     <aside
       aria-label="已摺疊的客戶記錄"
-      className="sticky top-[49px] flex h-[calc(100vh-49px)] w-14 shrink-0 justify-center border-r border-border bg-card/80 pt-3 backdrop-blur-sm"
+      className="sticky top-[49px] z-auto flex h-[calc(100vh-49px)] w-14 shrink-0 justify-center border-r border-border bg-card/80 pt-3 backdrop-blur-sm"
     >
       <Button
         type="button"

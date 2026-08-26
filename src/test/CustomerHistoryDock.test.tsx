@@ -62,4 +62,16 @@ describe("CustomerHistoryDock", () => {
 
     expect(screen.getByRole("region", { name: "May 客戶記錄面板" })).toBeVisible();
   });
+
+  it("keeps the collapsed dock in the 361px mobile flex layout without covering checkout", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 361 });
+    render(<CustomerHistoryDock customer={customer} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "關閉客戶記錄" }));
+
+    const dock = screen.getByRole("complementary", { name: "已摺疊的客戶記錄" });
+    expect(dock).toHaveClass("sticky", "w-14", "shrink-0");
+    expect(dock).not.toHaveClass("fixed", "inset-y-0", "z-50");
+    expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+  });
 });

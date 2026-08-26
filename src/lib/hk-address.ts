@@ -192,50 +192,25 @@ export const resolveHongKongAddressHierarchy = (
 };
 
 /**
- * Applies detected values while retaining only canonical manual children that
- * remain valid under the resolved parent.
+ * Applies a Google selection as one authoritative hierarchy snapshot. Manual
+ * descendants are intentionally not retained: a district-only result must not
+ * silently keep an area that belonged to the previous address.
  */
 export const mergeAddressHierarchy = (
   detected: AddressHierarchy,
-  current: AddressHierarchy,
+  _current: AddressHierarchy,
 ): AddressHierarchy => {
-  const canonicalDetected = canonicalHierarchyFromValues(detected);
-  const currentRegion = regionByNormalizedName.get(
-    normalizeCanonicalValue(current.region),
-  ) || "";
-  const currentDistrictMatch = districtByNormalizedName.get(
-    normalizeCanonicalValue(current.district),
-  );
-  const currentDistrict = currentDistrictMatch?.region === currentRegion
-    ? currentDistrictMatch.district
-    : "";
-  const currentAreaMatch = areaByNormalizedName.get(
-    normalizeCanonicalValue(current.area),
-  );
-  const currentArea = currentAreaMatch?.region === currentRegion
-    && currentAreaMatch.district === currentDistrict
-    ? currentAreaMatch.area
-    : "";
-  const region = canonicalDetected.region || currentRegion;
+  return canonicalHierarchyFromValues(detected);
+};
 
-  const district = canonicalDetected.district
-    || (
-      currentDistrict
-      && currentRegion === region
-        ? currentDistrict
-        : ""
-    );
+export const hierarchyFromGoogleSelection = (
+  selection: GoogleAddressSelection,
+): AddressHierarchy => {
+  const detected = canonicalHierarchyFromValues(selection);
+  if (detected.region || detected.district || detected.area) return detected;
 
-  const area = canonicalDetected.area
-    || (
-      currentArea
-      && currentRegion === region
-      && currentDistrict === district
-        ? currentArea
-        : ""
-    );
-
-  return { region, district, area };
+  const parsed = parseDeliveryAddress(selection.address);
+  return canonicalHierarchyFromValues(parsed);
 };
 
 const normalizedTokens = (value: string) => value.trim().split(/\s+/).filter(Boolean);

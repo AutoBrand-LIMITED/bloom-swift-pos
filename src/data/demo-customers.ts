@@ -41,7 +41,7 @@ export interface PurchaseRecord {
   invoiceNumber?: string;
   items: string;
   total: number;
-  status: "paid" | "unpaid";
+  status: "paid" | "deposit" | "unpaid";
   deliveryDate?: string;
   deliveryAddress?: string;
   recipientType?: "personal" | "company";

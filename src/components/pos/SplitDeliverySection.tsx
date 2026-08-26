@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deliverySlotSnapshot } from "@/lib/delivery-slots";
-import { parseDeliveryAddress, type GoogleAddressSelection } from "@/lib/hk-address";
+import {
+  hierarchyFromGoogleSelection,
+  parseDeliveryAddress,
+  type GoogleAddressSelection,
+} from "@/lib/hk-address";
 import type { DeliverySlot, RecipientSuggestion } from "@/lib/odoo-api";
 import type { DeliverySplit, OrderItem } from "@/types/order";
 
@@ -203,12 +207,15 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
             onBuildingChange={(deliveryBuilding) => update(split.id, { deliveryBuilding }, true)}
             onFloorChange={(deliveryFloor) => update(split.id, { deliveryFloor }, true)}
             onUnitChange={(deliveryUnit) => update(split.id, { deliveryUnit }, true)}
-            onGoogleAddressSelect={(selection: GoogleAddressSelection) => update(split.id, {
-              deliveryRegion: selection.region,
-              deliveryDistrict: selection.district,
-              deliveryArea: selection.area,
-              deliveryDetail: parseDeliveryAddress(selection.address).detail,
-            }, true)}
+            onGoogleAddressSelect={(selection: GoogleAddressSelection) => {
+              const hierarchy = hierarchyFromGoogleSelection(selection);
+              update(split.id, {
+                deliveryRegion: hierarchy.region,
+                deliveryDistrict: hierarchy.district,
+                deliveryArea: hierarchy.area,
+                deliveryDetail: parseDeliveryAddress(selection.address).detail,
+              }, true);
+            }}
             onRecipientTypeChange={(recipientType) => update(split.id, {
               recipientType,
               recipientCompanyName: recipientType === "personal" ? "" : split.recipientCompanyName,

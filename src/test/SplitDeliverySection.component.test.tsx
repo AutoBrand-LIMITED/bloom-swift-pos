@@ -16,6 +16,11 @@ vi.mock("@/components/pos/DeliverySection", () => ({
     senderName,
     senderPhone,
     onRecipientDetailsChange,
+    deliveryRegion,
+    deliveryDistrict,
+    deliveryArea,
+    deliveryDetail,
+    onGoogleAddressSelect,
   }: {
     fulfillmentType: FulfillmentType;
     onFulfillmentTypeChange: (value: FulfillmentType) => void;
@@ -30,6 +35,16 @@ vi.mock("@/components/pos/DeliverySection", () => ({
       companyName: string;
       name: string;
       phone: string;
+    }) => void;
+    deliveryRegion: string;
+    deliveryDistrict: string;
+    deliveryArea: string;
+    deliveryDetail: string;
+    onGoogleAddressSelect: (selection: {
+      address: string;
+      region: string;
+      district: string;
+      area: string;
     }) => void;
   }) => (
     <div>
@@ -54,6 +69,20 @@ vi.mock("@/components/pos/DeliverySection", () => ({
         套用送花人
       </button>
       <output aria-label="拆單收貨人">{recipientName}|{recipientPhone}</output>
+      <button
+        type="button"
+        onClick={() => onGoogleAddressSelect({
+          address: "香港灣仔軒尼詩道 1 號",
+          region: "香港島",
+          district: "灣仔區",
+          area: "灣仔",
+        })}
+      >
+        選擇 Google 地址
+      </button>
+      <output aria-label="拆單地址層級">
+        {deliveryRegion}|{deliveryDistrict}|{deliveryArea}|{deliveryDetail}
+      </output>
     </div>
   ),
 }));
@@ -100,6 +129,17 @@ describe("SplitDeliverySection fulfillment controls", () => {
 
     expect(screen.getByRole("status", { name: "拆單收貨人" })).toHaveTextContent(
       "Ms Chan|61234567",
+    );
+  });
+
+  it("applies a Google address hierarchy to one split destination atomically", () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+    fireEvent.click(screen.getByRole("button", { name: "選擇 Google 地址" }));
+
+    expect(screen.getByRole("status", { name: "拆單地址層級" })).toHaveTextContent(
+      "香港島|灣仔區|灣仔|香港灣仔軒尼詩道 1 號",
     );
   });
 });
