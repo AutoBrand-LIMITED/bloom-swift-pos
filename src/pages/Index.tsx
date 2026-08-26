@@ -4,7 +4,10 @@ import { toast } from "sonner";
 import { Calculator, ClipboardList, LogOut, RotateCcw, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
-import { generateAllDocuments, generateReceipt, printDocument } from "@/lib/print-utils";
+import {
+  showOrderSubmissionFailure,
+  showOrderSubmissionSuccess,
+} from "@/lib/order-submission-feedback";
 import CustomerSection from "@/components/pos/CustomerSection";
 import BusinessDetailsSection from "@/components/pos/BusinessDetailsSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
@@ -1147,9 +1150,7 @@ const Index = () => {
   const handleSubmit = async () => {
     if (isSubmitting) return;
     if (!hasOdooBackend && !allowLocalOnlyOrders) {
-      toast.error("未連接 Odoo backend，訂單未建立。請先恢復 backend 連線後再試。", {
-        duration: 8000,
-      });
+      showOrderSubmissionFailure();
       return;
     }
     // Validation
@@ -1534,21 +1535,8 @@ const Index = () => {
           setOperationalOrders(next);
           saveOperationalOrdersForEmployee(operatorEmployeeId, next);
         }
-        if (needsOdooReview) {
-          toast.warning(odooOrder.reviewError || "訂單已安全保存，需要管理員核對", {
-            duration: 9000,
-          });
-        } else if (!isPendingOdooSync) {
-          const references = [
-            odooOrder.name ? `訂單 ${odooOrder.name}` : null,
-            odooOrder.accounting?.invoice.name ? `發票 ${odooOrder.accounting.invoice.name}` : null,
-            odooOrder.accounting?.payment?.name ? `收款 ${odooOrder.accounting.payment.name}` : null,
-          ].filter(Boolean).join(" · ");
-          toast.success(`已同步到 Odoo staging：${references}`);
-        }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "未知錯誤";
       if (isDeterministicSubmissionFailure(err)) {
         setPendingSubmission(null);
         // Supabase keeps the rejected checkout as an immutable audit record. A corrected
@@ -1556,10 +1544,8 @@ const Index = () => {
         // checkout that was already marked for review.
         setCheckoutId(crypto.randomUUID());
         setPaymentIdempotencyKey(crypto.randomUUID());
-        toast.error(`Odoo 驗證失敗：${message}。訂單已解鎖，可以修改後再提交。`, { duration: 9000 });
-      } else {
-        toast.error(`Odoo 同步失敗：${message}`, { duration: 8000 });
       }
+      showOrderSubmissionFailure();
       setIsSubmitting(false);
       return;
     }
@@ -1572,33 +1558,7 @@ const Index = () => {
       saveUnsyncedOrders(updated);
     }
 
-    if (needsOdooReview) {
-      toast.info("這張訂單不會阻塞下一張單；可在訂單記錄查看核對狀態", {
-        duration: 7000,
-      });
-    } else if (!isPendingOdooSync && order.paymentStatus === "unpaid") {
-      toast.warning("訂單已建立 — 未付款", { duration: 5000 });
-    } else if (!isPendingOdooSync && order.paymentStatus === "deposit") {
-      toast.info(
-        `訂單已建立 — 已收訂金 $${order.depositAmount}，尚欠 $${order.finalPrice - order.depositAmount}`,
-      );
-    } else if (!isPendingOdooSync) {
-      toast.success("訂單已建立 ✓");
-    }
-
-    // Show print dialog
-    toast("列印單據", {
-      duration: 15000,
-      description: "選擇要列印嘅單據：",
-      action: {
-        label: "收據",
-        onClick: () => printDocument(generateReceipt(syncedOrder)),
-      },
-      cancel: {
-        label: "全部列印",
-        onClick: () => printDocument(generateAllDocuments(syncedOrder)),
-      },
-    });
+    showOrderSubmissionSuccess(syncedOrder);
 
     resetOrderForm();
     setIsSubmitting(false);
