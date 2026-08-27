@@ -43,6 +43,7 @@ describe("POS session authentication", () => {
         name: "Elma",
         login: "elma",
         salesLabel: "AC02 — Elma",
+        role: "manager",
       },
     })));
     const { getPosSession, loginToPos } = await import("@/lib/pos-auth");
@@ -55,6 +56,7 @@ describe("POS session authentication", () => {
       name: "Elma",
       login: "elma",
       salesLabel: "AC02 — Elma",
+      role: "manager",
     });
     expect(fetch).toHaveBeenCalledWith("https://backend.test/auth/login", expect.objectContaining({
       body: JSON.stringify({ login: "elma", password: "operator password" }),
@@ -106,6 +108,7 @@ describe("POS session authentication", () => {
         name: "Elma",
         login: "elma",
         salesLabel: "AC02 — Elma",
+        role: "staff",
       },
     })));
     window.sessionStorage.setItem("anglo-chinese-florist-pos-session", "signed-session");
@@ -116,6 +119,7 @@ describe("POS session authentication", () => {
       name: "Elma",
       login: "elma",
       salesLabel: "AC02 — Elma",
+      role: "staff",
     });
   });
 });

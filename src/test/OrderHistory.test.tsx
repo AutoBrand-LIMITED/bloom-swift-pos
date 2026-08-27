@@ -1,9 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OrderHistory from "@/components/pos/OrderHistory";
 import type { OrderRecordView } from "@/lib/order-records";
-import type { Order } from "@/types/order";
 
 const {
   getAccountingPaymentOptions,
@@ -24,7 +23,7 @@ vi.mock("@/lib/odoo-api", () => ({
   updateOdooOrderOperationalDetails,
 }));
 
-const orderFixture = (overrides: Partial<Order> = {}): OrderRecordView => ({
+const orderFixture = (overrides: Partial<OrderRecordView> = {}): OrderRecordView => ({
   source: "odoo",
   syncState: "synced",
   id: "order-1",
@@ -438,5 +437,107 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText("香港中環花園道 1 號")).toBeVisible();
     expect(screen.queryByText("PO-300")).not.toBeInTheDocument();
     expect(screen.queryByText("Net 30")).not.toBeInTheDocument();
+  });
+
+  it("shows same-day backlog counts and lets a manager retry only an eligible pending row", async () => {
+    let finishRetry!: () => void;
+    const onOperationalRetry = vi.fn(() => new Promise<void>((resolve) => {
+      finishRetry = resolve;
+    }));
+    const pending = orderFixture({
+      id: "pending-order",
+      source: "operational",
+      syncState: "pending_odoo",
+      operationalOrderId: "pending-operational-id",
+      operationalRetryEligible: true,
+      operationalAttemptCount: 2,
+      operationalLastError: "odoo_unavailable",
+    });
+    const review = orderFixture({
+      id: "review-order",
+      source: "operational",
+      syncState: "needs_review",
+      operationalOrderId: "review-operational-id",
+      operationalRetryEligible: false,
+      operationalReviewError: "customer_conflict",
+    });
+
+    render(
+      <OrderHistory
+        orders={[pending, review]}
+        open
+        onClose={vi.fn()}
+        viewerRole="manager"
+        onOperationalRetry={onOperationalRetry}
+      />,
+    );
+
+    expect(screen.getByText("Odoo 同步待處理（2）")).toBeVisible();
+    expect(screen.getByText("待同步 1 · 同步中 0 · 需核對 1")).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "立即重試 Odoo 同步" })).toHaveLength(1);
+    expect(screen.getByText(/customer_conflict/)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "立即重試 Odoo 同步" }));
+    expect(onOperationalRetry).toHaveBeenCalledWith("pending-operational-id");
+    expect(await screen.findByRole("button", { name: "正在重試 Odoo 同步..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "正在重試 Odoo 同步..." })).toHaveClass(
+      "min-h-11",
+      "touch-manipulation",
+    );
+
+    await act(async () => finishRetry());
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "立即重試 Odoo 同步" })).toBeEnabled();
+    });
+  });
+
+  it("never exposes retry to staff and shows a manager retry error", async () => {
+    const pending = orderFixture({
+      id: "pending-order",
+      source: "operational",
+      syncState: "pending_odoo",
+      operationalOrderId: "pending-operational-id",
+      operationalRetryEligible: true,
+    });
+    const { rerender } = render(
+      <OrderHistory
+        orders={[pending]}
+        open
+        onClose={vi.fn()}
+        viewerRole="staff"
+        onOperationalRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "立即重試 Odoo 同步" })).not.toBeInTheDocument();
+
+    rerender(
+      <OrderHistory
+        orders={[pending]}
+        open
+        onClose={vi.fn()}
+        viewerRole="manager"
+        onOperationalRetry={vi.fn().mockRejectedValue(new Error("retry_conflict"))}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "立即重試 Odoo 同步" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("重試失敗：retry_conflict");
+  });
+
+  it("warns when the current-day operational backlog is truncated", () => {
+    render(
+      <OrderHistory
+        orders={[]}
+        open
+        onClose={vi.fn()}
+        viewerRole="manager"
+        operationalTruncated
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "待同步訂單超過畫面顯示上限",
+    );
   });
 });

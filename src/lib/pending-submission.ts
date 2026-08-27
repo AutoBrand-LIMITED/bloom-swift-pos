@@ -1,6 +1,9 @@
 import type { DeliveryTimeMode, Order, RecipientType } from "@/types/order";
 import type { PosEmployeeIdentity } from "@/lib/pos-auth";
 
+type PosEmployeeScope = Omit<PosEmployeeIdentity, "role">
+  & Partial<Pick<PosEmployeeIdentity, "role">>;
+
 export interface PendingSubmissionOptions {
   customerId?: number;
   customerType?: "personal" | "company";
@@ -31,7 +34,7 @@ const submissionScopeKey = (pending: PendingOrderSubmission): string => {
   return employeeId === undefined ? "anonymous" : `employee:${employeeId}`;
 };
 
-const employeeScopeKey = (employee: PosEmployeeIdentity): string => `employee:${employee.id}`;
+const employeeScopeKey = (employee: PosEmployeeScope): string => `employee:${employee.id}`;
 
 function isPendingSubmission(value: unknown): value is PendingOrderSubmission {
   if (!value || typeof value !== "object") return false;
@@ -115,7 +118,7 @@ function pendingSubmissionForScope(
 
 export function pendingSubmissionBelongsToEmployee(
   pending: PendingOrderSubmission,
-  employee: PosEmployeeIdentity,
+  employee: PosEmployeeScope,
 ): boolean {
   return pending.order.operatorEmployeeId !== undefined
     && pending.order.operatorEmployeeId === employee.id;
@@ -123,7 +126,7 @@ export function pendingSubmissionBelongsToEmployee(
 
 export function pendingSubmissionForEmployee(
   pending: PendingOrderSubmission | null,
-  employee: PosEmployeeIdentity | null,
+  employee: PosEmployeeScope | null,
   authRequired = true,
 ): PendingOrderSubmission | null {
   if (!pending) return null;
@@ -136,7 +139,7 @@ export function pendingSubmissionForEmployee(
 
 export function employeeSnapshotForSubmission(
   pending: PendingOrderSubmission | null,
-  employee: PosEmployeeIdentity | null,
+  employee: PosEmployeeScope | null,
   current: Pick<Order, "salesId" | "operatorEmployeeId">,
 ): Pick<Order, "salesId" | "operatorEmployeeId"> {
   if (pending && employee && pendingSubmissionBelongsToEmployee(pending, employee)) {
@@ -229,7 +232,7 @@ export function deliveryContractFieldsForSubmission(
 }
 
 export function loadPendingSubmission(
-  employee: PosEmployeeIdentity | null = null,
+  employee: PosEmployeeScope | null = null,
   authRequired = false,
 ): PendingOrderSubmission | null {
   const store = readPendingStore();
@@ -282,7 +285,7 @@ export function clearPendingSubmission(expected?: string | PendingOrderSubmissio
 
 export function discardPendingSubmissionAfterOdooReview(
   pending: PendingOrderSubmission,
-  employee: PosEmployeeIdentity | null,
+  employee: PosEmployeeScope | null,
   confirmed: boolean,
   authRequired = true,
 ): boolean {

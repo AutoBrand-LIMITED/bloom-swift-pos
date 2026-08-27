@@ -7,7 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDayEndMoney } from "@/lib/day-end";
-import { getDayEndSummary, hasOdooBackend, type DayEndOrderRow, type DayEndPaymentBucket, type DayEndSummary } from "@/lib/odoo-api";
+import {
+  getDayEndSummary,
+  hasOdooBackend,
+  type DayEndOrderRow,
+  type DayEndPaymentBucket,
+  type DayEndPaymentRow,
+  type DayEndSummary,
+} from "@/lib/odoo-api";
 import { usePosAuth } from "@/components/auth/PosAuthContext";
 
 const todayString = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Hong_Kong" });
@@ -55,9 +62,14 @@ const DayEndSettlement = () => {
   }, [loadSummary]);
 
   const nonZeroBuckets = useMemo(
-    () => summary?.salesToday.buckets.filter((bucket) => bucket.amount || bucket.orderCount) ?? [],
+    () => summary?.odooAvailable
+      ? (summary.paymentBuckets ?? summary.salesToday.buckets)
+        .filter((bucket) => bucket.amount || bucket.orderCount)
+      : [],
     [summary],
   );
+  const availableSummary = summary?.odooAvailable ? summary : null;
+  const odooUnavailable = summary?.odooAvailable === false;
 
   return (
     <div className="day-end-page min-h-screen bg-background">
@@ -67,7 +79,7 @@ const DayEndSettlement = () => {
             <Calculator className="w-5 h-5 text-primary" />
             <div>
               <h1 className="text-lg font-bold">每日埋數</h1>
-              <p className="text-xs text-muted-foreground">Odoo staging 訂單核對，不寫入正式會計紀錄</p>
+              <p className="text-xs text-muted-foreground">Odoo staging 訂單及真實收款核對，不寫入正式會計紀錄</p>
             </div>
           </div>
           <div className="day-end-controls flex flex-wrap items-center gap-2">
@@ -82,15 +94,32 @@ const DayEndSettlement = () => {
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}
-              className="h-9 w-[150px]"
+              className="min-h-11 w-[150px]"
             />
-            <Button variant="outline" size="sm" onClick={() => loadSummary()} disabled={loading} className="gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadSummary()}
+              disabled={loading}
+              className="min-h-11 gap-1.5 touch-manipulation"
+            >
               <RefreshCw className="w-3.5 h-3.5" /> 重新整理
             </Button>
-            <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!summary} className="gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              disabled={!availableSummary}
+              className="min-h-11 gap-1.5 touch-manipulation"
+            >
               <Printer className="w-3.5 h-3.5" /> 列印埋數表
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/")}
+              className="min-h-11 gap-1.5 touch-manipulation"
+            >
               <ArrowLeft className="w-3.5 h-3.5" /> 返回 POS
             </Button>
             {employee && (
@@ -116,13 +145,37 @@ const DayEndSettlement = () => {
           </div>
         )}
 
-        {summary ? (
+        {odooUnavailable ? (
+          <section
+            role="status"
+            className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-8 text-center"
+          >
+            <AlertTriangle className="mx-auto h-9 w-9 text-amber-700" aria-hidden="true" />
+            <h2 className="mt-3 text-lg font-semibold text-amber-950">Odoo 暫時無法使用</h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-amber-900">
+              {summary.availabilityMessage}
+            </p>
+            <p className="mx-auto mt-2 max-w-xl text-xs text-amber-800">
+              系統不會顯示訂單數、營業額、收款總額或訂單表，請在 Odoo 恢復後重新整理。
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-5 min-h-11 gap-2 border-amber-400 bg-white touch-manipulation"
+              onClick={() => loadSummary()}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              {loading ? "正在重試..." : "重試讀取 Odoo 日結"}
+            </Button>
+          </section>
+        ) : availableSummary ? (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <MetricCard label="Order qty" value={summary.salesToday.orderCount.toString()} />
-              <MetricCard label="Sales today" value={formatDayEndMoney(summary.salesToday.saleTotal)} />
-              <MetricCard label="Money received" value={formatDayEndMoney(summary.totalMoneyReceived)} />
-              <MetricCard label="Avg spend" value={formatDayEndMoney(summary.salesToday.averageSpend)} />
+              <MetricCard label="Order qty" value={availableSummary.salesToday.orderCount.toString()} />
+              <MetricCard label="Order value today" value={formatDayEndMoney(availableSummary.salesToday.saleTotal)} />
+              <MetricCard label="Money received" value={formatDayEndMoney(availableSummary.totalMoneyReceived)} />
+              <MetricCard label="Avg spend" value={formatDayEndMoney(availableSummary.salesToday.averageSpend)} />
             </div>
 
             <Card>
@@ -130,35 +183,41 @@ const DayEndSettlement = () => {
                 <CardTitle className="text-base">付款方式總覽</CardTitle>
               </CardHeader>
               <CardContent>
-                <BucketGrid buckets={summary.salesToday.buckets} />
+                <BucketGrid buckets={availableSummary.paymentBuckets ?? availableSummary.salesToday.buckets} />
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">A. 今日營業額 Sales Today</CardTitle>
+                <CardTitle className="text-base">A. 今日落單金額 Orders Booked Today</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <OrderTable orders={summary.salesToday.orders} />
+                <OrderTable orders={availableSummary.salesToday.orders} />
                 <div className="flex flex-wrap justify-end gap-4 border-t pt-3 text-sm">
-                  <span>訂單數：<strong>{summary.salesToday.orderCount}</strong></span>
-                  <span>銷售額：<strong>{formatDayEndMoney(summary.salesToday.saleTotal)}</strong></span>
-                  <span>今日收款：<strong>{formatDayEndMoney(summary.salesToday.receivedTotal)}</strong></span>
+                  <span>訂單數：<strong>{availableSummary.salesToday.orderCount}</strong></span>
+                  <span>落單金額：<strong>{formatDayEndMoney(availableSummary.salesToday.saleTotal)}</strong></span>
+                  <span>今日收款：<strong>{formatDayEndMoney(availableSummary.salesToday.receivedTotal)}</strong></span>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">B. 今日收錢，非今日落單</CardTitle>
+                <CardTitle className="text-base">B. 今日舊單／未匹配收款</CardTitle>
               </CardHeader>
               <CardContent>
-                {summary.receivedForOtherDays.unsupportedReason ? (
+                {availableSummary.receivedForOtherDays.unsupportedReason ? (
                   <div className="rounded-lg bg-warning/10 border border-warning/30 p-3 text-sm text-muted-foreground">
-                    {summary.receivedForOtherDays.unsupportedReason}
+                    {availableSummary.receivedForOtherDays.unsupportedReason}
                   </div>
                 ) : (
-                  <OrderTable orders={summary.receivedForOtherDays.orders} />
+                  <div className="space-y-3">
+                    <PaymentTable payments={availableSummary.receivedForOtherDays.payments ?? []} />
+                    <div className="flex flex-wrap justify-end gap-4 border-t pt-3 text-sm">
+                      <span>已匹配訂單：<strong>{availableSummary.receivedForOtherDays.orderCount}</strong></span>
+                      <span>收款：<strong>{formatDayEndMoney(availableSummary.receivedForOtherDays.receivedTotal)}</strong></span>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -178,7 +237,7 @@ const DayEndSettlement = () => {
                 </div>
                 <div className="rounded-lg border bg-primary/5 px-4 py-3 text-right">
                   <p className="text-xs text-muted-foreground">總收款</p>
-                  <p className="text-xl font-bold font-mono">{formatDayEndMoney(summary.totalMoneyReceived)}</p>
+                  <p className="text-xl font-bold font-mono">{formatDayEndMoney(availableSummary.totalMoneyReceived)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -233,8 +292,8 @@ export const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
           <TableHead className="min-w-[135px]">時間</TableHead>
           <TableHead className="min-w-[180px]">客戶</TableHead>
           <TableHead className="min-w-[180px]">落單員工／Sales</TableHead>
-          <TableHead className="min-w-[120px]">付款</TableHead>
-          <TableHead className="text-right min-w-[120px]">銷售額</TableHead>
+          <TableHead className="min-w-[120px]">目前付款狀態</TableHead>
+          <TableHead className="text-right min-w-[120px]">落單金額</TableHead>
           <TableHead className="text-right min-w-[120px]">今日收款</TableHead>
           <TableHead className="min-w-[160px]">收貨人</TableHead>
           <TableHead className="min-w-[240px]">地址 / Remarks</TableHead>
@@ -267,6 +326,54 @@ export const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
               <div>{order.deliveryAddress || "-"}</div>
               {order.remarks && <div className="mt-1">{order.remarks}</div>}
             </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
+
+export const PaymentTable = ({ payments }: { payments: DayEndPaymentRow[] }) => {
+  if (!payments.length) {
+    return <p className="text-sm text-muted-foreground">今日沒有舊單收款</p>;
+  }
+
+  return (
+    <Table className="day-end-payment-table">
+      <TableHeader>
+        <TableRow>
+          <TableHead className="min-w-[135px]">收款時間</TableHead>
+          <TableHead className="min-w-[140px]">收款編號</TableHead>
+          <TableHead className="min-w-[150px]">原訂單</TableHead>
+          <TableHead className="min-w-[135px]">原落單日期</TableHead>
+          <TableHead className="min-w-[180px]">客戶</TableHead>
+          <TableHead className="min-w-[150px]">收款員工</TableHead>
+          <TableHead className="min-w-[180px]">付款方法／參考</TableHead>
+          <TableHead className="text-right min-w-[120px]">收款金額</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {payments.map((payment) => (
+          <TableRow key={payment.id}>
+            <TableCell className="font-mono text-xs">{payment.receivedAt}</TableCell>
+            <TableCell className="font-mono text-xs">{payment.paymentName}</TableCell>
+            <TableCell className="font-mono">
+              <div>{payment.invoiceReference || payment.orderName || "未配對訂單"}</div>
+              {payment.orderName && payment.invoiceReference && (
+                <div className="text-xs text-muted-foreground">{payment.orderName}</div>
+              )}
+              {!payment.orderName && (
+                <div className="text-xs text-muted-foreground break-all">{payment.checkoutKey}</div>
+              )}
+            </TableCell>
+            <TableCell className="font-mono text-xs">{payment.orderDate || "-"}</TableCell>
+            <TableCell>{payment.customerName || "-"}</TableCell>
+            <TableCell>{payment.operatorName || "-"}</TableCell>
+            <TableCell>
+              <div>{payment.paymentMethod || "未分類"}</div>
+              <div className="text-xs text-muted-foreground">{payment.paymentReference || "-"}</div>
+            </TableCell>
+            <TableCell className="text-right font-mono">{formatDayEndMoney(payment.amount)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

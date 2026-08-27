@@ -71,6 +71,7 @@ describe("order record sources", () => {
       lastError: "Odoo temporarily unavailable",
       attemptCount: 2,
       updatedAt: new Date().toISOString(),
+      retryEligible: true,
     };
 
     expect(mergeOrderRecords([], [], null, [operational])).toEqual([
@@ -97,10 +98,37 @@ describe("order record sources", () => {
       lastError: null,
       attemptCount: 1,
       updatedAt: new Date().toISOString(),
+      retryEligible: false,
     };
 
     expect(mergeOrderRecords([remote], [], null, [operational])).toEqual([
       expect.objectContaining({ id: remote.id, source: "odoo", syncState: "synced" }),
+    ]);
+  });
+
+  it("keeps an unresolved operational row visible when Odoo has only a matching draft", () => {
+    const remoteDraft = order("same-operational", {
+      odooOrderId: 91,
+      odooOrderName: "S00091",
+    });
+    const operational: OperationalOrderRecord = {
+      operationalOrderId: "same-operational",
+      operatorEmployeeId: 17,
+      order: { ...remoteDraft },
+      syncState: "needs_review",
+      reviewError: "訂單需要管理員核對。",
+      lastError: null,
+      attemptCount: 1,
+      updatedAt: new Date().toISOString(),
+      retryEligible: false,
+    };
+
+    expect(mergeOrderRecords([remoteDraft], [], null, [operational])).toEqual([
+      expect.objectContaining({
+        id: "same-operational",
+        source: "operational",
+        syncState: "needs_review",
+      }),
     ]);
   });
 
@@ -110,6 +138,30 @@ describe("order record sources", () => {
 
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({ syncState: "pending_confirmation" });
+  });
+
+  it("lets the server operational row replace a duplicate local fallback", () => {
+    const sharedOrder = order("shared");
+    const operational: OperationalOrderRecord = {
+      operationalOrderId: "operational-shared",
+      operatorEmployeeId: 17,
+      order: { ...sharedOrder, customerName: "Server operational copy" },
+      syncState: "pending_odoo",
+      reviewError: null,
+      lastError: null,
+      attemptCount: 0,
+      updatedAt: new Date().toISOString(),
+      retryEligible: true,
+    };
+
+    expect(mergeOrderRecords([], [sharedOrder], null, [operational])).toEqual([
+      expect.objectContaining({
+        id: "shared",
+        customerName: "Server operational copy",
+        source: "operational",
+        operationalOrderId: "operational-shared",
+      }),
+    ]);
   });
 
   it("keeps accounting confirmation pending when Odoo already has the same POS UUID", () => {

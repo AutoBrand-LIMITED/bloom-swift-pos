@@ -10,6 +10,7 @@ import {
   type PosEmployeeIdentity,
   validatePosSession,
 } from "@/lib/pos-auth";
+import { clearOperationalOrders } from "@/lib/operational-orders";
 import { PosAuthContext } from "@/components/auth/PosAuthContext";
 
 interface LoginGateProps {
@@ -39,6 +40,7 @@ const LoginGate = ({ children }: LoginGateProps) => {
       })
       .finally(() => setChecking(false));
     const expire = () => {
+      clearOperationalOrders();
       setAuthenticated(false);
       setEmployee(null);
       setLogin("");
@@ -133,6 +135,7 @@ const LoginGate = ({ children }: LoginGateProps) => {
 
   const logout = () => {
     clearPosSession();
+    clearOperationalOrders();
     setEmployee(null);
     setAuthenticated(false);
     setLogin("");

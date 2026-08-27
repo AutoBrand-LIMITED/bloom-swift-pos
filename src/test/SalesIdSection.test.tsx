@@ -14,6 +14,7 @@ describe("SalesIdSection employee binding", () => {
           name: "Elma",
           login: "elma",
           salesLabel: "AC02 — Elma",
+          role: "staff",
         }}
         onSalespersonChange={vi.fn()}
       />,

@@ -80,6 +80,90 @@ describe("odoo-api note contracts", () => {
     );
   });
 
+  it("loads the authenticated current-day operational collection contract", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const rows = [{
+      operationalOrderId: "43e81d2e-ccfb-415b-8799-12a2e7a528d4",
+      operatorEmployeeId: 95,
+      order: { id: "43e81d2e-ccfb-415b-8799-12a2e7a528d4" },
+      syncState: "pending_odoo",
+      reviewError: null,
+      lastError: "odoo_unavailable",
+      attemptCount: 2,
+      updatedAt: "2026-08-27T10:00:00+08:00",
+      retryEligible: true,
+      odooOrderId: null,
+      odooOrderName: null,
+      odooPartnerId: null,
+    }];
+    const collection = {
+      date: "2026-08-27",
+      timezone: "Asia/Hong_Kong",
+      generatedAt: "2026-08-27T10:00:00+08:00",
+      truncated: true,
+      orders: rows,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(collection));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOperationalOrders } = await import("@/lib/odoo-api");
+
+    await expect(getOperationalOrders()).resolves.toEqual(collection);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders/operational",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
+  it("posts a manager retry to the encoded operational-order route", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      operationalOrderId: "order / 42",
+      syncState: "syncing",
+      odooOrderId: null,
+      odooOrderName: null,
+      odooPartnerId: null,
+      reviewError: null,
+      lastError: null,
+      attemptCount: 3,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { retryOperationalOrder } = await import("@/lib/odoo-api");
+
+    await expect(retryOperationalOrder("order / 42")).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders/operational/order%20%2F%2042/retry",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  });
+
+  it("preserves the typed day-end outage response and availabilityMessage", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const outage = {
+      date: "2026-08-27",
+      timezone: "Asia/Hong_Kong",
+      generatedAt: "2026-08-27T18:00:00+08:00",
+      odooAvailable: false,
+      availabilityMessage: "Odoo is temporarily unavailable. Retry after service recovers.",
+      salesToday: null,
+      receivedForOtherDays: null,
+      totalMoneyReceived: null,
+      summaryHash: null,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(outage, 503));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getDayEndSummary } = await import("@/lib/odoo-api");
+
+    await expect(getDayEndSummary("2026-08-27")).resolves.toEqual(outage);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/day-end/summary?date=2026-08-27",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
   it("stops a stalled product reorder instead of leaving the UI saving forever", async () => {
     vi.useFakeTimers();
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");

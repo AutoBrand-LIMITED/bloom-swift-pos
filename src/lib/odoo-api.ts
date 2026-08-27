@@ -89,6 +89,35 @@ export interface OperationalOrderStatusResponse {
   attemptCount: number;
 }
 
+export interface OperationalOrderCollectionRow {
+  operationalOrderId: string;
+  operatorEmployeeId: number;
+  order: Order;
+  syncState: OperationalOrderStatusSyncState;
+  reviewError: string | null;
+  lastError: string | null;
+  attemptCount: number;
+  updatedAt: string;
+  retryEligible: boolean;
+  odooOrderId?: number | null;
+  odooOrderName?: string | null;
+  odooPartnerId?: number | null;
+  odooInvoiceId?: number | null;
+  odooInvoiceName?: string | null;
+  odooPaymentId?: number | null;
+  odooPaymentName?: string | null;
+}
+
+export interface OperationalOrdersCollectionResponse {
+  date: string;
+  timezone: string;
+  generatedAt: string;
+  truncated: boolean;
+  orders: OperationalOrderCollectionRow[];
+}
+
+export type OperationalOrderRetryResponse = OperationalOrderStatusResponse;
+
 export interface AccountingPaymentOption {
   code: string;
   label: string;
@@ -281,6 +310,24 @@ export interface DayEndPaymentBucket {
   orderCount: number;
 }
 
+export interface DayEndPaymentRow {
+  id: number;
+  paymentName: string;
+  paymentKey: string | null;
+  checkoutKey: string;
+  receivedAt: string;
+  amount: number;
+  paymentMethod: string | null;
+  paymentBucket: string;
+  paymentReference: string | null;
+  operatorName: string | null;
+  orderId: number | null;
+  orderName: string | null;
+  orderDate: string | null;
+  invoiceReference: string | null;
+  customerName: string | null;
+}
+
 export interface DayEndOrderRow {
   id: number;
   orderName: string;
@@ -313,18 +360,36 @@ export interface DayEndSection {
   averageSpend: number;
   buckets: DayEndPaymentBucket[];
   orders: DayEndOrderRow[];
+  payments?: DayEndPaymentRow[];
   unsupportedReason: string | null;
 }
 
-export interface DayEndSummary {
+interface DayEndSummaryBase {
   date: string;
   timezone: string;
   generatedAt: string;
+}
+
+export interface AvailableDayEndSummary extends DayEndSummaryBase {
+  odooAvailable: true;
   salesToday: DayEndSection;
   receivedForOtherDays: DayEndSection;
   totalMoneyReceived: number;
+  paymentBuckets?: DayEndPaymentBucket[];
   summaryHash: string;
 }
+
+export interface UnavailableDayEndSummary extends DayEndSummaryBase {
+  odooAvailable: false;
+  availabilityMessage: string;
+  salesToday?: null;
+  receivedForOtherDays?: null;
+  totalMoneyReceived?: null;
+  paymentBuckets?: null;
+  summaryHash?: null;
+}
+
+export type DayEndSummary = AvailableDayEndSummary | UnavailableDayEndSummary;
 
 export interface OdooOrderRecordsResponse {
   date?: string;
@@ -558,6 +623,49 @@ export async function getOperationalOrderStatus(
     return throwApiError(res, `Operational order status failed: ${res.status}`);
   }
   return (await res.json()) as OperationalOrderStatusResponse;
+}
+
+export async function getOperationalOrders(
+  signal?: AbortSignal,
+): Promise<OperationalOrdersCollectionResponse> {
+  if (!BACKEND_URL) {
+    return {
+      date: "",
+      timezone: "Asia/Hong_Kong",
+      generatedAt: "",
+      truncated: false,
+      orders: [],
+    };
+  }
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/operational`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError(res, `Operational order collection failed: ${res.status}`);
+  }
+  return (await res.json()) as OperationalOrdersCollectionResponse;
+}
+
+export async function retryOperationalOrder(
+  operationalOrderId: string,
+  signal?: AbortSignal,
+): Promise<OperationalOrderRetryResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(
+    `${BACKEND_URL}/orders/operational/${encodeURIComponent(operationalOrderId)}/retry`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal,
+    },
+  );
+  if (!res.ok) {
+    return throwApiError(res, `Operational order retry failed: ${res.status}`);
+  }
+  return (await res.json()) as OperationalOrderRetryResponse;
 }
 
 export async function updateOdooOrderOperationalDetails(
@@ -940,12 +1048,14 @@ export async function getDayEndSummary(date: string, signal?: AbortSignal): Prom
     signal,
   });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `Day-end summary failed: ${res.status}`);
+  const body = await res.json().catch(() => null) as DayEndSummary | { detail?: string } | null;
+  if (!res.ok && (!body || !("odooAvailable" in body) || body.odooAvailable !== false)) {
+    throw new Error((body && "detail" in body ? body.detail : null) ?? `Day-end summary failed: ${res.status}`);
   }
-
-  return (await res.json()) as DayEndSummary;
+  if (!body || !("odooAvailable" in body)) {
+    throw new Error("Day-end summary returned an invalid availability response");
+  }
+  return body as DayEndSummary;
 }
 
 export async function getOdooOrderRecords(

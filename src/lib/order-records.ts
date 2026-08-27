@@ -20,6 +20,9 @@ export type OrderRecordView = Order & {
   syncState: OrderRecordSyncState;
   operationalReviewError?: string | null;
   operationalLastError?: string | null;
+  operationalOrderId?: string;
+  operationalAttemptCount?: number;
+  operationalRetryEligible?: boolean;
 };
 
 const isOrder = (value: unknown): value is Order => {
@@ -140,12 +143,20 @@ export const mergeOrderRecords = (
   pendingOrder?: Order | null,
   operationalOrders: OperationalOrderRecord[] = [],
 ): OrderRecordView[] => {
+  const unresolvedOperationalOrders = operationalOrders
+    .filter((record) => record.syncState !== "synced")
+    .map((record) => record.order);
   const remoteByOdooId = new Set<number>();
   const remoteByOdooName = new Set<string>();
   const remoteByLocalId = new Set<string>();
   const remote: OrderRecordView[] = [];
 
   for (const order of remoteOrders) {
+    // Odoo can contain a draft even when invoice/payment creation failed. The
+    // durable row must remain visible until the outbox itself reaches synced.
+    if (unresolvedOperationalOrders.some((pending) => ordersMatch(order, pending))) {
+      continue;
+    }
     if (order.odooOrderId && remoteByOdooId.has(order.odooOrderId)) continue;
     if (order.odooOrderName && remoteByOdooName.has(order.odooOrderName)) continue;
     if (remoteByLocalId.has(order.id)) continue;
@@ -161,6 +172,34 @@ export const mergeOrderRecords = (
     });
   }
 
+  const operationalByOrderId = new Set<string>();
+  const operationalByOdooId = new Set<number>();
+  const operationalByOdooName = new Set<string>();
+  const operational: OrderRecordView[] = [];
+  for (const record of operationalOrders) {
+    const order = record.order;
+    const remoteMatch = remoteByLocalId.has(order.id)
+      || Boolean(order.odooOrderId && remoteByOdooId.has(order.odooOrderId))
+      || Boolean(order.odooOrderName && remoteByOdooName.has(order.odooOrderName));
+    const operationalDuplicate = operationalByOrderId.has(order.id)
+      || Boolean(order.odooOrderId && operationalByOdooId.has(order.odooOrderId))
+      || Boolean(order.odooOrderName && operationalByOdooName.has(order.odooOrderName));
+    if ((remoteMatch && record.syncState === "synced") || operationalDuplicate) continue;
+    operationalByOrderId.add(order.id);
+    if (order.odooOrderId) operationalByOdooId.add(order.odooOrderId);
+    if (order.odooOrderName) operationalByOdooName.add(order.odooOrderName);
+    operational.push({
+      ...order,
+      source: "operational",
+      syncState: record.syncState === "synced" ? "operational_synced" : record.syncState,
+      operationalReviewError: record.reviewError,
+      operationalLastError: record.lastError,
+      operationalOrderId: record.operationalOrderId,
+      operationalAttemptCount: record.attemptCount,
+      operationalRetryEligible: record.retryEligible,
+    });
+  }
+
   const localCandidates = pendingOrder
     ? [pendingOrder, ...localOrders]
     : [...localOrders];
@@ -172,27 +211,14 @@ export const mergeOrderRecords = (
     const remoteMatch = remoteByLocalId.has(order.id)
       || Boolean(order.odooOrderId && remoteByOdooId.has(order.odooOrderId))
       || Boolean(order.odooOrderName && remoteByOdooName.has(order.odooOrderName));
-    if (remoteMatch) continue;
+    const operationalMatch = operationalByOrderId.has(order.id)
+      || Boolean(order.odooOrderId && operationalByOdooId.has(order.odooOrderId))
+      || Boolean(order.odooOrderName && operationalByOdooName.has(order.odooOrderName));
+    if (remoteMatch || operationalMatch) continue;
     local.push({
       ...order,
       source: "local",
       syncState: pendingOrder?.id === order.id ? "pending_confirmation" : "unsynced",
-    });
-  }
-
-  const operational: OrderRecordView[] = [];
-  for (const record of operationalOrders) {
-    const order = record.order;
-    const remoteMatch = remoteByLocalId.has(order.id)
-      || Boolean(order.odooOrderId && remoteByOdooId.has(order.odooOrderId))
-      || Boolean(order.odooOrderName && remoteByOdooName.has(order.odooOrderName));
-    if (remoteMatch || seenLocal.has(order.id)) continue;
-    operational.push({
-      ...order,
-      source: "operational",
-      syncState: record.syncState === "synced" ? "operational_synced" : record.syncState,
-      operationalReviewError: record.reviewError,
-      operationalLastError: record.lastError,
     });
   }
 

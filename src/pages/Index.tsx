@@ -64,8 +64,9 @@ import {
   getDeliverySlots,
   getOdooCustomer,
   getOdooPartnerNotes,
-  getOperationalOrderStatus,
+  getOperationalOrders,
   getOdooOrderRecords,
+  retryOperationalOrder,
   searchOdooOrderRecords,
   getAccountingPaymentOptions,
   allowLocalOnlyOrders,
@@ -110,8 +111,10 @@ import {
   saveUnsyncedOrders,
 } from "@/lib/order-records";
 import {
+  applyOperationalOrderStatus,
   loadOperationalOrders,
-  saveOperationalOrdersForEmployee,
+  mergeOperationalOrderSources,
+  saveOperationalOrdersForScope,
   type OperationalOrderRecord,
 } from "@/lib/operational-orders";
 
@@ -268,6 +271,9 @@ const Index = () => {
     () => loadOperationalOrders(employee?.id),
   );
   const operationalOrdersRef = useRef(operationalOrders);
+  const [operationalOrdersError, setOperationalOrdersError] = useState<string | null>(null);
+  const [operationalOrdersTruncated, setOperationalOrdersTruncated] = useState(false);
+  const [operationalOrdersRefreshKey, setOperationalOrdersRefreshKey] = useState(0);
   const [remoteOrders, setRemoteOrders] = useState<Order[]>([]);
   const [remoteOrdersQuery, setRemoteOrdersQuery] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -334,78 +340,77 @@ const Index = () => {
   }, [operationalOrders]);
 
   useEffect(() => {
-    if (employee?.id === undefined) {
+    if (hasOdooBackend && employee?.id === undefined) {
       setOperationalOrders([]);
       return;
     }
-    setOperationalOrders(loadOperationalOrders(employee.id));
-  }, [employee?.id]);
+    const cached = loadOperationalOrders(employee?.id);
+    operationalOrdersRef.current = cached;
+    setOperationalOrders(cached);
+  }, [employee?.id, employee?.role]);
 
   useEffect(() => {
     if (!hasOdooBackend || employee?.id === undefined) return;
     let stopped = false;
     let timer: number | undefined;
     let controller: AbortController | undefined;
+    const cacheEmployeeId = employee.id;
 
     const poll = async () => {
-      const current = operationalOrdersRef.current;
-      const pending = current.filter(
-        (record) => record.syncState === "pending_odoo" || record.syncState === "syncing",
-      );
-      if (pending.length > 0) {
-        controller = new AbortController();
-        const results = await Promise.allSettled(
-          pending.map((record) => getOperationalOrderStatus(
-            record.operationalOrderId,
-            controller?.signal,
-          )),
+      controller = new AbortController();
+      try {
+        const response = await getOperationalOrders(controller.signal);
+        if (stopped) return;
+        const previous = operationalOrdersRef.current;
+        const next = mergeOperationalOrderSources(
+          response.orders,
+          loadOperationalOrders(cacheEmployeeId),
         );
-        if (!stopped) {
-          let transitionedToSynced = false;
-          const byId = new Map(results.flatMap((result, index) => {
-            if (result.status !== "fulfilled") return [];
-            return [[pending[index].operationalOrderId, result.value] as const];
-          }));
-          if (byId.size > 0) {
-            const next = current.map((record) => {
-              const status = byId.get(record.operationalOrderId);
-              if (!status) return record;
-              if (record.syncState !== "synced" && status.syncState === "synced") {
-                transitionedToSynced = true;
-              }
-              return {
-                ...record,
-                syncState: status.syncState,
-                reviewError: status.reviewError,
-                lastError: status.lastError,
-                attemptCount: status.attemptCount,
-                updatedAt: new Date().toISOString(),
-                order: {
-                  ...record.order,
-                  odooOrderId: status.odooOrderId ?? record.order.odooOrderId,
-                  odooOrderName: status.odooOrderName ?? record.order.odooOrderName,
-                },
-              };
-            });
-            operationalOrdersRef.current = next;
-            setOperationalOrders(next);
-            saveOperationalOrdersForEmployee(employee.id, next);
-            if (transitionedToSynced) {
-              setOrderRecordsRefreshKey((key) => key + 1);
-            }
-          }
+        const transitionedToSynced = next.some((record) => (
+          record.syncState === "synced"
+          && previous.some((prior) => (
+            prior.operationalOrderId === record.operationalOrderId
+            && prior.syncState !== "synced"
+          ))
+        ));
+        operationalOrdersRef.current = next;
+        setOperationalOrders(next);
+        setOperationalOrdersTruncated(response.truncated);
+        setOperationalOrdersError(null);
+        if (transitionedToSynced) setOrderRecordsRefreshKey((key) => key + 1);
+      } catch (error) {
+        if (!stopped && !controller.signal.aborted) {
+          setOperationalOrdersError(
+            error instanceof Error ? error.message : "未能更新 Odoo 同步待處理訂單",
+          );
         }
       }
       if (!stopped) timer = window.setTimeout(poll, 10_000);
     };
 
-    timer = window.setTimeout(poll, 1_500);
+    void poll();
     return () => {
       stopped = true;
       controller?.abort();
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [employee?.id]);
+  }, [employee?.id, employee?.role, operationalOrdersRefreshKey]);
+
+  const handleOperationalOrderRetry = useCallback(async (operationalOrderId: string) => {
+    if (employee?.role !== "manager") {
+      throw new Error("只有管理員可以重試待同步訂單");
+    }
+    const status = await retryOperationalOrder(operationalOrderId);
+    setOperationalOrders((current) => {
+      const next = applyOperationalOrderStatus(current, status);
+      operationalOrdersRef.current = next;
+      return next;
+    });
+    setOperationalOrdersRefreshKey((key) => key + 1);
+    if (status.syncState === "synced") {
+      setOrderRecordsRefreshKey((key) => key + 1);
+    }
+  }, [employee?.role]);
 
   useEffect(() => {
     const normalizedQuery = orderSearchQuery.trim();
@@ -463,22 +468,28 @@ const Index = () => {
         setRemoteOrders(response.orders);
         if (employee?.id !== undefined) {
           setOperationalOrders((current) => {
-            const remaining = current.filter((record) => !response.orders.some((remote) => (
-              remote.id === record.order.id
-              || Boolean(
-                remote.odooOrderId
-                && record.order.odooOrderId
-                && remote.odooOrderId === record.order.odooOrderId,
-              )
-              || Boolean(
-                remote.odooOrderName
-                && record.order.odooOrderName
-                && remote.odooOrderName === record.order.odooOrderName,
-              )
-            )));
+            const remaining = current.filter((record) => (
+              record.syncState !== "synced"
+              || !response.orders.some((remote) => (
+                remote.id === record.order.id
+                || Boolean(
+                  remote.odooOrderId
+                  && record.order.odooOrderId
+                  && remote.odooOrderId === record.order.odooOrderId,
+                )
+                || Boolean(
+                  remote.odooOrderName
+                  && record.order.odooOrderName
+                  && remote.odooOrderName === record.order.odooOrderName,
+                )
+              ))
+            ));
             if (remaining.length === current.length) return current;
             operationalOrdersRef.current = remaining;
-            saveOperationalOrdersForEmployee(employee.id, remaining);
+            saveOperationalOrdersForScope(
+              employee.id,
+              remaining,
+            );
             return remaining;
           });
         }
@@ -510,7 +521,7 @@ const Index = () => {
       });
 
     return () => controller.abort();
-  }, [debouncedOrderSearchQuery, employee?.id, historyOpen, orderRecordsRefreshKey]);
+  }, [debouncedOrderSearchQuery, employee?.id, employee?.role, historyOpen, orderRecordsRefreshKey]);
 
   const subtotal = useMemo(() => {
     const itemsTotal = orderItemsTotal(items);
@@ -1524,6 +1535,7 @@ const Index = () => {
             lastError: null,
             attemptCount: 0,
             updatedAt: new Date().toISOString(),
+            retryEligible: isPendingOdooSync,
           };
           const next = [
             tracked,
@@ -1533,7 +1545,10 @@ const Index = () => {
           ];
           operationalOrdersRef.current = next;
           setOperationalOrders(next);
-          saveOperationalOrdersForEmployee(operatorEmployeeId, next);
+          saveOperationalOrdersForScope(
+            operatorEmployeeId,
+            next,
+          );
         }
       }
     } catch (err) {
@@ -2145,6 +2160,10 @@ const Index = () => {
         truncated={orderRecordsTruncated}
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
+        operationalError={operationalOrdersError}
+        operationalTruncated={operationalOrdersTruncated}
+        viewerRole={employee?.role}
+        onOperationalRetry={handleOperationalOrderRetry}
       />
     </div>
   );

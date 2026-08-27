@@ -2,11 +2,14 @@ const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
 const SESSION_KEY = "anglo-chinese-florist-pos-session";
 export const POS_AUTH_EXPIRED_EVENT = "pos-auth-expired";
 
+export type PosEmployeeRole = "staff" | "manager";
+
 export interface PosEmployeeIdentity {
   id: number;
   name: string;
   login: string;
   salesLabel: string;
+  role: PosEmployeeRole;
 }
 
 interface PosSessionResponse {

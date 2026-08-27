@@ -7,6 +7,7 @@ const identity = {
   name: "Elma",
   login: "elma",
   salesLabel: "AC02 — Elma",
+  role: "manager" as const,
 };
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -19,6 +20,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.resetModules();
   window.sessionStorage.clear();
+  window.localStorage.clear();
 });
 
 describe("LoginGate employee authentication", () => {
@@ -37,6 +39,7 @@ describe("LoginGate employee authentication", () => {
       return (
         <div>
           <span>{employee?.salesLabel}</span>
+          <span>{employee?.role}</span>
           <button onClick={logout}>測試登出</button>
         </div>
       );
@@ -52,10 +55,13 @@ describe("LoginGate employee authentication", () => {
     fireEvent.click(screen.getByRole("button", { name: "登入" }));
 
     expect(await screen.findByText("AC02 — Elma")).toBeInTheDocument();
+    expect(screen.getByText("manager")).toBeInTheDocument();
     expect(window.sessionStorage.getItem("anglo-chinese-florist-pos-session")).toBe("signed-session");
+    window.localStorage.setItem("florist-pos-operational-orders-v1", "private-order-data");
     fireEvent.click(screen.getByRole("button", { name: "測試登出" }));
     expect(await screen.findByLabelText("員工登入代號")).toBeInTheDocument();
     expect(window.sessionStorage.getItem("anglo-chinese-florist-pos-session")).toBeNull();
+    expect(window.localStorage.getItem("florist-pos-operational-orders-v1")).toBeNull();
   });
 
   it("restores the employee identity from an existing signed session", async () => {
