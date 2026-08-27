@@ -3,6 +3,7 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CustomerSection from "@/components/pos/CustomerSection";
+import type { DemoCustomer } from "@/data/demo-customers";
 import {
   normalizeCustomerIdentityName,
   normalizePhoneNumber,
@@ -142,6 +143,40 @@ function ExistingCustomerWithoutCodeHarness() {
   );
 }
 
+function SelectedOdooCustomerSenderHarness({ customerName = "" }: { customerName?: string }) {
+  const [senderName, setSenderName] = useState("");
+  const [selectedCustomer] = useState<DemoCustomer>({
+    id: "odoo-42",
+    odooPartnerId: 42,
+    name: "Jay Contact",
+    phone: "67610707",
+    customerType: "company",
+    companyName: "Autobrand LIMITED",
+    history: [],
+  });
+
+  return (
+    <CustomerSection
+      phone="67610707"
+      customerName={customerName}
+      customerCode="testcompany"
+      senderName={senderName}
+      customerType="company"
+      companyName="Autobrand LIMITED"
+      {...emptyBusinessProps}
+      onPhoneChange={noop}
+      onNameChange={noop}
+      onCustomerCodeChange={noop}
+      onSenderNameChange={setSenderName}
+      onCustomerTypeChange={noop}
+      onCompanyNameChange={noop}
+      onCustomerSelect={noop}
+      onCustomerAndRecipientSelect={noop}
+      selectedCustomer={selectedCustomer}
+    />
+  );
+}
+
 describe("CustomerSection gift sender", () => {
   beforeEach(() => {
     searchOdooCustomerAccount.mockReset();
@@ -195,6 +230,23 @@ describe("CustomerSection gift sender", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
     expect(onSenderNameChange).toHaveBeenCalledWith("Jay");
+  });
+
+  it("falls back to the selected Odoo contact when the controlled name has not settled yet", () => {
+    render(<SelectedOdooCustomerSenderHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
+
+    expect(screen.getByLabelText(/送花人名稱/)).toHaveValue("Jay Contact");
+    expect(screen.getByLabelText(/送花人名稱/)).not.toHaveValue("Autobrand LIMITED");
+  });
+
+  it("keeps the displayed controlled contact authoritative over selected-customer fallback", () => {
+    render(<SelectedOdooCustomerSenderHarness customerName="Edited Contact" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
+
+    expect(screen.getByLabelText(/送花人名稱/)).toHaveValue("Edited Contact");
   });
 
   it("marks required customer fields invalid and exposes inline alerts", () => {

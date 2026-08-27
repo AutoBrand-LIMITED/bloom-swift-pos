@@ -262,7 +262,7 @@ const CustomerSection = ({
         : "正在準備搜尋...";
 
   // 「同客戶相同」係指實際下單人／聯絡人；公司名稱只屬於帳戶資料。
-  const orderingCustomerName = customerName.trim();
+  const orderingCustomerName = customerName.trim() || selectedCustomer?.name.trim() || "";
   const normalizedCurrentPhone = normalizePhoneNumber(phone);
   const currentPhoneSearchKey = phoneLocalDigits(phone);
   const normalizedCurrentCustomerName = normalizeCustomerIdentityName(customerName);

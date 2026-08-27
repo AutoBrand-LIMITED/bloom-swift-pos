@@ -203,6 +203,11 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
               deliveryArea: "",
             }, true)}
             onAreaChange={(deliveryArea) => update(split.id, { deliveryArea }, true)}
+            onAddressHierarchyChange={(hierarchy) => update(split.id, {
+              deliveryRegion: hierarchy.region,
+              deliveryDistrict: hierarchy.district,
+              deliveryArea: hierarchy.area,
+            }, true)}
             onDetailChange={(deliveryDetail) => update(split.id, { deliveryDetail }, true)}
             onBuildingChange={(deliveryBuilding) => update(split.id, { deliveryBuilding }, true)}
             onFloorChange={(deliveryFloor) => update(split.id, { deliveryFloor }, true)}

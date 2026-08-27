@@ -1,90 +1,19 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import SplitDeliverySection from "@/components/pos/SplitDeliverySection";
-import type { DeliverySplit, FulfillmentType } from "@/types/order";
+import type { DeliverySplit } from "@/types/order";
 
-vi.mock("@/components/pos/DeliverySection", () => ({
-  default: ({
-    fulfillmentType,
-    onFulfillmentTypeChange,
-    recipientName,
-    recipientPhone,
-    senderType,
-    senderCompanyName,
-    senderName,
-    senderPhone,
-    onRecipientDetailsChange,
-    deliveryRegion,
-    deliveryDistrict,
-    deliveryArea,
-    deliveryDetail,
-    onGoogleAddressSelect,
-  }: {
-    fulfillmentType: FulfillmentType;
-    onFulfillmentTypeChange: (value: FulfillmentType) => void;
-    recipientName: string;
-    recipientPhone: string;
-    senderType: "personal" | "company";
-    senderCompanyName: string;
-    senderName: string;
-    senderPhone: string;
-    onRecipientDetailsChange: (recipient: {
-      type: "personal" | "company";
-      companyName: string;
-      name: string;
-      phone: string;
-    }) => void;
-    deliveryRegion: string;
-    deliveryDistrict: string;
-    deliveryArea: string;
-    deliveryDetail: string;
-    onGoogleAddressSelect: (selection: {
-      address: string;
-      region: string;
-      district: string;
-      area: string;
-    }) => void;
-  }) => (
-    <div>
-      <button
-        type="button"
-        onClick={() => onFulfillmentTypeChange(
-          fulfillmentType === "delivery" ? "pickup" : "delivery",
-        )}
-      >
-        {fulfillmentType === "delivery" ? "改為自取" : "改為送貨"}
-      </button>
-      <button
-        type="button"
-        aria-label="收貨人同送花人相同"
-        onClick={() => onRecipientDetailsChange({
-          type: senderType,
-          companyName: senderCompanyName,
-          name: senderName,
-          phone: senderPhone,
-        })}
-      >
-        套用送花人
-      </button>
-      <output aria-label="拆單收貨人">{recipientName}|{recipientPhone}</output>
-      <button
-        type="button"
-        onClick={() => onGoogleAddressSelect({
-          address: "香港灣仔軒尼詩道 1 號",
-          region: "香港島",
-          district: "灣仔區",
-          area: "灣仔",
-        })}
-      >
-        選擇 Google 地址
-      </button>
-      <output aria-label="拆單地址層級">
-        {deliveryRegion}|{deliveryDistrict}|{deliveryArea}|{deliveryDetail}
-      </output>
-    </div>
-  ),
+const addressHookMocks = vi.hoisted(() => ({
+  useGoogleAddressSuggestions: vi.fn(),
+  clearSuggestions: vi.fn(),
+  refreshSuggestions: vi.fn(),
+  selectSuggestion: vi.fn(),
+}));
+
+vi.mock("@/hooks/useGoogleAddressSuggestions", () => ({
+  useGoogleAddressSuggestions: addressHookMocks.useGoogleAddressSuggestions,
 }));
 
 const Harness = () => {
@@ -111,35 +40,75 @@ const Harness = () => {
 };
 
 describe("SplitDeliverySection fulfillment controls", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    addressHookMocks.useGoogleAddressSuggestions.mockReturnValue({
+      suggestions: [],
+      status: "idle",
+      clearSuggestions: addressHookMocks.clearSuggestions,
+      refreshSuggestions: addressHookMocks.refreshSuggestions,
+      selectSuggestion: addressHookMocks.selectSuggestion,
+    });
+  });
+
   it("creates an independent destination and allows switching it to pickup", () => {
     render(<Harness />);
 
     fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
-    expect(screen.getByRole("button", { name: "改為自取" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "送貨" })).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(screen.getByRole("button", { name: "改為自取" }));
-    expect(screen.getByRole("button", { name: "改為送貨" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "自取" }));
+    expect(screen.getByText(/自取訂單只需選擇日期及時間/)).toBeVisible();
   });
 
   it("applies the sender name and phone to a split destination in one update", () => {
     render(<Harness />);
 
     fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
-    fireEvent.click(screen.getByRole("button", { name: "收貨人同送花人相同" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "收貨人同送花人相同" }));
 
-    expect(screen.getByRole("status", { name: "拆單收貨人" })).toHaveTextContent(
-      "Ms Chan|61234567",
-    );
+    expect(screen.getByLabelText(/收貨人姓名／聯絡人姓名/)).toHaveValue("Ms Chan");
+    expect(screen.getByLabelText("收貨人電話")).toHaveValue("61234567");
   });
 
   it("applies a Google address hierarchy to one split destination atomically", () => {
     render(<Harness />);
 
     fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
-    fireEvent.click(screen.getByRole("button", { name: "選擇 Google 地址" }));
+    const hookOptions = addressHookMocks.useGoogleAddressSuggestions.mock.calls.at(-1)?.[0];
+    act(() => {
+      hookOptions.onAddressSelect({
+        address: "香港灣仔軒尼詩道 1 號",
+        region: "香港島",
+        district: "灣仔區",
+        area: "灣仔",
+      });
+    });
 
-    expect(screen.getByRole("status", { name: "拆單地址層級" })).toHaveTextContent(
-      "香港島|灣仔區|灣仔|香港灣仔軒尼詩道 1 號",
+    expect(screen.getByRole("combobox", { name: "送貨地區" })).toHaveTextContent("香港島");
+    expect(screen.getByRole("combobox", { name: "送貨分區" })).toHaveTextContent("灣仔區");
+    expect(screen.getByRole("combobox", { name: "送貨地點" })).toHaveTextContent("灣仔");
+    expect(screen.getByPlaceholderText("搜尋並選擇 Google 地址")).toHaveValue(
+      "香港灣仔軒尼詩道 1 號",
     );
+  });
+
+  it("keeps manual region and district selections in the controlled split", () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+    const region = screen.getByRole("combobox", { name: "送貨地區" });
+    fireEvent.click(region);
+    fireEvent.click(screen.getByRole("option", { name: "九龍" }));
+
+    expect(region).toHaveTextContent("九龍");
+    const district = screen.getByRole("combobox", { name: "送貨分區" });
+    expect(district).toBeEnabled();
+    fireEvent.click(district);
+    fireEvent.click(screen.getByRole("option", { name: "觀塘區" }));
+
+    expect(region).toHaveTextContent("九龍");
+    expect(district).toHaveTextContent("觀塘區");
+    expect(screen.getByRole("combobox", { name: "送貨地點" })).toBeEnabled();
   });
 });
