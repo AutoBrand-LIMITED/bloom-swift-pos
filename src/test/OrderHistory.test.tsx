@@ -162,6 +162,28 @@ describe("OrderHistory delivery summary", () => {
     expect(within(order).getByText("送貨：2026-07-18 · 上午 09:00-13:00")).toBeVisible();
   });
 
+  it("labels pickup orders and their store address as pickup", () => {
+    render(
+      <OrderHistory
+        orders={[orderFixture({
+          fulfillmentType: "pickup",
+          deliveryAddress: "中西花店門市自取",
+        })]}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    const order = screen.getByRole("group", { name: /訂單 S00017/ });
+    expect(within(order).getByText("自取：2026-07-18 · 上午 09:00-13:00")).toBeVisible();
+    expect(within(order).queryByText("送貨：2026-07-18 · 上午 09:00-13:00")).not.toBeInTheDocument();
+
+    fireEvent.click(within(order).getByText("業務詳情"));
+    expect(within(order).getByText("自取地點")).toBeVisible();
+    expect(within(order).getByText("中西花店門市自取")).toBeVisible();
+    expect(within(order).queryByText("送貨地址")).not.toBeInTheDocument();
+  });
+
   it("edits an existing Odoo order and refreshes the drawer", async () => {
     updateOdooOrderOperationalDetails.mockResolvedValue({
       id: 17,

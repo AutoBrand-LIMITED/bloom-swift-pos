@@ -252,6 +252,8 @@ const OrderHistory = ({
             <div className="p-4 space-y-3">
               {orders.map((order) => {
                 const badge = statusBadge[order.paymentStatus];
+                const fulfillmentType = order.fulfillmentType || "delivery";
+                const fulfillmentLabel = fulfillmentType === "pickup" ? "自取" : "送貨";
                 const deliveryTimeLabel = order.deliveryTimeMode === "specified"
                   ? `指定時間：${order.deliveryTime || "未指定"}`
                   : order.deliveryTime || "未指定時段";
@@ -262,7 +264,7 @@ const OrderHistory = ({
                   ["收貨公司", order.recipientCompanyName],
                   ["收花聯絡人", order.recipientName],
                   ["收花電話", order.recipientPhone],
-                  ["送貨地址", order.deliveryAddress],
+                  [fulfillmentType === "pickup" ? "自取地點" : "送貨地址", order.deliveryAddress],
                   ["客戶電郵", order.customerEmail],
                   ["帳單地址", order.billingAddress],
                   ["客戶群組", order.customerGroup],
@@ -287,7 +289,7 @@ const OrderHistory = ({
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       <p className="flex items-center gap-1.5 font-medium text-foreground">
                         <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                        送貨：{order.deliveryDate || "未指定日期"} · {deliveryTimeLabel}
+                        {fulfillmentLabel}：{order.deliveryDate || "未指定日期"} · {deliveryTimeLabel}
                       </p>
                       {order.items.map((item) => (
                         <div key={item.id}>
