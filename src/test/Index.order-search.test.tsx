@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Index from "@/pages/Index";
 import type { OdooOrderRecordsResponse } from "@/lib/odoo-api";
+import { hongKongBusinessDate, UNSYNCED_ORDERS_KEY } from "@/lib/order-records";
 import type { Order } from "@/types/order";
 
 const odooMocks = vi.hoisted(() => ({
@@ -26,7 +27,11 @@ vi.mock("@/lib/odoo-api", async (importOriginal) => {
   };
 });
 
-const orderFixture = (id: number, customerName: string): Order => ({
+const orderFixture = (
+  id: number,
+  customerName: string,
+  overrides: Partial<Order> = {},
+): Order => ({
   id: `local-${id}`,
   odooOrderId: id,
   odooOrderName: `S${String(id).padStart(5, "0")}`,
@@ -59,6 +64,7 @@ const orderFixture = (id: number, customerName: string): Order => ({
   deliveryNote: "",
   internalNote: "",
   createdAt: "2026-08-26T09:00:00+08:00",
+  ...overrides,
 });
 
 function deferredResponse() {
@@ -87,11 +93,37 @@ describe("Index correlated order search", () => {
     odooMocks.getOdooProducts.mockResolvedValue([]);
   });
 
-  it("shows unsettled status without a false zero and ignores a slower previous response", async () => {
+  it("defaults to today in Hong Kong and fetches a changed date without text", async () => {
+    const today = hongKongBusinessDate();
+
+    render(<MemoryRouter><Index /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: /訂單記錄/ }));
+
+    const dateInput = screen.getByLabelText("香港落單日期");
+    expect(dateInput).toHaveValue(today);
+    await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
+      today,
+      expect.any(AbortSignal),
+    ));
+
+    fireEvent.change(dateInput, { target: { value: "2026-08-25" } });
+    await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
+      "2026-08-25",
+      expect.any(AbortSignal),
+    ));
+    expect(screen.getByText(/顯示 2026-08-25 的落單記錄/)).toBeVisible();
+  });
+
+  it("correlates combined search by query and date and ignores the stale date response", async () => {
+    const today = hongKongBusinessDate();
     const first = deferredResponse();
     const second = deferredResponse();
-    odooMocks.searchOdooOrderRecords.mockImplementation((query: string) => (
-      query === "Alpha" ? first.promise : second.promise
+    odooMocks.searchOdooOrderRecords.mockImplementation((
+      _query: string,
+      _signal: AbortSignal,
+      date?: string,
+    ) => (
+      date === today ? first.promise : second.promise
     ));
 
     render(<MemoryRouter><Index /></MemoryRouter>);
@@ -100,25 +132,28 @@ describe("Index correlated order search", () => {
 
     const search = screen.getByRole("textbox", { name: "搜尋訂單" });
     fireEvent.change(search, { target: { value: "Alpha" } });
-    expect(screen.getAllByText("等待搜尋當前資料...").length).toBeGreaterThan(0);
-    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
+    expect(screen.getAllByText(`等待搜尋 ${today} 的訂單...`).length).toBeGreaterThan(0);
+    expect(screen.queryByText(`未找到 ${today} 符合資料的訂單`)).not.toBeInTheDocument();
 
     await waitFor(
       () => expect(odooMocks.searchOdooOrderRecords).toHaveBeenCalledWith(
         "Alpha",
         expect.any(AbortSignal),
+        today,
       ),
       { timeout: 1_000 },
     );
-    expect(screen.getAllByText("正在搜尋當前資料...").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(`正在搜尋 ${today} 的訂單...`).length).toBeGreaterThan(0);
 
-    fireEvent.change(search, { target: { value: "Bravo" } });
-    expect(screen.getAllByText("等待搜尋當前資料...").length).toBeGreaterThan(0);
-    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("香港落單日期"), {
+      target: { value: "2026-08-25" },
+    });
+    expect(screen.queryByText(`未找到 ${today} 符合資料的訂單`)).not.toBeInTheDocument();
     await waitFor(
       () => expect(odooMocks.searchOdooOrderRecords).toHaveBeenCalledWith(
-        "Bravo",
+        "Alpha",
         expect.any(AbortSignal),
+        "2026-08-25",
       ),
       { timeout: 1_000 },
     );
@@ -131,7 +166,7 @@ describe("Index correlated order search", () => {
       });
     });
     expect((await screen.findAllByText("New Match"))[0]).toBeVisible();
-    expect(screen.getByText("跨日期搜尋結果：1 筆")).toBeVisible();
+    expect(screen.getByText("2026-08-25 搜尋結果：1 筆")).toBeVisible();
 
     await act(async () => {
       first.resolve({
@@ -143,5 +178,42 @@ describe("Index correlated order search", () => {
     });
     expect(screen.getAllByText("New Match")[0]).toBeVisible();
     expect(screen.queryByText("Old Match")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除訂單搜尋" }));
+    expect(screen.getByLabelText("香港落單日期")).toHaveValue("2026-08-25");
+    await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
+      "2026-08-25",
+      expect.any(AbortSignal),
+    ));
+  });
+
+  it("filters local fallback rows by Hong Kong created-at date before display", async () => {
+    const now = new Date();
+    const previous = new Date(now.getTime() - 24 * 60 * 60 * 1_000);
+    const today = hongKongBusinessDate(now);
+    const previousDate = hongKongBusinessDate(previous);
+    localStorage.setItem(UNSYNCED_ORDERS_KEY, JSON.stringify([
+      orderFixture(31, "Local Today", { createdAt: now.toISOString() }),
+      orderFixture(32, "Local Previous", { createdAt: previous.toISOString() }),
+      orderFixture(33, "Malformed Local", { createdAt: "not-a-date" }),
+    ]));
+
+    render(<MemoryRouter><Index /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: /訂單記錄/ }));
+    await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
+      today,
+      expect.any(AbortSignal),
+    ));
+
+    expect(screen.getAllByText("Local Today")[0]).toBeVisible();
+    expect(screen.queryByText("Local Previous")).not.toBeInTheDocument();
+    expect(screen.queryByText("Malformed Local")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("香港落單日期"), {
+      target: { value: previousDate },
+    });
+    expect((await screen.findAllByText("Local Previous"))[0]).toBeVisible();
+    expect(screen.queryByText("Local Today")).not.toBeInTheDocument();
+    expect(screen.queryByText("Malformed Local")).not.toBeInTheDocument();
   });
 });

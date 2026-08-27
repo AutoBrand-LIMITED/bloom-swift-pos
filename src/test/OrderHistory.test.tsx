@@ -89,24 +89,34 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByRole("group", { name: /訂單 S00020/ })).toBeInTheDocument();
   });
 
-  it("offers cross-date order search for customer and recipient details", () => {
+  it("offers an accessible Hong Kong order-date field and date-scoped search", () => {
     const onSearchQueryChange = vi.fn();
+    const onSelectedDateChange = vi.fn();
     render(
       <OrderHistory
         orders={[]}
         open
         onClose={vi.fn()}
+        selectedDate="2026-07-19"
+        onSelectedDateChange={onSelectedDateChange}
         searchQuery="accounts@example.com"
         onSearchQueryChange={onSearchQueryChange}
         searchPhase="success"
       />,
     );
 
+    const dateInput = screen.getByLabelText("香港落單日期");
+    expect(dateInput).toHaveAttribute("type", "date");
+    expect(dateInput).toHaveValue("2026-07-19");
+    expect(dateInput).toHaveClass("min-h-11", "touch-manipulation");
+    fireEvent.change(dateInput, { target: { value: "2026-07-18" } });
+    expect(onSelectedDateChange).toHaveBeenCalledWith("2026-07-18");
     expect(screen.getByRole("textbox", { name: "搜尋訂單" })).toHaveValue("accounts@example.com");
-    expect(screen.getByText("跨日期搜尋結果：0 筆")).toBeVisible();
-    expect(screen.getByText("未找到符合資料的訂單")).toBeVisible();
+    expect(screen.getByText("2026-07-19 搜尋結果：0 筆")).toBeVisible();
+    expect(screen.getByText("未找到 2026-07-19 符合資料的訂單")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "清除訂單搜尋" }));
     expect(onSearchQueryChange).toHaveBeenCalledWith("");
+    expect(onSelectedDateChange).toHaveBeenCalledTimes(1);
   });
 
   it("does not show a stale count or false zero while a remote search is unsettled", () => {
@@ -115,6 +125,7 @@ describe("OrderHistory delivery summary", () => {
         orders={[]}
         open
         onClose={vi.fn()}
+        selectedDate="2026-07-19"
         searchQuery="Wong"
         onSearchQueryChange={vi.fn()}
         searchPhase="debouncing"
@@ -122,15 +133,16 @@ describe("OrderHistory delivery summary", () => {
     );
 
     expect(screen.getByText("訂單記錄")).toBeVisible();
-    expect(screen.getAllByText("等待搜尋當前資料...").length).toBeGreaterThan(0);
-    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
-    expect(screen.queryByText(/跨日期搜尋結果/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("等待搜尋 2026-07-19 的訂單...").length).toBeGreaterThan(0);
+    expect(screen.queryByText("未找到 2026-07-19 符合資料的訂單")).not.toBeInTheDocument();
+    expect(screen.queryByText(/2026-07-19 搜尋結果/)).not.toBeInTheDocument();
 
     rerender(
       <OrderHistory
         orders={[]}
         open
         onClose={vi.fn()}
+        selectedDate="2026-07-19"
         searchQuery="Wong"
         onSearchQueryChange={vi.fn()}
         searchPhase="error"
@@ -138,7 +150,7 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
     expect(screen.getByText("搜尋未完成，請重試")).toBeVisible();
-    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
+    expect(screen.queryByText("未找到 2026-07-19 符合資料的訂單")).not.toBeInTheDocument();
   });
 
   it("requires two characters before starting order search", () => {

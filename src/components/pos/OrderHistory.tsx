@@ -15,6 +15,8 @@ interface OrderHistoryProps {
   orders: OrderRecordView[];
   open: boolean;
   onClose: () => void;
+  selectedDate?: string;
+  onSelectedDateChange?: (value: string) => void;
   searchQuery?: string;
   onSearchQueryChange?: (value: string) => void;
   loading?: boolean;
@@ -41,6 +43,8 @@ const OrderHistory = ({
   orders,
   open,
   onClose,
+  selectedDate = "",
+  onSelectedDateChange,
   searchQuery = "",
   onSearchQueryChange,
   loading = false,
@@ -65,6 +69,7 @@ const OrderHistory = ({
   const searchActive = normalizedSearch.length >= 2;
   const searchSettled = searchActive && searchPhase === "success";
   const showOrderCount = !searchActive || searchSettled;
+  const selectedDateLabel = selectedDate || "所選日期";
   const backlogOrders = orders.filter((order) => (
     order.source === "operational"
     && ["pending_odoo", "syncing", "needs_review"].includes(order.syncState)
@@ -122,6 +127,19 @@ const OrderHistory = ({
           </Button>
         </div>
         <div className="shrink-0 space-y-1.5 border-b border-border p-3">
+          <div className="space-y-1">
+            <label htmlFor="order-history-date" className="text-xs font-medium text-foreground">
+              香港落單日期
+            </label>
+            <Input
+              id="order-history-date"
+              type="date"
+              aria-label="香港落單日期"
+              value={selectedDate}
+              onChange={(event) => onSelectedDateChange?.(event.target.value)}
+              className="min-h-11 touch-manipulation text-sm"
+            />
+          </div>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -151,15 +169,15 @@ const OrderHistory = ({
               ? "請輸入至少 2 個字元"
               : searchActive
                 ? searchPhase === "debouncing"
-                  ? "等待搜尋當前資料..."
+                  ? `等待搜尋 ${selectedDateLabel} 的訂單...`
                   : searchPhase === "searching"
-                    ? "正在搜尋當前資料..."
+                    ? `正在搜尋 ${selectedDateLabel} 的訂單...`
                     : searchSettled
-                      ? `跨日期搜尋結果：${orders.length} 筆`
+                      ? `${selectedDateLabel} 搜尋結果：${orders.length} 筆`
                       : searchPhase === "error"
                         ? "搜尋未完成，請重試"
                         : "準備搜尋..."
-                : "留空會顯示今日訂單；搜尋會跨日期查找。"}
+                : `顯示 ${selectedDateLabel} 的落單記錄；文字搜尋只會查找該日期。`}
           </p>
         </div>
         {!searchActive && (backlogOrders.length > 0 || operationalError || operationalTruncated) && (
@@ -194,7 +212,9 @@ const OrderHistory = ({
               {loading && (
                 <p aria-live="polite" className="flex items-center gap-2 text-xs text-muted-foreground">
                   <LoaderCircle className="h-4 w-4 animate-spin" />
-                  {searchActive ? "正在 Odoo 搜尋訂單" : "正在從 Odoo 載入今日訂單記錄"}
+                  {searchActive
+                    ? `正在 Odoo 搜尋 ${selectedDateLabel} 的訂單`
+                    : `正在從 Odoo 載入 ${selectedDateLabel} 的落單記錄`}
                 </p>
               )}
               {error && (
@@ -231,7 +251,9 @@ const OrderHistory = ({
           {searchActive && !searchSettled ? (
             searchPhase === "error" ? null : (
               <p aria-live="polite" className="text-center text-muted-foreground p-8">
-                {searchPhase === "debouncing" ? "等待搜尋當前資料..." : "正在搜尋當前資料..."}
+                {searchPhase === "debouncing"
+                  ? `等待搜尋 ${selectedDateLabel} 的訂單...`
+                  : `正在搜尋 ${selectedDateLabel} 的訂單...`}
               </p>
             )
           ) : orders.length === 0 && !loaded ? (
@@ -245,8 +267,8 @@ const OrderHistory = ({
               {searchNeedsMoreInput
                 ? "請輸入至少 2 個字元開始搜尋"
                 : searchActive
-                  ? "未找到符合資料的訂單"
-                  : "今日暫無訂單"}
+                  ? `未找到 ${selectedDateLabel} 符合資料的訂單`
+                  : `${selectedDateLabel} 暫無訂單`}
             </p>
           ) : (
             <div className="p-4 space-y-3">

@@ -1081,13 +1081,15 @@ export async function getOdooOrderRecords(
 export async function searchOdooOrderRecords(
   query: string,
   signal?: AbortSignal,
+  date?: string,
 ): Promise<OdooOrderRecordsResponse> {
   const trimmed = query.trim();
   if (!BACKEND_URL || trimmed.length < 2) {
-    return { generatedAt: "", truncated: false, orders: [] };
+    return { ...(date ? { date } : {}), generatedAt: "", truncated: false, orders: [] };
   }
 
   const params = new URLSearchParams({ q: trimmed });
+  if (date) params.set("date", date);
   const res = await authenticatedFetch(`${BACKEND_URL}/orders?${params.toString()}`, {
     headers: { "Content-Type": "application/json" },
     signal,

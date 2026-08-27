@@ -681,7 +681,7 @@ describe("odoo-api note contracts", () => {
     );
   });
 
-  it("searches Odoo orders across dates with an encoded query", async () => {
+  it("searches Odoo orders with an encoded query and optional order date", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const response = {
       generatedAt: "2026-08-01T22:00:00+08:00",
@@ -692,9 +692,31 @@ describe("odoo-api note contracts", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { searchOdooOrderRecords } = await import("@/lib/odoo-api");
 
-    await expect(searchOdooOrderRecords(" accounts+hk@example.com ")).resolves.toEqual(response);
+    await expect(searchOdooOrderRecords(
+      " accounts+hk@example.com ",
+      undefined,
+      "2026-07-19",
+    )).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://backend.test/orders?q=accounts%2Bhk%40example.com",
+      "https://backend.test/orders?q=accounts%2Bhk%40example.com&date=2026-07-19",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
+  it("preserves query-only Odoo order search callers", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      generatedAt: "2026-08-01T22:00:00+08:00",
+      truncated: false,
+      orders: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooOrderRecords } = await import("@/lib/odoo-api");
+
+    await expect(searchOdooOrderRecords("Wong")).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders?q=Wong",
       expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
     );
   });
