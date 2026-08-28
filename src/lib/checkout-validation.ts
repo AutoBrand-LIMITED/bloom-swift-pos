@@ -57,6 +57,7 @@ interface CheckoutValidationInput {
 }
 
 const ALLOWED_PHONE_CHARACTERS = /^\+?[0-9 ()-]+$/;
+const EMAIL_ADDRESS = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const ISO_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 
 export function normalizePhoneNumber(value: string): string {
@@ -89,7 +90,7 @@ export function isValidDeliveryDate(value: string): boolean {
 
 export function isValidEmailAddress(value: string): boolean {
   const email = value.trim();
-  return !email || (email.length <= 254 && email.includes("@"));
+  return !email || (email.length <= 254 && EMAIL_ADDRESS.test(email));
 }
 
 export function validatePositiveOrderTotal(finalPrice: number): string | null {
