@@ -66,7 +66,6 @@ import {
   getOdooPartnerNotes,
   getOperationalOrders,
   getOdooOrderRecords,
-  retryOperationalOrder,
   searchOdooOrderRecords,
   getAccountingPaymentOptions,
   allowLocalOnlyOrders,
@@ -111,7 +110,6 @@ import {
   saveUnsyncedOrders,
 } from "@/lib/order-records";
 import {
-  applyOperationalOrderStatus,
   loadOperationalOrders,
   mergeOperationalOrderSources,
   saveOperationalOrdersForScope,
@@ -280,9 +278,6 @@ const Index = () => {
     () => loadOperationalOrders(employee?.id),
   );
   const operationalOrdersRef = useRef(operationalOrders);
-  const [operationalOrdersError, setOperationalOrdersError] = useState<string | null>(null);
-  const [operationalOrdersTruncated, setOperationalOrdersTruncated] = useState(false);
-  const [operationalOrdersRefreshKey, setOperationalOrdersRefreshKey] = useState(0);
   const [remoteOrders, setRemoteOrders] = useState<Order[]>([]);
   const [remoteOrdersQuery, setRemoteOrdersQuery] = useState("");
   const [remoteOrdersDate, setRemoteOrdersDate] = useState("");
@@ -393,14 +388,10 @@ const Index = () => {
         ));
         operationalOrdersRef.current = next;
         setOperationalOrders(next);
-        setOperationalOrdersTruncated(response.truncated);
-        setOperationalOrdersError(null);
         if (transitionedToSynced) setOrderRecordsRefreshKey((key) => key + 1);
       } catch (error) {
         if (!stopped && !controller.signal.aborted) {
-          setOperationalOrdersError(
-            error instanceof Error ? error.message : "未能更新 Odoo 同步待處理訂單",
-          );
+          console.warn("Operational order refresh failed", error);
         }
       }
       if (!stopped) timer = window.setTimeout(poll, 10_000);
@@ -412,23 +403,7 @@ const Index = () => {
       controller?.abort();
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [employee?.id, employee?.role, operationalOrdersRefreshKey]);
-
-  const handleOperationalOrderRetry = useCallback(async (operationalOrderId: string) => {
-    if (employee?.role !== "manager") {
-      throw new Error("只有管理員可以重試待同步訂單");
-    }
-    const status = await retryOperationalOrder(operationalOrderId);
-    setOperationalOrders((current) => {
-      const next = applyOperationalOrderStatus(current, status);
-      operationalOrdersRef.current = next;
-      return next;
-    });
-    setOperationalOrdersRefreshKey((key) => key + 1);
-    if (status.syncState === "synced") {
-      setOrderRecordsRefreshKey((key) => key + 1);
-    }
-  }, [employee?.role]);
+  }, [employee?.id, employee?.role]);
 
   useEffect(() => {
     const normalizedQuery = orderSearchQuery.trim();
@@ -2202,10 +2177,6 @@ const Index = () => {
         truncated={orderRecordsTruncated}
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
-        operationalError={operationalOrdersError}
-        operationalTruncated={operationalOrdersTruncated}
-        viewerRole={employee?.role}
-        onOperationalRetry={handleOperationalOrderRetry}
       />
     </div>
   );

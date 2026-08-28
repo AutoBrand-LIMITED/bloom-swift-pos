@@ -125,8 +125,8 @@ describe("Index operational-order hydration", () => {
     fireEvent.click(screen.getByRole("button", { name: "訂單記錄" }));
 
     expect(await screen.findByText("Cross-tablet customer")).toBeVisible();
-    expect(screen.getByText("Odoo 同步待處理（1）")).toBeVisible();
-    expect(screen.getByRole("button", { name: "立即重試 Odoo 同步" })).toBeVisible();
+    expect(screen.queryByText(/Odoo 同步/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已嘗試/)).not.toBeInTheDocument();
   });
 
   it("keeps the pending backlog when Odoo exposes only a matching draft", async () => {
@@ -153,7 +153,8 @@ describe("Index operational-order hydration", () => {
     await waitFor(() => expect(odooMocks.getOperationalOrders).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "訂單記錄" }));
 
-    expect(await screen.findByText("Odoo 同步待處理（1）")).toBeVisible();
-    expect(screen.getByRole("button", { name: "立即重試 Odoo 同步" })).toBeVisible();
+    expect(await screen.findByText("Cross-tablet customer")).toBeVisible();
+    expect(screen.queryByText(/Odoo 同步/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已嘗試/)).not.toBeInTheDocument();
   });
 });

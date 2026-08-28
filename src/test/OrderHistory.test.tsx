@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OrderHistory from "@/components/pos/OrderHistory";
@@ -473,11 +473,7 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.queryByText("Net 30")).not.toBeInTheDocument();
   });
 
-  it("shows same-day backlog counts and lets a manager retry only an eligible pending row", async () => {
-    let finishRetry!: () => void;
-    const onOperationalRetry = vi.fn(() => new Promise<void>((resolve) => {
-      finishRetry = resolve;
-    }));
+  it("keeps accepted orders visible without exposing backend sync details", () => {
     const pending = orderFixture({
       id: "pending-order",
       source: "operational",
@@ -501,77 +497,15 @@ describe("OrderHistory delivery summary", () => {
         orders={[pending, review]}
         open
         onClose={vi.fn()}
-        viewerRole="manager"
-        onOperationalRetry={onOperationalRetry}
       />,
     );
 
-    expect(screen.getByText("Odoo 同步待處理（2）")).toBeVisible();
-    expect(screen.getByText("待同步 1 · 同步中 0 · 需核對 1")).toBeVisible();
-    expect(screen.getAllByRole("button", { name: "立即重試 Odoo 同步" })).toHaveLength(1);
-    expect(screen.getByText(/customer_conflict/)).toBeVisible();
-
-    fireEvent.click(screen.getByRole("button", { name: "立即重試 Odoo 同步" }));
-    expect(onOperationalRetry).toHaveBeenCalledWith("pending-operational-id");
-    expect(await screen.findByRole("button", { name: "正在重試 Odoo 同步..." })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "正在重試 Odoo 同步..." })).toHaveClass(
-      "min-h-11",
-      "touch-manipulation",
-    );
-
-    await act(async () => finishRetry());
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "立即重試 Odoo 同步" })).toBeEnabled();
-    });
-  });
-
-  it("never exposes retry to staff and shows a manager retry error", async () => {
-    const pending = orderFixture({
-      id: "pending-order",
-      source: "operational",
-      syncState: "pending_odoo",
-      operationalOrderId: "pending-operational-id",
-      operationalRetryEligible: true,
-    });
-    const { rerender } = render(
-      <OrderHistory
-        orders={[pending]}
-        open
-        onClose={vi.fn()}
-        viewerRole="staff"
-        onOperationalRetry={vi.fn()}
-      />,
-    );
-
-    expect(screen.queryByRole("button", { name: "立即重試 Odoo 同步" })).not.toBeInTheDocument();
-
-    rerender(
-      <OrderHistory
-        orders={[pending]}
-        open
-        onClose={vi.fn()}
-        viewerRole="manager"
-        onOperationalRetry={vi.fn().mockRejectedValue(new Error("retry_conflict"))}
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "立即重試 Odoo 同步" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("重試失敗：retry_conflict");
-  });
-
-  it("warns when the current-day operational backlog is truncated", () => {
-    render(
-      <OrderHistory
-        orders={[]}
-        open
-        onClose={vi.fn()}
-        viewerRole="manager"
-        operationalTruncated
-      />,
-    );
-
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "待同步訂單超過畫面顯示上限",
-    );
+    expect(screen.getByText("訂單記錄 (2)")).toBeVisible();
+    expect(screen.queryByText(/Odoo 同步/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已安全保存/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已嘗試/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/odoo_unavailable/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/customer_conflict/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /重試 Odoo 同步/ })).not.toBeInTheDocument();
   });
 });
