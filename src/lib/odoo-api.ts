@@ -47,6 +47,8 @@ export interface CustomerAccountLookup {
   truncated: boolean;
 }
 
+export type CustomerCodeMatchMode = "exact" | "prefix";
+
 interface OdooEmployee {
   id: number;
   name: string;
@@ -857,14 +859,20 @@ export async function searchOdooCustomers(
   query: string,
   signal?: AbortSignal,
   searchType: "general" | "customer_code" = "general",
+  customerCodeMatchMode: CustomerCodeMatchMode = "exact",
 ): Promise<DemoCustomer[]> {
   const trimmed = query.trim();
-  const minimumLength = searchType === "customer_code" ? 1 : 2;
+  const minimumLength = searchType === "customer_code"
+    ? customerCodeMatchMode === "prefix" ? 3 : 1
+    : 2;
   if (!BACKEND_URL || trimmed.length < minimumLength) return [];
 
   const params = new URLSearchParams({ q: trimmed });
   if (searchType === "customer_code") {
     params.set("searchType", searchType);
+    if (customerCodeMatchMode !== "exact") {
+      params.set("matchMode", customerCodeMatchMode);
+    }
   }
   const res = await authenticatedFetch(`${BACKEND_URL}/customers?${params.toString()}`, {
     headers: { "Content-Type": "application/json" },
