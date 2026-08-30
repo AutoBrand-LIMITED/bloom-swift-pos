@@ -360,6 +360,28 @@ describe("odoo-api note contracts", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("loads native Sales Teams and current Odoo Contact Tags", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: 7, name: "Retail" }]))
+      .mockResolvedValueOnce(jsonResponse([{ id: 12, name: "Corporate" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOdooCustomerGroups, getOdooSalesTeams } = await import("@/lib/odoo-api");
+
+    await expect(getOdooSalesTeams()).resolves.toEqual([{ id: 7, name: "Retail" }]);
+    await expect(getOdooCustomerGroups()).resolves.toEqual([{ id: 12, name: "Corporate" }]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://backend.test/sales-teams",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://backend.test/customer-groups",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
   it("keeps search results lightweight until a customer is selected", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([{
@@ -371,7 +393,10 @@ describe("odoo-api note contracts", () => {
       history_count: null,
       total_spent: null,
       history: [],
-      tags: [],
+      tags: [{ id: 12, name: "Corporate", color: 3 }],
+      customerGroupId: 12,
+      customerGroup: "Corporate",
+      writeDate: "2026-08-29 09:15:00",
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
@@ -395,6 +420,9 @@ describe("odoo-api note contracts", () => {
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
+      customerGroupId: 12,
+      customerGroup: "Corporate",
+      writeDate: "2026-08-29 09:15:00",
       recipientMatch: {
         name: "Mary Wong",
         phone: "6111 1111",
@@ -408,6 +436,32 @@ describe("odoo-api note contracts", () => {
     });
     expect(customer.historyCount).toBeUndefined();
     expect(customer.totalSpent).toBeUndefined();
+  });
+
+  it("keeps multiple existing Contact Tags as a snapshot without inventing a Customer Group ID", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([{
+      id: 42,
+      name: "Alice",
+      email: null,
+      phone: "91234567",
+      mobile: null,
+      history_count: null,
+      total_spent: null,
+      history: [],
+      tags: [
+        { id: 12, name: "Corporate" },
+        { id: 13, name: "VIP Wholesale" },
+      ],
+      customerGroupId: null,
+      customerGroup: null,
+    }])));
+    const { searchOdooCustomers } = await import("@/lib/odoo-api");
+
+    const [customer] = await searchOdooCustomers("Alice");
+
+    expect(customer.customerGroup).toBe("Corporate, VIP Wholesale");
+    expect(customer.customerGroupId).toBeUndefined();
   });
 
   it("uses the explicit Customer ID search mode and preserves the returned code", async () => {
@@ -582,6 +636,10 @@ describe("odoo-api note contracts", () => {
       id: "local-1",
       salesId: "S001",
       operatorEmployeeId: 95,
+      salespersonEmployeeId: 96,
+      salesTeamId: 7,
+      customerGroupId: 12,
+      customerGroupExpectedWriteDate: "2026-07-14 10:00:00",
       customerName: "Chan Tai",
       customerCode: " NEW-001 ",
       senderName: "Director Lee",
@@ -664,6 +722,10 @@ describe("odoo-api note contracts", () => {
       customerId: 42,
       customerCode: " NEW-001 ",
       operatorEmployeeId: 95,
+      salespersonEmployeeId: 96,
+      salesTeamId: 7,
+      customerGroupId: 12,
+      customerGroupExpectedWriteDate: "2026-07-14 10:00:00",
       paymentReference: "CASH-001",
       paymentReceivedAt: "2026-07-14T10:00:00.000Z",
       paymentIdempotencyKey: "744078bd-ae57-4639-af5a-11d8805654b1",
@@ -725,6 +787,10 @@ describe("odoo-api note contracts", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { updateOdooOrderOperationalDetails } = await import("@/lib/odoo-api");
     const payload = {
+      salesId: "AC02 — Elma",
+      salespersonEmployeeId: 95,
+      salesTeamId: 7,
+      customerGroupId: 12,
       fulfillmentType: "delivery" as const,
       customerName: "Jay",
       senderName: "Jay",
@@ -782,11 +848,20 @@ describe("odoo-api note contracts", () => {
     };
 
     await expect(updateOdooOrderOperationalDetails(17, payload)).resolves.toEqual(response);
+    const {
+      salesId: _salesId,
+      department: _department,
+      customerGroup: _customerGroup,
+      salespersonEmployeeId: _salespersonEmployeeId,
+      salesTeamId: _salesTeamId,
+      customerGroupId: _customerGroupId,
+      ...expectedPayload
+    } = payload;
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/orders/17",
       expect.objectContaining({
         method: "PATCH",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(expectedPayload),
       }),
     );
   });

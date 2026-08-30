@@ -30,9 +30,21 @@ const emptyBusinessProps = {
   onBillingAddressChange: noop,
 };
 
-function Harness() {
+function Harness({
+  initialCustomerGroup = "",
+  initialCustomerGroupId,
+  customerGroups = [{ id: 12, name: "Corporate" }, { id: 13, name: "VIP Wholesale" }],
+  customerGroupsError = null,
+}: {
+  initialCustomerGroup?: string;
+  initialCustomerGroupId?: number;
+  customerGroups?: Array<{ id: number; name: string }>;
+  customerGroupsError?: string | null;
+} = {}) {
   const [senderName, setSenderName] = useState("");
   const [customerCode, setCustomerCode] = useState("");
+  const [customerGroup, setCustomerGroup] = useState(initialCustomerGroup);
+  const [customerGroupId, setCustomerGroupId] = useState<number | undefined>(initialCustomerGroupId);
 
   return (
     <CustomerSection
@@ -42,6 +54,10 @@ function Harness() {
       senderName={senderName}
       customerType="personal"
       companyName=""
+      customerGroup={customerGroup}
+      customerGroupId={customerGroupId}
+      customerGroups={customerGroups}
+      customerGroupsError={customerGroupsError}
       {...emptyBusinessProps}
       onPhoneChange={noop}
       onNameChange={noop}
@@ -49,6 +65,10 @@ function Harness() {
       onSenderNameChange={setSenderName}
       onCustomerTypeChange={noop}
       onCompanyNameChange={noop}
+      onCustomerGroupChange={(label, groupId) => {
+        setCustomerGroup(label);
+        setCustomerGroupId(groupId);
+      }}
       onCustomerSelect={selectCustomer}
       onStartNewCustomerUnderAccount={setCustomerCode}
       onCustomerAndRecipientSelect={selectCustomerAndRecipient}
@@ -202,6 +222,40 @@ describe("CustomerSection gift sender", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
     expect(senderInput).toHaveValue("Secretary Chan");
+  });
+
+  it("selects Customer Group from existing Odoo Contact Tags inside Customer Details", () => {
+    render(<Harness />);
+
+    const group = screen.getByRole("combobox", { name: "客戶群組（選填）" });
+    fireEvent.click(group);
+    fireEvent.click(screen.getByRole("option", { name: "VIP Wholesale" }));
+
+    expect(group).toHaveTextContent("VIP Wholesale");
+    expect(screen.getByText(/不會建立新分類/)).toBeVisible();
+    expect(screen.queryByRole("textbox", { name: "客戶群組" })).not.toBeInTheDocument();
+  });
+
+  it("preloads an existing Customer Group ID and resolved name", () => {
+    render(<Harness initialCustomerGroup="Corporate" initialCustomerGroupId={12} />);
+
+    expect(screen.getByRole("combobox", { name: "客戶群組（選填）" })).toHaveTextContent("Corporate");
+  });
+
+  it("shows ambiguous existing Contact Tags as a read-only snapshot without choosing an ID", () => {
+    render(<Harness initialCustomerGroup="Corporate, VIP Wholesale" />);
+
+    expect(screen.getByLabelText("客戶群組（選填）")).toHaveTextContent("Corporate, VIP Wholesale");
+    expect(screen.queryByRole("combobox", { name: "客戶群組（選填）" })).not.toBeInTheDocument();
+    expect(screen.getByText(/不會當成新 Contact Tag 選項/)).toBeVisible();
+  });
+
+  it("keeps Customer Group unavailable on a forbidden reference-list response", () => {
+    render(<Harness customerGroups={[]} customerGroupsError="Forbidden" />);
+
+    expect(screen.getByRole("combobox", { name: "客戶群組（選填）" })).toBeDisabled();
+    expect(screen.getByText(/未能同步 Odoo Contact Tags；不會提供未驗證選項/)).toBeVisible();
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
   });
 
   it("uses the ordering contact instead of the company name for a company customer", () => {

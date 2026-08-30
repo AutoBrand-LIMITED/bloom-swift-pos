@@ -140,12 +140,35 @@ export function pendingSubmissionForEmployee(
 export function employeeSnapshotForSubmission(
   pending: PendingOrderSubmission | null,
   employee: PosEmployeeScope | null,
-  current: Pick<Order, "salesId" | "operatorEmployeeId">,
-): Pick<Order, "salesId" | "operatorEmployeeId"> {
+  current: Pick<
+    Order,
+    | "salesId"
+    | "operatorEmployeeId"
+    | "salespersonEmployeeId"
+    | "salesTeamId"
+    | "customerGroupId"
+  >,
+): Pick<
+  Order,
+  | "salesId"
+  | "operatorEmployeeId"
+  | "salespersonEmployeeId"
+  | "salesTeamId"
+  | "customerGroupId"
+> {
   if (pending && employee && pendingSubmissionBelongsToEmployee(pending, employee)) {
     return {
       salesId: pending.order.salesId,
       operatorEmployeeId: pending.order.operatorEmployeeId,
+      ...(Object.prototype.hasOwnProperty.call(pending.order, "salespersonEmployeeId")
+        ? { salespersonEmployeeId: pending.order.salespersonEmployeeId }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(pending.order, "salesTeamId")
+        ? { salesTeamId: pending.order.salesTeamId }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(pending.order, "customerGroupId")
+        ? { customerGroupId: pending.order.customerGroupId }
+        : {}),
     };
   }
   return current;

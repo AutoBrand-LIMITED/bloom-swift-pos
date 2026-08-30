@@ -63,8 +63,18 @@ export interface PartnerNoteMutation {
 
 export interface Order {
   id: string;
+  /** Server-resolved responsible salesperson label retained for legacy/history display. */
   salesId: string;
+  /** Authenticated operator audit identity. This is never controlled by the salesperson picker. */
   operatorEmployeeId?: number;
+  /** Active Odoo employee selected as the responsible salesperson. */
+  salespersonEmployeeId?: number;
+  /** Optional native Odoo Sales Team. */
+  salesTeamId?: number;
+  /** Optional native Odoo Contact Tag used as this customer's group. */
+  customerGroupId?: number;
+  /** Odoo customer concurrency token captured when the Customer Group was selected. */
+  customerGroupExpectedWriteDate?: string;
   customerName: string;
   /** Customer ID stored in Odoo as res.partner/sale.order x_customer_code. */
   customerCode?: string;
@@ -143,10 +153,7 @@ export interface SalesStaff {
   odooEmployeeId?: number;
 }
 
-export const SALES_STAFF: SalesStaff[] = [
-  { id: "S001", name: "陳小明" },
-  { id: "S002", name: "李美玲" },
-  { id: "S003", name: "張大偉" },
-  { id: "S004", name: "王曉華" },
-  { id: "S005", name: "林志強" },
-];
+export interface OdooNamedReference {
+  id: number;
+  name: string;
+}

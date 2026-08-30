@@ -1,5 +1,5 @@
 import type { CustomerTag, DemoCustomer, PurchaseRecord } from "@/data/demo-customers";
-import type { DeliverySplit, Order, SalesStaff } from "@/types/order";
+import type { DeliverySplit, OdooNamedReference, Order, SalesStaff } from "@/types/order";
 import { authenticatedFetch } from "@/lib/pos-auth";
 import { normalizePurchasePaymentStatus } from "@/lib/customer-utils";
 
@@ -15,6 +15,8 @@ interface OdooPartner {
   customerType?: "personal" | "company";
   companyName?: string | null;
   billingAddress?: string | null;
+  customerGroupId?: number | null;
+  customerGroup?: string | null;
   recipientMatch?: {
     name: string | null;
     phone: string | null;
@@ -194,6 +196,8 @@ export interface OrderNoteUpdate {
 }
 
 export interface OrderOperationalUpdate {
+  /** Legacy snapshots are retained for old orders and safe display. */
+  salesId: string;
   customerName: string;
   senderName: string;
   phone: string;
@@ -227,6 +231,11 @@ export interface OrderOperationalUpdate {
   internalNote: string;
   expectedWriteDate: string;
 }
+
+export type OrderOperationalUpdatePayload = Omit<
+  OrderOperationalUpdate,
+  "salesId" | "department" | "customerGroup"
+>;
 
 export interface OrderOperationalUpdateResponse {
   id: number;
@@ -754,17 +763,31 @@ export async function retryOperationalOrder(
 
 export async function updateOdooOrderOperationalDetails(
   orderId: number,
-  payload: OrderOperationalUpdate,
+  payload: OrderOperationalUpdatePayload,
   signal?: AbortSignal,
 ): Promise<OrderOperationalUpdateResponse> {
   if (!BACKEND_URL) {
     throw new Error("Odoo backend is not configured");
   }
 
+  // Historical assignment fields are snapshots only. Never send them back to
+  // the operational PATCH endpoint, which deliberately forbids reassignment.
+  const {
+    salesId: _salesId,
+    department: _department,
+    customerGroup: _customerGroup,
+    operatorEmployeeId: _operatorEmployeeId,
+    salespersonEmployeeId: _salespersonEmployeeId,
+    salesTeamId: _salesTeamId,
+    customerGroupId: _customerGroupId,
+    customerGroupExpectedWriteDate: _customerGroupExpectedWriteDate,
+    ...operationalPayload
+  } = payload as OrderOperationalUpdatePayload & Record<string, unknown>;
+
   const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(operationalPayload),
     signal,
   });
 
@@ -891,6 +914,14 @@ export async function searchOdooCustomerAccount(
 }
 
 function mapOdooPartner(p: OdooPartner): DemoCustomer {
+  const tags = p.tags || [];
+  const customerGroupId = p.customerGroupId ?? undefined;
+  const customerGroup = p.customerGroup?.trim()
+    || (customerGroupId !== undefined
+      ? tags.find((tag) => tag.id === customerGroupId)?.name
+      : tags.map((tag) => tag.name.trim()).filter(Boolean).join(", "))
+    || undefined;
+
   return {
     id: `odoo-${p.id}`,
     odooPartnerId: p.id,
@@ -900,12 +931,14 @@ function mapOdooPartner(p: OdooPartner): DemoCustomer {
     customerType: p.customerType || "personal",
     companyName: p.companyName || undefined,
     billingAddress: p.billingAddress || undefined,
+    customerGroupId,
+    customerGroup,
     customerCode: p.customerCode || undefined,
     history: normalizePurchaseRecords(p.history),
     historyCount: p.history_count ?? undefined,
     totalSpent: p.total_spent ?? undefined,
     commentText: p.commentText || "",
-    tags: p.tags || [],
+    tags,
     writeDate: p.writeDate || undefined,
     recipientMatch: p.recipientMatch
       ? {
@@ -1120,6 +1153,32 @@ export async function getOdooEmployees(signal?: AbortSignal): Promise<SalesStaff
       odooEmployeeId: employee.id,
     }];
   });
+}
+
+export async function getOdooSalesTeams(signal?: AbortSignal): Promise<OdooNamedReference[]> {
+  if (!BACKEND_URL) return [];
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/sales-teams`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<OdooNamedReference[]>(res, `Odoo sales teams failed: ${res.status}`);
+  }
+  return (await res.json()) as OdooNamedReference[];
+}
+
+export async function getOdooCustomerGroups(signal?: AbortSignal): Promise<OdooNamedReference[]> {
+  if (!BACKEND_URL) return [];
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/customer-groups`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<OdooNamedReference[]>(res, `Odoo customer groups failed: ${res.status}`);
+  }
+  return (await res.json()) as OdooNamedReference[];
 }
 
 export async function getDayEndSummary(date: string, signal?: AbortSignal): Promise<DayEndSummary> {

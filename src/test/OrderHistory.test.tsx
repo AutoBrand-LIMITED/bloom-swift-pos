@@ -7,18 +7,28 @@ import type { OrderRecordView } from "@/lib/order-records";
 const {
   getAccountingPaymentOptions,
   getDeliverySlots,
+  getOdooCustomerGroups,
+  getOdooEmployees,
+  getOdooSalesTeams,
   recordOdooOrderPayment,
   updateOdooOrderOperationalDetails,
 } = vi.hoisted(() => ({
   getAccountingPaymentOptions: vi.fn(),
   getDeliverySlots: vi.fn(),
+  getOdooCustomerGroups: vi.fn(),
+  getOdooEmployees: vi.fn(),
+  getOdooSalesTeams: vi.fn(),
   recordOdooOrderPayment: vi.fn(),
   updateOdooOrderOperationalDetails: vi.fn(),
 }));
 
 vi.mock("@/lib/odoo-api", () => ({
+  hasOdooBackend: true,
   getAccountingPaymentOptions,
   getDeliverySlots,
+  getOdooCustomerGroups,
+  getOdooEmployees,
+  getOdooSalesTeams,
   recordOdooOrderPayment,
   updateOdooOrderOperationalDetails,
 }));
@@ -66,6 +76,12 @@ describe("OrderHistory delivery summary", () => {
       { id: 11, displayLabel: "上午 09:00-13:00", startTime: "09:00", endTime: "13:00" },
       { id: 12, displayLabel: "下午 13:00-18:00", startTime: "13:00", endTime: "18:00" },
     ]);
+    getOdooEmployees.mockReset();
+    getOdooEmployees.mockResolvedValue([]);
+    getOdooSalesTeams.mockReset();
+    getOdooSalesTeams.mockResolvedValue([]);
+    getOdooCustomerGroups.mockReset();
+    getOdooCustomerGroups.mockResolvedValue([]);
     updateOdooOrderOperationalDetails.mockReset();
     getAccountingPaymentOptions.mockReset();
     getAccountingPaymentOptions.mockResolvedValue([
@@ -236,6 +252,44 @@ describe("OrderHistory delivery summary", () => {
       );
     });
     expect(onOrderUpdated).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps historical assignment and customer group values as read-only snapshots", async () => {
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    render(<OrderHistory orders={[orderFixture({
+      salesId: "AC02 — Elma",
+      salespersonEmployeeId: 95,
+      salesTeamId: 7,
+      department: "Retail",
+      customerGroupId: 12,
+      customerGroup: "Regular",
+    })]} open onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    expect(await screen.findByLabelText("負責銷售員")).toHaveTextContent("AC02 — Elma");
+    expect(screen.getByLabelText("Sales Team")).toHaveTextContent("Retail");
+    expect(screen.getByLabelText("客戶群組")).toHaveTextContent("Regular");
+    expect(screen.getByText(/歷史銷售歸屬只供查閱/)).toBeVisible();
+    expect(screen.queryByRole("combobox", { name: /負責銷售員/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /Sales Team/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /客戶群組/ })).not.toBeInTheDocument();
+    expect(getOdooEmployees).not.toHaveBeenCalled();
+    expect(getOdooSalesTeams).not.toHaveBeenCalled();
+    expect(getOdooCustomerGroups).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => expect(updateOdooOrderOperationalDetails).toHaveBeenCalled());
+    const payload = updateOdooOrderOperationalDetails.mock.calls[0][1];
+    expect(payload).not.toHaveProperty("salesId");
+    expect(payload).not.toHaveProperty("department");
+    expect(payload).not.toHaveProperty("customerGroup");
+    expect(payload).not.toHaveProperty("salespersonEmployeeId");
+    expect(payload).not.toHaveProperty("salesTeamId");
+    expect(payload).not.toHaveProperty("customerGroupId");
   });
 
   it("edits every existing split destination while preserving IDs and item allocations", async () => {

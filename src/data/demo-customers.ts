@@ -11,6 +11,8 @@ export interface DemoCustomer {
   customerType?: "personal" | "company";
   companyName?: string;
   billingAddress?: string;
+  customerGroupId?: number;
+  customerGroup?: string;
   commentText?: string;
   tags?: CustomerTag[];
   writeDate?: string;

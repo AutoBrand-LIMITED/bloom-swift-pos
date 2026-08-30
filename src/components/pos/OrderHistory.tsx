@@ -209,7 +209,8 @@ const OrderHistory = ({
                   ? `指定時間：${order.deliveryTime || "未指定"}`
                   : order.deliveryTime || "未指定時段";
                 const businessDetails = [
-                  ["落單員工", order.salesId],
+                  ["登入操作員編號", order.operatorEmployeeId ? `#${order.operatorEmployeeId}` : undefined],
+                  ["負責銷售員", order.salesId || (order.salespersonEmployeeId ? `員工 #${order.salespersonEmployeeId}` : undefined)],
                   ["公司名稱", order.companyName],
                   ["送花人", order.senderName],
                   ["收貨公司", order.recipientCompanyName],
@@ -218,8 +219,8 @@ const OrderHistory = ({
                   [fulfillmentType === "pickup" ? "自取地點" : "送貨地址", order.deliveryAddress],
                   ["客戶電郵", order.customerEmail],
                   ["帳單地址", order.billingAddress],
-                  ["客戶群組", order.customerGroup],
-                  ["部門", order.department],
+                  ["客戶群組", order.customerGroup || (order.customerGroupId ? `Contact Tag #${order.customerGroupId}` : undefined)],
+                  ["Sales Team", order.department || (order.salesTeamId ? `Sales Team #${order.salesTeamId}` : undefined)],
                 ].filter((detail): detail is [string, string] => Boolean(detail[1]?.trim()));
                 return (
                   <div

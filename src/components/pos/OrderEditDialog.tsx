@@ -37,6 +37,7 @@ import {
   type AccountingPaymentOption,
   type DeliverySlot,
   type OrderOperationalUpdate,
+  type OrderOperationalUpdatePayload,
 } from "@/lib/odoo-api";
 import type { OrderRecordView } from "@/lib/order-records";
 
@@ -48,6 +49,7 @@ interface OrderEditDialogProps {
 }
 
 const formFromOrder = (order: OrderRecordView): OrderOperationalUpdate => ({
+  salesId: order.salesId || "",
   customerName: order.customerName || "",
   senderName: order.senderName || order.customerName || "",
   phone: order.phone || "",
@@ -171,7 +173,6 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
       endTime: "",
     });
   }
-
   const setField = <K extends keyof OrderOperationalUpdate>(
     field: K,
     value: OrderOperationalUpdate[K],
@@ -224,10 +225,17 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
     setSaving(true);
     setError(null);
     try {
-      await updateOdooOrderOperationalDetails(order.odooOrderId, {
-        ...form,
+      const {
+        salesId: _salesId,
+        department: _department,
+        customerGroup: _customerGroup,
+        ...operationalForm
+      } = form;
+      const operationalPayload: OrderOperationalUpdatePayload = {
+        ...operationalForm,
         deliverySplits,
-      });
+      };
+      await updateOdooOrderOperationalDetails(order.odooOrderId, operationalPayload);
       toast.success("訂單資料已更新到 Odoo");
       onOpenChange(false);
       onSaved();
@@ -308,7 +316,26 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                 </div>
               )}
 
-              <section className="space-y-3" aria-label="客戶資料">
+              <section className="space-y-3" aria-label="銷售歸屬">
+                <h3 className="text-sm font-semibold">銷售歸屬</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <SnapshotField
+                    label="負責銷售員"
+                    value={form.salesId}
+                    fallbackId={order?.salespersonEmployeeId}
+                    fallbackPrefix="員工"
+                  />
+                  <SnapshotField
+                    label="Sales Team"
+                    value={form.department}
+                    fallbackId={order?.salesTeamId}
+                    fallbackPrefix="Sales Team"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">歷史銷售歸屬只供查閱；如需重新指派，請在 Odoo 處理。</p>
+              </section>
+
+              <section className="space-y-3 border-t pt-5" aria-label="客戶資料">
                 <h3 className="text-sm font-semibold">客戶資料</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="下單人／客戶名稱 *" value={form.customerName} onChange={(value) => setField("customerName", value)} />
@@ -317,6 +344,12 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                   <Field label="客戶電郵" value={form.customerEmail} onChange={(value) => setField("customerEmail", value)} type="email" />
                 </div>
                 <TextField label="帳單地址" value={form.billingAddress} onChange={(value) => setField("billingAddress", value)} />
+                <SnapshotField
+                  label="客戶群組"
+                  value={form.customerGroup}
+                  fallbackId={order?.customerGroupId}
+                  fallbackPrefix="Contact Tag"
+                />
               </section>
 
               {form.deliverySplits && form.deliverySplits.length > 0 && (
@@ -481,14 +514,6 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                 </>}
               </section>
 
-              <details className="rounded-lg border p-3">
-                <summary className="min-h-8 cursor-pointer text-sm font-semibold">其他業務資料</summary>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Field label="客戶群組" value={form.customerGroup} onChange={(value) => setField("customerGroup", value)} />
-                  <Field label="部門" value={form.department} onChange={(value) => setField("department", value)} />
-                </div>
-              </details>
-
               {order && order.paymentStatus !== "paid" && (
                 <section className="space-y-3 border-t pt-5" aria-label="補記付款">
                   <div>
@@ -574,6 +599,33 @@ const Field = ({
     />
   </div>
 );
+
+const SnapshotField = ({
+  label,
+  value,
+  fallbackId,
+  fallbackPrefix,
+}: {
+  label: string;
+  value?: string;
+  fallbackId?: number;
+  fallbackPrefix: string;
+}) => {
+  const displayValue = value?.trim()
+    || (fallbackId !== undefined ? `${fallbackPrefix} #${fallbackId}` : "未指定");
+
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div
+        className="flex min-h-11 items-center rounded-md border bg-muted/40 px-3 text-sm"
+        aria-label={label}
+      >
+        {displayValue}
+      </div>
+    </div>
+  );
+};
 
 const TextField = ({
   label,

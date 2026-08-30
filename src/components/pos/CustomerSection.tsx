@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DemoCustomer } from "@/data/demo-customers";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CustomerFlags from "@/components/pos/CustomerFlags";
 import RegionalPhoneInput from "@/components/pos/RegionalPhoneInput";
 import { customerIdentityKey, loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
@@ -35,6 +36,7 @@ import {
   customerResolutionIdentityKey,
   type CustomerResolutionState,
 } from "@/lib/customer-profile";
+import type { OdooNamedReference } from "@/types/order";
 
 export type CustomerType = "personal" | "company";
 type CustomerLookupSource = "phone" | "name" | "email" | "customerCode";
@@ -48,6 +50,12 @@ interface CustomerSectionProps {
   companyName: string;
   customerEmail: string;
   billingAddress: string;
+  customerGroup?: string;
+  customerGroupId?: number;
+  customerGroups?: OdooNamedReference[];
+  customerGroupsLoading?: boolean;
+  customerGroupsError?: string | null;
+  customerGroupLocked?: boolean;
   onPhoneChange: (v: string) => void;
   onNameChange: (v: string) => void;
   onCustomerCodeChange: (v: string) => void;
@@ -56,6 +64,7 @@ interface CustomerSectionProps {
   onCompanyNameChange: (v: string) => void;
   onCustomerEmailChange: (v: string) => void;
   onBillingAddressChange: (v: string) => void;
+  onCustomerGroupChange?: (label: string, groupId?: number) => void;
   onCustomerSelect: (c: DemoCustomer) => void;
   onStartNewCustomerUnderAccount?: (customerCode: string) => void;
   onCustomerAndRecipientSelect: (
@@ -78,8 +87,10 @@ interface CustomerSectionProps {
 
 const CustomerSection = ({
   phone, customerName, customerCode, senderName, customerType, companyName, customerEmail, billingAddress,
+  customerGroup = "", customerGroupId, customerGroups = [], customerGroupsLoading = false,
+  customerGroupsError, customerGroupLocked = false,
   onPhoneChange, onNameChange, onCustomerCodeChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
-  onCustomerEmailChange, onBillingAddressChange,
+  onCustomerEmailChange, onBillingAddressChange, onCustomerGroupChange,
   onCustomerSelect, onCustomerAndRecipientSelect, onStartNewCustomerUnderAccount,
   phoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
@@ -105,6 +116,12 @@ const CustomerSection = ({
   const nameInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
+  const selectedCustomerGroup = customerGroups.find((group) => group.id === customerGroupId);
+  const customerGroupIsLegacySnapshot = customerGroupId === undefined && Boolean(customerGroup.trim());
+  const customerGroupDisabled = customerGroupLocked
+    || customerGroupsLoading
+    || Boolean(customerGroupsError)
+    || customerGroups.length === 0;
 
   useEffect(() => {
     const handleOutsidePointerDown = (event: PointerEvent) => {
@@ -896,6 +913,57 @@ const CustomerSection = ({
         {customerDropdown("email")}
         {customerEmailError && (
           <p id="customer-email-error" role="alert" className="text-xs text-destructive">{customerEmailError}</p>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">客戶群組（選填）</Label>
+        {customerGroupIsLegacySnapshot ? (
+          <div
+            className="flex min-h-11 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-medium"
+            aria-label="客戶群組（選填）"
+          >
+            {customerGroup}
+          </div>
+        ) : (
+          <Select
+            value={customerGroupId ? String(customerGroupId) : "none"}
+            disabled={customerGroupDisabled}
+            onValueChange={(value) => {
+              if (value === "none") {
+                onCustomerGroupChange?.("");
+                return;
+              }
+              const selected = customerGroups.find((group) => group.id === Number(value));
+              if (selected) onCustomerGroupChange?.(selected.name, selected.id);
+            }}
+          >
+            <SelectTrigger className="min-h-11 touch-manipulation text-sm" aria-label="客戶群組（選填）">
+              <SelectValue placeholder={customerGroupsLoading ? "正在載入 Odoo Contact Tags..." : "選擇 Odoo Contact Tag"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">不指定</SelectItem>
+              {customerGroupId && !selectedCustomerGroup && (
+                <SelectItem value={String(customerGroupId)} disabled>
+                  {customerGroup || `Contact Tag #${customerGroupId}`}
+                </SelectItem>
+              )}
+              {customerGroups.map((group) => (
+                <SelectItem key={group.id} value={String(group.id)}>{group.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {customerGroupIsLegacySnapshot && (
+          <p className="text-[10px] text-muted-foreground">舊訂單快照；不會當成新 Contact Tag 選項。</p>
+        )}
+        {customerGroupsError && (
+          <p role="status" className="text-[10px] text-destructive">未能同步 Odoo Contact Tags；不會提供未驗證選項。</p>
+        )}
+        {!customerGroupsError && (
+          <p className="text-[10px] text-muted-foreground">
+            只可選擇 Odoo 現有 Contact Tag；{selectedCustomer?.odooPartnerId ? "更改會在下單時更新此客戶資料。" : "此處不會建立新分類。"}
+          </p>
         )}
       </div>
       </div>

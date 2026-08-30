@@ -11,6 +11,8 @@ const odooMocks = vi.hoisted(() => ({
   getAccountingPaymentOptions: vi.fn(),
   getDeliverySlots: vi.fn(),
   getOdooEmployees: vi.fn(),
+  getOdooSalesTeams: vi.fn(),
+  getOdooCustomerGroups: vi.fn(),
   getOdooOrderRecords: vi.fn(),
   getOdooProductCategories: vi.fn(),
   getOdooProducts: vi.fn(),
@@ -83,6 +85,8 @@ describe("Index correlated order search", () => {
     odooMocks.getAccountingPaymentOptions.mockResolvedValue([]);
     odooMocks.getDeliverySlots.mockResolvedValue([]);
     odooMocks.getOdooEmployees.mockResolvedValue([]);
+    odooMocks.getOdooSalesTeams.mockResolvedValue([]);
+    odooMocks.getOdooCustomerGroups.mockResolvedValue([]);
     odooMocks.getOdooOrderRecords.mockResolvedValue({
       date: "2026-08-26",
       generatedAt: "2026-08-26T09:00:00+08:00",
