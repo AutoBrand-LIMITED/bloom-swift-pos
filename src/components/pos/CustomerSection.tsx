@@ -40,7 +40,7 @@ import type { OdooNamedReference } from "@/types/order";
 
 export type CustomerType = "personal" | "company";
 type CustomerLookupSource = "phone" | "name" | "email" | "customerCode";
-const CUSTOMER_CODE_PREFIX_MIN_LENGTH = 3;
+const CUSTOMER_CODE_PREFIX_MIN_LENGTH = 2;
 
 interface CustomerSectionProps {
   phone: string;
@@ -301,7 +301,7 @@ const CustomerSection = ({
         : activeDropdown === "email"
           ? "輸入完整電郵地址搜尋 Odoo 客戶"
           : activeDropdown === "customerCode"
-            ? "輸入至少 3 個 Customer ID 字元搜尋帳戶"
+            ? "輸入至少 2 個 Customer ID 字元搜尋帳戶"
             : "輸入至少 2 個字搜尋下單人或收件人"
       : completedCurrentSearch
         ? activeDropdown === "customerCode"
@@ -791,7 +791,7 @@ const CustomerSection = ({
           ) : (
             <>
               <p className="text-[11px] text-muted-foreground">
-                輸入最少 3 個 Customer ID 字元搜尋帳戶；揀完整編號後仍要揀實際聯絡人。
+                輸入最少 2 個 Customer ID 字元搜尋帳戶；揀完整編號後仍要揀實際聯絡人。
               </p>
             </>
           )}

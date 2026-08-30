@@ -345,7 +345,7 @@ describe("CustomerSection gift sender", () => {
     expect(screen.getByTestId("customer-resolution-panel")).toHaveTextContent(
       "搜尋結果唔係同一位聯絡人",
     );
-    fireEvent.pointerDown(screen.getByText(/輸入最少 3 個 Customer ID/));
+    fireEvent.pointerDown(screen.getByText(/輸入最少 2 個 Customer ID/));
     expect(screen.queryByText(/系統未有符合此電話及聯絡人名稱/)).not.toBeInTheDocument();
     const confirmButton = screen.getByRole("button", { name: "確認新增聯絡人" });
     expect(confirmButton).toHaveClass("min-h-11");
@@ -495,7 +495,7 @@ describe("CustomerSection gift sender", () => {
 
     expect(await screen.findByText("Oh Contact")).toBeVisible();
 
-    fireEvent.pointerDown(screen.getByText(/輸入最少 3 個 Customer ID/));
+    fireEvent.pointerDown(screen.getByText(/輸入最少 2 個 Customer ID/));
 
     expect(screen.queryByText("Oh Contact")).not.toBeInTheDocument();
     expect(selectCustomer).not.toHaveBeenCalled();
@@ -533,7 +533,7 @@ describe("CustomerSection gift sender", () => {
     });
 
     expect(await screen.findByText("Odoo timeout")).toBeInTheDocument();
-    fireEvent.pointerDown(screen.getByText(/輸入最少 3 個 Customer ID/));
+    fireEvent.pointerDown(screen.getByText(/輸入最少 2 個 Customer ID/));
     expect(screen.getByTestId("customer-resolution-panel")).toHaveTextContent(
       "未能完成當前客戶確認",
     );
@@ -656,7 +656,7 @@ describe("CustomerSection gift sender", () => {
     expect(screen.getByText("已確認以此電話及名稱新增聯絡人")).toBeInTheDocument();
   });
 
-  it("suggests complete Customer IDs from a three-character prefix before exact account lookup", async () => {
+  it("suggests complete Customer IDs from a two-character prefix before exact account lookup", async () => {
     searchOdooCustomerAccount.mockImplementation(async (customerCode: string) => (
       customerCode.toLocaleLowerCase() === "crownep"
         ? {
@@ -687,7 +687,7 @@ describe("CustomerSection gift sender", () => {
         }
     ));
     searchOdooCustomers.mockImplementation(async (query: string) => (
-      query.toLocaleLowerCase() === "cro"
+      query.toLocaleLowerCase() === "cr"
         ? [{
           id: "odoo-41",
           odooPartnerId: 41,
@@ -708,12 +708,12 @@ describe("CustomerSection gift sender", () => {
     render(<CustomerLookupHarness />);
 
     fireEvent.change(screen.getByLabelText("Customer ID／客戶編號"), {
-      target: { value: "CRO" },
+      target: { value: "CR" },
     });
 
-    expect(await screen.findByText(/符合「CRO」嘅 Customer ID/)).toBeInTheDocument();
+    expect(await screen.findByText(/符合「CR」嘅 Customer ID/)).toBeInTheDocument();
     expect(searchOdooCustomers).toHaveBeenCalledWith(
-      "CRO",
+      "CR",
       expect.any(AbortSignal),
       "customer_code",
       "prefix",
@@ -742,14 +742,14 @@ describe("CustomerSection gift sender", () => {
     );
   });
 
-  it("waits for three Customer ID characters before searching", async () => {
+  it("waits for two Customer ID characters before searching", async () => {
     render(<CustomerLookupHarness />);
 
     fireEvent.change(screen.getByLabelText("Customer ID／客戶編號"), {
-      target: { value: "CR" },
+      target: { value: "C" },
     });
 
-    expect(screen.getByText(/輸入至少 3 個 Customer ID 字元/)).toBeInTheDocument();
+    expect(screen.getByText(/輸入至少 2 個 Customer ID 字元/)).toBeInTheDocument();
     await new Promise((resolve) => window.setTimeout(resolve, 300));
     expect(searchOdooCustomerAccount).not.toHaveBeenCalled();
     expect(searchOdooCustomers).not.toHaveBeenCalled();

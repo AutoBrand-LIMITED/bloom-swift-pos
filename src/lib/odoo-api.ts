@@ -863,7 +863,7 @@ export async function searchOdooCustomers(
 ): Promise<DemoCustomer[]> {
   const trimmed = query.trim();
   const minimumLength = searchType === "customer_code"
-    ? customerCodeMatchMode === "prefix" ? 3 : 1
+    ? customerCodeMatchMode === "prefix" ? 2 : 1
     : 2;
   if (!BACKEND_URL || trimmed.length < minimumLength) return [];
 

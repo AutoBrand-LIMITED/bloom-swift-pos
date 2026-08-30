@@ -515,27 +515,27 @@ describe("odoo-api note contracts", () => {
     const { searchOdooCustomers } = await import("@/lib/odoo-api");
 
     const [customer] = await searchOdooCustomers(
-      " Cro ",
+      " Cr ",
       undefined,
       "customer_code",
       "prefix",
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://backend.test/customers?q=Cro&searchType=customer_code&matchMode=prefix",
+      "https://backend.test/customers?q=Cr&searchType=customer_code&matchMode=prefix",
       expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
     );
     expect(customer.customerCode).toBe("CROWNEP");
   });
 
-  it("does not request Customer ID prefix matches before three characters", async () => {
+  it("does not request Customer ID prefix matches before two characters", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const { searchOdooCustomers } = await import("@/lib/odoo-api");
 
     const customers = await searchOdooCustomers(
-      "CR",
+      "C",
       undefined,
       "customer_code",
       "prefix",
