@@ -164,6 +164,153 @@ describe("odoo-api note contracts", () => {
     );
   });
 
+  it("loads the exact paginated receivables contract with the signed POS session", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    window.sessionStorage.setItem("anglo-chinese-florist-pos-session", "signed-manager-session");
+    const receivables = {
+      snapshotVersion: "receivables-snapshot-1",
+      generatedAt: "2026-08-30T10:30:00+08:00",
+      asOfDate: "2026-08-30",
+      timezone: "Asia/Hong_Kong",
+      summary: {
+        companyCurrencyId: 344,
+        companyCurrency: "HKD",
+        openInvoiceCount: 1,
+        openResidual: 600,
+        overdueInvoiceCount: 1,
+        overdueResidual: 600,
+        dueTodayInvoiceCount: 0,
+        dueTodayResidual: 0,
+        notDueInvoiceCount: 0,
+        notDueResidual: 0,
+        missingDueDateInvoiceCount: 0,
+        missingDueDateResidual: 0,
+      },
+      rows: [{
+        id: 42,
+        invoiceNumber: "INV/2026/0042",
+        reference: "PO-42",
+        origin: "S00042",
+        invoiceDate: "2026-07-01",
+        dueDate: "2026-08-01",
+        paymentTermId: 3,
+        paymentTerm: "30 Days",
+        customerId: 7,
+        customerName: "Alpha",
+        salespersonId: 8,
+        salesperson: "Elma",
+        currencyId: 344,
+        currency: "HKD",
+        amountTotal: 1_000,
+        amountReconciled: 400,
+        amountResidual: 600,
+        companyCurrencyResidual: 600,
+        reconciliationStatus: "partially_reconciled",
+        status: "overdue",
+        daysOverdue: 29,
+        daysUntilDue: null,
+        overdueResidual: 600,
+        dueTodayResidual: 0,
+        notDueResidual: 0,
+        missingDueDateResidual: 0,
+      }],
+      totalRows: 1,
+      page: 2,
+      limit: 25,
+      hasMore: false,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(receivables));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getReceivables } = await import("@/lib/odoo-api");
+
+    await expect(getReceivables({ status: "overdue", page: 2, limit: 25 }))
+      .resolves.toEqual(receivables);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/accounting/receivables?status=overdue&page=2&limit=25&refresh=false",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("Authorization")).toBe(
+      "Bearer signed-manager-session",
+    );
+    window.sessionStorage.removeItem("anglo-chinese-florist-pos-session");
+  });
+
+  it("sends a receivables snapshot only for non-refresh requests", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({
+      snapshotVersion: "receivables-snapshot-1",
+    })));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getReceivables } = await import("@/lib/odoo-api");
+
+    await getReceivables({
+      status: "due_today",
+      page: 3,
+      limit: 100,
+      snapshotVersion: "snapshot / one",
+    });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "https://backend.test/accounting/receivables?status=due_today&page=3&limit=100&refresh=false&snapshot=snapshot+%2F+one",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+
+    await getReceivables({
+      refresh: true,
+      snapshotVersion: "snapshot-must-be-ignored",
+    });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "https://backend.test/accounting/receivables?status=all&page=1&limit=50&refresh=true",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("validates current manager access through the authenticated no-store endpoint", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    window.sessionStorage.setItem("anglo-chinese-florist-pos-session", "signed-manager-session");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { validateReceivablesAccess } = await import("@/lib/odoo-api");
+
+    await expect(validateReceivablesAccess()).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/accounting/receivables/access",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("Authorization")).toBe(
+      "Bearer signed-manager-session",
+    );
+    window.sessionStorage.removeItem("anglo-chinese-florist-pos-session");
+  });
+
+  it("loads one receivable contact only from the manager detail endpoint", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    window.sessionStorage.setItem("anglo-chinese-florist-pos-session", "signed-manager-session");
+    const detail = {
+      invoiceId: 42,
+      customerId: 7,
+      customerName: "Alpha",
+      customerCompany: "Alpha Limited",
+      customerPhone: "91234567",
+      customerEmail: "accounts@alpha.example",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(detail));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getReceivableDetail } = await import("@/lib/odoo-api");
+
+    await expect(getReceivableDetail(42)).resolves.toEqual(detail);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/accounting/receivables/42/detail",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("Authorization")).toBe(
+      "Bearer signed-manager-session",
+    );
+    window.sessionStorage.removeItem("anglo-chinese-florist-pos-session");
+  });
+
   it("stops a stalled product reorder instead of leaving the UI saving forever", async () => {
     vi.useFakeTimers();
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");

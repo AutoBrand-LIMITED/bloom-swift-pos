@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Calculator, ClipboardList, LogOut, RotateCcw, UserRound } from "lucide-react";
+import { Calculator, ClipboardList, HandCoins, LogOut, RotateCcw, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import {
@@ -1608,6 +1608,16 @@ const Index = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/day-end")} className="gap-1.5 text-xs">
               <Calculator className="w-3.5 h-3.5" /> 日結
             </Button>
+            {employee?.role === "manager" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/receivables")}
+                className="min-h-11 shrink-0 gap-1.5 text-xs touch-manipulation"
+              >
+                <HandCoins className="h-3.5 w-3.5" /> 應收追數
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={handleClearForm} className="gap-1.5 text-xs">
               <RotateCcw className="w-3.5 h-3.5" /> 清空
             </Button>

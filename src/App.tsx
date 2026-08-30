@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import DayEndSettlement from "./pages/DayEndSettlement.tsx";
+import ReceivablesDashboard from "./pages/ReceivablesDashboard.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import LoginGate from "./components/auth/LoginGate.tsx";
 
@@ -20,6 +21,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/day-end" element={<DayEndSettlement />} />
+            <Route path="/receivables" element={<ReceivablesDashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
