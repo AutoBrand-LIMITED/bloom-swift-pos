@@ -357,6 +357,39 @@ describe("ReceivablesDashboard", () => {
     expect(screen.queryByLabelText("應收摘要")).not.toBeInTheDocument();
   });
 
+  it("keeps the receivables visible and retries customer detail after an Odoo outage", async () => {
+    getReceivableDetail
+      .mockRejectedValueOnce(new OdooApiError("Odoo unavailable", 503))
+      .mockResolvedValueOnce({
+        invoiceId: 1,
+        customerId: 10,
+        customerName: "Alpha Flowers",
+        customerCompany: "Alpha Holdings Limited",
+        customerPhone: "9123 4567",
+        customerEmail: "accounts@alpha.example",
+      });
+    renderDashboard();
+    await screen.findByText("Alpha Flowers");
+
+    fireEvent.click(screen.getByRole("button", { name: "展開發票 INV/2026/0001 詳情" }));
+
+    expect(await screen.findByText("暫時未能連接 Odoo 讀取客戶資料")).toBeVisible();
+    expect(screen.getByText(/公司、電話及電郵未有以舊資料代替/)).toBeVisible();
+    expect(screen.queryByText("暫時無法讀取")).not.toBeInTheDocument();
+    expect(screen.getByText("Alpha Flowers")).toBeVisible();
+    expect(logout).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "重新讀取客戶資料" }));
+
+    expect(await screen.findByText("9123 4567")).toBeVisible();
+    expect(screen.getByText("accounts@alpha.example")).toBeVisible();
+    expect(screen.getByText("Alpha Holdings Limited")).toBeVisible();
+    expect(screen.queryByText("暫時未能連接 Odoo 讀取客戶資料")).not.toBeInTheDocument();
+    expect(getReceivableDetail).toHaveBeenCalledTimes(2);
+    expect(getReceivableDetail).toHaveBeenNthCalledWith(1, 1, expect.any(AbortSignal));
+    expect(getReceivableDetail).toHaveBeenNthCalledWith(2, 1, expect.any(AbortSignal));
+  });
+
   it("manual refresh removes stale totals and rows until a fresh response arrives", async () => {
     let resolveRefresh!: (value: ReceivablesResponse) => void;
     const refreshResponse = new Promise<ReceivablesResponse>((resolve) => {

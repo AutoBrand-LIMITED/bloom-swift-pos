@@ -137,6 +137,7 @@ const ReceivablesDashboard = () => {
   const [detail, setDetail] = useState<ReceivableInvoiceDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
+  const [detailRetryKey, setDetailRetryKey] = useState(0);
 
   useEffect(() => {
     if (employee?.role !== "manager" || !posAuthRequired) return;
@@ -328,7 +329,7 @@ const ReceivablesDashboard = () => {
         detailRequestRef.current = null;
       }
     };
-  }, [employee?.role, expandedInvoiceId, logout]);
+  }, [detailRetryKey, employee?.role, expandedInvoiceId, logout]);
 
   if (employee?.role !== "manager") {
     return <Navigate to="/" replace />;
@@ -363,6 +364,11 @@ const ReceivablesDashboard = () => {
 
   const toggleInvoice = (invoiceId: number) => {
     setExpandedInvoiceId((current) => current === invoiceId ? null : invoiceId);
+  };
+
+  const retryDetail = () => {
+    if (expandedInvoiceId === null || detailLoading) return;
+    setDetailRetryKey((key) => key + 1);
   };
 
   const firstVisibleRow = data && data.rows.length
@@ -585,10 +591,32 @@ const ReceivablesDashboard = () => {
                             {expanded && (
                               <TableRow id={`receivable-detail-${row.id}`} className="bg-muted/30 hover:bg-muted/30">
                                 <TableCell colSpan={6} className="px-5 py-4">
+                                  {detailError && (
+                                    <div
+                                      className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950"
+                                      role="alert"
+                                    >
+                                      <div>
+                                        <p className="text-sm font-semibold">暫時未能連接 Odoo 讀取客戶資料</p>
+                                        <p className="mt-0.5 text-xs text-amber-800">
+                                          應收金額仍可查看；公司、電話及電郵未有以舊資料代替。Odoo 恢復後可原位重試。
+                                        </p>
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="min-h-11 gap-2 border-amber-400 bg-white touch-manipulation"
+                                        onClick={retryDetail}
+                                      >
+                                        <RefreshCw className="h-4 w-4" aria-hidden="true" /> 重新讀取客戶資料
+                                      </Button>
+                                    </div>
+                                  )}
                                   <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                    <DetailItem label="公司" children={detailLoading ? "載入中..." : detail?.customerCompany || (detailError ? "暫時無法讀取" : "-")} />
-                                    <DetailItem label="電話" children={detailLoading ? "載入中..." : detail?.customerPhone || (detailError ? "暫時無法讀取" : "-")} />
-                                    <DetailItem label="電郵" children={detailLoading ? "載入中..." : detail?.customerEmail || (detailError ? "暫時無法讀取" : "-")} />
+                                    <DetailItem label="公司" children={detailLoading ? "載入中..." : detail?.customerCompany || "-"} />
+                                    <DetailItem label="電話" children={detailLoading ? "載入中..." : detail?.customerPhone || "-"} />
+                                    <DetailItem label="電郵" children={detailLoading ? "載入中..." : detail?.customerEmail || "-"} />
                                     <DetailItem label="Salesperson" children={row.salesperson || "-"} />
                                     <DetailItem label="發票編號" children={row.invoiceNumber} />
                                     <DetailItem label="發票參考" children={row.reference || "-"} />
