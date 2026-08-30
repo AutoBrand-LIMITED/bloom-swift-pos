@@ -40,6 +40,7 @@ import type { OdooNamedReference } from "@/types/order";
 
 export type CustomerType = "personal" | "company";
 type CustomerLookupSource = "phone" | "name" | "email" | "customerCode";
+const CUSTOMER_CODE_PREFIX_MIN_LENGTH = 2;
 
 interface CustomerSectionProps {
   phone: string;
@@ -169,7 +170,7 @@ const CustomerSection = ({
         : activeDropdown === "email"
           ? trimmed.includes("@") && trimmed.length >= 3
           : activeDropdown === "customerCode"
-            ? trimmed.length >= 1
+            ? trimmed.length >= CUSTOMER_CODE_PREFIX_MIN_LENGTH
             : trimmed.length >= 2;
 
     if (!activeDropdown || !hasOdooBackend || !canSearch) {
@@ -195,9 +196,19 @@ const CustomerSection = ({
     setCompletedOdooSearch(null);
 
     const searchPromise = activeDropdown === "customerCode"
-      ? searchOdooCustomerAccount(trimmed, controller.signal).then((account) => ({
+      ? Promise.all([
+          searchOdooCustomerAccount(trimmed, controller.signal),
+          searchOdooCustomers(
+            trimmed,
+            controller.signal,
+            "customer_code",
+            "prefix",
+          ),
+        ]).then(([account, prefixCustomers]) => ({
           account,
-          customers: account.contacts,
+          customers: account.contactCount > 0
+            ? account.contacts
+            : prefixCustomers,
         }))
       : searchOdooCustomers(trimmed, controller.signal, "general").then((customers) => ({
           account: null,
@@ -262,6 +273,26 @@ const CustomerSection = ({
     }
     return options;
   }, [activeDropdown, completedCurrentSearch, filtered, normalizedSearchPhone, odooCustomers, search]);
+  const customerCodeSuggestions = useMemo(() => {
+    if (
+      activeDropdown !== "customerCode"
+      || !completedCurrentSearch
+      || (customerAccount?.contactCount ?? 0) > 0
+    ) {
+      return [];
+    }
+    const normalizedPrefix = search.trim().toLocaleLowerCase();
+    const suggestions = new Map<string, string>();
+    for (const customer of odooCustomers) {
+      const code = customer.customerCode?.trim();
+      if (!code || !code.toLocaleLowerCase().startsWith(normalizedPrefix)) continue;
+      suggestions.set(code.toLocaleLowerCase(), code);
+    }
+    return [...suggestions.values()].sort((left, right) => (
+      left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" })
+    ));
+  }, [activeDropdown, completedCurrentSearch, customerAccount, odooCustomers, search]);
+  const hasCustomerCodeSuggestions = customerCodeSuggestions.length > 0;
 
   const searchHint =
     sourceRequiresMoreInput(activeDropdown, search)
@@ -270,7 +301,7 @@ const CustomerSection = ({
         : activeDropdown === "email"
           ? "輸入完整電郵地址搜尋 Odoo 客戶"
           : activeDropdown === "customerCode"
-            ? "輸入客戶編號搜尋 Odoo 客戶"
+            ? "輸入至少 2 個 Customer ID 字元搜尋帳戶"
             : "輸入至少 2 個字搜尋下單人或收件人"
       : completedCurrentSearch
         ? activeDropdown === "customerCode"
@@ -290,7 +321,8 @@ const CustomerSection = ({
       && completedCurrentSearch
       && !odooLoading
       && !odooError
-      && customerAccount?.contactCount === 0,
+      && customerAccount?.contactCount === 0
+      && !hasCustomerCodeSuggestions,
   );
   const hasExistingCustomerAccount = Boolean(
     activeDropdown === "customerCode"
@@ -561,7 +593,38 @@ const CustomerSection = ({
               Odoo 搜尋暫時不可用，以下顯示本機記錄
             </p>
           )}
-          {customerOptions.map((c) => c.recipientMatch?.resolved ? (
+          {hasCustomerCodeSuggestions ? (
+            <div>
+              <div className="border-b border-border bg-muted/30 px-3 py-2.5">
+                <p className="text-xs font-medium text-foreground">
+                  符合「{search.trim()}」嘅 Customer ID
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  請先揀完整編號，再選擇實際下單聯絡人。
+                </p>
+              </div>
+              {customerCodeSuggestions.map((code) => (
+                <button
+                  key={code.toLocaleLowerCase()}
+                  type="button"
+                  aria-label={`選擇 Customer ID ${code}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSearch(code);
+                    setCustomerAccount(null);
+                    setOdooCustomers([]);
+                    setCompletedOdooSearch(null);
+                  }}
+                  className="flex min-h-11 w-full touch-manipulation items-center justify-between gap-3 border-b border-border px-3 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/50"
+                >
+                  <span className="break-all font-mono text-sm font-semibold text-primary">
+                    {code}
+                  </span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">查看帳戶</span>
+                </button>
+              ))}
+            </div>
+          ) : customerOptions.map((c) => c.recipientMatch?.resolved ? (
             <div key={c.id} className="border-b border-border last:border-0">
               <button
                 type="button"
@@ -728,7 +791,7 @@ const CustomerSection = ({
           ) : (
             <>
               <p className="text-[11px] text-muted-foreground">
-                呢度用嚟搜尋客戶帳戶；揀帳戶後仍要揀實際聯絡人，亦可在帳戶下新增聯絡人。
+                輸入最少 2 個 Customer ID 字元搜尋帳戶；揀完整編號後仍要揀實際聯絡人。
               </p>
             </>
           )}
@@ -1010,7 +1073,7 @@ function sourceRequiresMoreInput(source: CustomerLookupSource | null, value: str
   const trimmed = value.trim();
   if (source === "phone") return trimmed.replace(/\D/g, "").length < 4;
   if (source === "email") return !trimmed.includes("@") || trimmed.length < 3;
-  if (source === "customerCode") return trimmed.length < 1;
+  if (source === "customerCode") return trimmed.length < CUSTOMER_CODE_PREFIX_MIN_LENGTH;
   return trimmed.length < 2;
 }
 

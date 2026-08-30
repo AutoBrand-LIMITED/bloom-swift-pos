@@ -497,6 +497,54 @@ describe("odoo-api note contracts", () => {
     });
   });
 
+  it("requests Customer ID prefix matches explicitly", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([{
+      id: 42,
+      name: "Crowne Plaza Contact",
+      email: null,
+      phone: "91234567",
+      mobile: null,
+      customerCode: "CROWNEP",
+      history_count: null,
+      total_spent: null,
+      history: [],
+      tags: [],
+    }]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooCustomers } = await import("@/lib/odoo-api");
+
+    const [customer] = await searchOdooCustomers(
+      " Cr ",
+      undefined,
+      "customer_code",
+      "prefix",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/customers?q=Cr&searchType=customer_code&matchMode=prefix",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+    expect(customer.customerCode).toBe("CROWNEP");
+  });
+
+  it("does not request Customer ID prefix matches before two characters", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooCustomers } = await import("@/lib/odoo-api");
+
+    const customers = await searchOdooCustomers(
+      "C",
+      undefined,
+      "customer_code",
+      "prefix",
+    );
+
+    expect(customers).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("loads a shared Customer ID as an account with selectable contacts", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
