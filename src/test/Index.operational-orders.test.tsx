@@ -8,6 +8,8 @@ const odooMocks = vi.hoisted(() => ({
   getAccountingPaymentOptions: vi.fn(),
   getDeliverySlots: vi.fn(),
   getOdooEmployees: vi.fn(),
+  getOdooSalesTeams: vi.fn(),
+  getOdooCustomerGroups: vi.fn(),
   getOdooOrderRecords: vi.fn(),
   getOdooProductCategories: vi.fn(),
   getOdooProducts: vi.fn(),
@@ -93,6 +95,8 @@ describe("Index operational-order hydration", () => {
     odooMocks.getAccountingPaymentOptions.mockResolvedValue([]);
     odooMocks.getDeliverySlots.mockResolvedValue([]);
     odooMocks.getOdooEmployees.mockResolvedValue([]);
+    odooMocks.getOdooSalesTeams.mockResolvedValue([]);
+    odooMocks.getOdooCustomerGroups.mockResolvedValue([]);
     odooMocks.getOdooOrderRecords.mockResolvedValue({
       date: "2026-08-27",
       generatedAt: new Date().toISOString(),
@@ -125,8 +129,8 @@ describe("Index operational-order hydration", () => {
     fireEvent.click(screen.getByRole("button", { name: "訂單記錄" }));
 
     expect(await screen.findByText("Cross-tablet customer")).toBeVisible();
-    expect(screen.getByText("Odoo 同步待處理（1）")).toBeVisible();
-    expect(screen.getByRole("button", { name: "立即重試 Odoo 同步" })).toBeVisible();
+    expect(screen.queryByText(/Odoo 同步/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已嘗試/)).not.toBeInTheDocument();
   });
 
   it("keeps the pending backlog when Odoo exposes only a matching draft", async () => {
@@ -153,7 +157,8 @@ describe("Index operational-order hydration", () => {
     await waitFor(() => expect(odooMocks.getOperationalOrders).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "訂單記錄" }));
 
-    expect(await screen.findByText("Odoo 同步待處理（1）")).toBeVisible();
-    expect(screen.getByRole("button", { name: "立即重試 Odoo 同步" })).toBeVisible();
+    expect(await screen.findByText("Cross-tablet customer")).toBeVisible();
+    expect(screen.queryByText(/Odoo 同步/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已嘗試/)).not.toBeInTheDocument();
   });
 });

@@ -164,6 +164,153 @@ describe("odoo-api note contracts", () => {
     );
   });
 
+  it("loads the exact paginated receivables contract with the signed POS session", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    window.sessionStorage.setItem("anglo-chinese-florist-pos-session", "signed-manager-session");
+    const receivables = {
+      snapshotVersion: "receivables-snapshot-1",
+      generatedAt: "2026-08-30T10:30:00+08:00",
+      asOfDate: "2026-08-30",
+      timezone: "Asia/Hong_Kong",
+      summary: {
+        companyCurrencyId: 344,
+        companyCurrency: "HKD",
+        openInvoiceCount: 1,
+        openResidual: 600,
+        overdueInvoiceCount: 1,
+        overdueResidual: 600,
+        dueTodayInvoiceCount: 0,
+        dueTodayResidual: 0,
+        notDueInvoiceCount: 0,
+        notDueResidual: 0,
+        missingDueDateInvoiceCount: 0,
+        missingDueDateResidual: 0,
+      },
+      rows: [{
+        id: 42,
+        invoiceNumber: "INV/2026/0042",
+        reference: "PO-42",
+        origin: "S00042",
+        invoiceDate: "2026-07-01",
+        dueDate: "2026-08-01",
+        paymentTermId: 3,
+        paymentTerm: "30 Days",
+        customerId: 7,
+        customerName: "Alpha",
+        salespersonId: 8,
+        salesperson: "Elma",
+        currencyId: 344,
+        currency: "HKD",
+        amountTotal: 1_000,
+        amountReconciled: 400,
+        amountResidual: 600,
+        companyCurrencyResidual: 600,
+        reconciliationStatus: "partially_reconciled",
+        status: "overdue",
+        daysOverdue: 29,
+        daysUntilDue: null,
+        overdueResidual: 600,
+        dueTodayResidual: 0,
+        notDueResidual: 0,
+        missingDueDateResidual: 0,
+      }],
+      totalRows: 1,
+      page: 2,
+      limit: 25,
+      hasMore: false,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(receivables));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getReceivables } = await import("@/lib/odoo-api");
+
+    await expect(getReceivables({ status: "overdue", page: 2, limit: 25 }))
+      .resolves.toEqual(receivables);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/accounting/receivables?status=overdue&page=2&limit=25&refresh=false",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("Authorization")).toBe(
+      "Bearer signed-manager-session",
+    );
+    window.sessionStorage.removeItem("anglo-chinese-florist-pos-session");
+  });
+
+  it("sends a receivables snapshot only for non-refresh requests", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({
+      snapshotVersion: "receivables-snapshot-1",
+    })));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getReceivables } = await import("@/lib/odoo-api");
+
+    await getReceivables({
+      status: "due_today",
+      page: 3,
+      limit: 100,
+      snapshotVersion: "snapshot / one",
+    });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "https://backend.test/accounting/receivables?status=due_today&page=3&limit=100&refresh=false&snapshot=snapshot+%2F+one",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+
+    await getReceivables({
+      refresh: true,
+      snapshotVersion: "snapshot-must-be-ignored",
+    });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "https://backend.test/accounting/receivables?status=all&page=1&limit=50&refresh=true",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("validates current manager access through the authenticated no-store endpoint", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    window.sessionStorage.setItem("anglo-chinese-florist-pos-session", "signed-manager-session");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { validateReceivablesAccess } = await import("@/lib/odoo-api");
+
+    await expect(validateReceivablesAccess()).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/accounting/receivables/access",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("Authorization")).toBe(
+      "Bearer signed-manager-session",
+    );
+    window.sessionStorage.removeItem("anglo-chinese-florist-pos-session");
+  });
+
+  it("loads one receivable contact only from the manager detail endpoint", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    window.sessionStorage.setItem("anglo-chinese-florist-pos-session", "signed-manager-session");
+    const detail = {
+      invoiceId: 42,
+      customerId: 7,
+      customerName: "Alpha",
+      customerCompany: "Alpha Limited",
+      customerPhone: "91234567",
+      customerEmail: "accounts@alpha.example",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(detail));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getReceivableDetail } = await import("@/lib/odoo-api");
+
+    await expect(getReceivableDetail(42)).resolves.toEqual(detail);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/accounting/receivables/42/detail",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("Authorization")).toBe(
+      "Bearer signed-manager-session",
+    );
+    window.sessionStorage.removeItem("anglo-chinese-florist-pos-session");
+  });
+
   it("stops a stalled product reorder instead of leaving the UI saving forever", async () => {
     vi.useFakeTimers();
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
@@ -213,6 +360,28 @@ describe("odoo-api note contracts", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("loads native Sales Teams and current Odoo Contact Tags", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: 7, name: "Retail" }]))
+      .mockResolvedValueOnce(jsonResponse([{ id: 12, name: "Corporate" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOdooCustomerGroups, getOdooSalesTeams } = await import("@/lib/odoo-api");
+
+    await expect(getOdooSalesTeams()).resolves.toEqual([{ id: 7, name: "Retail" }]);
+    await expect(getOdooCustomerGroups()).resolves.toEqual([{ id: 12, name: "Corporate" }]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://backend.test/sales-teams",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://backend.test/customer-groups",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
   it("keeps search results lightweight until a customer is selected", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([{
@@ -224,7 +393,10 @@ describe("odoo-api note contracts", () => {
       history_count: null,
       total_spent: null,
       history: [],
-      tags: [],
+      tags: [{ id: 12, name: "Corporate", color: 3 }],
+      customerGroupId: 12,
+      customerGroup: "Corporate",
+      writeDate: "2026-08-29 09:15:00",
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
@@ -248,6 +420,9 @@ describe("odoo-api note contracts", () => {
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
+      customerGroupId: 12,
+      customerGroup: "Corporate",
+      writeDate: "2026-08-29 09:15:00",
       recipientMatch: {
         name: "Mary Wong",
         phone: "6111 1111",
@@ -261,6 +436,32 @@ describe("odoo-api note contracts", () => {
     });
     expect(customer.historyCount).toBeUndefined();
     expect(customer.totalSpent).toBeUndefined();
+  });
+
+  it("keeps multiple existing Contact Tags as a snapshot without inventing a Customer Group ID", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([{
+      id: 42,
+      name: "Alice",
+      email: null,
+      phone: "91234567",
+      mobile: null,
+      history_count: null,
+      total_spent: null,
+      history: [],
+      tags: [
+        { id: 12, name: "Corporate" },
+        { id: 13, name: "VIP Wholesale" },
+      ],
+      customerGroupId: null,
+      customerGroup: null,
+    }])));
+    const { searchOdooCustomers } = await import("@/lib/odoo-api");
+
+    const [customer] = await searchOdooCustomers("Alice");
+
+    expect(customer.customerGroup).toBe("Corporate, VIP Wholesale");
+    expect(customer.customerGroupId).toBeUndefined();
   });
 
   it("uses the explicit Customer ID search mode and preserves the returned code", async () => {
@@ -435,6 +636,10 @@ describe("odoo-api note contracts", () => {
       id: "local-1",
       salesId: "S001",
       operatorEmployeeId: 95,
+      salespersonEmployeeId: 96,
+      salesTeamId: 7,
+      customerGroupId: 12,
+      customerGroupExpectedWriteDate: "2026-07-14 10:00:00",
       customerName: "Chan Tai",
       customerCode: " NEW-001 ",
       senderName: "Director Lee",
@@ -517,6 +722,10 @@ describe("odoo-api note contracts", () => {
       customerId: 42,
       customerCode: " NEW-001 ",
       operatorEmployeeId: 95,
+      salespersonEmployeeId: 96,
+      salesTeamId: 7,
+      customerGroupId: 12,
+      customerGroupExpectedWriteDate: "2026-07-14 10:00:00",
       paymentReference: "CASH-001",
       paymentReceivedAt: "2026-07-14T10:00:00.000Z",
       paymentIdempotencyKey: "744078bd-ae57-4639-af5a-11d8805654b1",
@@ -578,6 +787,10 @@ describe("odoo-api note contracts", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { updateOdooOrderOperationalDetails } = await import("@/lib/odoo-api");
     const payload = {
+      salesId: "AC02 — Elma",
+      salespersonEmployeeId: 95,
+      salesTeamId: 7,
+      customerGroupId: 12,
       fulfillmentType: "delivery" as const,
       customerName: "Jay",
       senderName: "Jay",
@@ -635,11 +848,20 @@ describe("odoo-api note contracts", () => {
     };
 
     await expect(updateOdooOrderOperationalDetails(17, payload)).resolves.toEqual(response);
+    const {
+      salesId: _salesId,
+      department: _department,
+      customerGroup: _customerGroup,
+      salespersonEmployeeId: _salespersonEmployeeId,
+      salesTeamId: _salesTeamId,
+      customerGroupId: _customerGroupId,
+      ...expectedPayload
+    } = payload;
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/orders/17",
       expect.objectContaining({
         method: "PATCH",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(expectedPayload),
       }),
     );
   });
@@ -681,7 +903,7 @@ describe("odoo-api note contracts", () => {
     );
   });
 
-  it("searches Odoo orders across dates with an encoded query", async () => {
+  it("searches Odoo orders with an encoded query and optional order date", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const response = {
       generatedAt: "2026-08-01T22:00:00+08:00",
@@ -692,9 +914,31 @@ describe("odoo-api note contracts", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { searchOdooOrderRecords } = await import("@/lib/odoo-api");
 
-    await expect(searchOdooOrderRecords(" accounts+hk@example.com ")).resolves.toEqual(response);
+    await expect(searchOdooOrderRecords(
+      " accounts+hk@example.com ",
+      undefined,
+      "2026-07-19",
+    )).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://backend.test/orders?q=accounts%2Bhk%40example.com",
+      "https://backend.test/orders?q=accounts%2Bhk%40example.com&date=2026-07-19",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
+  it("preserves query-only Odoo order search callers", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      generatedAt: "2026-08-01T22:00:00+08:00",
+      truncated: false,
+      orders: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { searchOdooOrderRecords } = await import("@/lib/odoo-api");
+
+    await expect(searchOdooOrderRecords("Wong")).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders?q=Wong",
       expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
     );
   });

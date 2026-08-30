@@ -22,6 +22,7 @@ import {
   HK_DISTRICTS,
   hierarchyFromGoogleSelection,
   parseDeliveryAddress,
+  type AddressHierarchy,
   type GoogleAddressSelection,
 } from "@/lib/hk-address";
 import type { DeliveryTimeMode, FulfillmentType, RecipientType } from "@/types/order";
@@ -94,6 +95,7 @@ interface DeliverySectionProps {
   onRegionChange: (v: string) => void;
   onDistrictChange: (v: string) => void;
   onAreaChange: (v: string) => void;
+  onAddressHierarchyChange?: (hierarchy: AddressHierarchy) => void;
   onDetailChange: (v: string) => void;
   onBuildingChange: (v: string) => void;
   onFloorChange: (v: string) => void;
@@ -138,7 +140,7 @@ const DeliverySection = ({
   senderType = "personal", senderCompanyName = "", senderName = "", senderPhone = "",
   deliveryPerson, failedDeliveryAction,
   onDateChange, onFulfillmentTypeChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect, onRetryDeliverySlots,
-  onRegionChange, onDistrictChange, onAreaChange, onDetailChange,
+  onRegionChange, onDistrictChange, onAreaChange, onAddressHierarchyChange, onDetailChange,
   onBuildingChange, onFloorChange, onUnitChange,
   onGoogleAddressSelect,
   onRecipientTypeChange, onRecipientCompanyNameChange,
@@ -464,12 +466,20 @@ const DeliverySection = ({
   };
 
   const handleRegionChange = (v: string) => {
+    if (onAddressHierarchyChange) {
+      onAddressHierarchyChange({ region: v, district: "", area: "" });
+      return;
+    }
     onRegionChange(v);
     onDistrictChange("");
     onAreaChange("");
   };
 
   const handleDistrictChange = (v: string) => {
+    if (onAddressHierarchyChange) {
+      onAddressHierarchyChange({ region: deliveryRegion, district: v, area: "" });
+      return;
+    }
     onDistrictChange(v);
     onAreaChange("");
   };

@@ -9,12 +9,13 @@ import OrderEditDialog from "@/components/pos/OrderEditDialog";
 import type { PaymentStatus } from "@/types/order";
 import { orderItemTotal } from "@/lib/order-pricing";
 import type { OrderRecordView } from "@/lib/order-records";
-import type { PosEmployeeRole } from "@/lib/pos-auth";
 
 interface OrderHistoryProps {
   orders: OrderRecordView[];
   open: boolean;
   onClose: () => void;
+  selectedDate?: string;
+  onSelectedDateChange?: (value: string) => void;
   searchQuery?: string;
   onSearchQueryChange?: (value: string) => void;
   loading?: boolean;
@@ -25,10 +26,6 @@ interface OrderHistoryProps {
   truncated?: boolean;
   onRetry?: () => void;
   onOrderUpdated?: () => void;
-  operationalError?: string | null;
-  operationalTruncated?: boolean;
-  viewerRole?: PosEmployeeRole;
-  onOperationalRetry?: (operationalOrderId: string) => Promise<void>;
 }
 
 const statusBadge: Record<PaymentStatus, { label: string; variant: "destructive" | "default" | "secondary" }> = {
@@ -41,6 +38,8 @@ const OrderHistory = ({
   orders,
   open,
   onClose,
+  selectedDate = "",
+  onSelectedDateChange,
   searchQuery = "",
   onSearchQueryChange,
   loading = false,
@@ -51,54 +50,15 @@ const OrderHistory = ({
   truncated = false,
   onRetry,
   onOrderUpdated,
-  operationalError,
-  operationalTruncated = false,
-  viewerRole,
-  onOperationalRetry,
 }: OrderHistoryProps) => {
   const [editingOrder, setEditingOrder] = useState<OrderRecordView | null>(null);
-  const [retryingOperationalOrderId, setRetryingOperationalOrderId] = useState<string | null>(null);
-  const [operationalRetryErrors, setOperationalRetryErrors] = useState<Record<string, string>>({});
   if (!open) return null;
   const normalizedSearch = searchQuery.trim();
   const searchNeedsMoreInput = normalizedSearch.length > 0 && normalizedSearch.length < 2;
   const searchActive = normalizedSearch.length >= 2;
   const searchSettled = searchActive && searchPhase === "success";
   const showOrderCount = !searchActive || searchSettled;
-  const backlogOrders = orders.filter((order) => (
-    order.source === "operational"
-    && ["pending_odoo", "syncing", "needs_review"].includes(order.syncState)
-  ));
-  const backlogCounts = {
-    pending: backlogOrders.filter((order) => order.syncState === "pending_odoo").length,
-    syncing: backlogOrders.filter((order) => order.syncState === "syncing").length,
-    review: backlogOrders.filter((order) => order.syncState === "needs_review").length,
-  };
-
-  const retryOrder = async (order: OrderRecordView) => {
-    if (
-      viewerRole !== "manager"
-      || order.syncState !== "pending_odoo"
-      || !order.operationalRetryEligible
-      || !order.operationalOrderId
-      || !onOperationalRetry
-    ) return;
-    const operationalOrderId = order.operationalOrderId;
-    setRetryingOperationalOrderId(operationalOrderId);
-    setOperationalRetryErrors((current) => ({ ...current, [operationalOrderId]: "" }));
-    try {
-      await onOperationalRetry(operationalOrderId);
-    } catch (error) {
-      setOperationalRetryErrors((current) => ({
-        ...current,
-        [operationalOrderId]: error instanceof Error
-          ? error.message
-          : "重試失敗，請稍後再試。",
-      }));
-    } finally {
-      setRetryingOperationalOrderId(null);
-    }
-  };
+  const selectedDateLabel = selectedDate || "所選日期";
 
   return (
     <div className="fixed inset-0 z-50 bg-foreground/40 flex justify-end" onClick={onClose}>
@@ -122,6 +82,19 @@ const OrderHistory = ({
           </Button>
         </div>
         <div className="shrink-0 space-y-1.5 border-b border-border p-3">
+          <div className="space-y-1">
+            <label htmlFor="order-history-date" className="text-xs font-medium text-foreground">
+              香港落單日期
+            </label>
+            <Input
+              id="order-history-date"
+              type="date"
+              aria-label="香港落單日期"
+              value={selectedDate}
+              onChange={(event) => onSelectedDateChange?.(event.target.value)}
+              className="min-h-11 touch-manipulation text-sm"
+            />
+          </div>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -151,50 +124,26 @@ const OrderHistory = ({
               ? "請輸入至少 2 個字元"
               : searchActive
                 ? searchPhase === "debouncing"
-                  ? "等待搜尋當前資料..."
+                  ? `等待搜尋 ${selectedDateLabel} 的訂單...`
                   : searchPhase === "searching"
-                    ? "正在搜尋當前資料..."
+                    ? `正在搜尋 ${selectedDateLabel} 的訂單...`
                     : searchSettled
-                      ? `跨日期搜尋結果：${orders.length} 筆`
+                      ? `${selectedDateLabel} 搜尋結果：${orders.length} 筆`
                       : searchPhase === "error"
                         ? "搜尋未完成，請重試"
                         : "準備搜尋..."
-                : "留空會顯示今日訂單；搜尋會跨日期查找。"}
+                : `顯示 ${selectedDateLabel} 的落單記錄；文字搜尋只會查找該日期。`}
           </p>
         </div>
-        {!searchActive && (backlogOrders.length > 0 || operationalError || operationalTruncated) && (
-          <div className="shrink-0 space-y-1.5 border-b border-border bg-amber-50/70 p-3">
-            {backlogOrders.length > 0 && (
-              <div aria-live="polite">
-                <p className="text-sm font-semibold text-amber-900">
-                  Odoo 同步待處理（{backlogOrders.length}）
-                </p>
-                <p className="text-xs text-amber-800">
-                  待同步 {backlogCounts.pending} · 同步中 {backlogCounts.syncing} · 需核對 {backlogCounts.review}
-                </p>
-              </div>
-            )}
-            {operationalError && (
-              <p role="alert" className="flex items-start gap-1.5 text-xs text-destructive">
-                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                未能更新跨平板待處理訂單；暫時顯示這部裝置最近保存的資料。
-              </p>
-            )}
-            {operationalTruncated && (
-              <p role="alert" className="flex items-start gap-1.5 text-xs text-amber-900">
-                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                待同步訂單超過畫面顯示上限，請由管理員檢查同步服務。
-              </p>
-            )}
-          </div>
-        )}
         <ScrollArea className="min-h-0 flex-1" data-testid="order-history-scroll-area">
           {(loading || error || truncated) && (
             <div className="border-b border-border p-3 space-y-2">
               {loading && (
                 <p aria-live="polite" className="flex items-center gap-2 text-xs text-muted-foreground">
                   <LoaderCircle className="h-4 w-4 animate-spin" />
-                  {searchActive ? "正在 Odoo 搜尋訂單" : "正在從 Odoo 載入今日訂單記錄"}
+                  {searchActive
+                    ? `正在 Odoo 搜尋 ${selectedDateLabel} 的訂單`
+                    : `正在從 Odoo 載入 ${selectedDateLabel} 的落單記錄`}
                 </p>
               )}
               {error && (
@@ -231,7 +180,9 @@ const OrderHistory = ({
           {searchActive && !searchSettled ? (
             searchPhase === "error" ? null : (
               <p aria-live="polite" className="text-center text-muted-foreground p-8">
-                {searchPhase === "debouncing" ? "等待搜尋當前資料..." : "正在搜尋當前資料..."}
+                {searchPhase === "debouncing"
+                  ? `等待搜尋 ${selectedDateLabel} 的訂單...`
+                  : `正在搜尋 ${selectedDateLabel} 的訂單...`}
               </p>
             )
           ) : orders.length === 0 && !loaded ? (
@@ -245,8 +196,8 @@ const OrderHistory = ({
               {searchNeedsMoreInput
                 ? "請輸入至少 2 個字元開始搜尋"
                 : searchActive
-                  ? "未找到符合資料的訂單"
-                  : "今日暫無訂單"}
+                  ? `未找到 ${selectedDateLabel} 符合資料的訂單`
+                  : `${selectedDateLabel} 暫無訂單`}
             </p>
           ) : (
             <div className="p-4 space-y-3">
@@ -258,7 +209,8 @@ const OrderHistory = ({
                   ? `指定時間：${order.deliveryTime || "未指定"}`
                   : order.deliveryTime || "未指定時段";
                 const businessDetails = [
-                  ["落單員工", order.salesId],
+                  ["登入操作員編號", order.operatorEmployeeId ? `#${order.operatorEmployeeId}` : undefined],
+                  ["負責銷售員", order.salesId || (order.salespersonEmployeeId ? `員工 #${order.salespersonEmployeeId}` : undefined)],
                   ["公司名稱", order.companyName],
                   ["送花人", order.senderName],
                   ["收貨公司", order.recipientCompanyName],
@@ -267,8 +219,8 @@ const OrderHistory = ({
                   [fulfillmentType === "pickup" ? "自取地點" : "送貨地址", order.deliveryAddress],
                   ["客戶電郵", order.customerEmail],
                   ["帳單地址", order.billingAddress],
-                  ["客戶群組", order.customerGroup],
-                  ["部門", order.department],
+                  ["客戶群組", order.customerGroup || (order.customerGroupId ? `Contact Tag #${order.customerGroupId}` : undefined)],
+                  ["Sales Team", order.department || (order.salesTeamId ? `Sales Team #${order.salesTeamId}` : undefined)],
                 ].filter((detail): detail is [string, string] => Boolean(detail[1]?.trim()));
                 return (
                   <div
@@ -326,58 +278,6 @@ const OrderHistory = ({
                       </span>
                       <span className="font-mono font-bold text-sm">${order.finalPrice.toLocaleString()}</span>
                     </div>
-                    {order.source === "local" && (
-                      <p className="text-[11px] font-medium text-amber-700">
-                        {order.syncState === "pending_confirmation"
-                          ? "等待確認 Odoo 同步結果"
-                          : "只儲存在本機，尚未同步 Odoo"}
-                      </p>
-                    )}
-                    {order.source === "operational" && (
-                      <div className="space-y-2">
-                        <p className={`text-[11px] font-medium ${
-                          order.syncState === "needs_review" ? "text-destructive" : "text-amber-700"
-                        }`}>
-                          {order.syncState === "pending_odoo"
-                            ? order.operationalLastError || "已安全保存，等候 Odoo 自動同步"
-                            : order.syncState === "syncing"
-                              ? "Odoo 同步處理中"
-                            : order.syncState === "needs_review"
-                              ? order.operationalReviewError || order.operationalLastError || "訂單需要管理員核對"
-                              : "已同步 Odoo，正在更新訂單記錄"}
-                          {order.operationalAttemptCount
-                            ? `（已嘗試 ${order.operationalAttemptCount} 次）`
-                            : ""}
-                        </p>
-                        {viewerRole === "manager"
-                          && order.syncState === "pending_odoo"
-                          && order.operationalRetryEligible
-                          && order.operationalOrderId
-                          && onOperationalRetry && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="min-h-11 w-full gap-2 touch-manipulation"
-                              disabled={Boolean(retryingOperationalOrderId)}
-                              onClick={() => void retryOrder(order)}
-                            >
-                              {retryingOperationalOrderId === order.operationalOrderId
-                                ? <LoaderCircle className="h-4 w-4 animate-spin" />
-                                : <RefreshCw className="h-4 w-4" />}
-                              {retryingOperationalOrderId === order.operationalOrderId
-                                ? "正在重試 Odoo 同步..."
-                                : "立即重試 Odoo 同步"}
-                            </Button>
-                        )}
-                        {order.operationalOrderId
-                          && operationalRetryErrors[order.operationalOrderId] && (
-                            <p role="alert" className="text-xs text-destructive">
-                              重試失敗：{operationalRetryErrors[order.operationalOrderId]}
-                            </p>
-                        )}
-                      </div>
-                    )}
                     {order.source === "odoo"
                       && order.odooOrderId
                       && order.writeDate

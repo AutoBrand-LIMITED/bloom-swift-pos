@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Calculator, ClipboardList, LogOut, RotateCcw, UserRound } from "lucide-react";
+import { Calculator, ClipboardList, HandCoins, LogOut, RotateCcw, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CsvImportButton from "@/components/pos/CsvImportButton";
 import {
@@ -9,7 +9,6 @@ import {
   showOrderSubmissionSuccess,
 } from "@/lib/order-submission-feedback";
 import CustomerSection from "@/components/pos/CustomerSection";
-import BusinessDetailsSection from "@/components/pos/BusinessDetailsSection";
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
 import SplitDeliverySection from "@/components/pos/SplitDeliverySection";
@@ -35,6 +34,11 @@ import type {
   RecipientType,
 } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
+import {
+  useOdooCustomerGroups,
+  useOdooEmployees,
+  useOdooSalesTeams,
+} from "@/hooks/use-odoo-employees";
 import { usePosAuth } from "@/components/auth/PosAuthContext";
 import { posAuthRequired } from "@/lib/pos-auth";
 import type { DemoCustomer } from "@/data/demo-customers";
@@ -66,7 +70,6 @@ import {
   getOdooPartnerNotes,
   getOperationalOrders,
   getOdooOrderRecords,
-  retryOperationalOrder,
   searchOdooOrderRecords,
   getAccountingPaymentOptions,
   allowLocalOnlyOrders,
@@ -111,7 +114,6 @@ import {
   saveUnsyncedOrders,
 } from "@/lib/order-records";
 import {
-  applyOperationalOrderStatus,
   loadOperationalOrders,
   mergeOperationalOrderSources,
   saveOperationalOrdersForScope,
@@ -146,9 +148,33 @@ const DELIVERY_CHECKOUT_FIELDS: CheckoutField[] = [
   "deliveryTime",
 ];
 
+const orderCreatedOnHongKongDate = (
+  order: Pick<Order, "createdAt">,
+  businessDate: string,
+): boolean => {
+  const createdAt = new Date(order.createdAt);
+  return Number.isFinite(createdAt.getTime())
+    && hongKongBusinessDate(createdAt) === businessDate;
+};
+
 const Index = () => {
   const navigate = useNavigate();
   const { employee, logout } = usePosAuth();
+  const {
+    staff,
+    loading: staffLoading,
+    error: staffError,
+  } = useOdooEmployees();
+  const {
+    teams: salesTeams,
+    loading: salesTeamsLoading,
+    error: salesTeamsError,
+  } = useOdooSalesTeams();
+  const {
+    groups: customerGroups,
+    loading: customerGroupsLoading,
+    error: customerGroupsError,
+  } = useOdooCustomerGroups();
   const [pendingSubmission, setPendingSubmission] = useState<PendingOrderSubmission | null>(
     () => loadPendingSubmission(employee, posAuthRequired),
   );
@@ -173,10 +199,13 @@ const Index = () => {
   const [customerEmail, setCustomerEmail] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
   const [customerGroup, setCustomerGroup] = useState("");
+  const [customerGroupId, setCustomerGroupId] = useState<number>();
+  const [customerGroupExpectedWriteDate, setCustomerGroupExpectedWriteDate] = useState<string>();
   const [senderDoNumber, setSenderDoNumber] = useState("");
   const [recipientDoNumber, setRecipientDoNumber] = useState("");
   const [sourceReference, setSourceReference] = useState("");
   const [department, setDepartment] = useState("");
+  const [salesTeamId, setSalesTeamId] = useState<number>();
   const [terms, setTerms] = useState("");
   const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({});
   const [customerResolution, setCustomerResolution] = useState<CustomerResolutionState>({
@@ -262,6 +291,7 @@ const Index = () => {
   const [paymentOptionsError, setPaymentOptionsError] = useState<string | null>(null);
   const [salesId, setSalesId] = useState(employee?.salesLabel || "");
   const [operatorEmployeeId, setOperatorEmployeeId] = useState<number | undefined>(employee?.id);
+  const [salespersonEmployeeId, setSalespersonEmployeeId] = useState<number | undefined>(employee?.id);
   const [priceOverridden, setPriceOverridden] = useState(false);
   const [manualPrice, setManualPrice] = useState<number | null>(null);
 
@@ -271,12 +301,11 @@ const Index = () => {
     () => loadOperationalOrders(employee?.id),
   );
   const operationalOrdersRef = useRef(operationalOrders);
-  const [operationalOrdersError, setOperationalOrdersError] = useState<string | null>(null);
-  const [operationalOrdersTruncated, setOperationalOrdersTruncated] = useState(false);
-  const [operationalOrdersRefreshKey, setOperationalOrdersRefreshKey] = useState(0);
   const [remoteOrders, setRemoteOrders] = useState<Order[]>([]);
   const [remoteOrdersQuery, setRemoteOrdersQuery] = useState("");
+  const [remoteOrdersDate, setRemoteOrdersDate] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [orderHistoryDate, setOrderHistoryDate] = useState(() => hongKongBusinessDate());
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [debouncedOrderSearchQuery, setDebouncedOrderSearchQuery] = useState("");
   const [orderSearchPhase, setOrderSearchPhase] = useState<
@@ -284,6 +313,7 @@ const Index = () => {
   >("idle");
   const orderSearchRequestRef = useRef(0);
   const orderSearchQueryRef = useRef("");
+  const orderSearchDateRef = useRef(orderHistoryDate);
   const [orderRecordsLoading, setOrderRecordsLoading] = useState(false);
   const [orderRecordsLoaded, setOrderRecordsLoaded] = useState(!hasOdooBackend);
   const [orderRecordsError, setOrderRecordsError] = useState<string | null>(null);
@@ -303,22 +333,26 @@ const Index = () => {
   const orderSearchActive = normalizedOrderSearchQuery.length >= 2;
   const visibleOrderRecords = useMemo(() => {
     if (normalizedOrderSearchQuery && !orderSearchActive) return [];
-    const matchingLocalOrders = orderSearchActive
-      ? localOrders.filter((order) => orderMatchesSearch(order, normalizedOrderSearchQuery))
-      : localOrders;
+    const matchingLocalOrders = localOrders
+      .filter((order) => orderCreatedOnHongKongDate(order, orderHistoryDate))
+      .filter((order) => (
+        !orderSearchActive || orderMatchesSearch(order, normalizedOrderSearchQuery)
+      ));
     const matchingPendingOrder = employeePendingSubmission?.order
+      && orderCreatedOnHongKongDate(employeePendingSubmission.order, orderHistoryDate)
       && (!orderSearchActive
         || orderMatchesSearch(employeePendingSubmission.order, normalizedOrderSearchQuery))
       ? employeePendingSubmission.order
       : undefined;
     const matchingRemoteOrders = remoteOrdersQuery === normalizedOrderSearchQuery
+      && remoteOrdersDate === orderHistoryDate
       ? remoteOrders
       : [];
-    const matchingOperationalOrders = orderSearchActive
-      ? operationalOrders.filter((record) => (
-          orderMatchesSearch(record.order, normalizedOrderSearchQuery)
-        ))
-      : operationalOrders;
+    const matchingOperationalOrders = operationalOrders
+      .filter((record) => orderCreatedOnHongKongDate(record.order, orderHistoryDate))
+      .filter((record) => (
+        !orderSearchActive || orderMatchesSearch(record.order, normalizedOrderSearchQuery)
+      ));
     return mergeOrderRecords(
       matchingRemoteOrders,
       matchingLocalOrders,
@@ -330,8 +364,10 @@ const Index = () => {
     localOrders,
     normalizedOrderSearchQuery,
     orderSearchActive,
+    orderHistoryDate,
     operationalOrders,
     remoteOrders,
+    remoteOrdersDate,
     remoteOrdersQuery,
   ]);
 
@@ -375,14 +411,10 @@ const Index = () => {
         ));
         operationalOrdersRef.current = next;
         setOperationalOrders(next);
-        setOperationalOrdersTruncated(response.truncated);
-        setOperationalOrdersError(null);
         if (transitionedToSynced) setOrderRecordsRefreshKey((key) => key + 1);
       } catch (error) {
         if (!stopped && !controller.signal.aborted) {
-          setOperationalOrdersError(
-            error instanceof Error ? error.message : "未能更新 Odoo 同步待處理訂單",
-          );
+          console.warn("Operational order refresh failed", error);
         }
       }
       if (!stopped) timer = window.setTimeout(poll, 10_000);
@@ -394,27 +426,12 @@ const Index = () => {
       controller?.abort();
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [employee?.id, employee?.role, operationalOrdersRefreshKey]);
-
-  const handleOperationalOrderRetry = useCallback(async (operationalOrderId: string) => {
-    if (employee?.role !== "manager") {
-      throw new Error("只有管理員可以重試待同步訂單");
-    }
-    const status = await retryOperationalOrder(operationalOrderId);
-    setOperationalOrders((current) => {
-      const next = applyOperationalOrderStatus(current, status);
-      operationalOrdersRef.current = next;
-      return next;
-    });
-    setOperationalOrdersRefreshKey((key) => key + 1);
-    if (status.syncState === "synced") {
-      setOrderRecordsRefreshKey((key) => key + 1);
-    }
-  }, [employee?.role]);
+  }, [employee?.id, employee?.role]);
 
   useEffect(() => {
     const normalizedQuery = orderSearchQuery.trim();
     orderSearchQueryRef.current = normalizedQuery;
+    orderSearchDateRef.current = orderHistoryDate;
     orderSearchRequestRef.current += 1;
     if (!normalizedQuery) {
       setOrderSearchPhase("idle");
@@ -434,7 +451,7 @@ const Index = () => {
     }
     const timer = window.setTimeout(() => setDebouncedOrderSearchQuery(normalizedQuery), 300);
     return () => window.clearTimeout(timer);
-  }, [orderSearchQuery]);
+  }, [orderHistoryDate, orderSearchQuery]);
 
   useEffect(() => {
     if (!historyOpen || !hasOdooBackend) return;
@@ -449,13 +466,14 @@ const Index = () => {
     const requestId = orderSearchRequestRef.current + 1;
     orderSearchRequestRef.current = requestId;
     const requestQuery = debouncedOrderSearchQuery;
+    const requestDate = orderHistoryDate;
     setOrderRecordsLoading(true);
     setOrderRecordsError(null);
     if (requestQuery.length >= 2) setOrderSearchPhase("searching");
 
     const request = debouncedOrderSearchQuery.length >= 2
-      ? searchOdooOrderRecords(debouncedOrderSearchQuery, controller.signal)
-      : getOdooOrderRecords(hongKongBusinessDate(), controller.signal);
+      ? searchOdooOrderRecords(debouncedOrderSearchQuery, controller.signal, requestDate)
+      : getOdooOrderRecords(requestDate, controller.signal);
 
     request
       .then((response) => {
@@ -463,8 +481,10 @@ const Index = () => {
           controller.signal.aborted
           || orderSearchRequestRef.current !== requestId
           || orderSearchQueryRef.current !== requestQuery
+          || orderSearchDateRef.current !== requestDate
         ) return;
         setRemoteOrdersQuery(requestQuery);
+        setRemoteOrdersDate(requestDate);
         setRemoteOrders(response.orders);
         if (employee?.id !== undefined) {
           setOperationalOrders((current) => {
@@ -508,6 +528,7 @@ const Index = () => {
           controller.signal.aborted
           || orderSearchRequestRef.current !== requestId
           || orderSearchQueryRef.current !== requestQuery
+          || orderSearchDateRef.current !== requestDate
         ) return;
         setOrderRecordsError(error instanceof Error ? error.message : "未能載入 Odoo 訂單記錄");
         if (requestQuery.length >= 2) setOrderSearchPhase("error");
@@ -517,11 +538,19 @@ const Index = () => {
           !controller.signal.aborted
           && orderSearchRequestRef.current === requestId
           && orderSearchQueryRef.current === requestQuery
+          && orderSearchDateRef.current === requestDate
         ) setOrderRecordsLoading(false);
       });
 
     return () => controller.abort();
-  }, [debouncedOrderSearchQuery, employee?.id, employee?.role, historyOpen, orderRecordsRefreshKey]);
+  }, [
+    debouncedOrderSearchQuery,
+    employee?.id,
+    employee?.role,
+    historyOpen,
+    orderHistoryDate,
+    orderRecordsRefreshKey,
+  ]);
 
   const subtotal = useMemo(() => {
     const itemsTotal = orderItemsTotal(items);
@@ -615,9 +644,12 @@ const Index = () => {
 
   useEffect(() => {
     if (!employee) return;
-    setSalesId(employee.salesLabel);
     setOperatorEmployeeId(employee.id);
-  }, [employee]);
+    if (!restoredEmployeePendingSubmission) {
+      setSalesId(employee.salesLabel);
+      setSalespersonEmployeeId(employee.id);
+    }
+  }, [employee, restoredEmployeePendingSubmission]);
 
   useEffect(() => {
     if (!hasOdooBackend) return;
@@ -704,6 +736,9 @@ const Index = () => {
     setCustomerType(emptyProfile.customerType);
     setCompanyName(emptyProfile.companyName);
     setBillingAddress(emptyProfile.billingAddress);
+    setCustomerGroup("");
+    setCustomerGroupId(undefined);
+    setCustomerGroupExpectedWriteDate(undefined);
     setSenderContactDraft("");
     setSaveSenderNote(false);
     resetRecipientPersistence();
@@ -719,6 +754,10 @@ const Index = () => {
   }, []);
 
   const applyCustomerSelection = useCallback((customer: DemoCustomer) => {
+    const verifiedCustomerGroupId = customer.customerGroupId !== undefined
+      && customerGroups.some((group) => group.id === customer.customerGroupId)
+      ? customer.customerGroupId
+      : undefined;
     setSelectedCustomer(customer);
     setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
@@ -729,6 +768,12 @@ const Index = () => {
     setCustomerType(customer.customerType || "personal");
     setCompanyName(customer.companyName || "");
     setBillingAddress(customer.billingAddress || "");
+    setCustomerGroup(customer.customerGroup || "");
+    setCustomerGroupId(verifiedCustomerGroupId);
+    // Keep the selected Odoo partner version even when it has no group yet.
+    // A manager may assign its first group before the separate notes refresh
+    // completes, and that write still needs the original optimistic-lock token.
+    setCustomerGroupExpectedWriteDate(customer.writeDate);
     clearCheckoutErrors(
       "customerName",
       "phone",
@@ -740,7 +785,21 @@ const Index = () => {
     setSaveSenderNote(false);
     setNotesConflict(null);
     resetRecipientPersistence();
-  }, [clearCheckoutErrors, resetRecipientPersistence]);
+  }, [clearCheckoutErrors, customerGroups, resetRecipientPersistence]);
+
+  useEffect(() => {
+    const selectedGroupId = selectedCustomer?.customerGroupId;
+    if (
+      selectedGroupId === undefined
+      || customerGroupsLoading
+      || customerGroupsError
+      || !customerGroups.some((group) => group.id === selectedGroupId)
+    ) {
+      return;
+    }
+    setCustomerGroupId(selectedGroupId);
+    setCustomerGroupExpectedWriteDate(selectedCustomer.writeDate);
+  }, [customerGroups, customerGroupsError, customerGroupsLoading, selectedCustomer]);
 
   const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
     const emptyProfile = detachedCustomerProfile();
@@ -755,6 +814,9 @@ const Index = () => {
     setCustomerType(emptyProfile.customerType);
     setCompanyName(emptyProfile.companyName);
     setBillingAddress(emptyProfile.billingAddress);
+    setCustomerGroup("");
+    setCustomerGroupId(undefined);
+    setCustomerGroupExpectedWriteDate(undefined);
     setSenderContactDraft("");
     setSaveSenderNote(false);
     resetRecipientPersistence();
@@ -840,10 +902,13 @@ const Index = () => {
     setCustomerEmail("");
     setBillingAddress("");
     setCustomerGroup("");
+    setCustomerGroupId(undefined);
+    setCustomerGroupExpectedWriteDate(undefined);
     setSenderDoNumber("");
     setRecipientDoNumber("");
     setSourceReference("");
     setDepartment("");
+    setSalesTeamId(undefined);
     setTerms("");
     setCheckoutErrors({});
     setSelectedCustomer(null);
@@ -893,7 +958,10 @@ const Index = () => {
     setCheckoutId(crypto.randomUUID());
     setPriceOverridden(false);
     setManualPrice(null);
-  }, []);
+    setSalesId(employee?.salesLabel || "");
+    setOperatorEmployeeId(employee?.id);
+    setSalespersonEmployeeId(employee?.id);
+  }, [employee]);
 
   const handleClearForm = useCallback(() => {
     if (pendingSubmission) {
@@ -943,10 +1011,13 @@ const Index = () => {
     setCustomerEmail(order.customerEmail || "");
     setBillingAddress(order.billingAddress || "");
     setCustomerGroup(order.customerGroup || "");
+    setCustomerGroupId(order.customerGroupId);
+    setCustomerGroupExpectedWriteDate(order.customerGroupExpectedWriteDate);
     setSenderDoNumber(order.senderDoNumber || "");
     setRecipientDoNumber(order.recipientDoNumber || "");
     setSourceReference(order.sourceReference || "");
     setDepartment(order.department || "");
+    setSalesTeamId(order.salesTeamId);
     setTerms(order.terms || "");
     setSelectedCustomer(options.customerId ? {
       id: `odoo-${options.customerId}`,
@@ -955,6 +1026,9 @@ const Index = () => {
       customerCode: order.customerCode,
       history: [],
       odooPartnerId: options.customerId,
+      customerGroupId: order.customerGroupId,
+      customerGroup: order.customerGroup,
+      writeDate: order.customerGroupExpectedWriteDate,
     } : null);
     setConfirmedNewCustomerName(options.customerId ? null : order.customerName);
     setConfirmedNewCustomerPhone(options.customerId ? null : normalizePhoneNumber(order.phone));
@@ -999,10 +1073,9 @@ const Index = () => {
     setCheckoutId(order.id);
     setPriceOverridden(order.priceOverridden);
     setManualPrice(order.priceOverridden ? order.finalPrice : null);
-    if (!employee) {
-      setSalesId(order.salesId);
-      setOperatorEmployeeId(order.operatorEmployeeId);
-    }
+    setSalesId(order.salesId);
+    setOperatorEmployeeId(order.operatorEmployeeId);
+    setSalespersonEmployeeId(order.salespersonEmployeeId);
     toast.info("已恢復尚未確認嘅 Odoo 訂單，重試會沿用原本嘅訂單編號");
   }, [employee, restoredEmployeePendingSubmission]);
 
@@ -1037,8 +1110,9 @@ const Index = () => {
         writeDate: record.writeDate,
       };
     });
+    if (!pendingSubmission) setCustomerGroupExpectedWriteDate(record.writeDate);
     setSenderContactDraft(record.commentText);
-  }, []);
+  }, [pendingSubmission]);
 
   const refreshSenderContact = useCallback(async (signal?: AbortSignal) => {
     if (!selectedCustomer?.odooPartnerId || !hasOdooBackend) return;
@@ -1170,6 +1244,10 @@ const Index = () => {
       return;
     }
     if (hasOdooBackend && !operatorEmployeeId) {
+      toast.error("登入操作員身份未確認，請重新登入");
+      return;
+    }
+    if (hasOdooBackend && !salespersonEmployeeId) {
       toast.error("請選擇已同步到 Odoo 嘅負責員工");
       return;
     }
@@ -1377,7 +1455,13 @@ const Index = () => {
     const submissionEmployee = employeeSnapshotForSubmission(
       pendingSubmission,
       employee,
-      { salesId, operatorEmployeeId },
+      {
+        salesId,
+        operatorEmployeeId,
+        salespersonEmployeeId,
+        salesTeamId,
+        customerGroupId,
+      },
     );
     const currentOrder: Order = {
       id: pendingSubmission?.order.id || checkoutId,
@@ -1389,6 +1473,11 @@ const Index = () => {
       ...(includePendingField("customerEmail") ? { customerEmail: customerEmail.trim() } : {}),
       ...(includePendingField("billingAddress") ? { billingAddress: billingAddress.trim() } : {}),
       ...(includePendingField("customerGroup") ? { customerGroup: customerGroup.trim() } : {}),
+      ...(customerGroupId !== undefined
+        && includePendingField("customerGroupExpectedWriteDate")
+        && customerGroupExpectedWriteDate !== undefined
+        ? { customerGroupExpectedWriteDate }
+        : {}),
       ...(includePendingField("senderDoNumber") ? { senderDoNumber: senderDoNumber.trim() } : {}),
       ...(includePendingField("recipientDoNumber") ? { recipientDoNumber: recipientDoNumber.trim() } : {}),
       ...(includePendingField("sourceReference") ? { sourceReference: sourceReference.trim() } : {}),
@@ -1602,6 +1691,16 @@ const Index = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/day-end")} className="gap-1.5 text-xs">
               <Calculator className="w-3.5 h-3.5" /> 日結
             </Button>
+            {employee?.role === "manager" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/receivables")}
+                className="min-h-11 shrink-0 gap-1.5 text-xs touch-manipulation"
+              >
+                <HandCoins className="h-3.5 w-3.5" /> 應收追數
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={handleClearForm} className="gap-1.5 text-xs">
               <RotateCcw className="w-3.5 h-3.5" /> 清空
             </Button>
@@ -1671,10 +1770,24 @@ const Index = () => {
         <main className="min-w-0 max-w-4xl flex-1 space-y-4">
         <SalesIdSection
           salesId={salesId}
+          salespersonEmployeeId={salespersonEmployeeId}
+          salesTeamId={salesTeamId}
+          department={department}
+          staff={staff}
+          teams={salesTeams}
+          staffLoading={staffLoading}
+          staffError={staffError}
+          teamsLoading={salesTeamsLoading}
+          teamsError={salesTeamsError}
+          locked={Boolean(pendingSubmission)}
           employee={employee}
           onSalespersonChange={(label, employeeId) => {
             setSalesId(label);
-            setOperatorEmployeeId(employeeId);
+            setSalespersonEmployeeId(employeeId);
+          }}
+          onSalesTeamChange={(label, teamId) => {
+            setDepartment(label);
+            setSalesTeamId(teamId);
           }}
         />
 
@@ -1729,6 +1842,12 @@ const Index = () => {
           companyName={companyName}
           customerEmail={customerEmail}
           billingAddress={billingAddress}
+          customerGroup={customerGroup}
+          customerGroupId={customerGroupId}
+          customerGroups={customerGroups}
+          customerGroupsLoading={customerGroupsLoading}
+          customerGroupsError={customerGroupsError}
+          customerGroupLocked={Boolean(pendingSubmission)}
           onPhoneChange={(v) => {
             setPhone(v);
             clearCheckoutErrors("phone");
@@ -1794,6 +1913,10 @@ const Index = () => {
             setBillingAddress(value);
             clearCheckoutErrors("billingAddress");
           }}
+          onCustomerGroupChange={(label, groupId) => {
+            setCustomerGroup(label);
+            setCustomerGroupId(groupId);
+          }}
           onCustomerSelect={applyCustomerSelection}
           onStartNewCustomerUnderAccount={startNewCustomerUnderAccount}
           onCustomerAndRecipientSelect={applyCustomerAndRecipient}
@@ -1808,6 +1931,7 @@ const Index = () => {
           confirmedNewCustomerPhone={confirmedNewCustomerPhone}
           onConfirmNewCustomer={(normalizedPhone, confirmedName) => {
             setSelectedCustomer(null);
+            setCustomerGroupExpectedWriteDate(undefined);
             setConfirmedNewCustomerName(confirmedName);
             setConfirmedNewCustomerPhone(normalizedPhone);
             clearCheckoutErrors("customerName", "phone");
@@ -1816,12 +1940,6 @@ const Index = () => {
           refreshKey={customerRefreshKey}
         />
 
-        <BusinessDetailsSection
-          customerGroup={customerGroup}
-          department={department}
-          onCustomerGroupChange={setCustomerGroup}
-          onDepartmentChange={setDepartment}
-        />
         </section>
 
         <section
@@ -2146,6 +2264,13 @@ const Index = () => {
         orders={visibleOrderRecords}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
+        selectedDate={orderHistoryDate}
+        onSelectedDateChange={(value) => {
+          if (!value) return;
+          setOrderHistoryDate(value);
+          setOrderRecordsError(null);
+          setOrderRecordsTruncated(false);
+        }}
         searchQuery={orderSearchQuery}
         onSearchQueryChange={(value) => {
           setOrderSearchQuery(value);
@@ -2156,14 +2281,14 @@ const Index = () => {
         loaded={orderRecordsLoaded}
         searchPhase={orderSearchPhase}
         error={orderRecordsError}
-        stale={orderRecordsLoaded && Boolean(orderRecordsError) && remoteOrders.length > 0}
+        stale={orderRecordsLoaded
+          && Boolean(orderRecordsError)
+          && remoteOrders.length > 0
+          && remoteOrdersDate === orderHistoryDate
+          && remoteOrdersQuery === normalizedOrderSearchQuery}
         truncated={orderRecordsTruncated}
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
-        operationalError={operationalOrdersError}
-        operationalTruncated={operationalOrdersTruncated}
-        viewerRole={employee?.role}
-        onOperationalRetry={handleOperationalOrderRetry}
       />
     </div>
   );

@@ -1,34 +1,48 @@
 import { useEffect, useMemo, useState } from "react";
-import { getOdooEmployees, hasOdooBackend } from "@/lib/odoo-api";
-import { SALES_STAFF, type SalesStaff } from "@/types/order";
+import {
+  getOdooCustomerGroups,
+  getOdooEmployees,
+  getOdooSalesTeams,
+  hasOdooBackend,
+} from "@/lib/odoo-api";
+import type { OdooNamedReference, SalesStaff } from "@/types/order";
 
-export function useOdooEmployees() {
-  const [odooStaff, setOdooStaff] = useState<SalesStaff[]>([]);
+function useOdooReferenceList<T>(
+  loader: (signal?: AbortSignal) => Promise<T[]>,
+  fallbackError: string,
+  enabled = true,
+) {
+  const [values, setValues] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hasOdooBackend) return;
-
+    if (!enabled || !hasOdooBackend) return;
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-
-    getOdooEmployees(controller.signal)
-      .then(setOdooStaff)
+    loader(controller.signal)
+      .then(setValues)
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
-        setOdooStaff([]);
-        setError(err instanceof Error ? err.message : "未能同步 Odoo 員工");
+        setValues([]);
+        setError(err instanceof Error ? err.message : fallbackError);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
-
     return () => controller.abort();
-  }, []);
+  }, [enabled, fallbackError, loader]);
 
-  const staff = odooStaff.length > 0 ? odooStaff : SALES_STAFF;
+  return { values, loading, error };
+}
+
+export function useOdooEmployees(enabled = true) {
+  const { values: staff, loading, error } = useOdooReferenceList<SalesStaff>(
+    getOdooEmployees,
+    "未能同步 Odoo 員工",
+    enabled,
+  );
   const staffById = useMemo(() => new Map(staff.map((employee) => [employee.id, employee])), [staff]);
 
   return {
@@ -36,8 +50,26 @@ export function useOdooEmployees() {
     staffById,
     loading,
     error,
-    usingOdoo: odooStaff.length > 0,
+    usingOdoo: !error && staff.length > 0,
   };
+}
+
+export function useOdooSalesTeams(enabled = true) {
+  const { values, ...status } = useOdooReferenceList<OdooNamedReference>(
+    getOdooSalesTeams,
+    "未能同步 Odoo Sales Team",
+    enabled,
+  );
+  return { teams: values, ...status };
+}
+
+export function useOdooCustomerGroups(enabled = true) {
+  const { values, ...status } = useOdooReferenceList<OdooNamedReference>(
+    getOdooCustomerGroups,
+    "未能同步 Odoo 客戶群組",
+    enabled,
+  );
+  return { groups: values, ...status };
 }
 
 export function salesStaffDisplayName(employee: SalesStaff) {

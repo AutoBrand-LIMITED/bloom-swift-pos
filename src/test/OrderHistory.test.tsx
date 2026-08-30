@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OrderHistory from "@/components/pos/OrderHistory";
@@ -7,18 +7,28 @@ import type { OrderRecordView } from "@/lib/order-records";
 const {
   getAccountingPaymentOptions,
   getDeliverySlots,
+  getOdooCustomerGroups,
+  getOdooEmployees,
+  getOdooSalesTeams,
   recordOdooOrderPayment,
   updateOdooOrderOperationalDetails,
 } = vi.hoisted(() => ({
   getAccountingPaymentOptions: vi.fn(),
   getDeliverySlots: vi.fn(),
+  getOdooCustomerGroups: vi.fn(),
+  getOdooEmployees: vi.fn(),
+  getOdooSalesTeams: vi.fn(),
   recordOdooOrderPayment: vi.fn(),
   updateOdooOrderOperationalDetails: vi.fn(),
 }));
 
 vi.mock("@/lib/odoo-api", () => ({
+  hasOdooBackend: true,
   getAccountingPaymentOptions,
   getDeliverySlots,
+  getOdooCustomerGroups,
+  getOdooEmployees,
+  getOdooSalesTeams,
   recordOdooOrderPayment,
   updateOdooOrderOperationalDetails,
 }));
@@ -66,6 +76,12 @@ describe("OrderHistory delivery summary", () => {
       { id: 11, displayLabel: "上午 09:00-13:00", startTime: "09:00", endTime: "13:00" },
       { id: 12, displayLabel: "下午 13:00-18:00", startTime: "13:00", endTime: "18:00" },
     ]);
+    getOdooEmployees.mockReset();
+    getOdooEmployees.mockResolvedValue([]);
+    getOdooSalesTeams.mockReset();
+    getOdooSalesTeams.mockResolvedValue([]);
+    getOdooCustomerGroups.mockReset();
+    getOdooCustomerGroups.mockResolvedValue([]);
     updateOdooOrderOperationalDetails.mockReset();
     getAccountingPaymentOptions.mockReset();
     getAccountingPaymentOptions.mockResolvedValue([
@@ -89,24 +105,34 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByRole("group", { name: /訂單 S00020/ })).toBeInTheDocument();
   });
 
-  it("offers cross-date order search for customer and recipient details", () => {
+  it("offers an accessible Hong Kong order-date field and date-scoped search", () => {
     const onSearchQueryChange = vi.fn();
+    const onSelectedDateChange = vi.fn();
     render(
       <OrderHistory
         orders={[]}
         open
         onClose={vi.fn()}
+        selectedDate="2026-07-19"
+        onSelectedDateChange={onSelectedDateChange}
         searchQuery="accounts@example.com"
         onSearchQueryChange={onSearchQueryChange}
         searchPhase="success"
       />,
     );
 
+    const dateInput = screen.getByLabelText("香港落單日期");
+    expect(dateInput).toHaveAttribute("type", "date");
+    expect(dateInput).toHaveValue("2026-07-19");
+    expect(dateInput).toHaveClass("min-h-11", "touch-manipulation");
+    fireEvent.change(dateInput, { target: { value: "2026-07-18" } });
+    expect(onSelectedDateChange).toHaveBeenCalledWith("2026-07-18");
     expect(screen.getByRole("textbox", { name: "搜尋訂單" })).toHaveValue("accounts@example.com");
-    expect(screen.getByText("跨日期搜尋結果：0 筆")).toBeVisible();
-    expect(screen.getByText("未找到符合資料的訂單")).toBeVisible();
+    expect(screen.getByText("2026-07-19 搜尋結果：0 筆")).toBeVisible();
+    expect(screen.getByText("未找到 2026-07-19 符合資料的訂單")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "清除訂單搜尋" }));
     expect(onSearchQueryChange).toHaveBeenCalledWith("");
+    expect(onSelectedDateChange).toHaveBeenCalledTimes(1);
   });
 
   it("does not show a stale count or false zero while a remote search is unsettled", () => {
@@ -115,6 +141,7 @@ describe("OrderHistory delivery summary", () => {
         orders={[]}
         open
         onClose={vi.fn()}
+        selectedDate="2026-07-19"
         searchQuery="Wong"
         onSearchQueryChange={vi.fn()}
         searchPhase="debouncing"
@@ -122,15 +149,16 @@ describe("OrderHistory delivery summary", () => {
     );
 
     expect(screen.getByText("訂單記錄")).toBeVisible();
-    expect(screen.getAllByText("等待搜尋當前資料...").length).toBeGreaterThan(0);
-    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
-    expect(screen.queryByText(/跨日期搜尋結果/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("等待搜尋 2026-07-19 的訂單...").length).toBeGreaterThan(0);
+    expect(screen.queryByText("未找到 2026-07-19 符合資料的訂單")).not.toBeInTheDocument();
+    expect(screen.queryByText(/2026-07-19 搜尋結果/)).not.toBeInTheDocument();
 
     rerender(
       <OrderHistory
         orders={[]}
         open
         onClose={vi.fn()}
+        selectedDate="2026-07-19"
         searchQuery="Wong"
         onSearchQueryChange={vi.fn()}
         searchPhase="error"
@@ -138,7 +166,7 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
     expect(screen.getByText("搜尋未完成，請重試")).toBeVisible();
-    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
+    expect(screen.queryByText("未找到 2026-07-19 符合資料的訂單")).not.toBeInTheDocument();
   });
 
   it("requires two characters before starting order search", () => {
@@ -224,6 +252,44 @@ describe("OrderHistory delivery summary", () => {
       );
     });
     expect(onOrderUpdated).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps historical assignment and customer group values as read-only snapshots", async () => {
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    render(<OrderHistory orders={[orderFixture({
+      salesId: "AC02 — Elma",
+      salespersonEmployeeId: 95,
+      salesTeamId: 7,
+      department: "Retail",
+      customerGroupId: 12,
+      customerGroup: "Regular",
+    })]} open onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    expect(await screen.findByLabelText("負責銷售員")).toHaveTextContent("AC02 — Elma");
+    expect(screen.getByLabelText("Sales Team")).toHaveTextContent("Retail");
+    expect(screen.getByLabelText("客戶群組")).toHaveTextContent("Regular");
+    expect(screen.getByText(/歷史銷售歸屬只供查閱/)).toBeVisible();
+    expect(screen.queryByRole("combobox", { name: /負責銷售員/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /Sales Team/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /客戶群組/ })).not.toBeInTheDocument();
+    expect(getOdooEmployees).not.toHaveBeenCalled();
+    expect(getOdooSalesTeams).not.toHaveBeenCalled();
+    expect(getOdooCustomerGroups).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => expect(updateOdooOrderOperationalDetails).toHaveBeenCalled());
+    const payload = updateOdooOrderOperationalDetails.mock.calls[0][1];
+    expect(payload).not.toHaveProperty("salesId");
+    expect(payload).not.toHaveProperty("department");
+    expect(payload).not.toHaveProperty("customerGroup");
+    expect(payload).not.toHaveProperty("salespersonEmployeeId");
+    expect(payload).not.toHaveProperty("salesTeamId");
+    expect(payload).not.toHaveProperty("customerGroupId");
   });
 
   it("edits every existing split destination while preserving IDs and item allocations", async () => {
@@ -461,11 +527,7 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.queryByText("Net 30")).not.toBeInTheDocument();
   });
 
-  it("shows same-day backlog counts and lets a manager retry only an eligible pending row", async () => {
-    let finishRetry!: () => void;
-    const onOperationalRetry = vi.fn(() => new Promise<void>((resolve) => {
-      finishRetry = resolve;
-    }));
+  it("keeps accepted orders visible without exposing backend sync details", () => {
     const pending = orderFixture({
       id: "pending-order",
       source: "operational",
@@ -489,77 +551,15 @@ describe("OrderHistory delivery summary", () => {
         orders={[pending, review]}
         open
         onClose={vi.fn()}
-        viewerRole="manager"
-        onOperationalRetry={onOperationalRetry}
       />,
     );
 
-    expect(screen.getByText("Odoo 同步待處理（2）")).toBeVisible();
-    expect(screen.getByText("待同步 1 · 同步中 0 · 需核對 1")).toBeVisible();
-    expect(screen.getAllByRole("button", { name: "立即重試 Odoo 同步" })).toHaveLength(1);
-    expect(screen.getByText(/customer_conflict/)).toBeVisible();
-
-    fireEvent.click(screen.getByRole("button", { name: "立即重試 Odoo 同步" }));
-    expect(onOperationalRetry).toHaveBeenCalledWith("pending-operational-id");
-    expect(await screen.findByRole("button", { name: "正在重試 Odoo 同步..." })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "正在重試 Odoo 同步..." })).toHaveClass(
-      "min-h-11",
-      "touch-manipulation",
-    );
-
-    await act(async () => finishRetry());
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "立即重試 Odoo 同步" })).toBeEnabled();
-    });
-  });
-
-  it("never exposes retry to staff and shows a manager retry error", async () => {
-    const pending = orderFixture({
-      id: "pending-order",
-      source: "operational",
-      syncState: "pending_odoo",
-      operationalOrderId: "pending-operational-id",
-      operationalRetryEligible: true,
-    });
-    const { rerender } = render(
-      <OrderHistory
-        orders={[pending]}
-        open
-        onClose={vi.fn()}
-        viewerRole="staff"
-        onOperationalRetry={vi.fn()}
-      />,
-    );
-
-    expect(screen.queryByRole("button", { name: "立即重試 Odoo 同步" })).not.toBeInTheDocument();
-
-    rerender(
-      <OrderHistory
-        orders={[pending]}
-        open
-        onClose={vi.fn()}
-        viewerRole="manager"
-        onOperationalRetry={vi.fn().mockRejectedValue(new Error("retry_conflict"))}
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "立即重試 Odoo 同步" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("重試失敗：retry_conflict");
-  });
-
-  it("warns when the current-day operational backlog is truncated", () => {
-    render(
-      <OrderHistory
-        orders={[]}
-        open
-        onClose={vi.fn()}
-        viewerRole="manager"
-        operationalTruncated
-      />,
-    );
-
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "待同步訂單超過畫面顯示上限",
-    );
+    expect(screen.getByText("訂單記錄 (2)")).toBeVisible();
+    expect(screen.queryByText(/Odoo 同步/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已安全保存/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/已嘗試/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/odoo_unavailable/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/customer_conflict/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /重試 Odoo 同步/ })).not.toBeInTheDocument();
   });
 });

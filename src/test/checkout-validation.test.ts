@@ -71,17 +71,18 @@ describe("checkout email validation", () => {
     "",
     "accounts@example.com",
     "jayng@autobrand.site",
-    "jayng@autobrand,site",
-    "name@",
-    "@domain",
-  ])("accepts an optional email containing @: %s", (email) => {
+  ])("accepts an optional email with a complete domain: %s", (email) => {
     expect(isValidEmailAddress(email)).toBe(true);
   });
 
   it.each([
+    "xxxxx.test@com",
+    "jayng@autobrand,site",
+    "name@",
+    "@domain",
     "jayng.autobrand.site",
     "not-an-email",
-  ])("rejects a non-empty value without @: %s", (email) => {
+  ])("rejects an incomplete or malformed email: %s", (email) => {
     expect(isValidEmailAddress(email)).toBe(false);
   });
 });

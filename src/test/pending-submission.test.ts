@@ -329,6 +329,51 @@ describe("pending Odoo submission", () => {
     expect(submissionPayloadMatches(pending, retry)).toBe(true);
   });
 
+  it("replays salesperson, Sales Team, and Customer Group IDs exactly", () => {
+    const pending = buildSubmission();
+    Object.assign(pending.order, {
+      salespersonEmployeeId: 96,
+      salesTeamId: 7,
+      customerGroupId: 12,
+      customerGroupExpectedWriteDate: "2026-08-29 09:15:00",
+      department: "Retail",
+      customerGroup: "Corporate",
+    });
+
+    const snapshot = employeeSnapshotForSubmission(pending, {
+      id: 95,
+      name: "Elma",
+      login: "elma",
+      salesLabel: "AC02 — Elma",
+    }, {
+      salesId: "AC04 — Other",
+      operatorEmployeeId: 95,
+      salespersonEmployeeId: 97,
+      salesTeamId: 8,
+      customerGroupId: 13,
+    });
+
+    expect(snapshot).toEqual({
+      salesId: "ACCOUNT - AC02 - Elma",
+      operatorEmployeeId: 95,
+      salespersonEmployeeId: 96,
+      salesTeamId: 7,
+      customerGroupId: 12,
+    });
+    expect(submissionPayloadMatches(pending, {
+      ...pending,
+      order: { ...pending.order, ...snapshot },
+    })).toBe(true);
+    expect(submissionPayloadMatches(pending, {
+      ...pending,
+      order: {
+        ...pending.order,
+        ...snapshot,
+        customerGroupExpectedWriteDate: "2026-08-29 09:16:00",
+      },
+    })).toBe(false);
+  });
+
   it("clears the envelope only after a confirmed response", async () => {
     const submission = buildSubmission();
     await submitPersistedOrder(submission, async () => ({ id: 501 }));

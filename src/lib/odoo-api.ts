@@ -1,5 +1,5 @@
 import type { CustomerTag, DemoCustomer, PurchaseRecord } from "@/data/demo-customers";
-import type { DeliverySplit, Order, SalesStaff } from "@/types/order";
+import type { DeliverySplit, OdooNamedReference, Order, SalesStaff } from "@/types/order";
 import { authenticatedFetch } from "@/lib/pos-auth";
 import { normalizePurchasePaymentStatus } from "@/lib/customer-utils";
 
@@ -15,6 +15,8 @@ interface OdooPartner {
   customerType?: "personal" | "company";
   companyName?: string | null;
   billingAddress?: string | null;
+  customerGroupId?: number | null;
+  customerGroup?: string | null;
   recipientMatch?: {
     name: string | null;
     phone: string | null;
@@ -194,6 +196,8 @@ export interface OrderNoteUpdate {
 }
 
 export interface OrderOperationalUpdate {
+  /** Legacy snapshots are retained for old orders and safe display. */
+  salesId: string;
   customerName: string;
   senderName: string;
   phone: string;
@@ -227,6 +231,11 @@ export interface OrderOperationalUpdate {
   internalNote: string;
   expectedWriteDate: string;
 }
+
+export type OrderOperationalUpdatePayload = Omit<
+  OrderOperationalUpdate,
+  "salesId" | "department" | "customerGroup"
+>;
 
 export interface OrderOperationalUpdateResponse {
   id: number;
@@ -390,6 +399,90 @@ export interface UnavailableDayEndSummary extends DayEndSummaryBase {
 }
 
 export type DayEndSummary = AvailableDayEndSummary | UnavailableDayEndSummary;
+
+export type ReceivablesStatus =
+  | "all"
+  | "overdue"
+  | "due_today"
+  | "not_due"
+  | "missing_due_date";
+
+export type ReceivableReconciliationStatus = "unreconciled" | "partially_reconciled";
+
+export interface ReceivablesSummary {
+  companyCurrencyId: number;
+  companyCurrency: string;
+  openInvoiceCount: number;
+  openResidual: number;
+  overdueInvoiceCount: number;
+  overdueResidual: number;
+  dueTodayInvoiceCount: number;
+  dueTodayResidual: number;
+  notDueInvoiceCount: number;
+  notDueResidual: number;
+  missingDueDateInvoiceCount: number;
+  missingDueDateResidual: number;
+}
+
+export interface ReceivableInvoiceRow {
+  id: number;
+  invoiceNumber: string;
+  reference: string | null;
+  origin: string | null;
+  invoiceDate: string;
+  dueDate: string | null;
+  paymentTermId: number | null;
+  paymentTerm: string | null;
+  customerId: number;
+  customerName: string;
+  salespersonId: number | null;
+  salesperson: string | null;
+  currencyId: number;
+  currency: string;
+  amountTotal: number;
+  amountReconciled: number;
+  amountResidual: number;
+  companyCurrencyResidual: number;
+  reconciliationStatus: ReceivableReconciliationStatus;
+  status: Exclude<ReceivablesStatus, "all">;
+  daysOverdue: number | null;
+  daysUntilDue: number | null;
+  overdueResidual: number;
+  dueTodayResidual: number;
+  notDueResidual: number;
+  missingDueDateResidual: number;
+}
+
+export interface ReceivableInvoiceDetail {
+  invoiceId: number;
+  customerId: number;
+  customerName: string;
+  customerCompany: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
+}
+
+export interface ReceivablesResponse {
+  snapshotVersion: string;
+  generatedAt: string;
+  asOfDate: string;
+  timezone: string;
+  summary: ReceivablesSummary;
+  rows: ReceivableInvoiceRow[];
+  totalRows: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+export interface ReceivablesQuery {
+  status?: ReceivablesStatus;
+  page?: number;
+  limit?: number;
+  refresh?: boolean;
+  snapshotVersion?: string;
+  signal?: AbortSignal;
+}
 
 export interface OdooOrderRecordsResponse {
   date?: string;
@@ -670,17 +763,31 @@ export async function retryOperationalOrder(
 
 export async function updateOdooOrderOperationalDetails(
   orderId: number,
-  payload: OrderOperationalUpdate,
+  payload: OrderOperationalUpdatePayload,
   signal?: AbortSignal,
 ): Promise<OrderOperationalUpdateResponse> {
   if (!BACKEND_URL) {
     throw new Error("Odoo backend is not configured");
   }
 
+  // Historical assignment fields are snapshots only. Never send them back to
+  // the operational PATCH endpoint, which deliberately forbids reassignment.
+  const {
+    salesId: _salesId,
+    department: _department,
+    customerGroup: _customerGroup,
+    operatorEmployeeId: _operatorEmployeeId,
+    salespersonEmployeeId: _salespersonEmployeeId,
+    salesTeamId: _salesTeamId,
+    customerGroupId: _customerGroupId,
+    customerGroupExpectedWriteDate: _customerGroupExpectedWriteDate,
+    ...operationalPayload
+  } = payload as OrderOperationalUpdatePayload & Record<string, unknown>;
+
   const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(operationalPayload),
     signal,
   });
 
@@ -807,6 +914,14 @@ export async function searchOdooCustomerAccount(
 }
 
 function mapOdooPartner(p: OdooPartner): DemoCustomer {
+  const tags = p.tags || [];
+  const customerGroupId = p.customerGroupId ?? undefined;
+  const customerGroup = p.customerGroup?.trim()
+    || (customerGroupId !== undefined
+      ? tags.find((tag) => tag.id === customerGroupId)?.name
+      : tags.map((tag) => tag.name.trim()).filter(Boolean).join(", "))
+    || undefined;
+
   return {
     id: `odoo-${p.id}`,
     odooPartnerId: p.id,
@@ -816,12 +931,14 @@ function mapOdooPartner(p: OdooPartner): DemoCustomer {
     customerType: p.customerType || "personal",
     companyName: p.companyName || undefined,
     billingAddress: p.billingAddress || undefined,
+    customerGroupId,
+    customerGroup,
     customerCode: p.customerCode || undefined,
     history: normalizePurchaseRecords(p.history),
     historyCount: p.history_count ?? undefined,
     totalSpent: p.total_spent ?? undefined,
     commentText: p.commentText || "",
-    tags: p.tags || [],
+    tags,
     writeDate: p.writeDate || undefined,
     recipientMatch: p.recipientMatch
       ? {
@@ -1038,6 +1155,32 @@ export async function getOdooEmployees(signal?: AbortSignal): Promise<SalesStaff
   });
 }
 
+export async function getOdooSalesTeams(signal?: AbortSignal): Promise<OdooNamedReference[]> {
+  if (!BACKEND_URL) return [];
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/sales-teams`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<OdooNamedReference[]>(res, `Odoo sales teams failed: ${res.status}`);
+  }
+  return (await res.json()) as OdooNamedReference[];
+}
+
+export async function getOdooCustomerGroups(signal?: AbortSignal): Promise<OdooNamedReference[]> {
+  if (!BACKEND_URL) return [];
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/customer-groups`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<OdooNamedReference[]>(res, `Odoo customer groups failed: ${res.status}`);
+  }
+  return (await res.json()) as OdooNamedReference[];
+}
+
 export async function getDayEndSummary(date: string, signal?: AbortSignal): Promise<DayEndSummary> {
   if (!BACKEND_URL) {
     throw new Error("Odoo backend is not configured");
@@ -1056,6 +1199,86 @@ export async function getDayEndSummary(date: string, signal?: AbortSignal): Prom
     throw new Error("Day-end summary returned an invalid availability response");
   }
   return body as DayEndSummary;
+}
+
+export async function getReceivables({
+  status = "all",
+  page = 1,
+  limit = 50,
+  refresh = false,
+  snapshotVersion,
+  signal,
+}: ReceivablesQuery = {}): Promise<ReceivablesResponse> {
+  if (!BACKEND_URL) {
+    throw new OdooApiError("Odoo backend is not configured", 503);
+  }
+
+  const params = new URLSearchParams({
+    status,
+    page: String(page),
+    limit: String(limit),
+    refresh: String(refresh),
+  });
+  if (snapshotVersion !== undefined && !refresh) {
+    params.set("snapshot", snapshotVersion);
+  }
+  const res = await authenticatedFetch(`${BACKEND_URL}/accounting/receivables?${params.toString()}`, {
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+
+  if (!res.ok) {
+    return throwApiError<ReceivablesResponse>(
+      res,
+      `Receivables request failed: ${res.status}`,
+    );
+  }
+
+  return (await res.json()) as ReceivablesResponse;
+}
+
+export async function validateReceivablesAccess(signal?: AbortSignal): Promise<void> {
+  if (!BACKEND_URL) {
+    throw new OdooApiError("Odoo backend is not configured", 503);
+  }
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/accounting/receivables/access`, {
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<void>(
+      res,
+      `Receivables access validation failed: ${res.status}`,
+    );
+  }
+}
+
+export async function getReceivableDetail(
+  invoiceId: number,
+  signal?: AbortSignal,
+): Promise<ReceivableInvoiceDetail> {
+  if (!BACKEND_URL) {
+    throw new OdooApiError("Odoo backend is not configured", 503);
+  }
+
+  const res = await authenticatedFetch(
+    `${BACKEND_URL}/accounting/receivables/${encodeURIComponent(String(invoiceId))}/detail`,
+    {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      signal,
+    },
+  );
+  if (!res.ok) {
+    return throwApiError<ReceivableInvoiceDetail>(
+      res,
+      `Receivable detail request failed: ${res.status}`,
+    );
+  }
+  return (await res.json()) as ReceivableInvoiceDetail;
 }
 
 export async function getOdooOrderRecords(
@@ -1081,13 +1304,15 @@ export async function getOdooOrderRecords(
 export async function searchOdooOrderRecords(
   query: string,
   signal?: AbortSignal,
+  date?: string,
 ): Promise<OdooOrderRecordsResponse> {
   const trimmed = query.trim();
   if (!BACKEND_URL || trimmed.length < 2) {
-    return { generatedAt: "", truncated: false, orders: [] };
+    return { ...(date ? { date } : {}), generatedAt: "", truncated: false, orders: [] };
   }
 
   const params = new URLSearchParams({ q: trimmed });
+  if (date) params.set("date", date);
   const res = await authenticatedFetch(`${BACKEND_URL}/orders?${params.toString()}`, {
     headers: { "Content-Type": "application/json" },
     signal,
