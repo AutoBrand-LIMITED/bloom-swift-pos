@@ -843,13 +843,13 @@ const DeliverySection = ({
                   </Label>
                   <Input
                     id="specified-delivery-time"
+                    type="time"
+                    step={300}
                     aria-label="指定送貨時間"
                     aria-invalid={Boolean(deliveryTimeError)}
                     value={deliveryTime}
                     onChange={(event) => onTimeChange(event.target.value)}
-                    placeholder="例如：上午 10 時前／辦公時間"
-                    maxLength={120}
-                    className="min-h-11 text-sm"
+                    className="min-h-11 max-w-xs text-sm"
                   />
                   <p className="flex items-start gap-1 text-xs text-muted-foreground">
                     <CircleDollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0" />

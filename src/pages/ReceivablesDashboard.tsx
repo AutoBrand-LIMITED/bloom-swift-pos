@@ -559,7 +559,7 @@ const ReceivablesDashboard = () => {
                               <TableCell className="text-right font-mono font-semibold">
                                 {formatMoney(row.amountResidual, row.currency)}
                                 <div className="text-xs font-normal text-muted-foreground">
-                                  {row.reconciliationStatus === "partially_reconciled" ? "部分核銷" : "未核銷"}
+                                  {row.reconciliationStatus === "partially_reconciled" ? "部份付款" : "未付款"}
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -599,7 +599,7 @@ const ReceivablesDashboard = () => {
                                       <div>
                                         <p className="text-sm font-semibold">暫時未能連接 Odoo 讀取客戶資料</p>
                                         <p className="mt-0.5 text-xs text-amber-800">
-                                          應收金額仍可查看；公司、電話及電郵未有以舊資料代替。Odoo 恢復後可原位重試。
+                                          應收金額仍可查看；公司、電話、電郵、送花人及銷售員未有以舊資料代替。Odoo 恢復後可原位重試。
                                         </p>
                                       </div>
                                       <Button
@@ -617,7 +617,9 @@ const ReceivablesDashboard = () => {
                                     <DetailItem label="公司" children={detailLoading ? "載入中..." : detail?.customerCompany || "-"} />
                                     <DetailItem label="電話" children={detailLoading ? "載入中..." : detail?.customerPhone || "-"} />
                                     <DetailItem label="電郵" children={detailLoading ? "載入中..." : detail?.customerEmail || "-"} />
-                                    <DetailItem label="Salesperson" children={row.salesperson || "-"} />
+                                    <DetailItem label="送花人" children={detailLoading ? "載入中..." : detail?.senderName || "-"} />
+                                    <DetailItem label="送花人電話" children={detailLoading ? "載入中..." : detail?.senderPhone || "-"} />
+                                    <DetailItem label="Salesperson" children={detailLoading ? "載入中..." : detail?.salesperson || row.salesperson || "-"} />
                                     <DetailItem label="發票編號" children={row.invoiceNumber} />
                                     <DetailItem label="發票參考" children={row.reference || "-"} />
                                     <DetailItem label="來源訂單" children={row.origin || "-"} />

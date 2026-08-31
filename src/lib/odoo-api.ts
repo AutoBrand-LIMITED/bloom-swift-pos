@@ -477,6 +477,9 @@ export interface ReceivableInvoiceDetail {
   customerCompany: string | null;
   customerPhone: string | null;
   customerEmail: string | null;
+  senderName: string | null;
+  senderPhone: string | null;
+  salesperson: string | null;
 }
 
 export interface ReceivablesResponse {

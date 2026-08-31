@@ -414,13 +414,15 @@ describe("DeliverySection delivery time controls", () => {
       deliveryTimeError: "請輸入指定送貨時間",
     });
 
-    const input = screen.getByRole("textbox", { name: "指定送貨時間" });
+    const input = screen.getByLabelText("指定送貨時間");
+    expect(input).toHaveAttribute("type", "time");
+    expect(input).toHaveAttribute("step", "300");
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("指定時間可能另收附加費")).toBeVisible();
     expect(screen.getByRole("alert", { name: "" })).toHaveTextContent("請輸入指定送貨時間");
 
-    fireEvent.change(input, { target: { value: "上午 10 時前" } });
-    expect(props.onTimeChange).toHaveBeenCalledWith("上午 10 時前");
+    fireEvent.change(input, { target: { value: "10:00" } });
+    expect(props.onTimeChange).toHaveBeenCalledWith("10:00");
   });
 
   it("renders loading, error/retry, and empty backend states without hiding specified time", () => {

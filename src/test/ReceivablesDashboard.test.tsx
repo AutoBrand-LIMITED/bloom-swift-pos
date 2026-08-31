@@ -218,6 +218,9 @@ describe("ReceivablesDashboard", () => {
       customerCompany: "Alpha Holdings Limited",
       customerPhone: "9123 4567",
       customerEmail: "accounts@alpha.example",
+      senderName: "Director Lee",
+      senderPhone: "9876 5432",
+      salesperson: "AC03 — May",
     });
   });
 
@@ -230,7 +233,7 @@ describe("ReceivablesDashboard", () => {
     expect(screen.getAllByText("今日到期")).toHaveLength(3);
     expect(screen.getByText("尚有 3 日")).toBeVisible();
     expect(screen.getByText("付款期限未設定")).toBeVisible();
-    expect(screen.getByText("部分核銷")).toBeVisible();
+    expect(screen.getByText("部份付款")).toBeVisible();
     expect(screen.queryByText("9123 4567")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "展開發票 INV/2026/0001 詳情" }));
@@ -238,6 +241,9 @@ describe("ReceivablesDashboard", () => {
     expect(await screen.findByText("9123 4567")).toBeVisible();
     expect(screen.getByText("accounts@alpha.example")).toBeVisible();
     expect(screen.getByText("Alpha Holdings Limited")).toBeVisible();
+    expect(screen.getByText("Director Lee")).toBeVisible();
+    expect(screen.getByText("9876 5432")).toBeVisible();
+    expect(screen.getByText("AC03 — May")).toBeVisible();
     expect(screen.getByText("S00100")).toBeVisible();
     expect(screen.getByText("HK$400.00")).toBeVisible();
     expect(getReceivables).toHaveBeenCalledWith(expect.objectContaining({
@@ -367,6 +373,9 @@ describe("ReceivablesDashboard", () => {
         customerCompany: "Alpha Holdings Limited",
         customerPhone: "9123 4567",
         customerEmail: "accounts@alpha.example",
+        senderName: "Director Lee",
+        senderPhone: "9876 5432",
+        salesperson: "AC03 — May",
       });
     renderDashboard();
     await screen.findByText("Alpha Flowers");
@@ -374,7 +383,7 @@ describe("ReceivablesDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "展開發票 INV/2026/0001 詳情" }));
 
     expect(await screen.findByText("暫時未能連接 Odoo 讀取客戶資料")).toBeVisible();
-    expect(screen.getByText(/公司、電話及電郵未有以舊資料代替/)).toBeVisible();
+    expect(screen.getByText(/公司、電話、電郵、送花人及銷售員未有以舊資料代替/)).toBeVisible();
     expect(screen.queryByText("暫時無法讀取")).not.toBeInTheDocument();
     expect(screen.getByText("Alpha Flowers")).toBeVisible();
     expect(logout).not.toHaveBeenCalled();

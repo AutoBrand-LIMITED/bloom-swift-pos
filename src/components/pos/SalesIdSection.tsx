@@ -1,8 +1,19 @@
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Check, ChevronsUpDown, UserCheck } from "lucide-react";
 import { salesStaffDisplayName } from "@/hooks/use-odoo-employees";
+import { cn } from "@/lib/utils";
 import type { PosEmployeeIdentity } from "@/lib/pos-auth";
 import type { SalesStaff } from "@/types/order";
 
@@ -31,6 +42,7 @@ const SalesIdSection = ({
   onSalesTeamChange,
   employee,
 }: SalesIdSectionProps) => {
+  const [salespersonOpen, setSalespersonOpen] = useState(false);
   const selectedStaff = staff.find((candidate) => candidate.odooEmployeeId === salespersonEmployeeId);
   const salespersonIsLegacySnapshot = salespersonEmployeeId === undefined && Boolean(salesId.trim());
   const salespersonDisabled = locked || staffLoading || Boolean(staffError) || staff.length === 0;
@@ -66,32 +78,66 @@ const SalesIdSection = ({
               {salesId}
             </div>
           ) : (
-            <Select
-              value={salespersonEmployeeId ? String(salespersonEmployeeId) : undefined}
-              disabled={salespersonDisabled}
-              onValueChange={(value) => {
-                const selected = staff.find((candidate) => candidate.odooEmployeeId === Number(value));
-                if (selected?.odooEmployeeId) {
-                  onSalespersonChange(salesStaffDisplayName(selected), selected.odooEmployeeId);
-                }
-              }}
-            >
-              <SelectTrigger className="min-h-11 touch-manipulation text-sm" aria-label="負責銷售員" aria-required="true">
-                <SelectValue placeholder={staffLoading ? "正在載入 Odoo 員工..." : "選擇員工"} />
-              </SelectTrigger>
-              <SelectContent>
-                {salespersonEmployeeId && !selectedStaff && (
-                  <SelectItem value={String(salespersonEmployeeId)} disabled>
-                    {salesId || `員工 #${salespersonEmployeeId}`}
-                  </SelectItem>
-                )}
-                {staff.map((candidate) => candidate.odooEmployeeId ? (
-                  <SelectItem key={candidate.odooEmployeeId} value={String(candidate.odooEmployeeId)}>
-                    {salesStaffDisplayName(candidate)}
-                  </SelectItem>
-                ) : null)}
-              </SelectContent>
-            </Select>
+            <Popover open={salespersonOpen} onOpenChange={setSalespersonOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-label="負責銷售員"
+                  aria-required="true"
+                  aria-expanded={salespersonOpen}
+                  disabled={salespersonDisabled}
+                  className="min-h-11 w-full justify-between touch-manipulation px-3 text-sm font-normal"
+                >
+                  <span className="truncate text-left">
+                    {selectedStaff
+                      ? salesStaffDisplayName(selectedStaff)
+                      : salesId || (staffLoading ? "正在載入 Odoo 員工..." : "選擇員工")}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden="true" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <Command>
+                  <CommandInput aria-label="搜尋負責銷售員" placeholder="搜尋員工編號或姓名..." />
+                  <CommandList>
+                    <CommandEmpty>找不到符合嘅銷售員</CommandEmpty>
+                    <CommandGroup>
+                      {salespersonEmployeeId && !selectedStaff && (
+                        <CommandItem disabled value={salesId || `員工 ${salespersonEmployeeId}`}>
+                          {salesId || `員工 #${salespersonEmployeeId}`}
+                        </CommandItem>
+                      )}
+                      {staff.map((candidate) => candidate.odooEmployeeId ? (
+                        <CommandItem
+                          key={candidate.odooEmployeeId}
+                          value={`${candidate.code || candidate.id} ${candidate.name}`}
+                          onSelect={() => {
+                            onSalespersonChange(
+                              salesStaffDisplayName(candidate),
+                              candidate.odooEmployeeId!,
+                            );
+                            setSalespersonOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              candidate.odooEmployeeId === salespersonEmployeeId
+                                ? "opacity-100"
+                                : "opacity-0",
+                            )}
+                            aria-hidden="true"
+                          />
+                          {salesStaffDisplayName(candidate)}
+                        </CommandItem>
+                      ) : null)}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           )}
           {salespersonIsLegacySnapshot && <p className="text-[10px] text-muted-foreground">舊訂單快照；重試時會原樣保留。</p>}
           {staffError && <p role="status" className="text-[10px] text-destructive">未能同步 Odoo 員工；不會提供未驗證選項。</p>}
