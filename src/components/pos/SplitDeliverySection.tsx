@@ -10,6 +10,7 @@ import {
   recipientOccasionsStateFromSelection,
   recipientOccasionsVersionFromSelection,
 } from "@/lib/recipient-occasions";
+import { resolveRecipientSuggestionForCustomer } from "@/lib/recipient-binding";
 import {
   hierarchyFromGoogleSelection,
   parseDeliveryAddress,
@@ -34,6 +35,7 @@ interface SplitDeliverySectionProps {
   senderCompanyName: string;
   senderName: string;
   senderPhone: string;
+  orderingCustomerId?: number;
 }
 
 const addressSnapshot = (split: DeliverySplit) => {
@@ -106,23 +108,27 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
   const remove = (id: string) => props.onChange(props.splits.filter((split) => split.id !== id));
 
   const applyRecipient = (split: DeliverySplit, suggestion: RecipientSuggestion) => {
-    const occasionState = recipientOccasionsStateFromSelection(suggestion);
-    const occasionVersion = suggestion.shippingPartnerId
-      ? recipientOccasionsVersionFromSelection(suggestion)
+    const { selection } = resolveRecipientSuggestionForCustomer(
+      suggestion,
+      props.orderingCustomerId,
+    );
+    const occasionState = recipientOccasionsStateFromSelection(selection);
+    const occasionVersion = selection.shippingPartnerId
+      ? recipientOccasionsVersionFromSelection(selection)
       : undefined;
     const changes: Partial<DeliverySplit> = {
-      recipientType: suggestion.recipientType || "personal",
-      recipientCompanyName: suggestion.recipientCompanyName || "",
-      recipientName: suggestion.recipientName || "",
-      recipientPhone: suggestion.recipientPhone || "",
-      recipientPartnerId: suggestion.shippingPartnerId ?? undefined,
+      recipientType: selection.recipientType || "personal",
+      recipientCompanyName: selection.recipientCompanyName || "",
+      recipientName: selection.recipientName || "",
+      recipientPhone: selection.recipientPhone || "",
+      recipientPartnerId: selection.shippingPartnerId ?? undefined,
     };
     if (occasionState.known) changes.recipientOccasions = occasionState.value;
     if (occasionVersion !== undefined) {
       changes.recipientOccasionsVersion = occasionVersion;
     }
-    if (suggestion.deliveryAddress) {
-      const parsed = parseDeliveryAddress(suggestion.deliveryAddress);
+    if (selection.deliveryAddress) {
+      const parsed = parseDeliveryAddress(selection.deliveryAddress);
       Object.assign(changes, {
         deliveryRegion: parsed.region,
         deliveryDistrict: parsed.district,
@@ -188,6 +194,7 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
           <DeliverySection
             showFulfillmentSelector
             sectionTitle={`額外收貨資料 ${index + 2}`}
+            allowLinkedCustomerSelection={false}
             fulfillmentType={split.fulfillmentType || "delivery"}
             deliveryDate={split.deliveryDate}
             deliveryTime={split.deliveryTime}

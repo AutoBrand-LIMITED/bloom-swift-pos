@@ -56,6 +56,8 @@ interface RecipientDraft {
 interface DeliverySectionProps {
   showFulfillmentSelector?: boolean;
   sectionTitle?: string;
+  /** Split destinations cannot replace the order's selected customer. */
+  allowLinkedCustomerSelection?: boolean;
   fulfillmentType: FulfillmentType;
   deliveryDate: string;
   deliveryTime: string;
@@ -132,6 +134,7 @@ const normalizeRecipientLookupQuery = (field: RecipientLookupField, value: strin
 const DeliverySection = ({
   showFulfillmentSelector = true,
   sectionTitle = "收貨方式",
+  allowLinkedCustomerSelection = true,
   fulfillmentType,
   deliveryDate, deliveryTime, deliveryTimeMode, deliverySlotId,
   frozenSlotSelection,
@@ -638,7 +641,7 @@ const DeliverySection = ({
                 aria-selected="false"
                 className="min-h-11 w-full px-3 py-2.5 text-left hover:bg-accent/50 touch-manipulation"
                 onClick={() => {
-                  if (suggestion.orderingCustomerId) {
+                  if (suggestion.orderingCustomerId && allowLinkedCustomerSelection) {
                     onRecipientAndCustomerSuggestionSelect(suggestion);
                   } else {
                     onRecipientSuggestionSelect(suggestion);
@@ -651,10 +654,14 @@ const DeliverySection = ({
               >
                 {recipientSuggestionContent(
                   suggestion,
-                  suggestion.orderingCustomerId ? "一鍵套用收貨人＋下單人" : undefined,
+                  suggestion.orderingCustomerId && allowLinkedCustomerSelection
+                    ? "一鍵套用收貨人＋下單人"
+                    : suggestion.orderingCustomerId
+                      ? "只複製收貨人資料；不會更改下單人"
+                      : undefined,
                 )}
               </button>
-              {suggestion.orderingCustomerId && (
+              {suggestion.orderingCustomerId && allowLinkedCustomerSelection && (
                 <button
                   type="button"
                   className="min-h-11 w-full border-t border-border/60 px-3 py-2 text-left text-xs font-medium text-muted-foreground hover:bg-accent/30 touch-manipulation"

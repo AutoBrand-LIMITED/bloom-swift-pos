@@ -54,6 +54,7 @@ import {
   recipientOccasionsVersionFromSelection,
   recipientOccasionValidationError,
 } from "@/lib/recipient-occasions";
+import { resolveRecipientSuggestionForCustomer } from "@/lib/recipient-binding";
 import {
   companyFieldsForCustomerType,
   type CustomerResolutionState,
@@ -871,6 +872,19 @@ const Index = () => {
     );
   }, [clearCheckoutErrors]);
 
+  const applyRecipientForCurrentCustomer = useCallback((suggestion: RecipientSuggestion) => {
+    const { selection, copiedToCurrentCustomer } = resolveRecipientSuggestionForCustomer(
+      suggestion,
+      selectedCustomer?.odooPartnerId,
+    );
+    applyRecipientSelection(selection);
+    toast.success(
+      copiedToCurrentCustomer
+        ? "已複製收貨人資料；系統會喺目前客戶下建立正確收貨紀錄"
+        : "已套用過往收貨人資料",
+    );
+  }, [applyRecipientSelection, selectedCustomer?.odooPartnerId]);
+
   const applyCustomerAndRecipient = useCallback((
     customer: DemoCustomer,
     recipient: NonNullable<DemoCustomer["recipientMatch"]>,
@@ -919,14 +933,18 @@ const Index = () => {
       toast.success("已同時套用收貨人及下單人資料");
     } catch (error: unknown) {
       if (linkedPartySelectionRequestRef.current !== requestId) return;
-      applyRecipientSelection(suggestion);
+      const { selection } = resolveRecipientSuggestionForCustomer(
+        suggestion,
+        selectedCustomer?.odooPartnerId,
+      );
+      applyRecipientSelection(selection);
       toast.error(
         error instanceof Error
           ? `已套用收貨人，但未能載入相連下單人：${error.message}`
           : "已套用收貨人，但未能載入相連下單人",
       );
     }
-  }, [applyCustomerSelection, applyRecipientSelection]);
+  }, [applyCustomerSelection, applyRecipientSelection, selectedCustomer?.odooPartnerId]);
 
   const resetOrderForm = useCallback(() => {
     setPhone("");
@@ -2151,8 +2169,7 @@ const Index = () => {
             setRecipientOccasionsKnown(value !== undefined);
           }}
           onRecipientSuggestionSelect={(suggestion) => {
-            applyRecipientSelection(suggestion);
-            toast.success("已套用過往收貨人資料");
+            applyRecipientForCurrentCustomer(suggestion);
           }}
           onRecipientAndCustomerSuggestionSelect={(suggestion) => {
             void applyRecipientAndLinkedCustomer(suggestion);
@@ -2189,6 +2206,7 @@ const Index = () => {
           senderCompanyName={companyName}
           senderName={senderName || customerName}
           senderPhone={phone}
+          orderingCustomerId={selectedCustomer?.odooPartnerId}
         />
         </section>
 

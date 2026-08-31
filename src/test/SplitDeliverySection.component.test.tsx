@@ -43,6 +43,7 @@ const Harness = ({ initialSplits = [] }: { initialSplits?: DeliverySplit[] }) =>
         senderCompanyName=""
         senderName="Ms Chan"
         senderPhone="61234567"
+        orderingCustomerId={42}
       />
       <output data-testid="split-state">{JSON.stringify(splits)}</output>
     </>
@@ -208,7 +209,7 @@ describe("SplitDeliverySection fulfillment controls", () => {
       recipientOccasionsVersion: "recipient-85-v4",
       deliveryAddress: "九龍觀塘巧明街 6 號",
       shippingPartnerId: 85,
-      orderingCustomerId: null,
+      orderingCustomerId: 42,
       orderingCustomerName: null,
       orderingCustomerPhone: null,
       orderingCustomerEmail: null,
@@ -263,7 +264,7 @@ describe("SplitDeliverySection fulfillment controls", () => {
       recipientPhone: "6123 4567",
       deliveryAddress: "九龍觀塘巧明街 6 號",
       shippingPartnerId: 85,
-      orderingCustomerId: null,
+      orderingCustomerId: 42,
       orderingCustomerName: null,
       orderingCustomerPhone: null,
       orderingCustomerEmail: null,
@@ -296,7 +297,7 @@ describe("SplitDeliverySection fulfillment controls", () => {
       recipientBirthday: null,
       deliveryAddress: "九龍觀塘巧明街 6 號",
       shippingPartnerId: 86,
-      orderingCustomerId: null,
+      orderingCustomerId: 42,
       orderingCustomerName: null,
       orderingCustomerPhone: null,
       orderingCustomerEmail: null,
@@ -342,5 +343,44 @@ describe("SplitDeliverySection fulfillment controls", () => {
       giftCardEnabled: true,
       giftCardMessage: "D3 card",
     });
+  });
+
+  it("copies a foreign recipient without retaining its Odoo partner binding", async () => {
+    recipientSearchMocks.searchOdooRecipients.mockResolvedValue([{
+      id: 93,
+      recipientType: "personal",
+      recipientCompanyName: null,
+      recipientName: "Other Customer Recipient",
+      recipientPhone: "6123 4567",
+      recipientOccasions: [{ id: 9, type: "birthday", date: "1992-03-04" }],
+      recipientOccasionsVersion: "b".repeat(64),
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      shippingPartnerId: 85,
+      orderingCustomerId: 99,
+      orderingCustomerName: "Other Customer",
+      orderingCustomerPhone: "69999999",
+      orderingCustomerEmail: null,
+      orderingCustomerBillingAddress: null,
+    }]);
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+    const phone = screen.getByLabelText("收貨人電話");
+    fireEvent.change(phone, { target: { value: "6" } });
+    fireEvent.focus(phone);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    fireEvent.click(screen.getByRole("option", { name: /Other Customer Recipient/ }));
+
+    const state = JSON.parse(screen.getByTestId("split-state").textContent || "[]")[0];
+    expect(state).toMatchObject({
+      recipientName: "Other Customer Recipient",
+      recipientOccasions: [{ type: "birthday", date: "1992-03-04" }],
+    });
+    expect(state).not.toHaveProperty("recipientPartnerId");
+    expect(state).not.toHaveProperty("recipientOccasionsVersion");
+    expect(state.recipientOccasions[0]).not.toHaveProperty("id");
+    expect(screen.queryByRole("button", { name: "只套用收貨人" })).not.toBeInTheDocument();
   });
 });
