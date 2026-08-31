@@ -81,6 +81,9 @@ const formFromOrder = (order: OrderRecordView): OrderOperationalUpdate => ({
   recipientCompanyName: order.recipientCompanyName || "",
   recipientName: order.recipientName || "",
   recipientPhone: order.recipientPhone || "",
+  ...(Object.prototype.hasOwnProperty.call(order, "recipientBirthday")
+    ? { recipientBirthday: order.recipientBirthday || "" }
+    : {}),
   deliveryPerson: order.deliveryPerson || "",
   giftCardMessage: order.giftCardMessage || "",
   senderNote: order.senderNote || "",
@@ -229,10 +232,15 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
         salesId: _salesId,
         department: _department,
         customerGroup: _customerGroup,
+        recipientBirthday: rawRecipientBirthday,
         ...operationalForm
       } = form;
       const operationalPayload: OrderOperationalUpdatePayload = {
         ...operationalForm,
+        ...(rawRecipientBirthday?.trim()
+          || Object.prototype.hasOwnProperty.call(order, "recipientBirthday")
+          ? { recipientBirthday: rawRecipientBirthday?.trim() || "" }
+          : {}),
         deliverySplits,
       };
       await updateOdooOrderOperationalDetails(order.odooOrderId, operationalPayload);
@@ -510,6 +518,7 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                   )}
                   <Field label="收貨人／聯絡人姓名 *" value={form.recipientName} onChange={(value) => setField("recipientName", value)} />
                   <Field label="收貨人電話 *" value={form.recipientPhone} onChange={(value) => setField("recipientPhone", value)} />
+                  <Field label="收件人生日" value={form.recipientBirthday || ""} onChange={(value) => setField("recipientBirthday", value)} type="date" />
                 </div>
                 </>}
               </section>

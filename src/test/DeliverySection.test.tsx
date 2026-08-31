@@ -147,6 +147,7 @@ describe("DeliverySection delivery time controls", () => {
       companyName: "Sender Limited",
       name: "Ms Chan",
       phone: "+852 6123 4567",
+      birthday: "",
     });
     expect(props.onRecipientTypeChange).not.toHaveBeenCalled();
     expect(props.onRecipientCompanyNameChange).not.toHaveBeenCalled();
@@ -209,6 +210,7 @@ describe("DeliverySection delivery time controls", () => {
       recipientCompanyName: null,
       recipientName: "Ms Gift",
       recipientPhone: "6123 4567",
+      recipientBirthday: "1990-01-02",
       deliveryAddress: "九龍觀塘巧明街 6 號",
       shippingPartnerId: 45,
       orderingCustomerId: null,
@@ -234,6 +236,20 @@ describe("DeliverySection delivery time controls", () => {
     );
     fireEvent.click(screen.getByRole("option", { name: /Ms Gift/ }));
     expect(props.onRecipientSuggestionSelect).toHaveBeenCalledWith(suggestion);
+  });
+
+  it("edits the optional recipient birthday independently", () => {
+    const onRecipientBirthdayChange = vi.fn();
+    renderSection({
+      recipientBirthday: "1990-01-02",
+      onRecipientBirthdayChange,
+    });
+
+    const birthday = screen.getByLabelText("收貨方式 收件人生日");
+    expect(birthday).toHaveValue("1990-01-02");
+
+    fireEvent.change(birthday, { target: { value: "1985-11-12" } });
+    expect(onRecipientBirthdayChange).toHaveBeenCalledWith("1985-11-12");
   });
 
   it("offers an explicit new-recipient action when the search has no matches", async () => {

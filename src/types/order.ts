@@ -49,9 +49,15 @@ export interface DeliverySplit {
   recipientCompanyName: string;
   recipientName: string;
   recipientPhone: string;
+  /** Optional recipient birthday in ISO YYYY-MM-DD format. */
+  recipientBirthday?: string;
+  /** Explicit Odoo shipping contact selected for this destination. */
+  recipientPartnerId?: number;
   deliveryPerson: string;
   failedDeliveryAction: string;
   deliveryNote: string;
+  giftCardEnabled?: boolean;
+  giftCardMessage?: string;
   itemAllocations: DeliverySplitItemAllocation[];
 }
 
@@ -123,6 +129,8 @@ export interface Order {
   recipientCompanyName?: string;
   recipientName: string;
   recipientPhone: string;
+  /** Optional primary-destination recipient birthday in ISO YYYY-MM-DD format. */
+  recipientBirthday?: string;
   deliveryPerson: string;
   giftCardEnabled: boolean;
   giftCardMessage: string;

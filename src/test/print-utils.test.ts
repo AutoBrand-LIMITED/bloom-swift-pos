@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   generateAllDocuments,
   generateDeliveryNote,
+  generateMessageCards,
   generatePickingList,
   generateReceipt,
 } from "@/lib/print-utils";
-import type { Order } from "@/types/order";
+import type { DeliverySplit, Order } from "@/types/order";
 
 const orderFixture = (overrides: Partial<Order> = {}): Order => ({
   id: "43e81d2e-ccfb-415b-8799-12a2e7a528d4",
@@ -38,24 +39,68 @@ const orderFixture = (overrides: Partial<Order> = {}): Order => ({
   ...overrides,
 });
 
+const splitFixture = (overrides: Partial<DeliverySplit> = {}): DeliverySplit => ({
+  id: "split-1",
+  fulfillmentType: "delivery",
+  deliveryDate: "2026-07-17",
+  deliveryTimeMode: "slot",
+  deliveryTime: "下午 13:00-18:00",
+  deliveryRegion: "九龍",
+  deliveryDistrict: "觀塘區",
+  deliveryArea: "觀塘",
+  deliveryDetail: "第二地址",
+  deliveryAddress: "九龍觀塘第二地址",
+  deliveryGoogleAddress: "九龍觀塘第二地址",
+  deliveryBuilding: "",
+  deliveryFloor: "",
+  deliveryUnit: "",
+  recipientType: "personal",
+  recipientCompanyName: "",
+  recipientName: "SECOND RECIPIENT",
+  recipientPhone: "6111 1111",
+  deliveryPerson: "Driver B",
+  failedDeliveryAction: "",
+  deliveryNote: "Second address note",
+  giftCardEnabled: false,
+  giftCardMessage: "",
+  itemAllocations: [{ itemId: "line-1", itemName: "Rose bouquet", quantity: 1 }],
+  ...overrides,
+});
+
 const documentGenerators = [
   ["receipt", generateReceipt],
   ["delivery note", generateDeliveryNote],
   ["picking list", generatePickingList],
+  ["message card", generateMessageCards],
 ] as const;
 
 describe("print layout contract", () => {
-  it("bundles all three document types into one print job with page breaks", () => {
+  it("bundles all enabled document types into one print job with page breaks", () => {
     const html = generateAllDocuments(orderFixture());
 
     expect(html.match(/<!DOCTYPE html>/g)).toHaveLength(1);
-    expect(html.match(/data-batch-print-document=/g)).toHaveLength(3);
+    expect(html.match(/data-batch-print-document=/g)).toHaveLength(4);
     expect(html).toContain('data-batch-print-document="receipt"');
     expect(html).toContain('data-batch-print-document="delivery-note"');
     expect(html).toContain('data-batch-print-document="picking-list"');
+    expect(html).toContain('data-batch-print-document="message-card"');
+    expect(html).toContain("PRIVATE CARD MESSAGE");
     expect(html).toContain(".batch-print-document + .batch-print-document");
     expect(html).toContain("page-break-before: always");
     expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(2);
+  });
+
+  it("omits message cards from all-documents when no destination card is enabled", () => {
+    const html = generateAllDocuments(orderFixture({
+      giftCardEnabled: false,
+      giftCardMessage: "PRIMARY DISABLED CARD",
+      deliverySplits: [splitFixture({ giftCardMessage: "SPLIT DISABLED CARD" })],
+    }));
+
+    expect(html.match(/data-batch-print-document=/g)).toHaveLength(3);
+    expect(html).not.toContain('data-batch-print-document="message-card"');
+    expect(html).not.toContain("PRIMARY DISABLED CARD");
+    expect(html).not.toContain("SPLIT DISABLED CARD");
   });
 
   it.each(documentGenerators)("prints the %s as monochrome A4 landscape without emoji", (_, generator) => {
@@ -167,7 +212,53 @@ describe("print layout contract", () => {
     expect(html).toContain("$680");
     expect(html).toContain('data-document-section="payment-summary"');
     expect(html).toContain("已付款");
-    expect(html).toContain("PRIVATE CARD MESSAGE");
+    expect(html).not.toContain("PRIVATE CARD MESSAGE");
+  });
+
+  it("prints one private card page per enabled destination with its own reference and message", () => {
+    const html = generateMessageCards(orderFixture({
+      deliverySplits: [
+        splitFixture({
+          giftCardEnabled: false,
+          giftCardMessage: "DISABLED SPLIT MESSAGE",
+        }),
+        splitFixture({
+          id: "split-2",
+          giftCardEnabled: true,
+          giftCardMessage: "THIRD DESTINATION MESSAGE",
+        }),
+      ],
+    }));
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    const pages = [...parsed.querySelectorAll('[data-print-document="message-card"]')];
+
+    expect(pages).toHaveLength(2);
+    expect(pages[0].getAttribute("data-message-card-reference")).toBe("S17738-D1");
+    expect(pages[0].textContent).toContain("PRIVATE CARD MESSAGE");
+    expect(pages[0].textContent).not.toContain("THIRD DESTINATION MESSAGE");
+    expect(pages[1].getAttribute("data-message-card-reference")).toBe("S17738-D3");
+    expect(pages[1].textContent).toContain("THIRD DESTINATION MESSAGE");
+    expect(pages[1].textContent).not.toContain("PRIVATE CARD MESSAGE");
+    expect(html).not.toContain("DISABLED SPLIT MESSAGE");
+    expect(html).not.toContain("RECIPIENT NAME");
+    expect(html).not.toContain("SECOND RECIPIENT");
+  });
+
+  it("uses the D1 destination reference for an unsplit primary message card", () => {
+    const html = generateMessageCards(orderFixture({ deliverySplits: undefined }));
+
+    expect(html).toContain('data-message-card-reference="S17738-D1"');
+    expect(html).toContain("DESTINATION：S17738-D1");
+  });
+
+  it("prints safe Markdown emphasis while escaping message-card HTML", () => {
+    const html = generateMessageCards(orderFixture({
+      giftCardMessage: '**Bold <script>alert("x")</script>** and *italic & safe*',
+    }));
+
+    expect(html).toContain('<strong>Bold &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;</strong>');
+    expect(html).toContain("<em>italic &amp; safe</em>");
+    expect(html).not.toContain("<script>alert");
   });
 
   it("renders warehouse and dispatch picking copies as separate full A4 pages", () => {
@@ -200,6 +291,22 @@ describe("print layout contract", () => {
 });
 
 describe("print document privacy", () => {
+  it.each([
+    ["receipt", generateReceipt],
+    ["delivery note", generateDeliveryNote],
+    ["picking list", generatePickingList],
+  ])("does not expose any destination card message in the %s", (_, generator) => {
+    const html = generator(orderFixture({
+      deliverySplits: [splitFixture({
+        giftCardEnabled: true,
+        giftCardMessage: "PRIVATE SPLIT CARD MESSAGE",
+      })],
+    }));
+
+    expect(html).not.toContain("PRIVATE CARD MESSAGE");
+    expect(html).not.toContain("PRIVATE SPLIT CARD MESSAGE");
+  });
+
   it.each([
     ["delivery note", generateDeliveryNote],
     ["picking list", generatePickingList],
@@ -344,7 +451,7 @@ describe("print document privacy", () => {
     expect(html).not.toContain("<script>");
   });
 
-  it.each([generateReceipt, generateDeliveryNote, generatePickingList])(
+  it.each([generateReceipt, generateDeliveryNote, generatePickingList, generateMessageCards])(
     "escapes user-entered text before printing",
     (generator) => {
       const html = generator(orderFixture({

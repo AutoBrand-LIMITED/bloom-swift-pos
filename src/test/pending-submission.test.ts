@@ -13,6 +13,7 @@ import {
   pendingSubmissionForEmployee,
   PENDING_SUBMISSION_KEY,
   PENDING_SUBMISSION_TTL_MS,
+  recipientBirthdayFieldForSubmission,
   savePendingSubmission,
   submissionPayloadMatches,
   submitPersistedOrder,
@@ -20,7 +21,9 @@ import {
   type PendingOrderSubmission,
 } from "@/lib/pending-submission";
 import { OdooApiError, OdooConflictError } from "@/lib/odoo-api";
-import type { Order } from "@/types/order";
+import { normalizeDeliverySplitsForSubmission } from "@/lib/split-delivery";
+import { recipientBirthdayStateFromSelection } from "@/lib/recipient-birthday";
+import type { DeliverySplit, Order } from "@/types/order";
 
 function buildSubmission(): PendingOrderSubmission {
   const order: Order = {
@@ -61,6 +64,33 @@ function buildSubmission(): PendingOrderSubmission {
     order,
     options: { customerId: 42, customerType: "personal", companyName: "" },
     savedAt: new Date().toISOString(),
+  };
+}
+
+function buildLegacySplit(): DeliverySplit {
+  return {
+    id: "legacy-split-2",
+    fulfillmentType: "delivery",
+    deliveryDate: "2026-07-17",
+    deliveryTimeMode: "specified",
+    deliveryTime: "14:00",
+    deliveryRegion: "香港島",
+    deliveryDistrict: "中西區",
+    deliveryArea: "中環",
+    deliveryDetail: "Legacy address",
+    deliveryAddress: "Legacy address",
+    deliveryGoogleAddress: "Legacy address",
+    deliveryBuilding: "",
+    deliveryFloor: "",
+    deliveryUnit: "",
+    recipientType: "personal",
+    recipientCompanyName: "",
+    recipientName: "Legacy Recipient",
+    recipientPhone: "61234567",
+    deliveryPerson: "",
+    failedDeliveryAction: "none",
+    deliveryNote: "",
+    itemAllocations: [{ itemId: "line-1", itemName: "Bouquet", quantity: 1 }],
   };
 }
 
@@ -534,6 +564,167 @@ describe("pending Odoo submission", () => {
 
     expect(submissionPayloadMatches(restored, rebuilt)).toBe(true);
     expect(rebuilt.options.companyName).toBe("  Reload Test Limited  ");
+  });
+
+  it("rebuilds legacy pending splits byte-equally without injecting card or birthday fields", () => {
+    const pending = buildSubmission();
+    pending.order.deliverySplits = [buildLegacySplit()];
+    const restored = JSON.parse(JSON.stringify(pending)) as PendingOrderSubmission;
+    const rebuilt: PendingOrderSubmission = {
+      ...restored,
+      order: {
+        ...restored.order,
+        deliverySplits: normalizeDeliverySplitsForSubmission(
+          restored.order.deliverySplits || [],
+          { baselineSplits: restored.order.deliverySplits },
+        ),
+      },
+    };
+
+    expect(JSON.stringify(rebuilt.order.deliverySplits))
+      .toBe(JSON.stringify(restored.order.deliverySplits));
+    expect(rebuilt.order.deliverySplits?.[0]).not.toHaveProperty("giftCardEnabled");
+    expect(rebuilt.order.deliverySplits?.[0]).not.toHaveProperty("giftCardMessage");
+    expect(rebuilt.order.deliverySplits?.[0]).not.toHaveProperty("recipientBirthday");
+    expect(rebuilt.order.deliverySplits?.[0]).not.toHaveProperty("recipientPartnerId");
+    expect(submissionPayloadMatches(restored, rebuilt)).toBe(true);
+  });
+
+  it("omits a fresh D1 birthday when the bound recipient suggestion omitted the field", () => {
+    const suggestion: { shippingPartnerId: number; recipientBirthday?: string | null } = {
+      shippingPartnerId: 84,
+    };
+    const birthdayState = recipientBirthdayStateFromSelection(suggestion);
+
+    expect(birthdayState).toEqual({ value: "", known: false });
+    expect(recipientBirthdayFieldForSubmission(
+      birthdayState.value,
+      birthdayState.known,
+    )).toEqual({});
+  });
+
+  it("also treats an explicit undefined D1 suggestion birthday as unknown", () => {
+    const birthdayState = recipientBirthdayStateFromSelection({ recipientBirthday: undefined });
+
+    expect(birthdayState).toEqual({ value: "", known: false });
+    expect(recipientBirthdayFieldForSubmission(
+      birthdayState.value,
+      birthdayState.known,
+    )).toEqual({});
+  });
+
+  it.each([null, ""] as const)(
+    "serializes a fresh D1 explicit %s birthday as a clear",
+    (recipientBirthday) => {
+      const suggestion = { shippingPartnerId: 84, recipientBirthday };
+      const birthdayState = recipientBirthdayStateFromSelection(suggestion);
+
+      expect(birthdayState).toEqual({ value: "", known: true });
+      expect(recipientBirthdayFieldForSubmission(
+        birthdayState.value,
+        birthdayState.known,
+      )).toEqual({
+        recipientBirthday: "",
+      });
+    },
+  );
+
+  it("serializes a cashier's manual D1 birthday clear", () => {
+    const selectedBirthday = recipientBirthdayStateFromSelection({
+      recipientBirthday: "1990-01-02",
+    });
+
+    expect(recipientBirthdayFieldForSubmission("", selectedBirthday.known)).toEqual({
+      recipientBirthday: "",
+    });
+  });
+
+  it("does not inject a D1 birthday into a legacy pending binding that omitted the field", () => {
+    const pending = buildSubmission();
+    pending.order.recipientPartnerId = 84;
+
+    expect(recipientBirthdayFieldForSubmission("", false, pending.order)).toEqual({});
+  });
+
+  it("preserves an explicit D1 birthday clear when the pending baseline owns the field", () => {
+    const pending = buildSubmission();
+    pending.order.recipientPartnerId = 84;
+    pending.order.recipientBirthday = "1990-01-02";
+
+    expect(recipientBirthdayFieldForSubmission("", false, pending.order)).toEqual({
+      recipientBirthday: "",
+    });
+  });
+
+  it("keeps destination-owned data when it is added to a legacy pending split", () => {
+    const pending = buildSubmission();
+    pending.order.deliverySplits = [buildLegacySplit()];
+    const editedSplits = [{
+      ...pending.order.deliverySplits[0],
+      giftCardEnabled: true,
+      giftCardMessage: "New card must count as an edit",
+      recipientBirthday: "1990-01-02",
+      recipientPartnerId: 85,
+    }];
+    const rebuilt: PendingOrderSubmission = {
+      ...pending,
+      order: {
+        ...pending.order,
+        deliverySplits: normalizeDeliverySplitsForSubmission(editedSplits, {
+          baselineSplits: pending.order.deliverySplits,
+        }),
+      },
+    };
+
+    expect(rebuilt.order.deliverySplits?.[0]).toMatchObject({
+      giftCardEnabled: true,
+      giftCardMessage: "New card must count as an edit",
+      recipientBirthday: "1990-01-02",
+      recipientPartnerId: 85,
+    });
+    expect(submissionPayloadMatches(pending, rebuilt)).toBe(false);
+  });
+
+  it("preserves independent split partner bindings through pending outbox submission", async () => {
+    const pending = buildSubmission();
+    pending.order.deliverySplits = normalizeDeliverySplitsForSubmission([
+      { ...buildLegacySplit(), recipientPartnerId: 85 },
+      { ...buildLegacySplit(), id: "legacy-split-3", recipientPartnerId: 86 },
+    ]);
+    const submitter = vi.fn().mockResolvedValue({ id: 501 });
+
+    await submitPersistedOrder(pending, submitter);
+
+    expect(submitter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deliverySplits: [
+          expect.objectContaining({ id: "legacy-split-2", recipientPartnerId: 85 }),
+          expect.objectContaining({ id: "legacy-split-3", recipientPartnerId: 86 }),
+        ],
+      }),
+      pending.options,
+    );
+  });
+
+  it("keeps a legacy pending split with a partner binding byte-equal when birthday was absent", () => {
+    const pending = buildSubmission();
+    pending.order.deliverySplits = [{ ...buildLegacySplit(), recipientPartnerId: 85 }];
+    const restored = JSON.parse(JSON.stringify(pending)) as PendingOrderSubmission;
+    const rebuilt: PendingOrderSubmission = {
+      ...restored,
+      order: {
+        ...restored.order,
+        deliverySplits: normalizeDeliverySplitsForSubmission(
+          restored.order.deliverySplits || [],
+          { baselineSplits: restored.order.deliverySplits },
+        ),
+      },
+    };
+
+    expect(JSON.stringify(rebuilt.order.deliverySplits))
+      .toBe(JSON.stringify(restored.order.deliverySplits));
+    expect(rebuilt.order.deliverySplits?.[0]).not.toHaveProperty("recipientBirthday");
+    expect(submissionPayloadMatches(restored, rebuilt)).toBe(true);
   });
 
   it("detects a new field entered on an immutable legacy pending order", () => {

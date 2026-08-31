@@ -48,6 +48,7 @@ interface RecipientDraft {
   companyName: string;
   name: string;
   phone: string;
+  birthday: string;
 }
 
 interface DeliverySectionProps {
@@ -80,6 +81,7 @@ interface DeliverySectionProps {
   recipientCompanyName: string;
   recipientName: string;
   recipientPhone: string;
+  recipientBirthday?: string;
   senderType?: RecipientType;
   senderCompanyName?: string;
   senderName?: string;
@@ -105,6 +107,7 @@ interface DeliverySectionProps {
   onRecipientCompanyNameChange: (v: string) => void;
   onRecipientNameChange: (v: string) => void;
   onRecipientPhoneChange: (v: string) => void;
+  onRecipientBirthdayChange?: (v: string) => void;
   /** Applies all recipient identity fields in one state update when the parent stores them together. */
   onRecipientDetailsChange?: (recipient: RecipientDraft) => void;
   onRecipientSuggestionSelect: (suggestion: RecipientSuggestion) => void;
@@ -136,7 +139,7 @@ const DeliverySection = ({
   legacyDeliveryTime,
   deliveryRegion, deliveryDistrict, deliveryArea, deliveryDetail,
   deliveryBuilding, deliveryFloor, deliveryUnit,
-  recipientType, recipientCompanyName, recipientName, recipientPhone,
+  recipientType, recipientCompanyName, recipientName, recipientPhone, recipientBirthday = "",
   senderType = "personal", senderCompanyName = "", senderName = "", senderPhone = "",
   deliveryPerson, failedDeliveryAction,
   onDateChange, onFulfillmentTypeChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect, onRetryDeliverySlots,
@@ -144,7 +147,8 @@ const DeliverySection = ({
   onBuildingChange, onFloorChange, onUnitChange,
   onGoogleAddressSelect,
   onRecipientTypeChange, onRecipientCompanyNameChange,
-  onRecipientNameChange, onRecipientPhoneChange, onRecipientDetailsChange, onRecipientSuggestionSelect,
+  onRecipientNameChange, onRecipientPhoneChange, onRecipientBirthdayChange = () => {},
+  onRecipientDetailsChange, onRecipientSuggestionSelect,
   onRecipientAndCustomerSuggestionSelect,
   onConfirmNewRecipient,
   onDeliveryPersonChange,
@@ -162,6 +166,7 @@ const DeliverySection = ({
   ]);
   const addressListboxId = useId();
   const recipientListboxId = useId();
+  const recipientBirthdayId = useId();
   const [activeAddressSuggestion, setActiveAddressSuggestion] = useState(-1);
   const [addressInputFocused, setAddressInputFocused] = useState(false);
   const [addressCompositionActive, setAddressCompositionActive] = useState(false);
@@ -255,6 +260,7 @@ const DeliverySection = ({
     recipientCompanyName.trim(),
     recipientName.trim(),
     recipientPhone.trim(),
+    recipientBirthday,
   ]);
   const newRecipientConfirmed = confirmedNewRecipientSignature === recipientIdentitySignature;
   const canUseSenderAsRecipient = Boolean(senderName.trim() && senderPhone.trim());
@@ -262,7 +268,8 @@ const DeliverySection = ({
     && recipientType === senderType
     && recipientCompanyName.trim() === (senderType === "company" ? senderCompanyName.trim() : "")
     && recipientName.trim() === senderName.trim()
-    && recipientPhone.trim() === senderPhone.trim();
+    && recipientPhone.trim() === senderPhone.trim()
+    && !recipientBirthday;
 
   const applyRecipientDraft = (recipient: RecipientDraft) => {
     if (onRecipientDetailsChange) {
@@ -273,6 +280,7 @@ const DeliverySection = ({
     onRecipientCompanyNameChange(recipient.companyName);
     onRecipientNameChange(recipient.name);
     onRecipientPhoneChange(recipient.phone);
+    onRecipientBirthdayChange(recipient.birthday);
   };
 
   const handleUseSenderAsRecipient = () => {
@@ -281,12 +289,14 @@ const DeliverySection = ({
       companyName: recipientCompanyName,
       name: recipientName,
       phone: recipientPhone,
+      birthday: recipientBirthday,
     };
     applyRecipientDraft({
       type: senderType,
       companyName: senderType === "company" ? senderCompanyName.trim() : "",
       name: senderName.trim(),
       phone: senderPhone.trim(),
+      birthday: "",
     });
     setRecipientLookupField(null);
     setRecipientSuggestions([]);
@@ -300,6 +310,7 @@ const DeliverySection = ({
       companyName: previousRecipient?.companyName ?? "",
       name: previousRecipient?.name ?? "",
       phone: previousRecipient?.phone ?? "",
+      birthday: previousRecipient?.birthday ?? "",
     });
     recipientBeforeSenderCopyRef.current = null;
     setRecipientLookupField(null);
@@ -1190,6 +1201,17 @@ const DeliverySection = ({
           )}
           {recipientDropdown("phone")}
           </div>
+        </div>
+        <div className="max-w-xs space-y-1">
+          <Label htmlFor={recipientBirthdayId} className="text-xs">收件人生日</Label>
+          <Input
+            id={recipientBirthdayId}
+            aria-label={`${sectionTitle} 收件人生日`}
+            type="date"
+            value={recipientBirthday}
+            onChange={(event) => onRecipientBirthdayChange(event.target.value)}
+            className="min-h-11 text-sm"
+          />
         </div>
         {recipientLookupPhase !== "idle" && (
           <div

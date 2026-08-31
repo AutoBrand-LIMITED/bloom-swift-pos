@@ -11,33 +11,75 @@ const addressHookMocks = vi.hoisted(() => ({
   refreshSuggestions: vi.fn(),
   selectSuggestion: vi.fn(),
 }));
+const recipientSearchMocks = vi.hoisted(() => ({
+  searchOdooRecipients: vi.fn(),
+}));
 
 vi.mock("@/hooks/useGoogleAddressSuggestions", () => ({
   useGoogleAddressSuggestions: addressHookMocks.useGoogleAddressSuggestions,
 }));
+vi.mock("@/lib/odoo-api", () => ({
+  hasOdooBackend: true,
+  searchOdooRecipients: recipientSearchMocks.searchOdooRecipients,
+}));
 
-const Harness = () => {
-  const [splits, setSplits] = useState<DeliverySplit[]>([]);
+const Harness = ({ initialSplits = [] }: { initialSplits?: DeliverySplit[] }) => {
+  const [splits, setSplits] = useState<DeliverySplit[]>(initialSplits);
   return (
-    <SplitDeliverySection
-      items={[{ id: "line-1", name: "Bouquet", price: 100, quantity: 2 }]}
-      splits={splits}
-      onChange={setSplits}
-      defaultDeliveryDate="2026-08-18"
-      defaultDeliveryTime="上午 09:00-13:00"
-      defaultDeliveryTimeMode="slot"
-      defaultDeliverySlotId={1}
-      deliverySlots={[]}
-      deliverySlotsLoading={false}
-      deliverySlotsError={null}
-      onRetryDeliverySlots={vi.fn()}
-      senderType="personal"
-      senderCompanyName=""
-      senderName="Ms Chan"
-      senderPhone="61234567"
-    />
+    <>
+      <SplitDeliverySection
+        items={[{ id: "line-1", name: "Bouquet", price: 100, quantity: 2 }]}
+        splits={splits}
+        onChange={setSplits}
+        defaultDeliveryDate="2026-08-18"
+        defaultDeliveryTime="上午 09:00-13:00"
+        defaultDeliveryTimeMode="slot"
+        defaultDeliverySlotId={1}
+        deliverySlots={[]}
+        deliverySlotsLoading={false}
+        deliverySlotsError={null}
+        onRetryDeliverySlots={vi.fn()}
+        senderType="personal"
+        senderCompanyName=""
+        senderName="Ms Chan"
+        senderPhone="61234567"
+      />
+      <output data-testid="split-state">{JSON.stringify(splits)}</output>
+    </>
   );
 };
+
+const boundSplit = (
+  id: string,
+  recipientPartnerId: number,
+  recipientName: string,
+): DeliverySplit => ({
+  id,
+  fulfillmentType: "delivery",
+  deliveryDate: "2026-08-18",
+  deliveryTimeMode: "specified",
+  deliveryTime: "15:00",
+  deliveryRegion: "九龍",
+  deliveryDistrict: "觀塘區",
+  deliveryArea: "觀塘",
+  deliveryDetail: `${recipientName} address`,
+  deliveryAddress: `${recipientName} address`,
+  deliveryGoogleAddress: `${recipientName} address`,
+  deliveryBuilding: "",
+  deliveryFloor: "",
+  deliveryUnit: "",
+  recipientType: "personal",
+  recipientCompanyName: "",
+  recipientName,
+  recipientPhone: "61234567",
+  recipientPartnerId,
+  deliveryPerson: "",
+  failedDeliveryAction: "none",
+  deliveryNote: "",
+  giftCardEnabled: false,
+  giftCardMessage: "",
+  itemAllocations: [],
+});
 
 describe("SplitDeliverySection fulfillment controls", () => {
   beforeEach(() => {
@@ -49,6 +91,7 @@ describe("SplitDeliverySection fulfillment controls", () => {
       refreshSuggestions: addressHookMocks.refreshSuggestions,
       selectSuggestion: addressHookMocks.selectSuggestion,
     });
+    recipientSearchMocks.searchOdooRecipients.mockResolvedValue([]);
   });
 
   it("creates an independent destination and allows switching it to pickup", () => {
@@ -110,5 +153,177 @@ describe("SplitDeliverySection fulfillment controls", () => {
     expect(region).toHaveTextContent("九龍");
     expect(district).toHaveTextContent("觀塘區");
     expect(screen.getByRole("combobox", { name: "送貨地點" })).toBeEnabled();
+  });
+
+  it("keeps two split birthdays and cards independent", () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+
+    const initialState = JSON.parse(screen.getByTestId("split-state").textContent || "[]");
+    expect(initialState[0]).toMatchObject({ giftCardEnabled: false, giftCardMessage: "" });
+    expect(initialState[0]).not.toHaveProperty("recipientBirthday");
+    expect(initialState[1]).toMatchObject({ giftCardEnabled: false, giftCardMessage: "" });
+    expect(initialState[1]).not.toHaveProperty("recipientBirthday");
+
+    fireEvent.change(screen.getByLabelText("額外收貨資料 2 收件人生日"), {
+      target: { value: "1990-01-02" },
+    });
+    fireEvent.change(screen.getByLabelText("額外收貨資料 3 收件人生日"), {
+      target: { value: "1985-11-12" },
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "拆單收貨點 2 心意卡開關" }));
+    fireEvent.change(screen.getByLabelText("拆單收貨點 2 心意卡內容"), {
+      target: { value: "Destination two" },
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "拆單收貨點 3 心意卡開關" }));
+    fireEvent.change(screen.getByLabelText("拆單收貨點 3 心意卡內容"), {
+      target: { value: "Destination three" },
+    });
+
+    const state = JSON.parse(screen.getByTestId("split-state").textContent || "[]");
+    expect(state[0]).toMatchObject({
+      recipientBirthday: "1990-01-02",
+      giftCardEnabled: true,
+      giftCardMessage: "Destination two",
+    });
+    expect(state[1]).toMatchObject({
+      recipientBirthday: "1985-11-12",
+      giftCardEnabled: true,
+      giftCardMessage: "Destination three",
+    });
+  });
+
+  it("stores a suggested shipping partner until a recipient identity field changes", async () => {
+    recipientSearchMocks.searchOdooRecipients.mockResolvedValue([{
+      id: 90,
+      recipientType: "personal",
+      recipientCompanyName: null,
+      recipientName: "Ms Gift",
+      recipientPhone: "6123 4567",
+      recipientBirthday: "1990-01-02",
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      shippingPartnerId: 85,
+      orderingCustomerId: null,
+      orderingCustomerName: null,
+      orderingCustomerPhone: null,
+      orderingCustomerEmail: null,
+      orderingCustomerBillingAddress: null,
+    }]);
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+    const phone = screen.getByLabelText("收貨人電話");
+    fireEvent.change(phone, { target: { value: "6" } });
+    fireEvent.focus(phone);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    fireEvent.click(screen.getByRole("option", { name: /Ms Gift/ }));
+
+    expect(JSON.parse(screen.getByTestId("split-state").textContent || "[]")[0])
+      .toMatchObject({ recipientName: "Ms Gift", recipientPartnerId: 85 });
+
+    fireEvent.change(screen.getByLabelText("額外收貨資料 2 收件人生日"), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "拆單收貨點 2 心意卡開關" }));
+    fireEvent.change(screen.getByLabelText("拆單收貨點 2 心意卡內容"), {
+      target: { value: "Keep the binding" },
+    });
+    expect(JSON.parse(screen.getByTestId("split-state").textContent || "[]")[0])
+      .toMatchObject({ recipientPartnerId: 85, recipientBirthday: "" });
+
+    fireEvent.change(screen.getByLabelText(/收貨人姓名／聯絡人姓名/), {
+      target: { value: "Different Recipient" },
+    });
+    expect(JSON.parse(screen.getByTestId("split-state").textContent || "[]")[0])
+      .not.toHaveProperty("recipientPartnerId");
+  });
+
+  it("keeps an omitted suggestion birthday unknown while retaining its split binding", async () => {
+    recipientSearchMocks.searchOdooRecipients.mockResolvedValue([{
+      id: 91,
+      recipientType: "personal",
+      recipientCompanyName: null,
+      recipientName: "Unknown Birthday",
+      recipientPhone: "6123 4567",
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      shippingPartnerId: 85,
+      orderingCustomerId: null,
+      orderingCustomerName: null,
+      orderingCustomerPhone: null,
+      orderingCustomerEmail: null,
+      orderingCustomerBillingAddress: null,
+    }]);
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+    const phone = screen.getByLabelText("收貨人電話");
+    fireEvent.change(phone, { target: { value: "6" } });
+    fireEvent.focus(phone);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    fireEvent.click(screen.getByRole("option", { name: /Unknown Birthday/ }));
+
+    const state = JSON.parse(screen.getByTestId("split-state").textContent || "[]")[0];
+    expect(state).toHaveProperty("recipientPartnerId", 85);
+    expect(state).not.toHaveProperty("recipientBirthday");
+  });
+
+  it("keeps an explicit null suggestion birthday as a split clear", async () => {
+    recipientSearchMocks.searchOdooRecipients.mockResolvedValue([{
+      id: 92,
+      recipientType: "personal",
+      recipientCompanyName: null,
+      recipientName: "Known Empty Birthday",
+      recipientPhone: "6123 4567",
+      recipientBirthday: null,
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      shippingPartnerId: 86,
+      orderingCustomerId: null,
+      orderingCustomerName: null,
+      orderingCustomerPhone: null,
+      orderingCustomerEmail: null,
+      orderingCustomerBillingAddress: null,
+    }]);
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+    const phone = screen.getByLabelText("收貨人電話");
+    fireEvent.change(phone, { target: { value: "6" } });
+    fireEvent.focus(phone);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    fireEvent.click(screen.getByRole("option", { name: /Known Empty Birthday/ }));
+
+    expect(JSON.parse(screen.getByTestId("split-state").textContent || "[]")[0])
+      .toMatchObject({ recipientPartnerId: 86, recipientBirthday: "" });
+  });
+
+  it("keeps independent D2 and D3 partner bindings through birthday and card edits", () => {
+    render(<Harness initialSplits={[
+      boundSplit("split-2", 85, "Second Recipient"),
+      boundSplit("split-3", 86, "Third Recipient"),
+    ]} />);
+
+    fireEvent.change(screen.getByLabelText("額外收貨資料 2 收件人生日"), {
+      target: { value: "1990-01-02" },
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "拆單收貨點 3 心意卡開關" }));
+    fireEvent.change(screen.getByLabelText("拆單收貨點 3 心意卡內容"), {
+      target: { value: "D3 card" },
+    });
+
+    const state = JSON.parse(screen.getByTestId("split-state").textContent || "[]");
+    expect(state[0]).toMatchObject({ recipientPartnerId: 85, recipientBirthday: "1990-01-02" });
+    expect(state[1]).toMatchObject({
+      recipientPartnerId: 86,
+      giftCardEnabled: true,
+      giftCardMessage: "D3 card",
+    });
   });
 });

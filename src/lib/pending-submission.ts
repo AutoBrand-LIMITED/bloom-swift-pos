@@ -19,6 +19,22 @@ export interface PendingOrderSubmission {
 export const PENDING_SUBMISSION_KEY = "florist-pos-pending-odoo-submission-v1";
 export const PENDING_SUBMISSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+export function recipientBirthdayFieldForSubmission(
+  recipientBirthday: string,
+  recipientBirthdayKnown: boolean,
+  baselineOrder?: Pick<Order, "recipientBirthday">,
+): Pick<Order, "recipientBirthday"> {
+  const normalizedBirthday = recipientBirthday.trim();
+  const baselineHasBirthday = Boolean(
+    baselineOrder
+    && Object.prototype.hasOwnProperty.call(baselineOrder, "recipientBirthday"),
+  );
+  if (normalizedBirthday || recipientBirthdayKnown || baselineHasBirthday) {
+    return { recipientBirthday: normalizedBirthday };
+  }
+  return {};
+}
+
 interface PendingSubmissionStore {
   version: 2;
   submissions: Record<string, PendingOrderSubmission>;

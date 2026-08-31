@@ -24,6 +24,8 @@ const splitFixture = (fulfillmentType: "delivery" | "pickup"): DeliverySplit => 
   recipientCompanyName: "Recipient Limited",
   recipientName: "Ms Recipient",
   recipientPhone: "61234567",
+  recipientBirthday: "1990-01-02",
+  recipientPartnerId: 85,
   deliveryPerson: "Driver A",
   failedDeliveryAction: "return_to_shop",
   deliveryNote: "Call first",
@@ -56,6 +58,7 @@ describe("OrderDestinationEditCard fulfillment switching", () => {
       recipientCompanyName: "",
       recipientName: "",
       recipientPhone: "",
+      recipientBirthday: "",
       deliveryPerson: "",
       deliveryNote: "",
       itemAllocations: [{ itemId: "line-1", itemName: "Bouquet", quantity: 1 }],
@@ -84,7 +87,52 @@ describe("OrderDestinationEditCard fulfillment switching", () => {
       recipientCompanyName: "",
       recipientName: "",
       recipientPhone: "",
+      recipientBirthday: "",
       itemAllocations: [{ itemId: "line-1", itemName: "Bouquet", quantity: 1 }],
+    }));
+  });
+
+  it("edits a split recipient birthday without changing destination identity", () => {
+    const onChange = vi.fn();
+    render(
+      <OrderDestinationEditCard
+        index={0}
+        split={splitFixture("delivery")}
+        deliverySlots={[]}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("額外收貨點 2 收件人生日"), {
+      target: { value: "1985-11-12" },
+    });
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      id: "split-2",
+      recipientBirthday: "1985-11-12",
+      recipientPartnerId: 85,
+      itemAllocations: [{ itemId: "line-1", itemName: "Bouquet", quantity: 1 }],
+    }));
+  });
+
+  it("clears a split recipient binding when an identity field changes", () => {
+    const onChange = vi.fn();
+    render(
+      <OrderDestinationEditCard
+        index={0}
+        split={splitFixture("delivery")}
+        deliverySlots={[]}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("額外收貨點 2 收貨人／聯絡人"), {
+      target: { value: "Different Recipient" },
+    });
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      recipientName: "Different Recipient",
+      recipientPartnerId: undefined,
     }));
   });
 });

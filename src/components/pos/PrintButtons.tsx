@@ -1,10 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Printer, Receipt, Truck, ClipboardCheck } from "lucide-react";
+import { Printer, Receipt, Truck, ClipboardCheck, Gift } from "lucide-react";
 import {
   generateAllDocuments,
   generateReceipt,
   generateDeliveryNote,
+  generateMessageCards,
   generatePickingList,
+  hasEnabledMessageCards,
   printDocument,
 } from "@/lib/print-utils";
 import type { Order } from "@/types/order";
@@ -14,8 +16,11 @@ interface PrintButtonsProps {
   size?: "sm" | "default";
 }
 
-const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => (
-  <div className="flex flex-wrap gap-1.5">
+const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
+  const hasMessageCards = hasEnabledMessageCards(order);
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
     <Button
       size={size}
       className="gap-1.5 text-xs"
@@ -47,7 +52,18 @@ const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => (
     >
       <ClipboardCheck className="w-3.5 h-3.5" /> 執貨單
     </Button>
-  </div>
-);
+    {hasMessageCards && (
+      <Button
+        variant="outline"
+        size={size}
+        className="gap-1.5 text-xs"
+        onClick={(e) => { e.stopPropagation(); printDocument(generateMessageCards(order)); }}
+      >
+        <Gift className="w-3.5 h-3.5" /> 心意卡
+      </Button>
+    )}
+    </div>
+  );
+};
 
 export default PrintButtons;

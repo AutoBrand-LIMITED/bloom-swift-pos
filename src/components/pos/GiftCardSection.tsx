@@ -2,16 +2,24 @@ import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { renderSafeMarkdown } from "@/lib/safe-markdown";
 import { Gift } from "lucide-react";
 
 interface GiftCardSectionProps {
+  title?: string;
   enabled: boolean;
   message: string;
   onEnabledChange: (v: boolean) => void;
   onMessageChange: (v: string) => void;
 }
 
-const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange }: GiftCardSectionProps) => {
+const GiftCardSection = ({
+  title = "送禮卡片",
+  enabled,
+  message,
+  onEnabledChange,
+  onMessageChange,
+}: GiftCardSectionProps) => {
   const [preview, setPreview] = useState(false);
 
   return (
@@ -19,9 +27,13 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange }:
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
           <Gift className="w-4 h-4" />
-          送禮卡片
+          {title}
         </h2>
-        <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+        <Switch
+          aria-label={`${title}開關`}
+          checked={enabled}
+          onCheckedChange={onEnabledChange}
+        />
       </div>
 
       {enabled && (
@@ -45,6 +57,7 @@ const GiftCardSection = ({ enabled, message, onEnabledChange, onMessageChange }:
               </div>
             ) : (
               <Textarea
+                aria-label={`${title}內容`}
                 placeholder={"親愛的 ___：\n\n祝你生日快樂！\n\n**愛你的** ___"}
                 value={message}
                 onChange={(e) => onMessageChange(e.target.value)}
@@ -68,16 +81,7 @@ const MarkdownPreview = ({ content }: { content: string }) => {
     return <p className="text-muted-foreground italic">未有內容</p>;
   }
 
-  const html = content
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/~~(.+?)~~/g, "<del>$1</del>")
-    .replace(/\n/g, "<br />");
-
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(content) }} />;
 };
 
 export default GiftCardSection;

@@ -43,6 +43,12 @@ const OrderDestinationEditCard = ({
   const setField = <K extends keyof DeliverySplit>(field: K, value: DeliverySplit[K]) => {
     onChange({ ...split, [field]: value });
   };
+  const setRecipientIdentityField = <K extends keyof DeliverySplit>(
+    field: K,
+    value: DeliverySplit[K],
+  ) => {
+    onChange({ ...split, [field]: value, recipientPartnerId: undefined });
+  };
   const changeFulfillmentType = (value: "delivery" | "pickup") => {
     onChange({
       ...split,
@@ -60,6 +66,8 @@ const OrderDestinationEditCard = ({
       recipientCompanyName: "",
       recipientName: "",
       recipientPhone: "",
+      recipientBirthday: "",
+      recipientPartnerId: undefined,
       deliveryPerson: "",
       failedDeliveryAction: "none",
       deliveryNote: "",
@@ -178,6 +186,7 @@ const OrderDestinationEditCard = ({
               ...split,
               recipientType: value,
               recipientCompanyName: value === "personal" ? "" : split.recipientCompanyName,
+              recipientPartnerId: undefined,
             })}
           >
             <SelectTrigger aria-label={`${title} 收貨人類型`} className="min-h-11"><SelectValue /></SelectTrigger>
@@ -188,10 +197,11 @@ const OrderDestinationEditCard = ({
           </Select>
         </div>
         {split.recipientType === "company" && (
-          <Field label={`${title} 收貨公司名稱 *`} value={split.recipientCompanyName} onChange={(value) => setField("recipientCompanyName", value)} />
+          <Field label={`${title} 收貨公司名稱 *`} value={split.recipientCompanyName} onChange={(value) => setRecipientIdentityField("recipientCompanyName", value)} />
         )}
-        <Field label={`${title} 收貨人／聯絡人`} value={split.recipientName} onChange={(value) => setField("recipientName", value)} />
-        <Field label={`${title} 聯絡電話`} value={split.recipientPhone} onChange={(value) => setField("recipientPhone", value)} />
+        <Field label={`${title} 收貨人／聯絡人`} value={split.recipientName} onChange={(value) => setRecipientIdentityField("recipientName", value)} />
+        <Field label={`${title} 聯絡電話`} value={split.recipientPhone} onChange={(value) => setRecipientIdentityField("recipientPhone", value)} />
+        <Field label={`${title} 收件人生日`} value={split.recipientBirthday || ""} onChange={(value) => setField("recipientBirthday", value)} type="date" />
         <Field label={`${title} 負責送貨同事`} value={split.deliveryPerson} onChange={(value) => setField("deliveryPerson", value)} />
       </div>
       <TextField label={`${title} 送貨備註`} value={split.deliveryNote} onChange={(value) => setField("deliveryNote", value)} />

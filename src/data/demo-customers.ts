@@ -25,6 +25,7 @@ export interface RecipientSearchMatch {
   resolved?: boolean;
   recipientType?: "personal" | "company";
   companyName?: string;
+  recipientBirthday?: string | null;
   deliveryAddress?: string;
   shippingPartnerId?: number;
 }
@@ -50,6 +51,7 @@ export interface PurchaseRecord {
   recipientCompanyName?: string;
   recipientName?: string;
   recipientPhone?: string;
+  recipientBirthday?: string;
   customerName?: string;
   senderName?: string;
   salesperson?: string;

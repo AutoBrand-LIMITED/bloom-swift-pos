@@ -204,6 +204,80 @@ describe("CustomerHistoryPanel resizable history", () => {
     }));
   });
 
+  it("keeps the newest explicit birthday clear when duplicate addresses are merged", () => {
+    const onUseAddress = vi.fn();
+    const duplicateCustomer: DemoCustomer = {
+      ...customer,
+      history: [
+        {
+          ...customer.history[0],
+          id: 10,
+          date: "2026-07-17",
+          deliveryAddress: "中環同一地址",
+          recipientBirthday: "1990-01-02",
+        },
+        {
+          ...customer.history[0],
+          id: 11,
+          date: "2026-07-18",
+          deliveryAddress: "中環同一地址",
+          recipientBirthday: "",
+        },
+      ],
+    };
+
+    render(
+      <CustomerHistoryPanel
+        customer={duplicateCustomer}
+        onClose={vi.fn()}
+        onUseAddress={onUseAddress}
+      />,
+    );
+
+    const choice = screen.getByRole("button", { name: "使用過往地址 中環同一地址" });
+    fireEvent.click(choice);
+    expect(onUseAddress).toHaveBeenCalledWith(expect.objectContaining({
+      recipientBirthday: "",
+    }));
+  });
+
+  it("can inherit an older birthday when the newest legacy snapshot omitted the field", () => {
+    const onUseAddress = vi.fn();
+    const newestLegacyRecord = {
+      ...customer.history[0],
+      id: 21,
+      date: "2026-07-18",
+      deliveryAddress: "金鐘同一地址",
+    };
+    delete newestLegacyRecord.recipientBirthday;
+    const duplicateCustomer: DemoCustomer = {
+      ...customer,
+      history: [
+        {
+          ...customer.history[0],
+          id: 20,
+          date: "2026-07-17",
+          deliveryAddress: "金鐘同一地址",
+          recipientBirthday: "1985-11-12",
+        },
+        newestLegacyRecord,
+      ],
+    };
+
+    render(
+      <CustomerHistoryPanel
+        customer={duplicateCustomer}
+        onClose={vi.fn()}
+        onUseAddress={onUseAddress}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "使用過往地址 金鐘同一地址" }));
+    expect(onUseAddress).toHaveBeenCalledWith(expect.objectContaining({
+      recipientBirthday: "1985-11-12",
+    }));
+  });
+
   it("shows all saved delivery addresses only after the compact view is expanded", () => {
     const manyAddressCustomer: DemoCustomer = {
       ...customer,
