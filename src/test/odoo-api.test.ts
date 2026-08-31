@@ -400,12 +400,14 @@ describe("odoo-api note contracts", () => {
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
+      recipientBirthday: "1970-01-01",
       recipientMatch: {
         name: "Mary Wong",
         phone: "6111 1111",
         resolved: true,
         recipientType: "company",
         companyName: "Mary Flowers Limited",
+        recipientBirthday: "1990-01-02",
         deliveryAddress: "6 How Ming Street",
         shippingPartnerId: 45,
       },
@@ -429,6 +431,7 @@ describe("odoo-api note contracts", () => {
         resolved: true,
         recipientType: "company",
         companyName: "Mary Flowers Limited",
+        recipientBirthday: "1990-01-02",
         deliveryAddress: "6 How Ming Street",
         shippingPartnerId: 45,
       },
@@ -436,6 +439,43 @@ describe("odoo-api note contracts", () => {
     });
     expect(customer.historyCount).toBeUndefined();
     expect(customer.totalSpent).toBeUndefined();
+    expect(customer).not.toHaveProperty("recipientBirthday");
+  });
+
+  it("preserves omitted versus explicit null recipient birthdays from the API", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const partner = (id: number, recipientMatch: Record<string, unknown>) => ({
+      id,
+      name: `Customer ${id}`,
+      email: null,
+      phone: "91234567",
+      mobile: null,
+      history_count: null,
+      total_spent: null,
+      history: [],
+      recipientMatch: {
+        name: `Recipient ${id}`,
+        phone: "61234567",
+        resolved: true,
+        recipientType: "personal",
+        companyName: null,
+        deliveryAddress: "6 How Ming Street",
+        shippingPartnerId: id + 40,
+        ...recipientMatch,
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([
+      partner(42, {}),
+      partner(43, { recipientBirthday: null }),
+      partner(44, { recipientBirthday: "" }),
+    ])));
+    const { searchOdooCustomers } = await import("@/lib/odoo-api");
+
+    const customers = await searchOdooCustomers("Customer");
+
+    expect(customers[0].recipientMatch).not.toHaveProperty("recipientBirthday");
+    expect(customers[1].recipientMatch).toHaveProperty("recipientBirthday", null);
+    expect(customers[2].recipientMatch).toHaveProperty("recipientBirthday", "");
   });
 
   it("keeps multiple existing Contact Tags as a snapshot without inventing a Customer Group ID", async () => {
@@ -589,6 +629,7 @@ describe("odoo-api note contracts", () => {
       recipientCompanyName: null,
       recipientName: "Ms Gift",
       recipientPhone: "6123 4567",
+      recipientBirthday: "1990-01-02",
       deliveryAddress: "九龍觀塘巧明街 6 號",
       shippingPartnerId: 45,
       orderingCustomerId: 42,
@@ -730,6 +771,7 @@ describe("odoo-api note contracts", () => {
       recipientCompanyName: "Recipient Limited",
       recipientName: "Lee",
       recipientPhone: "6000 0000",
+      recipientBirthday: "1990-01-02",
       deliveryPerson: "Driver A",
       giftCardEnabled: false,
       giftCardMessage: "",
@@ -781,6 +823,7 @@ describe("odoo-api note contracts", () => {
       deliverySlotId: 11,
       recipientType: "company",
       recipientCompanyName: "Recipient Limited",
+      recipientBirthday: "1990-01-02",
       customerType: "company",
       companyName: "Chan Tai Limited",
       customerEmail: "accounts@example.com",
@@ -878,6 +921,7 @@ describe("odoo-api note contracts", () => {
         recipientCompanyName: "",
         recipientName: "Pickup Contact",
         recipientPhone: "63334444",
+        recipientBirthday: "1985-11-12",
         deliveryPerson: "",
         failedDeliveryAction: "none",
         deliveryNote: "",
@@ -887,6 +931,7 @@ describe("odoo-api note contracts", () => {
       recipientCompanyName: "",
       recipientName: "Ng",
       recipientPhone: "61234567",
+      recipientBirthday: "1990-01-02",
       deliveryPerson: "",
       giftCardMessage: "",
       senderNote: "",

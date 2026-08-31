@@ -33,6 +33,7 @@ export interface DeliveryAddressSelection {
   recipientCompanyName?: string;
   recipientName?: string;
   recipientPhone?: string;
+  recipientBirthday?: string;
   shippingPartnerId?: number;
 }
 

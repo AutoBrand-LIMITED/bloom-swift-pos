@@ -2,6 +2,7 @@ import type { CustomerTag, DemoCustomer, PurchaseRecord } from "@/data/demo-cust
 import type { DeliverySplit, OdooNamedReference, Order, SalesStaff } from "@/types/order";
 import { authenticatedFetch } from "@/lib/pos-auth";
 import { normalizePurchasePaymentStatus } from "@/lib/customer-utils";
+import { hasRecipientBirthdayField } from "@/lib/recipient-birthday";
 
 type OdooPurchaseRecord = Omit<PurchaseRecord, "status"> & { status?: unknown };
 
@@ -23,6 +24,7 @@ interface OdooPartner {
     resolved?: boolean;
     recipientType?: "personal" | "company";
     companyName?: string | null;
+    recipientBirthday?: string | null;
     deliveryAddress?: string | null;
     shippingPartnerId?: number | null;
   } | null;
@@ -159,6 +161,7 @@ export interface RecipientSuggestion {
   recipientCompanyName: string | null;
   recipientName: string | null;
   recipientPhone: string | null;
+  recipientBirthday?: string | null;
   deliveryAddress: string | null;
   shippingPartnerId: number | null;
   orderingCustomerId: number | null;
@@ -226,6 +229,7 @@ export interface OrderOperationalUpdate {
   recipientCompanyName: string;
   recipientName: string;
   recipientPhone: string;
+  recipientBirthday?: string;
   deliveryPerson: string;
   giftCardMessage: string;
   senderNote: string;
@@ -955,6 +959,9 @@ function mapOdooPartner(p: OdooPartner): DemoCustomer {
           resolved: p.recipientMatch.resolved === true,
           recipientType: p.recipientMatch.recipientType || "personal",
           companyName: p.recipientMatch.companyName || undefined,
+          ...(hasRecipientBirthdayField(p.recipientMatch)
+            ? { recipientBirthday: p.recipientMatch.recipientBirthday ?? null }
+            : {}),
           deliveryAddress: p.recipientMatch.deliveryAddress || undefined,
           shippingPartnerId: p.recipientMatch.shippingPartnerId || undefined,
         }

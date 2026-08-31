@@ -35,6 +35,15 @@ const formatSalesperson = (value?: string) => {
 const normalizeIdentityPart = (value?: string) =>
   value?.trim().replace(/\s+/g, " ").toLocaleLowerCase() ?? "";
 
+const hasOwnRecipientBirthday = (record: { recipientBirthday?: string }) => (
+  Object.prototype.hasOwnProperty.call(record, "recipientBirthday")
+);
+
+const historySnapshotTime = (record: DemoCustomer["history"][number]) => {
+  const timestamp = Date.parse(record.dateTime || record.date);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
 const samePastAddressIdentity = (
   entry: {
     address: string;
@@ -132,11 +141,19 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
       recipientCompanyName?: string;
       recipientName?: string;
       recipientPhone?: string;
+      recipientBirthday?: string;
       shippingPartnerId?: number;
       recipientContactNote?: string;
       date: string;
     }[] = [];
-    for (const h of displayCustomer.history) {
+    const newestHistoryFirst = displayCustomer.history
+      .map((record, index) => ({ record, index }))
+      .sort((left, right) => (
+        historySnapshotTime(right.record) - historySnapshotTime(left.record)
+        || left.index - right.index
+      ))
+      .map(({ record }) => record);
+    for (const h of newestHistoryFirst) {
       const addr = h.deliveryAddress?.trim();
       if (!addr) continue;
       const existing = addrs.find((entry) => samePastAddressIdentity(entry, h, addr));
@@ -145,6 +162,9 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
         existing.recipientCompanyName ||= h.recipientCompanyName;
         existing.recipientName ||= h.recipientName;
         existing.recipientPhone ||= h.recipientPhone;
+        if (!hasOwnRecipientBirthday(existing) && hasOwnRecipientBirthday(h)) {
+          existing.recipientBirthday = h.recipientBirthday;
+        }
         existing.recipientContactNote ||= h.recipientContactNote;
       } else {
         addrs.push({
@@ -154,6 +174,9 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
           recipientCompanyName: h.recipientCompanyName,
           recipientName: h.recipientName,
           recipientPhone: h.recipientPhone,
+          ...(hasOwnRecipientBirthday(h)
+            ? { recipientBirthday: h.recipientBirthday }
+            : {}),
           shippingPartnerId: h.shippingPartnerId,
           recipientContactNote: h.recipientContactNote,
           date: h.date,
@@ -277,6 +300,9 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                           : {}),
                         recipientName: a.recipientName,
                         recipientPhone: a.recipientPhone,
+                        ...(hasOwnRecipientBirthday(a)
+                          ? { recipientBirthday: a.recipientBirthday || "" }
+                          : {}),
                         shippingPartnerId: a.shippingPartnerId,
                       })}
                       className="w-full text-left rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 p-2 transition-colors group"
@@ -471,6 +497,9 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                             : {}),
                           recipientName: h.recipientName,
                           recipientPhone: h.recipientPhone,
+                          ...(hasOwnRecipientBirthday(h)
+                            ? { recipientBirthday: h.recipientBirthday || "" }
+                            : {}),
                           shippingPartnerId: h.shippingPartnerId,
                         })}
                       >

@@ -3,6 +3,7 @@ import {
   normalizeDiscountPercent,
   orderItemTotal,
 } from "@/lib/order-pricing";
+import { renderSafeMarkdown } from "@/lib/safe-markdown";
 
 const paymentLabel: Record<string, string> = {
   unpaid: "未付款",
@@ -276,12 +277,6 @@ function itemsTable(order: Order, showPrice: boolean): string {
   `;
 }
 
-function receiptNotes(title: string, englishTitle: string, value: unknown): string {
-  return value
-    ? `<section data-document-section="customer-note"><h2 class="section-heading">${title} / ${englishTitle}</h2><div class="document-notes">${nl2br(value)}</div></section>`
-    : "";
-}
-
 function pickingDeliveryInfo(order: Order): string {
   const recipientCompanyRow = order.recipientCompanyName?.trim()
     ? `<div><span class="label">收貨公司</span>${displayValue(order.recipientCompanyName)}</div>`
@@ -325,7 +320,6 @@ export function generateReceipt(order: Order): string {
             : ""
         }
       </section>
-      ${order.giftCardEnabled ? receiptNotes("卡片內容", "CARD MESSAGE", order.giftCardMessage) : ""}
       <div class="footer">此收據由花店 POS 系統產生 | ${new Date().toLocaleDateString("zh-HK")}</div>
     </main>
   </body></html>`;
@@ -460,8 +454,11 @@ function splitAsOrder(order: Order, split: DeliverySplit, items: OrderItem[]): O
     recipientCompanyName: split.recipientCompanyName,
     recipientName: split.recipientName,
     recipientPhone: split.recipientPhone,
+    recipientBirthday: split.recipientBirthday,
     deliveryPerson: split.deliveryPerson,
     deliveryNote: split.deliveryNote,
+    giftCardEnabled: split.giftCardEnabled ?? false,
+    giftCardMessage: split.giftCardMessage ?? "",
   };
 }
 
@@ -480,6 +477,80 @@ function deliveryDestinations(order: Order): Array<{ order: Order; reference: st
       reference: `${reference}-D${index + 2}`,
     })),
   ];
+}
+
+function messageCardDestinations(order: Order) {
+  const reference = orderReference(order);
+  return deliveryDestinations(order)
+    .map((destination, index) => ({
+      ...destination,
+      destinationIndex: index + 1,
+      reference: `${reference}-D${index + 1}`,
+    }))
+    .filter(({ order: destinationOrder }) => destinationOrder.giftCardEnabled);
+}
+
+export function hasEnabledMessageCards(order: Order): boolean {
+  return messageCardDestinations(order).length > 0;
+}
+
+/** 每個已啟用收貨點各自一頁的心意卡 */
+export function generateMessageCards(order: Order): string {
+  const destinations = messageCardDestinations(order);
+  const pages = destinations.map(({ order: destinationOrder, reference, destinationIndex }) => `
+    <main
+      class="print-document message-card-document"
+      data-print-document="message-card"
+      data-message-card-destination="${destinationIndex}"
+      data-message-card-reference="${escapeHtml(reference)}"
+    >
+      <header class="message-card-header">
+        <div class="brand-name">中西花店</div>
+        <h1>心意卡</h1>
+        <div class="english-title">MESSAGE CARD</div>
+      </header>
+      <section class="message-card-content" data-document-section="message-card-content">
+        ${destinationOrder.giftCardMessage
+          ? renderSafeMarkdown(destinationOrder.giftCardMessage)
+          : "&nbsp;"}
+      </section>
+      <div class="message-card-reference">收貨點編號 / DESTINATION：${escapeHtml(reference)}</div>
+    </main>`).join("\n");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>心意卡 - ${escapeHtml(orderReference(order))}</title>
+    <style>${commonStyles}
+      .message-card-document {
+        display: flex;
+        min-height: 194mm;
+        flex-direction: column;
+        padding: 12mm;
+      }
+      .message-card-document + .message-card-document {
+        break-before: page;
+        page-break-before: always;
+      }
+      .message-card-header { text-align: center; }
+      .message-card-header h1 { margin-top: 3mm; font-size: 28pt; line-height: 1.1; }
+      .message-card-content {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        justify-content: center;
+        padding: 16mm;
+        font-size: 20pt;
+        line-height: 1.7;
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+      .message-card-reference {
+        padding-top: 3mm;
+        border-top: 0.3mm solid #000;
+        font-size: 9pt;
+        text-align: right;
+      }
+    </style></head><body>
+    ${pages}
+  </body></html>`;
 }
 
 /** 倉庫執貨單 */
@@ -634,13 +705,16 @@ function printableDocumentParts(html: string): PrintableDocumentParts {
   return { body, styles };
 }
 
-/** 客人收據、送貨單及執貨單，以一次列印操作輸出 */
+/** 客人收據、送貨單、執貨單及已啟用心意卡，以一次列印操作輸出 */
 export function generateAllDocuments(order: Order): string {
-  const documents = [
+  const documents: Array<readonly [string, string]> = [
     ["receipt", generateReceipt(order)],
     ["delivery-note", generateDeliveryNote(order)],
     ["picking-list", generatePickingList(order)],
-  ] as const;
+  ];
+  if (hasEnabledMessageCards(order)) {
+    documents.push(["message-card", generateMessageCards(order)]);
+  }
   const parts = documents.map(([kind, html]) => ({
     kind,
     ...printableDocumentParts(html),

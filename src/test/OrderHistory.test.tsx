@@ -386,6 +386,71 @@ describe("OrderHistory delivery summary", () => {
     });
   });
 
+  it("sends explicit D1 and split birthday clears while retaining the split partner binding", async () => {
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    const deliverySplit = {
+      id: "destination-2",
+      fulfillmentType: "delivery" as const,
+      deliveryDate: "2026-07-19",
+      deliveryTimeMode: "specified" as const,
+      deliveryTime: "下午 4 時前",
+      deliveryRegion: "九龍",
+      deliveryDistrict: "觀塘區",
+      deliveryArea: "觀塘",
+      deliveryDetail: "巧明街 6 號",
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      deliveryGoogleAddress: "九龍觀塘巧明街 6 號",
+      deliveryBuilding: "",
+      deliveryFloor: "",
+      deliveryUnit: "",
+      recipientType: "personal" as const,
+      recipientCompanyName: "",
+      recipientName: "Second Recipient",
+      recipientPhone: "62345678",
+      recipientBirthday: "1985-11-12",
+      recipientPartnerId: 85,
+      deliveryPerson: "Driver B",
+      failedDeliveryAction: "none",
+      deliveryNote: "",
+      itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+    };
+    render(
+      <OrderHistory
+        orders={[orderFixture({
+          recipientBirthday: "1990-01-02",
+          recipientPartnerId: 84,
+          deliverySplits: [deliverySplit],
+        })]}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    fireEvent.change(screen.getByLabelText("收件人生日"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("額外收貨點 2 收件人生日"), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => {
+      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+        17,
+        expect.objectContaining({
+          recipientBirthday: "",
+          deliverySplits: [expect.objectContaining({
+            id: "destination-2",
+            recipientBirthday: "",
+            recipientPartnerId: 85,
+          })],
+        }),
+      );
+    });
+  });
+
   it("allows an existing order to select a different standard delivery slot", async () => {
     updateOdooOrderOperationalDetails.mockResolvedValue({
       id: 17,

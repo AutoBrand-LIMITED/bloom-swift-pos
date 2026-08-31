@@ -80,6 +80,66 @@ describe("validateDeliverySplits", () => {
     });
   });
 
+  it("normalizes destination cards without mixing or retaining disabled text", () => {
+    const normalized = normalizeDeliverySplitsForSubmission([
+      { ...split(), giftCardEnabled: true, giftCardMessage: "  First split card  " },
+      { ...split(), id: "split-3", giftCardEnabled: false, giftCardMessage: "stale" },
+    ]);
+
+    expect(normalized[0]).toMatchObject({
+      giftCardEnabled: true,
+      giftCardMessage: "First split card",
+    });
+    expect(normalized[1]).toMatchObject({
+      giftCardEnabled: false,
+      giftCardMessage: "",
+    });
+  });
+
+  it("preserves two independent split birthdays", () => {
+    const normalized = normalizeDeliverySplitsForSubmission([
+      { ...split(), recipientBirthday: "1990-01-02", recipientPartnerId: 85 },
+      { ...split(), id: "split-3", recipientBirthday: "1985-11-12", recipientPartnerId: 86 },
+    ]);
+
+    expect(normalized.map((destination) => destination.recipientBirthday)).toEqual([
+      "1990-01-02",
+      "1985-11-12",
+    ]);
+    expect(normalized.map((destination) => destination.recipientPartnerId)).toEqual([85, 86]);
+  });
+
+  it("serializes explicit empty birthdays for fresh bound D2 and D3 recipients", () => {
+    const normalized = normalizeDeliverySplitsForSubmission([
+      { ...split(), recipientBirthday: "", recipientPartnerId: 85 },
+      { ...split(), id: "split-3", recipientBirthday: "", recipientPartnerId: 86 },
+    ]);
+
+    expect(normalized[0]).toHaveProperty("recipientBirthday", "");
+    expect(normalized[0]).toHaveProperty("recipientPartnerId", 85);
+    expect(normalized[1]).toHaveProperty("recipientBirthday", "");
+    expect(normalized[1]).toHaveProperty("recipientPartnerId", 86);
+  });
+
+  it("omits birthdays for fresh bound D2 and D3 recipients when suggestions omitted the field", () => {
+    const normalized = normalizeDeliverySplitsForSubmission([
+      { ...split(), recipientPartnerId: 85 },
+      { ...split(), id: "split-3", recipientPartnerId: 86 },
+    ]);
+
+    expect(normalized[0]).not.toHaveProperty("recipientBirthday");
+    expect(normalized[0]).toHaveProperty("recipientPartnerId", 85);
+    expect(normalized[1]).not.toHaveProperty("recipientBirthday");
+    expect(normalized[1]).toHaveProperty("recipientPartnerId", 86);
+  });
+
+  it("adds explicit disabled card fields for a new destination", () => {
+    const normalized = normalizeDeliverySplitsForSubmission([split()]);
+
+    expect(normalized[0]).toHaveProperty("giftCardEnabled", false);
+    expect(normalized[0]).toHaveProperty("giftCardMessage", "");
+  });
+
   it("preserves pickup contact details and historical allocations during operational edits", () => {
     const original = [{
       ...split(),
@@ -100,6 +160,17 @@ describe("validateDeliverySplits", () => {
     });
     expect(operationalSplitIdentityIsUnchanged(original, normalized)).toBe(true);
     expect(validateOperationalDeliverySplits(normalized)).toBeNull();
+  });
+
+  it("preserves an explicit split birthday clear and recipient binding for operational edits", () => {
+    const normalized = normalizeDeliverySplitsForOperationalUpdate([{
+      ...split(),
+      recipientBirthday: "",
+      recipientPartnerId: 85,
+    }]);
+
+    expect(normalized[0]).toHaveProperty("recipientBirthday", "");
+    expect(normalized[0]).toHaveProperty("recipientPartnerId", 85);
   });
 
   it("rejects changed destination IDs or allocations during operational edits", () => {

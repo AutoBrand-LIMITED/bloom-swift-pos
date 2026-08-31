@@ -44,6 +44,10 @@ import { posAuthRequired } from "@/lib/pos-auth";
 import type { DemoCustomer } from "@/data/demo-customers";
 import { buildPartnerNoteMutation } from "@/lib/customer-notes";
 import {
+  hasRecipientBirthdayField,
+  recipientBirthdayStateFromSelection,
+} from "@/lib/recipient-birthday";
+import {
   companyFieldsForCustomerType,
   type CustomerResolutionState,
   detachedCustomerProfile,
@@ -59,6 +63,7 @@ import {
   pendingRecipientBindingsMatch,
   pendingSubmissionBelongsToEmployee,
   pendingSubmissionForEmployee,
+  recipientBirthdayFieldForSubmission,
   submissionPayloadMatches,
   submitPersistedOrder,
   upgradeLegacyPendingDeliverySelection,
@@ -126,6 +131,7 @@ type RecipientSelectionDetails = Pick<
   | "recipientCompanyName"
   | "recipientName"
   | "recipientPhone"
+  | "recipientBirthday"
   | "deliveryAddress"
   | "shippingPartnerId"
 >;
@@ -265,6 +271,8 @@ const Index = () => {
   const [recipientCompanyName, setRecipientCompanyName] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
+  const [recipientBirthday, setRecipientBirthday] = useState("");
+  const [recipientBirthdayKnown, setRecipientBirthdayKnown] = useState(false);
   const [deliveryPerson, setDeliveryPerson] = useState("");
   const [failedDeliveryAction, setFailedDeliveryAction] = useState("none");
   const [deliverySplits, setDeliverySplits] = useState<DeliverySplit[]>(
@@ -824,10 +832,13 @@ const Index = () => {
   }, [clearCheckoutErrors, resetRecipientPersistence]);
 
   const applyRecipientSelection = useCallback((selection: RecipientSelectionDetails) => {
+    const birthdayState = recipientBirthdayStateFromSelection(selection);
     setRecipientType(selection.recipientType);
     setRecipientCompanyName(selection.recipientCompanyName || "");
     setRecipientName(selection.recipientName || "");
     setRecipientPhone(selection.recipientPhone || "");
+    setRecipientBirthday(birthdayState.value);
+    setRecipientBirthdayKnown(birthdayState.known);
     setRecipientPartnerId(selection.shippingPartnerId || undefined);
     setRecipientContact(null);
     setRecipientContactDraft("");
@@ -858,6 +869,9 @@ const Index = () => {
       recipientCompanyName: recipient.companyName || null,
       recipientName: recipient.name || null,
       recipientPhone: recipient.phone || null,
+      ...(hasRecipientBirthdayField(recipient)
+        ? { recipientBirthday: recipient.recipientBirthday ?? null }
+        : {}),
       deliveryAddress: recipient.deliveryAddress || null,
       shippingPartnerId: recipient.shippingPartnerId || null,
     });
@@ -944,6 +958,8 @@ const Index = () => {
     setRecipientCompanyName("");
     setRecipientName("");
     setRecipientPhone("");
+    setRecipientBirthday("");
+    setRecipientBirthdayKnown(false);
     setDeliveryPerson("");
     setFailedDeliveryAction("none");
     setDeliverySplits([]);
@@ -1060,6 +1076,8 @@ const Index = () => {
     setRecipientCompanyName(order.recipientCompanyName || "");
     setRecipientName(order.recipientName);
     setRecipientPhone(order.recipientPhone);
+    setRecipientBirthday(order.recipientBirthday || "");
+    setRecipientBirthdayKnown(hasRecipientBirthdayField(order));
     setDeliveryPerson(order.deliveryPerson);
     setDeliverySplits(order.deliverySplits || []);
     setGiftCardEnabled(order.giftCardEnabled);
@@ -1511,7 +1529,11 @@ const Index = () => {
       deliveryFloor: fulfillmentType === "delivery" ? deliveryFloor.trim() : "",
       deliveryUnit: fulfillmentType === "delivery" ? deliveryUnit.trim() : "",
       ...(includePendingField("deliverySplits")
-        ? { deliverySplits: normalizeDeliverySplitsForSubmission(deliverySplits) }
+        ? {
+            deliverySplits: normalizeDeliverySplitsForSubmission(deliverySplits, {
+              baselineSplits: pendingSubmission?.order.deliverySplits,
+            }),
+          }
         : {}),
       ...(includePendingField("recipientType") ? { recipientType } : {}),
       ...(includePendingField("recipientCompanyName")
@@ -1519,6 +1541,11 @@ const Index = () => {
         : {}),
       recipientName: recipientName.trim(),
       recipientPhone: recipientPhone.trim(),
+      ...recipientBirthdayFieldForSubmission(
+        recipientBirthday,
+        recipientBirthdayKnown,
+        pendingSubmission?.order,
+      ),
       deliveryPerson: deliveryPerson.trim(),
       giftCardEnabled,
       giftCardMessage: giftCardEnabled ? giftCardMessage.trim() : "",
@@ -1749,6 +1776,8 @@ const Index = () => {
               setRecipientCompanyName(reusedCompanyName);
               setRecipientName(selection.recipientName || "");
               setRecipientPhone(selection.recipientPhone || "");
+              setRecipientBirthday(selection.recipientBirthday || "");
+              setRecipientBirthdayKnown(hasRecipientBirthdayField(selection));
               setRecipientPartnerId(selection.shippingPartnerId);
               setRecipientContact(null);
               setRecipientContactDraft("");
@@ -2000,6 +2029,7 @@ const Index = () => {
           recipientCompanyName={recipientCompanyName}
           recipientName={recipientName}
           recipientPhone={recipientPhone}
+          recipientBirthday={recipientBirthday}
           senderType={customerType}
           senderCompanyName={companyName}
           senderName={senderName || customerName}
@@ -2078,6 +2108,10 @@ const Index = () => {
             clearCheckoutErrors("recipientPhone");
             resetRecipientPersistence();
           }}
+          onRecipientBirthdayChange={(value) => {
+            setRecipientBirthday(value);
+            setRecipientBirthdayKnown(true);
+          }}
           onRecipientSuggestionSelect={(suggestion) => {
             applyRecipientSelection(suggestion);
             toast.success("已套用過往收貨人資料");
@@ -2092,6 +2126,13 @@ const Index = () => {
           onDeliveryPersonChange={setDeliveryPerson}
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}
+        />
+        <GiftCardSection
+          title="主要收貨點心意卡"
+          enabled={giftCardEnabled}
+          message={giftCardMessage}
+          onEnabledChange={setGiftCardEnabled}
+          onMessageChange={setGiftCardMessage}
         />
         <SplitDeliverySection
           items={items}
@@ -2114,7 +2155,7 @@ const Index = () => {
 
         <section
           ref={(node) => { workflowSectionRefs.current.notes = node; }}
-          aria-label="備註及心意卡"
+          aria-label="備註"
           className="scroll-mt-40 space-y-4"
         >
         <OrderNotesSection
@@ -2158,12 +2199,6 @@ const Index = () => {
           conflict={notesConflict}
         />
 
-        <GiftCardSection
-          enabled={giftCardEnabled}
-          message={giftCardMessage}
-          onEnabledChange={setGiftCardEnabled}
-          onMessageChange={setGiftCardMessage}
-        />
         </section>
 
         <section

@@ -6,14 +6,69 @@ export const splitFulfillmentType = (split: DeliverySplit) => (
   split.fulfillmentType || "delivery"
 );
 
+interface NormalizeDeliverySplitsOptions {
+  baselineSplits?: readonly DeliverySplit[];
+}
+
+type DestinationOwnedOptionalFields = Pick<
+  DeliverySplit,
+  "giftCardEnabled" | "giftCardMessage" | "recipientBirthday"
+>;
+
+const hasOwn = (split: DeliverySplit, field: keyof DestinationOwnedOptionalFields) => (
+  Object.prototype.hasOwnProperty.call(split, field)
+);
+
+const normalizedDestinationOwnedFields = (
+  split: DeliverySplit,
+  baseline?: DeliverySplit,
+): DestinationOwnedOptionalFields => {
+  const giftCardEnabled = split.giftCardEnabled ?? false;
+  const giftCardMessage = giftCardEnabled ? (split.giftCardMessage ?? "").trim() : "";
+  const recipientBirthday = (split.recipientBirthday ?? "").trim();
+
+  if (!baseline) {
+    return {
+      giftCardEnabled,
+      giftCardMessage,
+      ...(hasOwn(split, "recipientBirthday")
+        ? { recipientBirthday }
+        : {}),
+    };
+  }
+
+  return {
+    ...(hasOwn(baseline, "giftCardEnabled") || giftCardEnabled
+      ? { giftCardEnabled }
+      : {}),
+    ...(hasOwn(baseline, "giftCardMessage") || Boolean(giftCardMessage)
+      ? { giftCardMessage }
+      : {}),
+    ...(hasOwn(baseline, "recipientBirthday") || hasOwn(split, "recipientBirthday")
+      ? { recipientBirthday }
+      : {}),
+  };
+};
+
 export const normalizeDeliverySplitsForSubmission = (
   splits: readonly DeliverySplit[],
-): DeliverySplit[] => splits.map((split) => {
+  options: NormalizeDeliverySplitsOptions = {},
+): DeliverySplit[] => splits.map((split, index) => {
+  const candidateBaseline = options.baselineSplits?.[index];
+  const baseline = candidateBaseline?.id === split.id ? candidateBaseline : undefined;
+  const {
+    giftCardEnabled: _giftCardEnabled,
+    giftCardMessage: _giftCardMessage,
+    recipientBirthday: _recipientBirthday,
+    ...requiredFields
+  } = split;
+  const destinationOwnedFields = normalizedDestinationOwnedFields(split, baseline);
   if (splitFulfillmentType(split) === "delivery") {
-    return { ...split, fulfillmentType: "delivery" };
+    return { ...requiredFields, ...destinationOwnedFields, fulfillmentType: "delivery" };
   }
   return {
-    ...split,
+    ...requiredFields,
+    ...destinationOwnedFields,
     fulfillmentType: "pickup",
     deliveryRegion: "",
     deliveryDistrict: "",
@@ -36,14 +91,24 @@ export const normalizeDeliverySplitsForSubmission = (
 
 export const normalizeDeliverySplitsForOperationalUpdate = (
   splits: readonly DeliverySplit[],
-): DeliverySplit[] => splits.map((split) => ({
-  ...split,
-  fulfillmentType: splitFulfillmentType(split),
-  deliveryAddress: splitFulfillmentType(split) === "pickup"
-    ? split.deliveryAddress.trim() || PICKUP_LOCATION_ADDRESS
-    : split.deliveryAddress.trim(),
-  itemAllocations: split.itemAllocations.map((allocation) => ({ ...allocation })),
-}));
+): DeliverySplit[] => splits.map((split) => {
+  const recipientBirthday = (split.recipientBirthday ?? "").trim();
+  const {
+    recipientBirthday: _recipientBirthday,
+    ...requiredFields
+  } = split;
+  return {
+    ...requiredFields,
+    giftCardEnabled: split.giftCardEnabled ?? false,
+    giftCardMessage: split.giftCardEnabled ? (split.giftCardMessage ?? "").trim() : "",
+    ...(hasOwn(split, "recipientBirthday") ? { recipientBirthday } : {}),
+    fulfillmentType: splitFulfillmentType(split),
+    deliveryAddress: splitFulfillmentType(split) === "pickup"
+      ? split.deliveryAddress.trim() || PICKUP_LOCATION_ADDRESS
+      : split.deliveryAddress.trim(),
+    itemAllocations: split.itemAllocations.map((allocation) => ({ ...allocation })),
+  };
+});
 
 export const operationalSplitIdentityIsUnchanged = (
   original: readonly DeliverySplit[],
