@@ -31,13 +31,13 @@ import type {
   Order,
   OrderItem,
   PaymentStatus,
+  RecipientOccasion,
   RecipientType,
 } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
 import {
   useOdooCustomerGroups,
   useOdooEmployees,
-  useOdooSalesTeams,
 } from "@/hooks/use-odoo-employees";
 import { usePosAuth } from "@/components/auth/PosAuthContext";
 import { posAuthRequired } from "@/lib/pos-auth";
@@ -45,8 +45,15 @@ import type { DemoCustomer } from "@/data/demo-customers";
 import { buildPartnerNoteMutation } from "@/lib/customer-notes";
 import {
   hasRecipientBirthdayField,
-  recipientBirthdayStateFromSelection,
 } from "@/lib/recipient-birthday";
+import {
+  hasRecipientOccasionsField,
+  ownsRecipientOccasionsVersionField,
+  recipientOccasionFieldsForSubmission,
+  recipientOccasionsStateFromSelection,
+  recipientOccasionsVersionFromSelection,
+  recipientOccasionValidationError,
+} from "@/lib/recipient-occasions";
 import {
   companyFieldsForCustomerType,
   type CustomerResolutionState,
@@ -63,7 +70,6 @@ import {
   pendingRecipientBindingsMatch,
   pendingSubmissionBelongsToEmployee,
   pendingSubmissionForEmployee,
-  recipientBirthdayFieldForSubmission,
   submissionPayloadMatches,
   submitPersistedOrder,
   upgradeLegacyPendingDeliverySelection,
@@ -131,6 +137,8 @@ type RecipientSelectionDetails = Pick<
   | "recipientCompanyName"
   | "recipientName"
   | "recipientPhone"
+  | "recipientOccasions"
+  | "recipientOccasionsVersion"
   | "recipientBirthday"
   | "deliveryAddress"
   | "shippingPartnerId"
@@ -171,11 +179,6 @@ const Index = () => {
     loading: staffLoading,
     error: staffError,
   } = useOdooEmployees();
-  const {
-    teams: salesTeams,
-    loading: salesTeamsLoading,
-    error: salesTeamsError,
-  } = useOdooSalesTeams();
   const {
     groups: customerGroups,
     loading: customerGroupsLoading,
@@ -271,8 +274,11 @@ const Index = () => {
   const [recipientCompanyName, setRecipientCompanyName] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
-  const [recipientBirthday, setRecipientBirthday] = useState("");
-  const [recipientBirthdayKnown, setRecipientBirthdayKnown] = useState(false);
+  const [recipientOccasions, setRecipientOccasions] = useState<RecipientOccasion[]>([]);
+  const [recipientOccasionsKnown, setRecipientOccasionsKnown] = useState(false);
+  const [recipientOccasionsVersion, setRecipientOccasionsVersion] = useState<
+    string | null | undefined
+  >();
   const [deliveryPerson, setDeliveryPerson] = useState("");
   const [failedDeliveryAction, setFailedDeliveryAction] = useState("none");
   const [deliverySplits, setDeliverySplits] = useState<DeliverySplit[]>(
@@ -726,6 +732,7 @@ const Index = () => {
 
   const clearRecipientPersistenceBinding = useCallback(() => {
     setRecipientPartnerId(undefined);
+    setRecipientOccasionsVersion(undefined);
     setRecipientContact(null);
     setNotesConflict((current) => current?.target === "recipient" ? null : current);
   }, []);
@@ -832,13 +839,18 @@ const Index = () => {
   }, [clearCheckoutErrors, resetRecipientPersistence]);
 
   const applyRecipientSelection = useCallback((selection: RecipientSelectionDetails) => {
-    const birthdayState = recipientBirthdayStateFromSelection(selection);
+    const occasionState = recipientOccasionsStateFromSelection(selection);
     setRecipientType(selection.recipientType);
     setRecipientCompanyName(selection.recipientCompanyName || "");
     setRecipientName(selection.recipientName || "");
     setRecipientPhone(selection.recipientPhone || "");
-    setRecipientBirthday(birthdayState.value);
-    setRecipientBirthdayKnown(birthdayState.known);
+    setRecipientOccasions(occasionState.value);
+    setRecipientOccasionsKnown(occasionState.known);
+    setRecipientOccasionsVersion(
+      selection.shippingPartnerId
+        ? recipientOccasionsVersionFromSelection(selection)
+        : undefined,
+    );
     setRecipientPartnerId(selection.shippingPartnerId || undefined);
     setRecipientContact(null);
     setRecipientContactDraft("");
@@ -869,7 +881,17 @@ const Index = () => {
       recipientCompanyName: recipient.companyName || null,
       recipientName: recipient.name || null,
       recipientPhone: recipient.phone || null,
-      ...(hasRecipientBirthdayField(recipient)
+      ...(hasRecipientOccasionsField(recipient)
+        ? {
+            recipientOccasions: recipient.recipientOccasions ?? [],
+            ...(ownsRecipientOccasionsVersionField(recipient)
+              ? {
+                  recipientOccasionsVersion:
+                    recipient.recipientOccasionsVersion,
+                }
+              : {}),
+          }
+        : hasRecipientBirthdayField(recipient)
         ? { recipientBirthday: recipient.recipientBirthday ?? null }
         : {}),
       deliveryAddress: recipient.deliveryAddress || null,
@@ -958,8 +980,9 @@ const Index = () => {
     setRecipientCompanyName("");
     setRecipientName("");
     setRecipientPhone("");
-    setRecipientBirthday("");
-    setRecipientBirthdayKnown(false);
+    setRecipientOccasions([]);
+    setRecipientOccasionsKnown(false);
+    setRecipientOccasionsVersion(undefined);
     setDeliveryPerson("");
     setFailedDeliveryAction("none");
     setDeliverySplits([]);
@@ -1010,6 +1033,7 @@ const Index = () => {
       return;
     }
     setPendingSubmission(null);
+    setSalesTeamId(undefined);
     setCheckoutId(crypto.randomUUID());
     setPaymentIdempotencyKey(crypto.randomUUID());
     toast.success("已解除待確認狀態；表格資料已保留，可以修改後再提交。");
@@ -1076,8 +1100,10 @@ const Index = () => {
     setRecipientCompanyName(order.recipientCompanyName || "");
     setRecipientName(order.recipientName);
     setRecipientPhone(order.recipientPhone);
-    setRecipientBirthday(order.recipientBirthday || "");
-    setRecipientBirthdayKnown(hasRecipientBirthdayField(order));
+    const occasionState = recipientOccasionsStateFromSelection(order);
+    setRecipientOccasions(occasionState.value);
+    setRecipientOccasionsKnown(occasionState.known);
+    setRecipientOccasionsVersion(order.recipientOccasionsVersion);
     setDeliveryPerson(order.deliveryPerson);
     setDeliverySplits(order.deliverySplits || []);
     setGiftCardEnabled(order.giftCardEnabled);
@@ -1355,6 +1381,15 @@ const Index = () => {
       );
       return;
     }
+    const primaryOccasionError = recipientOccasionValidationError(
+      recipientOccasions,
+      "主要收貨點收花人",
+    );
+    if (primaryOccasionError) {
+      toast.error(primaryOccasionError);
+      scrollToWorkflowSection("delivery");
+      return;
+    }
     const deliverySplitsError = validateDeliverySplits(deliverySplits, items);
     if (deliverySplitsError) {
       toast.error(deliverySplitsError);
@@ -1541,10 +1576,11 @@ const Index = () => {
         : {}),
       recipientName: recipientName.trim(),
       recipientPhone: recipientPhone.trim(),
-      ...recipientBirthdayFieldForSubmission(
-        recipientBirthday,
-        recipientBirthdayKnown,
+      ...recipientOccasionFieldsForSubmission(
+        recipientOccasions,
+        recipientOccasionsKnown,
         pendingSubmission?.order,
+        recipientOccasionsVersion,
       ),
       deliveryPerson: deliveryPerson.trim(),
       giftCardEnabled,
@@ -1776,8 +1812,14 @@ const Index = () => {
               setRecipientCompanyName(reusedCompanyName);
               setRecipientName(selection.recipientName || "");
               setRecipientPhone(selection.recipientPhone || "");
-              setRecipientBirthday(selection.recipientBirthday || "");
-              setRecipientBirthdayKnown(hasRecipientBirthdayField(selection));
+              const occasionState = recipientOccasionsStateFromSelection(selection);
+              setRecipientOccasions(occasionState.value);
+              setRecipientOccasionsKnown(occasionState.known);
+              setRecipientOccasionsVersion(
+                selection.shippingPartnerId
+                  ? recipientOccasionsVersionFromSelection(selection)
+                  : undefined,
+              );
               setRecipientPartnerId(selection.shippingPartnerId);
               setRecipientContact(null);
               setRecipientContactDraft("");
@@ -1800,23 +1842,19 @@ const Index = () => {
         <SalesIdSection
           salesId={salesId}
           salespersonEmployeeId={salespersonEmployeeId}
-          salesTeamId={salesTeamId}
           department={department}
           staff={staff}
-          teams={salesTeams}
           staffLoading={staffLoading}
           staffError={staffError}
-          teamsLoading={salesTeamsLoading}
-          teamsError={salesTeamsError}
           locked={Boolean(pendingSubmission)}
           employee={employee}
           onSalespersonChange={(label, employeeId) => {
             setSalesId(label);
             setSalespersonEmployeeId(employeeId);
           }}
-          onSalesTeamChange={(label, teamId) => {
+          onSalesTeamChange={(label) => {
             setDepartment(label);
-            setSalesTeamId(teamId);
+            setSalesTeamId(undefined);
           }}
         />
 
@@ -2029,7 +2067,7 @@ const Index = () => {
           recipientCompanyName={recipientCompanyName}
           recipientName={recipientName}
           recipientPhone={recipientPhone}
-          recipientBirthday={recipientBirthday}
+          recipientOccasions={recipientOccasionsKnown ? recipientOccasions : undefined}
           senderType={customerType}
           senderCompanyName={companyName}
           senderName={senderName || customerName}
@@ -2108,9 +2146,9 @@ const Index = () => {
             clearCheckoutErrors("recipientPhone");
             resetRecipientPersistence();
           }}
-          onRecipientBirthdayChange={(value) => {
-            setRecipientBirthday(value);
-            setRecipientBirthdayKnown(true);
+          onRecipientOccasionsChange={(value) => {
+            setRecipientOccasions(value || []);
+            setRecipientOccasionsKnown(value !== undefined);
           }}
           onRecipientSuggestionSelect={(suggestion) => {
             applyRecipientSelection(suggestion);
@@ -2121,6 +2159,7 @@ const Index = () => {
           }}
           onConfirmNewRecipient={() => {
             clearRecipientPersistenceBinding();
+            setRecipientOccasionsKnown(true);
             toast.success("已確認新增收貨人");
           }}
           onDeliveryPersonChange={setDeliveryPerson}

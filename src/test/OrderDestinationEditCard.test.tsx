@@ -24,7 +24,8 @@ const splitFixture = (fulfillmentType: "delivery" | "pickup"): DeliverySplit => 
   recipientCompanyName: "Recipient Limited",
   recipientName: "Ms Recipient",
   recipientPhone: "61234567",
-  recipientBirthday: "1990-01-02",
+  recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+  recipientOccasionsVersion: "recipient-85-v4",
   recipientPartnerId: 85,
   deliveryPerson: "Driver A",
   failedDeliveryAction: "return_to_shop",
@@ -58,7 +59,7 @@ describe("OrderDestinationEditCard fulfillment switching", () => {
       recipientCompanyName: "",
       recipientName: "",
       recipientPhone: "",
-      recipientBirthday: "",
+      recipientOccasions: [],
       deliveryPerson: "",
       deliveryNote: "",
       itemAllocations: [{ itemId: "line-1", itemName: "Bouquet", quantity: 1 }],
@@ -87,12 +88,12 @@ describe("OrderDestinationEditCard fulfillment switching", () => {
       recipientCompanyName: "",
       recipientName: "",
       recipientPhone: "",
-      recipientBirthday: "",
+      recipientOccasions: [],
       itemAllocations: [{ itemId: "line-1", itemName: "Bouquet", quantity: 1 }],
     }));
   });
 
-  it("edits a split recipient birthday without changing destination identity", () => {
+  it("edits a split recipient occasion without changing destination identity", () => {
     const onChange = vi.fn();
     render(
       <OrderDestinationEditCard
@@ -103,13 +104,14 @@ describe("OrderDestinationEditCard fulfillment switching", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("額外收貨點 2 收件人生日"), {
+    fireEvent.change(screen.getByLabelText("額外收貨點 2 收花人重要日子 1 日期"), {
       target: { value: "1985-11-12" },
     });
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
       id: "split-2",
-      recipientBirthday: "1985-11-12",
+      recipientOccasions: [{ type: "birthday", date: "1985-11-12" }],
+      recipientOccasionsVersion: "recipient-85-v4",
       recipientPartnerId: 85,
       itemAllocations: [{ itemId: "line-1", itemName: "Bouquet", quantity: 1 }],
     }));
@@ -133,6 +135,7 @@ describe("OrderDestinationEditCard fulfillment switching", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
       recipientName: "Different Recipient",
       recipientPartnerId: undefined,
+      recipientOccasionsVersion: undefined,
     }));
   });
 });

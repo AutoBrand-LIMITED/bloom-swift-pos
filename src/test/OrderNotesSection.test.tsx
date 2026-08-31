@@ -89,7 +89,9 @@ describe("OrderNotesSection", () => {
       />
     );
 
-    expect(screen.getByRole("checkbox", { name: /將今次送貨備註加入收花人長期備註/ })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: /同時將今次送貨備註複製到收花人長期備註/ })).toBeEnabled();
+    expect(screen.getByText(/不勾選也會把送花人備註保存於本張訂單/)).toBeVisible();
+    expect(screen.getByText(/不勾選也會把送貨備註保存於本張訂單/)).toBeVisible();
     expect(screen.getByLabelText("收花人長期備註")).toBeEnabled();
     fireEvent.change(screen.getByLabelText("收花人長期備註"), {
       target: { value: "New recipient note" },
@@ -114,7 +116,7 @@ describe("OrderNotesSection", () => {
       />
     );
 
-    expect(screen.getByRole("checkbox", { name: /將今次送貨備註加入收花人長期備註/ })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: /同時將今次送貨備註複製到收花人長期備註/ })).toBeEnabled();
     expect(screen.getByLabelText("收花人長期備註")).toBeEnabled();
     expect(screen.getByLabelText("收花人長期備註")).toHaveValue("Updated recipient note");
   });

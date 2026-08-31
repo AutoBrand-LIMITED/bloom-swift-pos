@@ -12,7 +12,7 @@ const operator = {
 };
 
 describe("SalesIdSection assignment", () => {
-  it("keeps the operator read-only while allowing a responsible salesperson and Sales Team", () => {
+  it("keeps the operator read-only while allowing a responsible salesperson and free-text Sales Team", () => {
     const onSalespersonChange = vi.fn();
     const onSalesTeamChange = vi.fn();
     render(
@@ -20,13 +20,11 @@ describe("SalesIdSection assignment", () => {
         salesId="AC02 — Elma"
         salespersonEmployeeId={95}
         department="Retail"
-        salesTeamId={7}
         employee={operator}
         staff={[
           { id: "AC02", name: "Elma", code: "AC02", odooEmployeeId: 95 },
           { id: "AC03", name: "May", code: "AC03", odooEmployeeId: 96 },
         ]}
-        teams={[{ id: 7, name: "Retail" }, { id: 8, name: "Corporate" }]}
         onSalespersonChange={onSalespersonChange}
         onSalesTeamChange={onSalesTeamChange}
       />,
@@ -37,23 +35,21 @@ describe("SalesIdSection assignment", () => {
     fireEvent.click(screen.getByRole("option", { name: "AC03 — May" }));
     expect(onSalespersonChange).toHaveBeenCalledWith("AC03 — May", 96);
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Sales Team（選填）" }));
-    fireEvent.click(screen.getByRole("option", { name: "Corporate" }));
-    expect(onSalesTeamChange).toHaveBeenCalledWith("Corporate", 8);
+    fireEvent.change(screen.getByRole("textbox", { name: "Sales Team（選填）" }), {
+      target: { value: "Corporate Events" },
+    });
+    expect(onSalesTeamChange).toHaveBeenCalledWith("Corporate Events");
   });
 
-  it("renders a saved assignment but blocks unverified choices after reference failure", () => {
+  it("blocks unverified salesperson choices while keeping Sales Team as text", () => {
     render(
       <SalesIdSection
         salesId="AC03 — May"
         salespersonEmployeeId={96}
         department="Corporate"
-        salesTeamId={8}
         employee={operator}
         staff={[]}
-        teams={[]}
         staffError="offline"
-        teamsError="offline"
         onSalespersonChange={vi.fn()}
         onSalesTeamChange={vi.fn()}
       />,
@@ -61,8 +57,8 @@ describe("SalesIdSection assignment", () => {
 
     expect(screen.getByRole("combobox", { name: "負責銷售員" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "負責銷售員" })).toHaveTextContent("AC03 — May");
-    expect(screen.getByRole("combobox", { name: "Sales Team（選填）" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "Sales Team（選填）" })).toHaveTextContent("Corporate");
-    expect(screen.getAllByText(/不會提供未驗證選項/)).toHaveLength(2);
+    expect(screen.getByRole("textbox", { name: "Sales Team（選填）" })).toBeEnabled();
+    expect(screen.getByRole("textbox", { name: "Sales Team（選填）" })).toHaveValue("Corporate");
+    expect(screen.getAllByText(/不會提供未驗證選項/)).toHaveLength(1);
   });
 });

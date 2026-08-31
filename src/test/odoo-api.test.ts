@@ -442,7 +442,7 @@ describe("odoo-api note contracts", () => {
     expect(customer).not.toHaveProperty("recipientBirthday");
   });
 
-  it("preserves omitted versus explicit null recipient birthdays from the API", async () => {
+  it("preserves birthday ownership and falls back when API occasions are null", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const partner = (id: number, recipientMatch: Record<string, unknown>) => ({
       id,
@@ -468,6 +468,15 @@ describe("odoo-api note contracts", () => {
       partner(42, {}),
       partner(43, { recipientBirthday: null }),
       partner(44, { recipientBirthday: "" }),
+      partner(45, {
+        recipientOccasions: [{ type: "anniversary", date: "2020-06-18" }],
+        recipientOccasionsVersion: "recipient-85-v4",
+        recipientBirthday: "1990-01-02",
+      }),
+      partner(46, {
+        recipientOccasions: null,
+        recipientBirthday: "1988-04-05",
+      }),
     ])));
     const { searchOdooCustomers } = await import("@/lib/odoo-api");
 
@@ -476,6 +485,17 @@ describe("odoo-api note contracts", () => {
     expect(customers[0].recipientMatch).not.toHaveProperty("recipientBirthday");
     expect(customers[1].recipientMatch).toHaveProperty("recipientBirthday", null);
     expect(customers[2].recipientMatch).toHaveProperty("recipientBirthday", "");
+    expect(customers[3].recipientMatch).toHaveProperty("recipientOccasions", [
+      { type: "anniversary", date: "2020-06-18" },
+    ]);
+    expect(customers[3].recipientMatch).toHaveProperty(
+      "recipientOccasionsVersion",
+      "recipient-85-v4",
+    );
+    expect(customers[3].recipientMatch).not.toHaveProperty("recipientBirthday");
+    expect(customers[4].recipientMatch).not.toHaveProperty("recipientOccasions");
+    expect(customers[4].recipientMatch).not.toHaveProperty("recipientOccasionsVersion");
+    expect(customers[4].recipientMatch).toHaveProperty("recipientBirthday", "1988-04-05");
   });
 
   it("keeps multiple existing Contact Tags as a snapshot without inventing a Customer Group ID", async () => {
@@ -844,6 +864,42 @@ describe("odoo-api note contracts", () => {
     expect(payload).not.toHaveProperty("notes");
     expect(payload).not.toHaveProperty("followUpDate");
     expect(payload).not.toHaveProperty("reminderOption");
+  });
+
+  it("submits new free-text teams and recipient occasions without legacy IDs or birthday", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      id: 8,
+      name: "S00008",
+      clientOrderRef: "POS-local-2",
+      amountTotal: 500,
+      partnerId: 42,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { submitOdooOrder } = await import("@/lib/odoo-api");
+
+    await submitOdooOrder({
+      id: "local-2",
+      department: "Corporate Events",
+      recipientOccasions: [
+        { type: "birthday", date: "1990-01-02" },
+        { type: "other", label: "相識紀念日", date: "2020-09-01" },
+      ],
+      recipientOccasionsVersion: "recipient-84-v3",
+    } as Order);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(init.body));
+    expect(payload).toMatchObject({
+      department: "Corporate Events",
+      recipientOccasions: [
+        { type: "birthday", date: "1990-01-02" },
+        { type: "other", label: "相識紀念日", date: "2020-09-01" },
+      ],
+      recipientOccasionsVersion: "recipient-84-v3",
+    });
+    expect(payload).not.toHaveProperty("salesTeamId");
+    expect(payload).not.toHaveProperty("recipientBirthday");
   });
 
   it("preserves structured recovery metadata from an ambiguous order failure", async () => {

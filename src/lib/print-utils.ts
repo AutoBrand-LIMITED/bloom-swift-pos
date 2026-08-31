@@ -454,6 +454,7 @@ function splitAsOrder(order: Order, split: DeliverySplit, items: OrderItem[]): O
     recipientCompanyName: split.recipientCompanyName,
     recipientName: split.recipientName,
     recipientPhone: split.recipientPhone,
+    recipientOccasions: split.recipientOccasions,
     recipientBirthday: split.recipientBirthday,
     deliveryPerson: split.deliveryPerson,
     deliveryNote: split.deliveryNote,

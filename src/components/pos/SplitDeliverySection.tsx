@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deliverySlotSnapshot } from "@/lib/delivery-slots";
-import { recipientBirthdayStateFromSelection } from "@/lib/recipient-birthday";
+import {
+  recipientOccasionsStateFromSelection,
+  recipientOccasionsVersionFromSelection,
+} from "@/lib/recipient-occasions";
 import {
   hierarchyFromGoogleSelection,
   parseDeliveryAddress,
@@ -69,6 +72,7 @@ const newSplit = (props: SplitDeliverySectionProps): DeliverySplit => ({
   recipientCompanyName: "",
   recipientName: "",
   recipientPhone: "",
+  recipientOccasions: [],
   deliveryPerson: "",
   failedDeliveryAction: "none",
   deliveryNote: "",
@@ -76,6 +80,11 @@ const newSplit = (props: SplitDeliverySectionProps): DeliverySplit => ({
   giftCardMessage: "",
   itemAllocations: [],
 });
+
+const recipientOccasionsForEditor = (split: DeliverySplit) => {
+  const state = recipientOccasionsStateFromSelection(split);
+  return state.known ? state.value : undefined;
+};
 
 const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
   const update = (id: string, changes: Partial<DeliverySplit>, refreshAddress = false) => {
@@ -87,13 +96,20 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
   };
 
   const updateRecipientIdentity = (id: string, changes: Partial<DeliverySplit>) => {
-    update(id, { ...changes, recipientPartnerId: undefined });
+    update(id, {
+      ...changes,
+      recipientPartnerId: undefined,
+      recipientOccasionsVersion: undefined,
+    });
   };
 
   const remove = (id: string) => props.onChange(props.splits.filter((split) => split.id !== id));
 
   const applyRecipient = (split: DeliverySplit, suggestion: RecipientSuggestion) => {
-    const birthdayState = recipientBirthdayStateFromSelection(suggestion);
+    const occasionState = recipientOccasionsStateFromSelection(suggestion);
+    const occasionVersion = suggestion.shippingPartnerId
+      ? recipientOccasionsVersionFromSelection(suggestion)
+      : undefined;
     const changes: Partial<DeliverySplit> = {
       recipientType: suggestion.recipientType || "personal",
       recipientCompanyName: suggestion.recipientCompanyName || "",
@@ -101,7 +117,10 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
       recipientPhone: suggestion.recipientPhone || "",
       recipientPartnerId: suggestion.shippingPartnerId ?? undefined,
     };
-    if (birthdayState.known) changes.recipientBirthday = birthdayState.value;
+    if (occasionState.known) changes.recipientOccasions = occasionState.value;
+    if (occasionVersion !== undefined) {
+      changes.recipientOccasionsVersion = occasionVersion;
+    }
     if (suggestion.deliveryAddress) {
       const parsed = parseDeliveryAddress(suggestion.deliveryAddress);
       Object.assign(changes, {
@@ -112,7 +131,9 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
       });
     }
     const next = { ...split, ...changes };
-    if (!birthdayState.known) delete next.recipientBirthday;
+    delete next.recipientBirthday;
+    if (!occasionState.known) delete next.recipientOccasions;
+    if (occasionVersion === undefined) delete next.recipientOccasionsVersion;
     props.onChange(props.splits.map((candidate) => (
       candidate.id === split.id ? addressSnapshot(next) : candidate
     )));
@@ -188,7 +209,7 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
             recipientCompanyName={split.recipientCompanyName}
             recipientName={split.recipientName}
             recipientPhone={split.recipientPhone}
-            recipientBirthday={split.recipientBirthday ?? ""}
+            recipientOccasions={recipientOccasionsForEditor(split)}
             senderType={props.senderType}
             senderCompanyName={props.senderCompanyName}
             senderName={props.senderName}
@@ -244,13 +265,17 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
             onRecipientCompanyNameChange={(recipientCompanyName) => updateRecipientIdentity(split.id, { recipientCompanyName })}
             onRecipientNameChange={(recipientName) => updateRecipientIdentity(split.id, { recipientName })}
             onRecipientPhoneChange={(recipientPhone) => updateRecipientIdentity(split.id, { recipientPhone })}
-            onRecipientBirthdayChange={(recipientBirthday) => update(split.id, { recipientBirthday })}
+            onRecipientOccasionsChange={(recipientOccasions) => update(split.id, {
+              recipientOccasions,
+              recipientBirthday: undefined,
+            })}
             onRecipientDetailsChange={(recipient) => updateRecipientIdentity(split.id, {
               recipientType: recipient.type,
               recipientCompanyName: recipient.companyName,
               recipientName: recipient.name,
               recipientPhone: recipient.phone,
-              recipientBirthday: recipient.birthday,
+              recipientOccasions: recipient.occasions,
+              recipientBirthday: undefined,
             })}
             onRecipientSuggestionSelect={(suggestion) => applyRecipient(split, suggestion)}
             onRecipientAndCustomerSuggestionSelect={(suggestion) => applyRecipient(split, suggestion)}

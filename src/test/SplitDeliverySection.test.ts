@@ -96,28 +96,77 @@ describe("validateDeliverySplits", () => {
     });
   });
 
-  it("preserves two independent split birthdays", () => {
+  it("converts two independent legacy split birthdays to occasion rows", () => {
     const normalized = normalizeDeliverySplitsForSubmission([
       { ...split(), recipientBirthday: "1990-01-02", recipientPartnerId: 85 },
       { ...split(), id: "split-3", recipientBirthday: "1985-11-12", recipientPartnerId: 86 },
     ]);
 
-    expect(normalized.map((destination) => destination.recipientBirthday)).toEqual([
-      "1990-01-02",
-      "1985-11-12",
+    expect(normalized.map((destination) => destination.recipientOccasions)).toEqual([
+      [{ type: "birthday", date: "1990-01-02" }],
+      [{ type: "birthday", date: "1985-11-12" }],
     ]);
     expect(normalized.map((destination) => destination.recipientPartnerId)).toEqual([85, 86]);
   });
 
-  it("serializes explicit empty birthdays for fresh bound D2 and D3 recipients", () => {
+  it("falls back from null split occasions to the legacy birthday", () => {
+    const legacy = {
+      ...split(),
+      recipientOccasions: null,
+      recipientOccasionsVersion: null,
+      recipientBirthday: "1990-01-02",
+      recipientPartnerId: 85,
+    };
+
+    expect(normalizeDeliverySplitsForSubmission([legacy])[0]).toMatchObject({
+      recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+      recipientPartnerId: 85,
+    });
+    expect(normalizeDeliverySplitsForSubmission([legacy])[0])
+      .not.toHaveProperty("recipientOccasionsVersion");
+    expect(normalizeDeliverySplitsForSubmission(
+      [legacy],
+      { baselineSplits: [legacy] },
+    )[0]).toMatchObject({
+      recipientOccasions: null,
+      recipientOccasionsVersion: null,
+      recipientBirthday: "1990-01-02",
+      recipientPartnerId: 85,
+    });
+  });
+
+  it("submits and exactly replays a split occasion version", () => {
+    const selected = {
+      ...split(),
+      recipientOccasions: [{ type: "birthday" as const, date: "1990-01-02" }],
+      recipientOccasionsVersion: "recipient-85-v4",
+      recipientPartnerId: 85,
+    };
+
+    expect(normalizeDeliverySplitsForSubmission([selected])[0]).toMatchObject({
+      recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+      recipientOccasionsVersion: "recipient-85-v4",
+      recipientPartnerId: 85,
+    });
+    expect(normalizeDeliverySplitsForSubmission(
+      [selected],
+      { baselineSplits: [selected] },
+    )[0]).toMatchObject({
+      recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+      recipientOccasionsVersion: "recipient-85-v4",
+      recipientPartnerId: 85,
+    });
+  });
+
+  it("serializes explicit empty legacy birthdays as empty occasion arrays", () => {
     const normalized = normalizeDeliverySplitsForSubmission([
       { ...split(), recipientBirthday: "", recipientPartnerId: 85 },
       { ...split(), id: "split-3", recipientBirthday: "", recipientPartnerId: 86 },
     ]);
 
-    expect(normalized[0]).toHaveProperty("recipientBirthday", "");
+    expect(normalized[0]).toHaveProperty("recipientOccasions", []);
     expect(normalized[0]).toHaveProperty("recipientPartnerId", 85);
-    expect(normalized[1]).toHaveProperty("recipientBirthday", "");
+    expect(normalized[1]).toHaveProperty("recipientOccasions", []);
     expect(normalized[1]).toHaveProperty("recipientPartnerId", 86);
   });
 
@@ -162,15 +211,34 @@ describe("validateDeliverySplits", () => {
     expect(validateOperationalDeliverySplits(normalized)).toBeNull();
   });
 
-  it("preserves an explicit split birthday clear and recipient binding for operational edits", () => {
+  it("converts an explicit split birthday clear and preserves its binding for operational edits", () => {
     const normalized = normalizeDeliverySplitsForOperationalUpdate([{
       ...split(),
       recipientBirthday: "",
       recipientPartnerId: 85,
     }]);
 
-    expect(normalized[0]).toHaveProperty("recipientBirthday", "");
+    expect(normalized[0]).toHaveProperty("recipientOccasions", []);
     expect(normalized[0]).toHaveProperty("recipientPartnerId", 85);
+  });
+
+  it("omits unchanged split occasion ownership during an unrelated operational edit", () => {
+    const original = {
+      ...split(),
+      recipientOccasions: null,
+      recipientOccasionsVersion: null,
+      recipientBirthday: "1990-01-02",
+      recipientPartnerId: 85,
+    };
+    const normalized = normalizeDeliverySplitsForOperationalUpdate(
+      [{ ...original, deliveryAddress: "九龍觀塘新地址" }],
+      { baselineSplits: [original] },
+    );
+
+    expect(normalized[0]).toHaveProperty("recipientPartnerId", 85);
+    expect(normalized[0]).not.toHaveProperty("recipientOccasions");
+    expect(normalized[0]).not.toHaveProperty("recipientOccasionsVersion");
+    expect(normalized[0]).not.toHaveProperty("recipientBirthday");
   });
 
   it("rejects changed destination IDs or allocations during operational edits", () => {

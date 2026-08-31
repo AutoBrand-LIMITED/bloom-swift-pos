@@ -20,6 +20,14 @@ export type PaymentStatus = "unpaid" | "paid" | "deposit";
 export type DeliveryTimeMode = "slot" | "specified";
 export type RecipientType = "personal" | "company";
 export type FulfillmentType = "delivery" | "pickup";
+export type RecipientOccasionType = "birthday" | "anniversary" | "valentines_day" | "other";
+
+export interface RecipientOccasion {
+  id?: number;
+  type: RecipientOccasionType;
+  label?: string;
+  date: string;
+}
 
 export interface DeliverySplitItemAllocation {
   itemId: string;
@@ -49,7 +57,11 @@ export interface DeliverySplit {
   recipientCompanyName: string;
   recipientName: string;
   recipientPhone: string;
-  /** Optional recipient birthday in ISO YYYY-MM-DD format. */
+  /** Recipient occasions snapshot. Absence means unknown; [] means explicitly empty. */
+  recipientOccasions?: RecipientOccasion[] | null;
+  /** Opaque optimistic-lock token for the bound recipient's occasion list. */
+  recipientOccasionsVersion?: string | null;
+  /** Legacy read/replay-only birthday field. */
   recipientBirthday?: string;
   /** Explicit Odoo shipping contact selected for this destination. */
   recipientPartnerId?: number;
@@ -129,7 +141,11 @@ export interface Order {
   recipientCompanyName?: string;
   recipientName: string;
   recipientPhone: string;
-  /** Optional primary-destination recipient birthday in ISO YYYY-MM-DD format. */
+  /** Recipient occasions snapshot. Absence means unknown; [] means explicitly empty. */
+  recipientOccasions?: RecipientOccasion[] | null;
+  /** Opaque optimistic-lock token for the bound recipient's occasion list. */
+  recipientOccasionsVersion?: string | null;
+  /** Legacy read/replay-only birthday field. */
   recipientBirthday?: string;
   deliveryPerson: string;
   giftCardEnabled: boolean;

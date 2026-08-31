@@ -156,7 +156,6 @@ describe("CustomerHistoryPanel resizable history", () => {
       recipientType: "personal",
       recipientName: "李先生",
       recipientPhone: "62345678",
-      shippingPartnerId: undefined,
     });
   });
 
@@ -204,7 +203,7 @@ describe("CustomerHistoryPanel resizable history", () => {
     }));
   });
 
-  it("keeps the newest explicit birthday clear when duplicate addresses are merged", () => {
+  it("does not promote a null legacy history snapshot to an explicit occasion clear", () => {
     const onUseAddress = vi.fn();
     const duplicateCustomer: DemoCustomer = {
       ...customer,
@@ -221,6 +220,7 @@ describe("CustomerHistoryPanel resizable history", () => {
           id: 11,
           date: "2026-07-18",
           deliveryAddress: "中環同一地址",
+          recipientOccasions: null,
           recipientBirthday: "",
         },
       ],
@@ -236,12 +236,13 @@ describe("CustomerHistoryPanel resizable history", () => {
 
     const choice = screen.getByRole("button", { name: "使用過往地址 中環同一地址" });
     fireEvent.click(choice);
-    expect(onUseAddress).toHaveBeenCalledWith(expect.objectContaining({
-      recipientBirthday: "",
-    }));
+    const selection = onUseAddress.mock.calls[0][0];
+    expect(selection).not.toHaveProperty("recipientOccasions");
+    expect(selection).not.toHaveProperty("recipientOccasionsVersion");
+    expect(selection.shippingPartnerId).toBe(84);
   });
 
-  it("can inherit an older birthday when the newest legacy snapshot omitted the field", () => {
+  it("does not inherit an immutable birthday from an older history snapshot", () => {
     const onUseAddress = vi.fn();
     const newestLegacyRecord = {
       ...customer.history[0],
@@ -273,9 +274,63 @@ describe("CustomerHistoryPanel resizable history", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "使用過往地址 金鐘同一地址" }));
-    expect(onUseAddress).toHaveBeenCalledWith(expect.objectContaining({
-      recipientBirthday: "1985-11-12",
+    const selection = onUseAddress.mock.calls[0][0];
+    expect(selection).not.toHaveProperty("recipientOccasions");
+    expect(selection).not.toHaveProperty("recipientOccasionsVersion");
+    expect(selection.shippingPartnerId).toBe(84);
+  });
+
+  it("binds history reuse only when a matching current occasion version is available", () => {
+    const onUseAddress = vi.fn();
+    render(
+      <CustomerHistoryPanel
+        customer={{
+          ...customer,
+          recipientMatch: {
+            name: "陳小姐",
+            phone: "61234567",
+            shippingPartnerId: 84,
+            recipientOccasions: [{ type: "anniversary", date: "2020-06-18" }],
+            recipientOccasionsVersion: "recipient-84-v5",
+          },
+        }}
+        onClose={vi.fn()}
+        onUseAddress={onUseAddress}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "使用過往地址 中環皇后大道中 1 號",
     }));
+    expect(onUseAddress).toHaveBeenCalledWith(expect.objectContaining({
+      recipientOccasions: [{ type: "anniversary", date: "2020-06-18" }],
+      recipientOccasionsVersion: "recipient-84-v5",
+      shippingPartnerId: 84,
+    }));
+  });
+
+  it("keeps the individual history record address unbound without a current version", () => {
+    const onUseAddress = vi.fn();
+    render(
+      <CustomerHistoryPanel
+        customer={{
+          ...customer,
+          history: [{
+            ...customer.history[0],
+            recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+          }],
+        }}
+        onClose={vi.fn()}
+        onUseAddress={onUseAddress}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /查看呢位客人過往消費紀錄/ }));
+    fireEvent.click(screen.getByRole("button", { name: "用地址" }));
+    const selection = onUseAddress.mock.calls[0][0];
+    expect(selection).not.toHaveProperty("recipientOccasions");
+    expect(selection).not.toHaveProperty("recipientOccasionsVersion");
+    expect(selection.shippingPartnerId).toBe(84);
   });
 
   it("shows all saved delivery addresses only after the compact view is expanded", () => {

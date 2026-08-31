@@ -23,12 +23,22 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import OrderDestinationEditCard from "@/components/pos/OrderDestinationEditCard";
+import RecipientOccasionEditor from "@/components/pos/RecipientOccasionEditor";
 import { isValidPhoneNumber } from "@/lib/checkout-validation";
 import {
   normalizeDeliverySplitsForOperationalUpdate,
   operationalSplitIdentityIsUnchanged,
   validateOperationalDeliverySplits,
 } from "@/lib/split-delivery";
+import {
+  cloneRecipientOccasions,
+  normalizeRecipientOccasions,
+  ownsRecipientOccasionsField,
+  ownsRecipientOccasionsVersionField,
+  recipientOccasionsAreUnchanged,
+  recipientOccasionsStateFromSelection,
+  recipientOccasionValidationError,
+} from "@/lib/recipient-occasions";
 import {
   getAccountingPaymentOptions,
   getDeliverySlots,
@@ -75,14 +85,29 @@ const formFromOrder = (order: OrderRecordView): OrderOperationalUpdate => ({
   deliveryUnit: order.deliveryUnit || "",
   deliverySplits: (order.deliverySplits || []).map((split) => ({
     ...split,
+    ...(Array.isArray(split.recipientOccasions)
+      ? { recipientOccasions: cloneRecipientOccasions(split.recipientOccasions) }
+      : {}),
     itemAllocations: split.itemAllocations.map((allocation) => ({ ...allocation })),
   })),
   recipientType: order.recipientType || "personal",
   recipientCompanyName: order.recipientCompanyName || "",
   recipientName: order.recipientName || "",
   recipientPhone: order.recipientPhone || "",
+  recipientPartnerId: order.recipientPartnerId,
+  ...(ownsRecipientOccasionsField(order)
+    ? {
+        recipientOccasions: Array.isArray(order.recipientOccasions)
+          ? cloneRecipientOccasions(order.recipientOccasions)
+          : order.recipientOccasions,
+      }
+    : {}),
+  ...(ownsRecipientOccasionsVersionField(order)
+    ? { recipientOccasionsVersion: order.recipientOccasionsVersion }
+    : {}),
   ...(Object.prototype.hasOwnProperty.call(order, "recipientBirthday")
-    ? { recipientBirthday: order.recipientBirthday || "" }
+    && order.recipientBirthday !== undefined
+    ? { recipientBirthday: order.recipientBirthday }
     : {}),
   deliveryPerson: order.deliveryPerson || "",
   giftCardMessage: order.giftCardMessage || "",
@@ -182,6 +207,17 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
   ) => {
     setForm((current) => current ? { ...current, [field]: value } : current);
   };
+  const setRecipientIdentityField = <K extends keyof OrderOperationalUpdate>(
+    field: K,
+    value: OrderOperationalUpdate[K],
+  ) => {
+    setForm((current) => current ? {
+      ...current,
+      [field]: value,
+      recipientPartnerId: undefined,
+      recipientOccasionsVersion: undefined,
+    } : current);
+  };
 
   const handleSave = async () => {
     if (!order?.odooOrderId || !form || !form.expectedWriteDate) {
@@ -214,7 +250,49 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
         return;
       }
     }
-    const deliverySplits = normalizeDeliverySplitsForOperationalUpdate(form.deliverySplits || []);
+    const primaryOccasionState = recipientOccasionsStateFromSelection(form);
+    const primaryOccasionsChanged = !recipientOccasionsAreUnchanged(
+      primaryOccasionState.value,
+      order,
+    );
+    if (primaryOccasionsChanged) {
+      const occasionError = recipientOccasionValidationError(
+        primaryOccasionState.value,
+        "主要收貨點收花人",
+      );
+      if (occasionError) {
+        setError(occasionError);
+        return;
+      }
+    }
+    const hasCurrentOccasionsVersion = (value: string | null | undefined) => (
+      typeof value === "string" && value.trim().length > 0
+    );
+    if (
+      primaryOccasionsChanged
+      && !hasCurrentOccasionsVersion(form.recipientOccasionsVersion)
+    ) {
+      setError("主要收貨點收花人重要日子已修改，但未有最新版本。請重新整理訂單，或重新選擇收花人後再試。");
+      return;
+    }
+    for (let index = 0; index < (form.deliverySplits || []).length; index += 1) {
+      const split = form.deliverySplits?.[index];
+      const baseline = order.deliverySplits?.[index];
+      if (!split || !baseline || split.id !== baseline.id) continue;
+      const splitOccasions = recipientOccasionsStateFromSelection(split).value;
+      if (
+        !recipientOccasionsAreUnchanged(splitOccasions, baseline)
+        && split.recipientPartnerId
+        && !hasCurrentOccasionsVersion(split.recipientOccasionsVersion)
+      ) {
+        setError(`額外收貨點 ${index + 2} 收花人重要日子已修改，但未有最新版本。請重新整理訂單，或重新選擇收花人後再試。`);
+        return;
+      }
+    }
+    const deliverySplits = normalizeDeliverySplitsForOperationalUpdate(
+      form.deliverySplits || [],
+      { baselineSplits: order.deliverySplits || [] },
+    );
     const splitValidationError = validateOperationalDeliverySplits(deliverySplits);
     if (splitValidationError) {
       setError(splitValidationError);
@@ -232,14 +310,24 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
         salesId: _salesId,
         department: _department,
         customerGroup: _customerGroup,
-        recipientBirthday: rawRecipientBirthday,
+        recipientBirthday: _recipientBirthday,
+        recipientPartnerId: rawRecipientPartnerId,
+        recipientOccasions: rawRecipientOccasions,
+        recipientOccasionsVersion: rawRecipientOccasionsVersion,
         ...operationalForm
       } = form;
       const operationalPayload: OrderOperationalUpdatePayload = {
         ...operationalForm,
-        ...(rawRecipientBirthday?.trim()
-          || Object.prototype.hasOwnProperty.call(order, "recipientBirthday")
-          ? { recipientBirthday: rawRecipientBirthday?.trim() || "" }
+        ...(rawRecipientPartnerId !== undefined
+          ? { recipientPartnerId: rawRecipientPartnerId }
+          : {}),
+        ...(primaryOccasionsChanged
+          ? {
+              recipientOccasions: normalizeRecipientOccasions(primaryOccasionState.value),
+              ...(hasCurrentOccasionsVersion(rawRecipientOccasionsVersion)
+                ? { recipientOccasionsVersion: rawRecipientOccasionsVersion }
+                : {}),
+            }
           : {}),
         deliverySplits,
       };
@@ -503,6 +591,8 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                           ...current,
                           recipientType: value,
                           recipientCompanyName: value === "personal" ? "" : current.recipientCompanyName,
+                          recipientPartnerId: undefined,
+                          recipientOccasionsVersion: undefined,
                         } : current);
                       }}
                     >
@@ -514,12 +604,23 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                     </Select>
                   </div>
                   {form.recipientType === "company" && (
-                    <Field label="收貨公司名稱 *" value={form.recipientCompanyName} onChange={(value) => setField("recipientCompanyName", value)} />
+                    <Field label="收貨公司名稱 *" value={form.recipientCompanyName} onChange={(value) => setRecipientIdentityField("recipientCompanyName", value)} />
                   )}
-                  <Field label="收貨人／聯絡人姓名 *" value={form.recipientName} onChange={(value) => setField("recipientName", value)} />
-                  <Field label="收貨人電話 *" value={form.recipientPhone} onChange={(value) => setField("recipientPhone", value)} />
-                  <Field label="收件人生日" value={form.recipientBirthday || ""} onChange={(value) => setField("recipientBirthday", value)} type="date" />
+                  <Field label="收貨人／聯絡人姓名 *" value={form.recipientName} onChange={(value) => setRecipientIdentityField("recipientName", value)} />
+                  <Field label="收貨人電話 *" value={form.recipientPhone} onChange={(value) => setRecipientIdentityField("recipientPhone", value)} />
                 </div>
+                <RecipientOccasionEditor
+                  label="主要收貨點收花人重要日子"
+                  occasions={recipientOccasionsStateFromSelection(form).value}
+                  onChange={(recipientOccasions) => {
+                    setForm((current) => {
+                      if (!current) return current;
+                      const next = { ...current, recipientOccasions };
+                      delete next.recipientBirthday;
+                      return next;
+                    });
+                  }}
+                />
                 </>}
               </section>
 

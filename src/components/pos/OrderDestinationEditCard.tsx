@@ -8,7 +8,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import RecipientOccasionEditor from "@/components/pos/RecipientOccasionEditor";
 import { PICKUP_LOCATION_ADDRESS } from "@/lib/fulfillment";
+import { recipientOccasionsStateFromSelection } from "@/lib/recipient-occasions";
 import type { DeliverySlot } from "@/lib/odoo-api";
 import type { DeliverySplit } from "@/types/order";
 
@@ -47,7 +49,12 @@ const OrderDestinationEditCard = ({
     field: K,
     value: DeliverySplit[K],
   ) => {
-    onChange({ ...split, [field]: value, recipientPartnerId: undefined });
+    onChange({
+      ...split,
+      [field]: value,
+      recipientPartnerId: undefined,
+      recipientOccasionsVersion: undefined,
+    });
   };
   const changeFulfillmentType = (value: "delivery" | "pickup") => {
     onChange({
@@ -66,7 +73,9 @@ const OrderDestinationEditCard = ({
       recipientCompanyName: "",
       recipientName: "",
       recipientPhone: "",
-      recipientBirthday: "",
+      recipientOccasions: [],
+      recipientOccasionsVersion: undefined,
+      recipientBirthday: undefined,
       recipientPartnerId: undefined,
       deliveryPerson: "",
       failedDeliveryAction: "none",
@@ -187,6 +196,7 @@ const OrderDestinationEditCard = ({
               recipientType: value,
               recipientCompanyName: value === "personal" ? "" : split.recipientCompanyName,
               recipientPartnerId: undefined,
+              recipientOccasionsVersion: undefined,
             })}
           >
             <SelectTrigger aria-label={`${title} 收貨人類型`} className="min-h-11"><SelectValue /></SelectTrigger>
@@ -201,9 +211,17 @@ const OrderDestinationEditCard = ({
         )}
         <Field label={`${title} 收貨人／聯絡人`} value={split.recipientName} onChange={(value) => setRecipientIdentityField("recipientName", value)} />
         <Field label={`${title} 聯絡電話`} value={split.recipientPhone} onChange={(value) => setRecipientIdentityField("recipientPhone", value)} />
-        <Field label={`${title} 收件人生日`} value={split.recipientBirthday || ""} onChange={(value) => setField("recipientBirthday", value)} type="date" />
         <Field label={`${title} 負責送貨同事`} value={split.deliveryPerson} onChange={(value) => setField("deliveryPerson", value)} />
       </div>
+      <RecipientOccasionEditor
+        label={`${title} 收花人重要日子`}
+        occasions={recipientOccasionsStateFromSelection(split).value}
+        onChange={(recipientOccasions) => {
+          const next = { ...split, recipientOccasions };
+          delete next.recipientBirthday;
+          onChange(next);
+        }}
+      />
       <TextField label={`${title} 送貨備註`} value={split.deliveryNote} onChange={(value) => setField("deliveryNote", value)} />
 
       <div className="rounded-lg border bg-background p-3">

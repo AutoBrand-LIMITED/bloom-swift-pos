@@ -198,9 +198,12 @@ const OrderNotesSection = ({
               disabled={!senderCanPersist}
             />
             <Label htmlFor="save-sender-note" className="text-xs leading-relaxed">
-              將今次送花人備註加入客戶長期備註
+              同時將今次送花人備註複製到客戶長期備註
             </Label>
           </div>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            不勾選也會把送花人備註保存於本張訂單；勾選後才會供日後搜尋同一客戶時重用。
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -257,9 +260,12 @@ const OrderNotesSection = ({
               disabled={!recipientCanPersist}
             />
             <Label htmlFor="save-recipient-note" className="text-xs leading-relaxed">
-              將今次送貨備註加入收花人長期備註
+              同時將今次送貨備註複製到收花人長期備註
             </Label>
           </div>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            不勾選也會把送貨備註保存於本張訂單；勾選後才會供日後搜尋同一收花人時重用。
+          </p>
         </div>
       </div>
     </section>

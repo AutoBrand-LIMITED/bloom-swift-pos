@@ -23,6 +23,11 @@ import {
 import { OdooApiError, OdooConflictError } from "@/lib/odoo-api";
 import { normalizeDeliverySplitsForSubmission } from "@/lib/split-delivery";
 import { recipientBirthdayStateFromSelection } from "@/lib/recipient-birthday";
+import {
+  recipientOccasionFieldsForSubmission,
+  recipientOccasionsStateFromSelection,
+  recipientOccasionsVersionFromSelection,
+} from "@/lib/recipient-occasions";
 import type { DeliverySplit, Order } from "@/types/order";
 
 function buildSubmission(): PendingOrderSubmission {
@@ -590,6 +595,117 @@ describe("pending Odoo submission", () => {
     expect(submissionPayloadMatches(restored, rebuilt)).toBe(true);
   });
 
+  it("converts a fresh legacy birthday to occasions but replays a legacy pending field exactly", () => {
+    const pending = buildSubmission();
+    pending.order.recipientBirthday = "1990-01-02";
+    const state = recipientOccasionsStateFromSelection(pending.order);
+
+    expect(recipientOccasionFieldsForSubmission(state.value, state.known)).toEqual({
+      recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+    });
+    expect(recipientOccasionFieldsForSubmission(
+      state.value,
+      state.known,
+      pending.order,
+    )).toEqual({ recipientBirthday: "1990-01-02" });
+  });
+
+  it("preserves unknown occasions separately from an explicit empty list", () => {
+    const unknown = recipientOccasionsStateFromSelection({});
+    const empty = recipientOccasionsStateFromSelection({ recipientOccasions: [] });
+
+    expect(recipientOccasionFieldsForSubmission(unknown.value, unknown.known)).toEqual({});
+    expect(recipientOccasionFieldsForSubmission(empty.value, empty.known)).toEqual({
+      recipientOccasions: [],
+    });
+  });
+
+  it("submits a primary suggestion's explicit occasion version with its array", () => {
+    const suggestion = {
+      recipientOccasions: [{ type: "anniversary" as const, date: "2020-06-18" }],
+      recipientOccasionsVersion: "recipient-84-v3",
+    };
+    const state = recipientOccasionsStateFromSelection(suggestion);
+    const version = recipientOccasionsVersionFromSelection(suggestion);
+
+    expect(recipientOccasionFieldsForSubmission(
+      state.value,
+      state.known,
+      undefined,
+      version,
+    )).toEqual({
+      recipientOccasions: [{ type: "anniversary", date: "2020-06-18" }],
+      recipientOccasionsVersion: "recipient-84-v3",
+    });
+  });
+
+  it("does not attach an occasion version to legacy birthday hydration", () => {
+    const legacy = {
+      recipientOccasions: null,
+      recipientOccasionsVersion: "must-not-follow-legacy-conversion",
+      recipientBirthday: "1990-01-02",
+    };
+
+    expect(recipientOccasionsVersionFromSelection(legacy)).toBeUndefined();
+  });
+
+  it("treats null occasions as legacy fallback data while retaining raw ownership for replay", () => {
+    const legacy = {
+      recipientOccasions: null,
+      recipientOccasionsVersion: null,
+      recipientBirthday: "1990-01-02",
+    } satisfies Pick<
+      Order,
+      "recipientOccasions" | "recipientOccasionsVersion" | "recipientBirthday"
+    >;
+    const state = recipientOccasionsStateFromSelection(legacy);
+
+    expect(state).toEqual({
+      value: [{ type: "birthday", date: "1990-01-02" }],
+      known: true,
+      legacy: true,
+    });
+    expect(recipientOccasionFieldsForSubmission(state.value, state.known)).toEqual({
+      recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+    });
+    expect(recipientOccasionFieldsForSubmission(
+      state.value,
+      state.known,
+      legacy,
+      legacy.recipientOccasionsVersion,
+    )).toEqual({
+      recipientOccasions: null,
+      recipientOccasionsVersion: null,
+      recipientBirthday: "1990-01-02",
+    });
+  });
+
+  it("treats null occasions without a legacy birthday as unknown", () => {
+    const state = recipientOccasionsStateFromSelection({ recipientOccasions: null });
+
+    expect(state).toEqual({ value: [], known: false, legacy: false });
+    expect(recipientOccasionFieldsForSubmission(state.value, state.known)).toEqual({});
+  });
+
+  it("keeps both owned compatibility fields byte-stable in an exact pending replay", () => {
+    const pending = buildSubmission();
+    pending.order.recipientOccasions = [{ type: "anniversary", date: "2020-06-18" }];
+    pending.order.recipientOccasionsVersion = "recipient-84-v3";
+    pending.order.recipientBirthday = "1990-01-02";
+    const state = recipientOccasionsStateFromSelection(pending.order);
+
+    expect(recipientOccasionFieldsForSubmission(
+      state.value,
+      state.known,
+      pending.order,
+      pending.order.recipientOccasionsVersion,
+    )).toEqual({
+      recipientOccasions: [{ type: "anniversary", date: "2020-06-18" }],
+      recipientOccasionsVersion: "recipient-84-v3",
+      recipientBirthday: "1990-01-02",
+    });
+  });
+
   it("omits a fresh D1 birthday when the bound recipient suggestion omitted the field", () => {
     const suggestion: { shippingPartnerId: number; recipientBirthday?: string | null } = {
       shippingPartnerId: 84,
@@ -679,7 +795,7 @@ describe("pending Odoo submission", () => {
     expect(rebuilt.order.deliverySplits?.[0]).toMatchObject({
       giftCardEnabled: true,
       giftCardMessage: "New card must count as an edit",
-      recipientBirthday: "1990-01-02",
+      recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
       recipientPartnerId: 85,
     });
     expect(submissionPayloadMatches(pending, rebuilt)).toBe(false);

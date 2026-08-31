@@ -6,6 +6,11 @@ import type { DemoCustomer } from "@/data/demo-customers";
 import { getOdooCustomerHistory, hasOdooBackend } from "@/lib/odoo-api";
 import CustomerFlags from "@/components/pos/CustomerFlags";
 import type { DeliveryAddressSelection } from "@/lib/hk-address";
+import {
+  hasRecipientOccasionsField,
+  recipientOccasionsVersionFromSelection,
+  recipientOccasionsStateFromSelection,
+} from "@/lib/recipient-occasions";
 
 interface CustomerHistoryPanelProps {
   customer: DemoCustomer | null;
@@ -34,10 +39,6 @@ const formatSalesperson = (value?: string) => {
 
 const normalizeIdentityPart = (value?: string) =>
   value?.trim().replace(/\s+/g, " ").toLocaleLowerCase() ?? "";
-
-const hasOwnRecipientBirthday = (record: { recipientBirthday?: string }) => (
-  Object.prototype.hasOwnProperty.call(record, "recipientBirthday")
-);
 
 const historySnapshotTime = (record: DemoCustomer["history"][number]) => {
   const timestamp = Date.parse(record.dateTime || record.date);
@@ -130,6 +131,29 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
     return odooHistory ? { ...customer, ...odooHistory } : customer;
   }, [customer, odooHistory]);
 
+  const currentOccasionBindingFor = (
+    shippingPartnerId?: number,
+  ): Partial<DeliveryAddressSelection> => {
+    const currentMatch = displayCustomer?.recipientMatch;
+    const currentVersion = currentMatch
+      ? recipientOccasionsVersionFromSelection(currentMatch)
+      : undefined;
+    if (
+      !shippingPartnerId
+      || currentMatch?.shippingPartnerId !== shippingPartnerId
+      || !hasRecipientOccasionsField(currentMatch)
+      || typeof currentVersion !== "string"
+      || !currentVersion.trim()
+    ) {
+      return shippingPartnerId ? { shippingPartnerId } : {};
+    }
+    return {
+      recipientOccasions: recipientOccasionsStateFromSelection(currentMatch).value,
+      recipientOccasionsVersion: currentVersion,
+      shippingPartnerId,
+    };
+  };
+
   const totalSpent = displayCustomer?.totalSpent ?? displayCustomer?.history.reduce((s, h) => s + h.total, 0) ?? 0;
   const orderCount = displayCustomer?.historyCount ?? displayCustomer?.history.length ?? 0;
 
@@ -141,7 +165,6 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
       recipientCompanyName?: string;
       recipientName?: string;
       recipientPhone?: string;
-      recipientBirthday?: string;
       shippingPartnerId?: number;
       recipientContactNote?: string;
       date: string;
@@ -162,9 +185,6 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
         existing.recipientCompanyName ||= h.recipientCompanyName;
         existing.recipientName ||= h.recipientName;
         existing.recipientPhone ||= h.recipientPhone;
-        if (!hasOwnRecipientBirthday(existing) && hasOwnRecipientBirthday(h)) {
-          existing.recipientBirthday = h.recipientBirthday;
-        }
         existing.recipientContactNote ||= h.recipientContactNote;
       } else {
         addrs.push({
@@ -174,9 +194,6 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
           recipientCompanyName: h.recipientCompanyName,
           recipientName: h.recipientName,
           recipientPhone: h.recipientPhone,
-          ...(hasOwnRecipientBirthday(h)
-            ? { recipientBirthday: h.recipientBirthday }
-            : {}),
           shippingPartnerId: h.shippingPartnerId,
           recipientContactNote: h.recipientContactNote,
           date: h.date,
@@ -292,19 +309,18 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                       key={i}
                       type="button"
                       aria-label={`使用過往地址 ${a.address}`}
-                      onClick={() => onUseAddress?.({
-                        address: a.address,
-                        recipientType: a.recipientType,
-                        ...(a.recipientCompanyName
-                          ? { recipientCompanyName: a.recipientCompanyName }
-                          : {}),
-                        recipientName: a.recipientName,
-                        recipientPhone: a.recipientPhone,
-                        ...(hasOwnRecipientBirthday(a)
-                          ? { recipientBirthday: a.recipientBirthday || "" }
-                          : {}),
-                        shippingPartnerId: a.shippingPartnerId,
-                      })}
+                      onClick={() => {
+                        onUseAddress?.({
+                          address: a.address,
+                          recipientType: a.recipientType,
+                          ...(a.recipientCompanyName
+                            ? { recipientCompanyName: a.recipientCompanyName }
+                            : {}),
+                          recipientName: a.recipientName,
+                          recipientPhone: a.recipientPhone,
+                          ...currentOccasionBindingFor(a.shippingPartnerId),
+                        });
+                      }}
                       className="w-full text-left rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 p-2 transition-colors group"
                     >
                       <p className="text-xs leading-relaxed">{a.address}</p>
@@ -497,10 +513,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                             : {}),
                           recipientName: h.recipientName,
                           recipientPhone: h.recipientPhone,
-                          ...(hasOwnRecipientBirthday(h)
-                            ? { recipientBirthday: h.recipientBirthday || "" }
-                            : {}),
-                          shippingPartnerId: h.shippingPartnerId,
+                          ...currentOccasionBindingFor(h.shippingPartnerId),
                         })}
                       >
                         用地址

@@ -1,3 +1,5 @@
+import type { RecipientOccasion } from "@/types/order";
+
 export const HK_DISTRICTS: Record<string, Record<string, string[]>> = {
   "香港島": {
     "中西區": ["中環", "上環", "西營盤", "堅尼地城", "山頂", "半山"],
@@ -33,6 +35,8 @@ export interface DeliveryAddressSelection {
   recipientCompanyName?: string;
   recipientName?: string;
   recipientPhone?: string;
+  recipientOccasions?: RecipientOccasion[];
+  recipientOccasionsVersion?: string | null;
   recipientBirthday?: string;
   shippingPartnerId?: number;
 }

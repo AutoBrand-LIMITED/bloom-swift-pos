@@ -9,6 +9,7 @@ import OrderEditDialog from "@/components/pos/OrderEditDialog";
 import type { PaymentStatus } from "@/types/order";
 import { orderItemTotal } from "@/lib/order-pricing";
 import type { OrderRecordView } from "@/lib/order-records";
+import { formatRecipientOccasions } from "@/lib/recipient-occasions";
 
 interface OrderHistoryProps {
   orders: OrderRecordView[];
@@ -208,6 +209,7 @@ const OrderHistory = ({
                 const deliveryTimeLabel = order.deliveryTimeMode === "specified"
                   ? `指定時間：${order.deliveryTime || "未指定"}`
                   : order.deliveryTime || "未指定時段";
+                const recipientOccasionSummary = formatRecipientOccasions(order);
                 const businessDetails = [
                   ["登入操作員編號", order.operatorEmployeeId ? `#${order.operatorEmployeeId}` : undefined],
                   ["負責銷售員", order.salesId || (order.salespersonEmployeeId ? `員工 #${order.salespersonEmployeeId}` : undefined)],
@@ -216,6 +218,7 @@ const OrderHistory = ({
                   ["收貨公司", order.recipientCompanyName],
                   ["收花聯絡人", order.recipientName],
                   ["收花電話", order.recipientPhone],
+                  ["收花人重要日子", recipientOccasionSummary],
                   [fulfillmentType === "pickup" ? "自取地點" : "送貨地址", order.deliveryAddress],
                   ["客戶電郵", order.customerEmail],
                   ["帳單地址", order.billingAddress],

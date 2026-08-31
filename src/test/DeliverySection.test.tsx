@@ -147,7 +147,7 @@ describe("DeliverySection delivery time controls", () => {
       companyName: "Sender Limited",
       name: "Ms Chan",
       phone: "+852 6123 4567",
-      birthday: "",
+      occasions: [],
     });
     expect(props.onRecipientTypeChange).not.toHaveBeenCalled();
     expect(props.onRecipientCompanyNameChange).not.toHaveBeenCalled();
@@ -210,7 +210,8 @@ describe("DeliverySection delivery time controls", () => {
       recipientCompanyName: null,
       recipientName: "Ms Gift",
       recipientPhone: "6123 4567",
-      recipientBirthday: "1990-01-02",
+      recipientOccasions: [{ type: "birthday" as const, date: "1990-01-02" }],
+      recipientOccasionsVersion: "recipient-45-v2",
       deliveryAddress: "九龍觀塘巧明街 6 號",
       shippingPartnerId: 45,
       orderingCustomerId: null,
@@ -238,18 +239,21 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onRecipientSuggestionSelect).toHaveBeenCalledWith(suggestion);
   });
 
-  it("edits the optional recipient birthday independently", () => {
-    const onRecipientBirthdayChange = vi.fn();
+  it("edits repeatable recipient occasions independently", () => {
+    const onRecipientOccasionsChange = vi.fn();
     renderSection({
-      recipientBirthday: "1990-01-02",
-      onRecipientBirthdayChange,
+      recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+      onRecipientOccasionsChange,
     });
 
-    const birthday = screen.getByLabelText("收貨方式 收件人生日");
+    const birthday = screen.getByLabelText("收貨方式 收花人重要日子 1 日期");
     expect(birthday).toHaveValue("1990-01-02");
 
     fireEvent.change(birthday, { target: { value: "1985-11-12" } });
-    expect(onRecipientBirthdayChange).toHaveBeenCalledWith("1985-11-12");
+    expect(onRecipientOccasionsChange).toHaveBeenCalledWith([{
+      type: "birthday",
+      date: "1985-11-12",
+    }]);
   });
 
   it("offers an explicit new-recipient action when the search has no matches", async () => {

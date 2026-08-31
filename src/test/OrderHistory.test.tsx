@@ -105,6 +105,23 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByRole("group", { name: /訂單 S00020/ })).toBeInTheDocument();
   });
 
+  it("shows new occasions and converted legacy birthdays in history snapshots", () => {
+    render(<OrderHistory orders={[
+      orderFixture({
+        id: "new-occasion",
+        recipientOccasions: [
+          { type: "anniversary", date: "2020-06-18" },
+          { type: "other", label: "相識紀念日", date: "2021-09-01" },
+        ],
+      }),
+      orderFixture({ id: "legacy-birthday", recipientBirthday: "1990-01-02" }),
+    ]} open onClose={vi.fn()} />);
+
+    expect(screen.getByText(/週年：2020-06-18/)).toBeInTheDocument();
+    expect(screen.getByText(/相識紀念日：2021-09-01/)).toBeInTheDocument();
+    expect(screen.getByText(/收件人生日：1990-01-02/)).toBeInTheDocument();
+  });
+
   it("offers an accessible Hong Kong order-date field and date-scoped search", () => {
     const onSearchQueryChange = vi.fn();
     const onSelectedDateChange = vi.fn();
@@ -386,7 +403,79 @@ describe("OrderHistory delivery summary", () => {
     });
   });
 
-  it("sends explicit D1 and split birthday clears while retaining the split partner binding", async () => {
+  it("sends explicit D1 and split occasion clears while retaining the split partner binding", async () => {
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    const deliverySplit = {
+      id: "destination-2",
+      fulfillmentType: "delivery" as const,
+      deliveryDate: "2026-07-19",
+      deliveryTimeMode: "specified" as const,
+      deliveryTime: "下午 4 時前",
+      deliveryRegion: "九龍",
+      deliveryDistrict: "觀塘區",
+      deliveryArea: "觀塘",
+      deliveryDetail: "巧明街 6 號",
+      deliveryAddress: "九龍觀塘巧明街 6 號",
+      deliveryGoogleAddress: "九龍觀塘巧明街 6 號",
+      deliveryBuilding: "",
+      deliveryFloor: "",
+      deliveryUnit: "",
+      recipientType: "personal" as const,
+      recipientCompanyName: "",
+      recipientName: "Second Recipient",
+      recipientPhone: "62345678",
+      recipientOccasions: [{ type: "birthday" as const, date: "1985-11-12" }],
+      recipientOccasionsVersion: "recipient-85-v4",
+      recipientPartnerId: 85,
+      deliveryPerson: "Driver B",
+      failedDeliveryAction: "none",
+      deliveryNote: "",
+      itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+    };
+    render(
+      <OrderHistory
+        orders={[orderFixture({
+          recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+          recipientOccasionsVersion: "recipient-84-v3",
+          recipientPartnerId: 84,
+          deliverySplits: [deliverySplit],
+        })]}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    fireEvent.click(screen.getByRole("button", {
+      name: "移除主要收貨點收花人重要日子 1",
+    }));
+    fireEvent.click(screen.getByRole("button", {
+      name: "移除額外收貨點 2 收花人重要日子 1",
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => {
+      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+        17,
+        expect.objectContaining({
+          recipientPartnerId: 84,
+          recipientOccasions: [],
+          recipientOccasionsVersion: "recipient-84-v3",
+          deliverySplits: [expect.objectContaining({
+            id: "destination-2",
+            recipientOccasions: [],
+            recipientOccasionsVersion: "recipient-85-v4",
+            recipientPartnerId: 85,
+          })],
+        }),
+      );
+    });
+  });
+
+  it("omits unchanged legacy occasion fields during unrelated primary and split edits", async () => {
     updateOdooOrderOperationalDetails.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
@@ -420,6 +509,7 @@ describe("OrderHistory delivery summary", () => {
     render(
       <OrderHistory
         orders={[orderFixture({
+          senderName: "Original Sender",
           recipientBirthday: "1990-01-02",
           recipientPartnerId: 84,
           deliverySplits: [deliverySplit],
@@ -430,24 +520,136 @@ describe("OrderHistory delivery summary", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
-    fireEvent.change(screen.getByLabelText("收件人生日"), { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText("額外收貨點 2 收件人生日"), {
-      target: { value: "" },
+    fireEvent.change(screen.getByLabelText("送花人名稱 *"), {
+      target: { value: "Updated Sender" },
+    });
+    fireEvent.change(screen.getByLabelText("額外收貨點 2 送貨地址 *"), {
+      target: { value: "九龍觀塘巧明街 8 號" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => expect(updateOdooOrderOperationalDetails).toHaveBeenCalledTimes(1));
+    const payload = updateOdooOrderOperationalDetails.mock.calls[0][1];
+    expect(payload).toHaveProperty("recipientPartnerId", 84);
+    expect(payload).not.toHaveProperty("recipientOccasions");
+    expect(payload).not.toHaveProperty("recipientOccasionsVersion");
+    expect(payload).not.toHaveProperty("recipientBirthday");
+    expect(payload.deliverySplits[0]).toHaveProperty("recipientPartnerId", 85);
+    expect(payload.deliverySplits[0]).not.toHaveProperty("recipientOccasions");
+    expect(payload.deliverySplits[0]).not.toHaveProperty("recipientOccasionsVersion");
+    expect(payload.deliverySplits[0]).not.toHaveProperty("recipientBirthday");
+  });
+
+  it("blocks occasion changes for a bound recipient when no current version is available", async () => {
+    render(
+      <OrderHistory
+        orders={[orderFixture({
+          recipientPartnerId: 84,
+          recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+        })]}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    fireEvent.change(screen.getByLabelText("主要收貨點收花人重要日子 1 日期"), {
+      target: { value: "1991-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("未有最新版本");
+    expect(screen.getByRole("alert")).toHaveTextContent("重新選擇收花人");
+    expect(updateOdooOrderOperationalDetails).not.toHaveBeenCalled();
+  });
+
+  it("blocks occasion changes after recipient identity detaches the current version", async () => {
+    render(
+      <OrderHistory
+        orders={[orderFixture({
+          recipientPartnerId: 84,
+          recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+          recipientOccasionsVersion: "recipient-84-v3",
+        })]}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    fireEvent.change(screen.getByLabelText("收貨人／聯絡人姓名 *"), {
+      target: { value: "Changed Recipient" },
+    });
+    fireEvent.change(screen.getByLabelText("主要收貨點收花人重要日子 1 日期"), {
+      target: { value: "1991-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("未有最新版本");
+    expect(updateOdooOrderOperationalDetails).not.toHaveBeenCalled();
+  });
+
+  it("clears only the primary recipient binding when its identity is edited", async () => {
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    render(
+      <OrderHistory
+        orders={[orderFixture({
+          recipientPartnerId: 84,
+          recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+          recipientOccasionsVersion: "recipient-84-v3",
+          deliverySplits: [{
+            id: "destination-2",
+            fulfillmentType: "delivery",
+            deliveryDate: "2026-07-19",
+            deliveryTimeMode: "specified",
+            deliveryTime: "下午 4 時前",
+            deliveryRegion: "九龍",
+            deliveryDistrict: "觀塘區",
+            deliveryArea: "觀塘",
+            deliveryDetail: "巧明街 6 號",
+            deliveryAddress: "九龍觀塘巧明街 6 號",
+            deliveryGoogleAddress: "九龍觀塘巧明街 6 號",
+            deliveryBuilding: "",
+            deliveryFloor: "",
+            deliveryUnit: "",
+            recipientType: "personal",
+            recipientCompanyName: "",
+            recipientName: "Second Recipient",
+            recipientPhone: "62345678",
+            recipientOccasions: [{ type: "birthday", date: "1985-11-12" }],
+            recipientOccasionsVersion: "recipient-85-v4",
+            recipientPartnerId: 85,
+            deliveryPerson: "Driver B",
+            failedDeliveryAction: "none",
+            deliveryNote: "",
+            itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+          }],
+        })]}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    fireEvent.change(screen.getByLabelText("收貨人／聯絡人姓名 *"), {
+      target: { value: "Changed Primary Recipient" },
     });
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     await waitFor(() => {
-      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
-        17,
+      const payload = updateOdooOrderOperationalDetails.mock.calls[0]?.[1];
+      expect(payload).not.toHaveProperty("recipientPartnerId");
+      expect(payload).not.toHaveProperty("recipientOccasionsVersion");
+      expect(payload.deliverySplits).toEqual([
         expect.objectContaining({
-          recipientBirthday: "",
-          deliverySplits: [expect.objectContaining({
-            id: "destination-2",
-            recipientBirthday: "",
-            recipientPartnerId: 85,
-          })],
+          recipientPartnerId: 85,
         }),
-      );
+      ]);
+      expect(payload.deliverySplits[0]).not.toHaveProperty("recipientOccasions");
+      expect(payload.deliverySplits[0]).not.toHaveProperty("recipientOccasionsVersion");
     });
   });
 

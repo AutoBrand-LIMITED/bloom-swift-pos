@@ -1,5 +1,13 @@
 import { isValidDeliveryDate, isValidPhoneNumber } from "@/lib/checkout-validation";
 import { PICKUP_LOCATION_ADDRESS } from "@/lib/fulfillment";
+import {
+  normalizeRecipientOccasions,
+  ownsRecipientOccasionsField,
+  ownsRecipientOccasionsVersionField,
+  recipientOccasionsAreUnchanged,
+  recipientOccasionsStateFromSelection,
+  recipientOccasionValidationError,
+} from "@/lib/recipient-occasions";
 import type { DeliverySplit, OrderItem } from "@/types/order";
 
 export const splitFulfillmentType = (split: DeliverySplit) => (
@@ -12,7 +20,11 @@ interface NormalizeDeliverySplitsOptions {
 
 type DestinationOwnedOptionalFields = Pick<
   DeliverySplit,
-  "giftCardEnabled" | "giftCardMessage" | "recipientBirthday"
+  | "giftCardEnabled"
+  | "giftCardMessage"
+  | "recipientOccasions"
+  | "recipientOccasionsVersion"
+  | "recipientBirthday"
 >;
 
 const hasOwn = (split: DeliverySplit, field: keyof DestinationOwnedOptionalFields) => (
@@ -25,14 +37,19 @@ const normalizedDestinationOwnedFields = (
 ): DestinationOwnedOptionalFields => {
   const giftCardEnabled = split.giftCardEnabled ?? false;
   const giftCardMessage = giftCardEnabled ? (split.giftCardMessage ?? "").trim() : "";
-  const recipientBirthday = (split.recipientBirthday ?? "").trim();
+  const occasionState = recipientOccasionsStateFromSelection(split);
 
   if (!baseline) {
     return {
       giftCardEnabled,
       giftCardMessage,
-      ...(hasOwn(split, "recipientBirthday")
-        ? { recipientBirthday }
+      ...(occasionState.known
+        ? {
+            recipientOccasions: normalizeRecipientOccasions(occasionState.value),
+            ...(!occasionState.legacy && ownsRecipientOccasionsVersionField(split)
+              ? { recipientOccasionsVersion: split.recipientOccasionsVersion }
+              : {}),
+          }
         : {}),
     };
   }
@@ -44,9 +61,30 @@ const normalizedDestinationOwnedFields = (
     ...(hasOwn(baseline, "giftCardMessage") || Boolean(giftCardMessage)
       ? { giftCardMessage }
       : {}),
-    ...(hasOwn(baseline, "recipientBirthday") || hasOwn(split, "recipientBirthday")
-      ? { recipientBirthday }
-      : {}),
+    ...(JSON.stringify(occasionState.value)
+      === JSON.stringify(recipientOccasionsStateFromSelection(baseline).value)
+      && split.recipientOccasionsVersion === baseline.recipientOccasionsVersion
+      && ownsRecipientOccasionsVersionField(split)
+        === ownsRecipientOccasionsVersionField(baseline)
+      ? {
+          ...(ownsRecipientOccasionsField(baseline)
+            ? { recipientOccasions: baseline.recipientOccasions }
+            : {}),
+          ...(ownsRecipientOccasionsVersionField(baseline)
+            ? { recipientOccasionsVersion: baseline.recipientOccasionsVersion }
+            : {}),
+          ...(hasOwn(baseline, "recipientBirthday")
+            ? { recipientBirthday: baseline.recipientBirthday }
+            : {}),
+        }
+      : occasionState.known
+        ? {
+            recipientOccasions: normalizeRecipientOccasions(occasionState.value),
+            ...(!occasionState.legacy && ownsRecipientOccasionsVersionField(split)
+              ? { recipientOccasionsVersion: split.recipientOccasionsVersion }
+              : {}),
+          }
+        : {}),
   };
 };
 
@@ -59,6 +97,8 @@ export const normalizeDeliverySplitsForSubmission = (
   const {
     giftCardEnabled: _giftCardEnabled,
     giftCardMessage: _giftCardMessage,
+    recipientOccasions: _recipientOccasions,
+    recipientOccasionsVersion: _recipientOccasionsVersion,
     recipientBirthday: _recipientBirthday,
     ...requiredFields
   } = split;
@@ -91,9 +131,14 @@ export const normalizeDeliverySplitsForSubmission = (
 
 export const normalizeDeliverySplitsForOperationalUpdate = (
   splits: readonly DeliverySplit[],
-): DeliverySplit[] => splits.map((split) => {
-  const recipientBirthday = (split.recipientBirthday ?? "").trim();
+  options: NormalizeDeliverySplitsOptions = {},
+): DeliverySplit[] => splits.map((split, index) => {
+  const candidateBaseline = options.baselineSplits?.[index];
+  const baseline = candidateBaseline?.id === split.id ? candidateBaseline : undefined;
+  const occasionState = recipientOccasionsStateFromSelection(split);
   const {
+    recipientOccasions: _recipientOccasions,
+    recipientOccasionsVersion: _recipientOccasionsVersion,
     recipientBirthday: _recipientBirthday,
     ...requiredFields
   } = split;
@@ -101,7 +146,16 @@ export const normalizeDeliverySplitsForOperationalUpdate = (
     ...requiredFields,
     giftCardEnabled: split.giftCardEnabled ?? false,
     giftCardMessage: split.giftCardEnabled ? (split.giftCardMessage ?? "").trim() : "",
-    ...(hasOwn(split, "recipientBirthday") ? { recipientBirthday } : {}),
+    ...(baseline && recipientOccasionsAreUnchanged(occasionState.value, baseline)
+      ? {}
+      : occasionState.known
+      ? {
+          recipientOccasions: normalizeRecipientOccasions(occasionState.value),
+          ...(!occasionState.legacy && ownsRecipientOccasionsVersionField(split)
+            ? { recipientOccasionsVersion: split.recipientOccasionsVersion }
+            : {}),
+        }
+      : {}),
     fulfillmentType: splitFulfillmentType(split),
     deliveryAddress: splitFulfillmentType(split) === "pickup"
       ? split.deliveryAddress.trim() || PICKUP_LOCATION_ADDRESS
@@ -154,6 +208,11 @@ export const validateOperationalDeliverySplits = (
     } else if (split.recipientPhone.trim() && !isValidPhoneNumber(split.recipientPhone)) {
       return `${label}請輸入有效聯絡電話。`;
     }
+    const occasionError = recipientOccasionValidationError(
+      recipientOccasionsStateFromSelection(split).value,
+      label,
+    );
+    if (occasionError) return occasionError;
     if (split.itemAllocations.length === 0 || split.itemAllocations.some(
       (allocation) => !allocation.itemId || !allocation.itemName || !Number.isInteger(allocation.quantity) || allocation.quantity <= 0,
     )) {
@@ -185,6 +244,11 @@ export const validateDeliverySplits = (
         return `${label}請輸入收貨公司名稱。`;
       }
     }
+    const occasionError = recipientOccasionValidationError(
+      recipientOccasionsStateFromSelection(split).value,
+      label,
+    );
+    if (occasionError) return occasionError;
     const positiveAllocations = split.itemAllocations.filter((entry) => entry.quantity > 0);
     if (positiveAllocations.length === 0) return `${label}請至少分配一件商品。`;
     for (const entry of positiveAllocations) {

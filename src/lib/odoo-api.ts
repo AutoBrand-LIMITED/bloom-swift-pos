@@ -1,8 +1,12 @@
 import type { CustomerTag, DemoCustomer, PurchaseRecord } from "@/data/demo-customers";
-import type { DeliverySplit, OdooNamedReference, Order, SalesStaff } from "@/types/order";
+import type { DeliverySplit, OdooNamedReference, Order, RecipientOccasion, SalesStaff } from "@/types/order";
 import { authenticatedFetch } from "@/lib/pos-auth";
 import { normalizePurchasePaymentStatus } from "@/lib/customer-utils";
 import { hasRecipientBirthdayField } from "@/lib/recipient-birthday";
+import {
+  hasRecipientOccasionsField,
+  ownsRecipientOccasionsVersionField,
+} from "@/lib/recipient-occasions";
 
 type OdooPurchaseRecord = Omit<PurchaseRecord, "status"> & { status?: unknown };
 
@@ -24,6 +28,8 @@ interface OdooPartner {
     resolved?: boolean;
     recipientType?: "personal" | "company";
     companyName?: string | null;
+    recipientOccasions?: RecipientOccasion[] | null;
+    recipientOccasionsVersion?: string | null;
     recipientBirthday?: string | null;
     deliveryAddress?: string | null;
     shippingPartnerId?: number | null;
@@ -161,6 +167,8 @@ export interface RecipientSuggestion {
   recipientCompanyName: string | null;
   recipientName: string | null;
   recipientPhone: string | null;
+  recipientOccasions?: RecipientOccasion[] | null;
+  recipientOccasionsVersion?: string | null;
   recipientBirthday?: string | null;
   deliveryAddress: string | null;
   shippingPartnerId: number | null;
@@ -229,6 +237,9 @@ export interface OrderOperationalUpdate {
   recipientCompanyName: string;
   recipientName: string;
   recipientPhone: string;
+  recipientPartnerId?: number;
+  recipientOccasions?: RecipientOccasion[] | null;
+  recipientOccasionsVersion?: string | null;
   recipientBirthday?: string;
   deliveryPerson: string;
   giftCardMessage: string;
@@ -959,7 +970,17 @@ function mapOdooPartner(p: OdooPartner): DemoCustomer {
           resolved: p.recipientMatch.resolved === true,
           recipientType: p.recipientMatch.recipientType || "personal",
           companyName: p.recipientMatch.companyName || undefined,
-          ...(hasRecipientBirthdayField(p.recipientMatch)
+          ...(hasRecipientOccasionsField(p.recipientMatch)
+            ? {
+                recipientOccasions: p.recipientMatch.recipientOccasions ?? [],
+                ...(ownsRecipientOccasionsVersionField(p.recipientMatch)
+                  ? {
+                      recipientOccasionsVersion:
+                        p.recipientMatch.recipientOccasionsVersion,
+                    }
+                  : {}),
+              }
+            : hasRecipientBirthdayField(p.recipientMatch)
             ? { recipientBirthday: p.recipientMatch.recipientBirthday ?? null }
             : {}),
           deliveryAddress: p.recipientMatch.deliveryAddress || undefined,

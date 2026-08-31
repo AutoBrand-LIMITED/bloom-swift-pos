@@ -1,3 +1,5 @@
+import type { RecipientOccasion } from "@/types/order";
+
 export interface DemoCustomer {
   id: string;
   name: string;
@@ -25,6 +27,8 @@ export interface RecipientSearchMatch {
   resolved?: boolean;
   recipientType?: "personal" | "company";
   companyName?: string;
+  recipientOccasions?: RecipientOccasion[] | null;
+  recipientOccasionsVersion?: string | null;
   recipientBirthday?: string | null;
   deliveryAddress?: string;
   shippingPartnerId?: number;
@@ -51,6 +55,7 @@ export interface PurchaseRecord {
   recipientCompanyName?: string;
   recipientName?: string;
   recipientPhone?: string;
+  recipientOccasions?: RecipientOccasion[] | null;
   recipientBirthday?: string;
   customerName?: string;
   senderName?: string;
