@@ -155,6 +155,25 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onRecipientPhoneChange).not.toHaveBeenCalled();
   });
 
+  it("lets the parent preserve the verified sender partner binding", () => {
+    const onUseSenderAsRecipient = vi.fn();
+    renderSection({
+      senderName: "Ms Chan",
+      senderPhone: "+852 6123 4567",
+      onUseSenderAsRecipient,
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "收貨人同送花人相同" }));
+
+    expect(onUseSenderAsRecipient).toHaveBeenCalledWith({
+      type: "personal",
+      companyName: "",
+      name: "Ms Chan",
+      phone: "+852 6123 4567",
+      occasions: [],
+    });
+  });
+
   it("restores the previous recipient when same-as-sender is cancelled", () => {
     const props = renderSectionProps({
       recipientType: "personal",

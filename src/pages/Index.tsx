@@ -592,6 +592,12 @@ const Index = () => {
       && normalizeCustomerIdentityName(confirmedNewCustomerName || "")
         === normalizeCustomerIdentityName(customerName)
     );
+  const selectedSenderPartnerId = (
+    selectedCustomer?.odooPartnerId
+    && normalizePhoneNumber(selectedCustomer.phone) === normalizePhoneNumber(phone)
+    && normalizeCustomerIdentityName(selectedCustomer.name)
+      === normalizeCustomerIdentityName(senderName || customerName)
+  ) ? selectedCustomer.odooPartnerId : undefined;
   const customerSectionComplete = Boolean(
     customerName.trim()
       && senderName.trim()
@@ -2197,6 +2203,21 @@ const Index = () => {
             setRecipientOccasions(value || []);
             setRecipientOccasionsKnown(value !== undefined);
           }}
+          onUseSenderAsRecipient={(recipient) => {
+            setRecipientType(recipient.type);
+            setRecipientCompanyName(recipient.companyName);
+            setRecipientName(recipient.name);
+            setRecipientPhone(recipient.phone);
+            setRecipientOccasions([]);
+            setRecipientOccasionsKnown(false);
+            setRecipientOccasionsVersion(undefined);
+            setRecipientPartnerId(selectedSenderPartnerId);
+            setRecipientContact(null);
+            setRecipientContactDraft("");
+            setSaveRecipientNote(false);
+            setNotesConflict((current) => current?.target === "recipient" ? null : current);
+            clearCheckoutErrors("recipientCompanyName", "recipientName", "recipientPhone");
+          }}
           onRecipientSuggestionSelect={(suggestion) => {
             applyRecipientForCurrentCustomer(suggestion);
           }}
@@ -2236,6 +2257,7 @@ const Index = () => {
           senderName={senderName || customerName}
           senderPhone={phone}
           orderingCustomerId={selectedCustomer?.odooPartnerId}
+          senderPartnerId={selectedSenderPartnerId}
         />
         </section>
 

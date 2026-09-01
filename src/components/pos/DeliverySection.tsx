@@ -114,6 +114,8 @@ interface DeliverySectionProps {
   onRecipientOccasionsChange?: (v: RecipientOccasion[] | undefined) => void;
   /** Applies all recipient identity fields in one state update when the parent stores them together. */
   onRecipientDetailsChange?: (recipient: RecipientDraft) => void;
+  /** Applies sender identity while retaining a verified Odoo customer binding. */
+  onUseSenderAsRecipient?: (recipient: RecipientDraft) => void;
   onRecipientSuggestionSelect: (suggestion: RecipientSuggestion) => void;
   onRecipientAndCustomerSuggestionSelect: (suggestion: RecipientSuggestion) => void;
   onConfirmNewRecipient?: () => void;
@@ -153,7 +155,7 @@ const DeliverySection = ({
   onGoogleAddressSelect,
   onRecipientTypeChange, onRecipientCompanyNameChange,
   onRecipientNameChange, onRecipientPhoneChange, onRecipientOccasionsChange = () => {},
-  onRecipientDetailsChange, onRecipientSuggestionSelect,
+  onRecipientDetailsChange, onUseSenderAsRecipient, onRecipientSuggestionSelect,
   onRecipientAndCustomerSuggestionSelect,
   onConfirmNewRecipient,
   onDeliveryPersonChange,
@@ -297,13 +299,18 @@ const DeliverySection = ({
         ? { occasions: cloneRecipientOccasions(recipientOccasions) }
         : {}),
     };
-    applyRecipientDraft({
+    const senderRecipient = {
       type: senderType,
       companyName: senderType === "company" ? senderCompanyName.trim() : "",
       name: senderName.trim(),
       phone: senderPhone.trim(),
       occasions: [],
-    });
+    };
+    if (onUseSenderAsRecipient) {
+      onUseSenderAsRecipient(senderRecipient);
+    } else {
+      applyRecipientDraft(senderRecipient);
+    }
     setRecipientLookupField(null);
     setRecipientSuggestions([]);
     setCompletedRecipientSearch(null);

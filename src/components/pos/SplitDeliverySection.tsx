@@ -36,6 +36,7 @@ interface SplitDeliverySectionProps {
   senderName: string;
   senderPhone: string;
   orderingCustomerId?: number;
+  senderPartnerId?: number;
 }
 
 const addressSnapshot = (split: DeliverySplit) => {
@@ -284,6 +285,23 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
               recipientOccasions: recipient.occasions,
               recipientBirthday: undefined,
             })}
+            onUseSenderAsRecipient={(recipient) => {
+              const next = {
+                ...split,
+                recipientType: recipient.type,
+                recipientCompanyName: recipient.companyName,
+                recipientName: recipient.name,
+                recipientPhone: recipient.phone,
+                recipientPartnerId: props.senderPartnerId,
+              };
+              if (!props.senderPartnerId) delete next.recipientPartnerId;
+              delete next.recipientBirthday;
+              delete next.recipientOccasions;
+              delete next.recipientOccasionsVersion;
+              props.onChange(props.splits.map((candidate) => (
+                candidate.id === split.id ? next : candidate
+              )));
+            }}
             onRecipientSuggestionSelect={(suggestion) => applyRecipient(split, suggestion)}
             onRecipientAndCustomerSuggestionSelect={(suggestion) => applyRecipient(split, suggestion)}
             onDeliveryPersonChange={(deliveryPerson) => update(split.id, { deliveryPerson })}

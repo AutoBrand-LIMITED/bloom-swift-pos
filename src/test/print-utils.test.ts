@@ -203,6 +203,62 @@ describe("print layout contract", () => {
     expect(html).toContain("page-break-before: always");
   });
 
+  it("reconciles legacy POS allocation IDs after Odoo replaces order-line IDs", () => {
+    const html = generateDeliveryNote(orderFixture({
+      odooOrderName: "S17816",
+      items: [
+        {
+          id: "odoo-line-301",
+          name: "CNY REMOVAL FOR KOWLOON AREA",
+          price: 100,
+          quantity: 1,
+        },
+        {
+          id: "odoo-line-302",
+          name: "Container - baskets",
+          price: 200,
+          quantity: 1,
+        },
+      ],
+      deliverySplits: [splitFixture({
+        itemAllocations: [{
+          itemId: "legacy-pos-container",
+          itemName: "Container - baskets",
+          quantity: 1,
+        }],
+      })],
+    }));
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    const pages = [...parsed.querySelectorAll('[data-print-document="delivery-note"]')];
+
+    expect(pages).toHaveLength(2);
+    expect(pages[0].textContent).toContain("CNY REMOVAL FOR KOWLOON AREA");
+    expect(pages[0].textContent).not.toContain("Container - baskets");
+    expect(pages[1].textContent).toContain("Container - baskets");
+    expect(pages[1].textContent).not.toContain("CNY REMOVAL FOR KOWLOON AREA");
+  });
+
+  it("refuses to guess a legacy allocation when duplicate item names exist", () => {
+    const order = orderFixture({
+      odooOrderName: "S17816",
+      items: [
+        { id: "odoo-line-301", name: "Rose bouquet", price: 100, quantity: 1 },
+        { id: "odoo-line-302", name: "Rose bouquet", price: 200, quantity: 1 },
+      ],
+      deliverySplits: [splitFixture({
+        itemAllocations: [{
+          itemId: "legacy-pos-rose",
+          itemName: "Rose bouquet",
+          quantity: 1,
+        }],
+      })],
+    });
+
+    expect(() => generateDeliveryNote(order)).toThrow(
+      "S17816-D2 商品分配「Rose bouquet」有多條同名 Odoo 訂單行，系統拒絕自動猜配。",
+    );
+  });
+
   it("keeps the receipt as a formal priced customer and payment document", () => {
     const html = generateReceipt(orderFixture());
 

@@ -9,6 +9,12 @@ import {
 } from "@/lib/print-utils";
 import type { Order } from "@/types/order";
 
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
+
+vi.mock("sonner", () => ({
+  toast: { error: toastError },
+}));
+
 vi.mock("@/lib/print-utils", () => ({
   generateAllDocuments: vi.fn(() => "<html>all documents</html>"),
   generateReceipt: vi.fn(),
@@ -54,5 +60,18 @@ describe("PrintButtons", () => {
     render(<PrintButtons order={order} />);
 
     expect(screen.queryByRole("button", { name: "心意卡" })).not.toBeInTheDocument();
+  });
+
+  it("shows the exact allocation error instead of opening a broken print job", () => {
+    const order = { id: "order-1" } as Order;
+    vi.mocked(generateAllDocuments).mockImplementationOnce(() => {
+      throw new Error("S17816-D2 商品分配未能對應 Odoo 訂單行");
+    });
+
+    render(<PrintButtons order={order} />);
+    fireEvent.click(screen.getByRole("button", { name: "全部列印" }));
+
+    expect(printDocument).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith("S17816-D2 商品分配未能對應 Odoo 訂單行");
   });
 });

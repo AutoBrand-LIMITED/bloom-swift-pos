@@ -44,6 +44,7 @@ const Harness = ({ initialSplits = [] }: { initialSplits?: DeliverySplit[] }) =>
         senderName="Ms Chan"
         senderPhone="61234567"
         orderingCustomerId={42}
+        senderPartnerId={42}
       />
       <output data-testid="split-state">{JSON.stringify(splits)}</output>
     </>
@@ -113,6 +114,10 @@ describe("SplitDeliverySection fulfillment controls", () => {
 
     expect(screen.getByLabelText(/收貨人姓名／聯絡人姓名/)).toHaveValue("Ms Chan");
     expect(screen.getByLabelText("收貨人電話")).toHaveValue("61234567");
+    const state = JSON.parse(screen.getByTestId("split-state").textContent || "[]")[0];
+    expect(state).toHaveProperty("recipientPartnerId", 42);
+    expect(state).not.toHaveProperty("recipientOccasions");
+    expect(state).not.toHaveProperty("recipientOccasionsVersion");
   });
 
   it("applies a Google address hierarchy to one split destination atomically", () => {

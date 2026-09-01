@@ -411,29 +411,62 @@ export function generateDeliveryNote(order: Order): string {
   </body></html>`;
 }
 
-function splitItems(order: Order, split: DeliverySplit): OrderItem[] {
-  return split.itemAllocations.flatMap((allocation) => {
-    const item = order.items.find((candidate) => candidate.id === allocation.itemId);
-    if (!item || allocation.quantity <= 0) return [];
-    return [{ ...item, quantity: allocation.quantity }];
-  });
+interface ResolvedDeliveryAllocations {
+  primaryItems: OrderItem[];
+  splitItems: OrderItem[][];
 }
 
-function primaryDestinationItems(order: Order): OrderItem[] {
-  const allocated = new Map<string, number>();
-  for (const split of order.deliverySplits || []) {
-    for (const allocation of split.itemAllocations) {
-      allocated.set(
-        allocation.itemId,
-        (allocated.get(allocation.itemId) || 0) + allocation.quantity,
-      );
-    }
+const normalizedAllocationName = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+
+function resolveDeliveryAllocations(order: Order): ResolvedDeliveryAllocations {
+  const reference = orderReference(order);
+  const itemsById = new Map(order.items.map((item) => [item.id, item]));
+  const itemsByName = new Map<string, OrderItem[]>();
+  for (const item of order.items) {
+    const key = normalizedAllocationName(item.name);
+    itemsByName.set(key, [...(itemsByName.get(key) || []), item]);
   }
 
-  return order.items.flatMap((item) => {
-    const quantity = item.quantity - (allocated.get(item.id) || 0);
-    return quantity > 0 ? [{ ...item, quantity }] : [];
-  });
+  const allocated = new Map<string, number>();
+  const splitItems = (order.deliverySplits || []).map((split, splitIndex) => (
+    split.itemAllocations.map((allocation) => {
+      const destinationReference = `${reference}-D${splitIndex + 2}`;
+      let item = itemsById.get(allocation.itemId);
+      if (!item) {
+        const matches = itemsByName.get(normalizedAllocationName(allocation.itemName)) || [];
+        if (matches.length > 1) {
+          throw new Error(
+            `${destinationReference} 商品分配「${allocation.itemName}」有多條同名 Odoo 訂單行，系統拒絕自動猜配。`,
+          );
+        }
+        item = matches[0];
+      }
+      if (!item) {
+        throw new Error(
+          `${destinationReference} 商品分配「${allocation.itemName}」未能對應 Odoo 訂單行，請重新同步訂單。`,
+        );
+      }
+      if (!Number.isFinite(allocation.quantity) || allocation.quantity <= 0) {
+        throw new Error(`${destinationReference} 商品分配「${allocation.itemName}」數量無效。`);
+      }
+      const nextAllocated = (allocated.get(item.id) || 0) + allocation.quantity;
+      if (nextAllocated > item.quantity) {
+        throw new Error(
+          `${destinationReference} 商品分配「${allocation.itemName}」超出訂單數量，請核對拆單。`,
+        );
+      }
+      allocated.set(item.id, nextAllocated);
+      return { ...item, quantity: allocation.quantity };
+    })
+  ));
+
+  return {
+    primaryItems: order.items.flatMap((item) => {
+      const quantity = item.quantity - (allocated.get(item.id) || 0);
+      return quantity > 0 ? [{ ...item, quantity }] : [];
+    }),
+    splitItems,
+  };
 }
 
 function splitAsOrder(order: Order, split: DeliverySplit, items: OrderItem[]): Order {
@@ -468,13 +501,14 @@ function deliveryDestinations(order: Order): Array<{ order: Order; reference: st
   if (!splits.length) return [{ order, reference: orderReference(order) }];
 
   const reference = orderReference(order);
+  const resolved = resolveDeliveryAllocations(order);
   return [
     {
-      order: { ...order, items: primaryDestinationItems(order) },
+      order: { ...order, items: resolved.primaryItems },
       reference: `${reference}-D1`,
     },
     ...splits.map((split, index) => ({
-      order: splitAsOrder(order, split, splitItems(order, split)),
+      order: splitAsOrder(order, split, resolved.splitItems[index]),
       reference: `${reference}-D${index + 2}`,
     })),
   ];
@@ -482,17 +516,25 @@ function deliveryDestinations(order: Order): Array<{ order: Order; reference: st
 
 function messageCardDestinations(order: Order) {
   const reference = orderReference(order);
-  return deliveryDestinations(order)
-    .map((destination, index) => ({
-      ...destination,
-      destinationIndex: index + 1,
-      reference: `${reference}-D${index + 1}`,
-    }))
+  const destinations = order.deliverySplits?.length
+    ? [
+        { order, reference: `${reference}-D1` },
+        ...order.deliverySplits.map((split, index) => ({
+          order: splitAsOrder(order, split, []),
+          reference: `${reference}-D${index + 2}`,
+        })),
+      ]
+    : [{ order, reference: `${reference}-D1` }];
+  return destinations
+    .map((destination, index) => ({ ...destination, destinationIndex: index + 1 }))
     .filter(({ order: destinationOrder }) => destinationOrder.giftCardEnabled);
 }
 
 export function hasEnabledMessageCards(order: Order): boolean {
-  return messageCardDestinations(order).length > 0;
+  return Boolean(
+    order.giftCardEnabled
+    || order.deliverySplits?.some((split) => split.giftCardEnabled),
+  );
 }
 
 /** 每個已啟用收貨點各自一頁的心意卡 */
