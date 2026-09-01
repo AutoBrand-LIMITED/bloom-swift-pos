@@ -167,6 +167,17 @@ export const mergeOperationalOrderSources = (
   );
 };
 
+export const newlyReviewedOperationalOrder = (
+  previous: OperationalOrderRecord[],
+  next: OperationalOrderRecord[],
+): OperationalOrderRecord | undefined => next.find((record) => (
+  record.syncState === "needs_review"
+  && !previous.some((prior) => (
+    prior.operationalOrderId === record.operationalOrderId
+    && prior.syncState === "needs_review"
+  ))
+));
+
 export const applyOperationalOrderStatus = (
   records: OperationalOrderRecord[],
   status: OperationalOrderStatusResponse,

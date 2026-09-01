@@ -128,6 +128,7 @@ import {
 import {
   loadOperationalOrders,
   mergeOperationalOrderSources,
+  newlyReviewedOperationalOrder,
   saveOperationalOrdersForScope,
   type OperationalOrderRecord,
 } from "@/lib/operational-orders";
@@ -424,9 +425,15 @@ const Index = () => {
             && prior.syncState !== "synced"
           ))
         ));
+        const newlyReviewed = newlyReviewedOperationalOrder(previous, next);
         operationalOrdersRef.current = next;
         setOperationalOrders(next);
         if (transitionedToSynced) setOrderRecordsRefreshKey((key) => key + 1);
+        if (newlyReviewed) {
+          showOrderSubmissionFailure(
+            new Error(newlyReviewed.reviewError || "訂單需要管理員核對。"),
+          );
+        }
       } catch (error) {
         if (!stopped && !controller.signal.aborted) {
           console.warn("Operational order refresh failed", error);
@@ -1678,6 +1685,7 @@ const Index = () => {
     let syncedOrder: Order = order;
     let isPendingOdooSync = false;
     let needsOdooReview = false;
+    let reviewFailure: string | null = null;
 
     try {
       if (hasOdooBackend) {
@@ -1686,6 +1694,9 @@ const Index = () => {
         setPendingSubmission(null);
         isPendingOdooSync = odooOrder.syncState === "pending_odoo";
         needsOdooReview = odooOrder.syncState === "needs_review";
+        reviewFailure = needsOdooReview
+          ? odooOrder.reviewError || "訂單需要管理員核對。"
+          : null;
         syncedOrder = {
           ...order,
           odooOrderId: odooOrder.id ?? undefined,
@@ -1730,7 +1741,15 @@ const Index = () => {
         setCheckoutId(crypto.randomUUID());
         setPaymentIdempotencyKey(crypto.randomUUID());
       }
-      showOrderSubmissionFailure();
+      showOrderSubmissionFailure(err);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (needsOdooReview) {
+      showOrderSubmissionFailure(new Error(reviewFailure || "訂單需要管理員核對。"));
+      setCheckoutId(crypto.randomUUID());
+      setPaymentIdempotencyKey(crypto.randomUUID());
       setIsSubmitting(false);
       return;
     }
@@ -2176,7 +2195,7 @@ const Index = () => {
           }}
           onConfirmNewRecipient={() => {
             clearRecipientPersistenceBinding();
-            setRecipientOccasionsKnown(true);
+            setRecipientOccasionsKnown(recipientOccasions.length > 0);
             toast.success("已確認新增收貨人");
           }}
           onDeliveryPersonChange={setDeliveryPerson}

@@ -519,7 +519,11 @@ export const allowLocalOnlyOrders = import.meta.env.DEV
 
 async function throwApiError<T>(res: Response, fallback: string): Promise<never> {
   const body = await res.json().catch(() => null) as {
-    detail?: string | {
+    detail?: string | Array<{
+      loc?: Array<string | number>;
+      msg?: string;
+      type?: string;
+    }> | {
       message?: string;
       current?: T;
       latest?: T;
@@ -533,21 +537,40 @@ async function throwApiError<T>(res: Response, fallback: string): Promise<never>
     latest?: T;
   } | null;
   const detail = body?.detail;
+  const validationMessage = Array.isArray(detail)
+    ? detail
+      .map((issue) => {
+        const field = issue.loc?.filter((part) => part !== "body").join(".");
+        const reason = issue.msg?.trim();
+        if (field && reason) return `${field}: ${reason}`;
+        return reason || field || "";
+      })
+      .filter(Boolean)
+      .join("；")
+    : "";
   const message =
-    (typeof detail === "string" ? detail : detail?.message) ||
+    (typeof detail === "string"
+      ? detail
+      : Array.isArray(detail)
+        ? validationMessage
+        : detail?.message) ||
     body?.reviewError ||
     body?.message ||
     fallback;
 
   if (res.status === 409) {
     const latest =
-      (typeof detail === "object" ? detail?.current ?? detail?.latest : undefined) ??
+      (detail && typeof detail === "object" && !Array.isArray(detail)
+        ? detail.current ?? detail.latest
+        : undefined) ??
       body?.current ??
       body?.latest;
     throw new OdooConflictError<T>(message, latest);
   }
 
-  const recovery = typeof detail === "object" ? detail?.recovery : undefined;
+  const recovery = detail && typeof detail === "object" && !Array.isArray(detail)
+    ? detail.recovery
+    : undefined;
   throw new OdooApiError(message, res.status, recovery);
 }
 

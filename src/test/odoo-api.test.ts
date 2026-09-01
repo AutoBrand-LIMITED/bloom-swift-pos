@@ -15,6 +15,24 @@ afterEach(() => {
 });
 
 describe("odoo-api note contracts", () => {
+  it("keeps FastAPI validation field names and reasons in submission errors", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      detail: [{
+        loc: ["body", "deliveryDistrict"],
+        msg: "Field required",
+        type: "missing",
+      }],
+    }, 422)));
+    const { OdooApiError, submitOdooOrder } = await import("@/lib/odoo-api");
+
+    await expect(submitOdooOrder({ id: "missing-district" } as Order)).rejects.toMatchObject({
+      name: "OdooApiError",
+      status: 422,
+      message: "deliveryDistrict: Field required",
+    } satisfies Partial<InstanceType<typeof OdooApiError>>);
+  });
+
   it("treats HTTP 202 as a durably saved order waiting for Odoo", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const pendingResponse = {

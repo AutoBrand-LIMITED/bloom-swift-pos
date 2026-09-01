@@ -61,4 +61,17 @@ describe("order submission feedback", () => {
     expect(mocks.toastError).toHaveBeenCalledTimes(1);
     expect(mocks.toastError).toHaveBeenCalledWith("下單失敗");
   });
+
+  it("shows the actual submission reason when the backend provides one", () => {
+    showOrderSubmissionFailure(
+      new Error("Reload the selected recipient before saving its occasions."),
+    );
+
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "下單失敗",
+      expect.objectContaining({
+        description: "收件人資料或重要日子版本已更新，請重新選擇收件人後再下單。",
+      }),
+    );
+  });
 });

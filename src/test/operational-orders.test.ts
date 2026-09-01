@@ -6,6 +6,7 @@ import {
   clearOperationalOrders,
   loadOperationalOrders,
   mergeOperationalOrderSources,
+  newlyReviewedOperationalOrder,
   normalizeOperationalOrder,
   saveOperationalOrdersForEmployee,
   type OperationalOrderRecord,
@@ -149,5 +150,17 @@ describe("operational order display cache", () => {
       }),
       expect.objectContaining({ operationalOrderId: "local-only" }),
     ]);
+  });
+
+  it("detects a pending order that has newly moved to manager review", () => {
+    const pending = record("review-me", 95);
+    const reviewed = {
+      ...pending,
+      syncState: "needs_review" as const,
+      reviewError: "請選擇送貨地區。",
+    };
+
+    expect(newlyReviewedOperationalOrder([pending], [reviewed])).toEqual(reviewed);
+    expect(newlyReviewedOperationalOrder([reviewed], [reviewed])).toBeUndefined();
   });
 });
