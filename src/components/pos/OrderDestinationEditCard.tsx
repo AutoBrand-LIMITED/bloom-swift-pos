@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import RecipientOccasionEditor from "@/components/pos/RecipientOccasionEditor";
+import QuarterHourTimeSelect from "@/components/pos/QuarterHourTimeSelect";
 import { PICKUP_LOCATION_ADDRESS } from "@/lib/fulfillment";
 import { recipientOccasionsStateFromSelection } from "@/lib/recipient-occasions";
 import type { DeliverySlot } from "@/lib/odoo-api";
@@ -158,7 +159,8 @@ const OrderDestinationEditCard = ({
             </Select>
           </div>
         ) : (
-          <Field
+          <QuarterHourTimeSelect
+            id={`order-edit-split-${index + 2}-specified-delivery-time`}
             label={`${title} 指定時間 *`}
             value={split.deliveryTime}
             onChange={(value) => setField("deliveryTime", value)}

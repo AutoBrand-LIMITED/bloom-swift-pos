@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import RegionalPhoneInput from "@/components/pos/RegionalPhoneInput";
 import RecipientOccasionEditor from "@/components/pos/RecipientOccasionEditor";
+import QuarterHourTimeSelect from "@/components/pos/QuarterHourTimeSelect";
 import { RadioGroup } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGoogleAddressSuggestions } from "@/hooks/useGoogleAddressSuggestions";
@@ -852,17 +853,13 @@ const DeliverySection = ({
 
             {deliveryTimeMode === "specified" && (
               <div className="space-y-1 pt-1">
-                  <Label htmlFor="specified-delivery-time" className="text-xs">
-                    指定送貨時間
-                  </Label>
-                  <Input
+                  <QuarterHourTimeSelect
                     id="specified-delivery-time"
-                    type="time"
-                    step={300}
-                    aria-label="指定送貨時間"
-                    aria-invalid={Boolean(deliveryTimeError)}
+                    label="指定送貨時間"
                     value={deliveryTime}
-                    onChange={(event) => onTimeChange(event.target.value)}
+                    onChange={onTimeChange}
+                    ariaInvalid={Boolean(deliveryTimeError)}
+                    ariaDescribedBy={deliveryTimeError ? "delivery-time-error" : undefined}
                     className="min-h-11 max-w-xs text-sm"
                   />
                   <p className="flex items-start gap-1 text-xs text-muted-foreground">

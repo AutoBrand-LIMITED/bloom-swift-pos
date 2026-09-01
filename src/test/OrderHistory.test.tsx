@@ -688,9 +688,10 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
     fireEvent.click(screen.getByRole("combobox", { name: "送貨時間模式 *" }));
     fireEvent.click(screen.getByRole("option", { name: "指定時間" }));
-    fireEvent.change(screen.getByLabelText("指定送貨時間 *"), {
-      target: { value: "下午 3 時前" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 * 小時" }));
+    fireEvent.click(screen.getByRole("option", { name: "下午 03 時" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 * 分鐘" }));
+    fireEvent.click(screen.getByRole("option", { name: "15 分" }));
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     await waitFor(() => {
@@ -699,7 +700,7 @@ describe("OrderHistory delivery summary", () => {
         expect.objectContaining({
           deliveryTimeMode: "specified",
           deliverySlotId: undefined,
-          deliveryTime: "下午 3 時前",
+          deliveryTime: "15:15",
         }),
       );
     });

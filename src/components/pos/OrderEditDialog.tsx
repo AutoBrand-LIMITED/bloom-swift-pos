@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import OrderDestinationEditCard from "@/components/pos/OrderDestinationEditCard";
+import QuarterHourTimeSelect from "@/components/pos/QuarterHourTimeSelect";
 import RecipientOccasionEditor from "@/components/pos/RecipientOccasionEditor";
 import { isValidPhoneNumber } from "@/lib/checkout-validation";
 import {
@@ -564,7 +565,8 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                       )}
                     </div>
                   ) : (
-                    <Field
+                    <QuarterHourTimeSelect
+                      id="order-edit-specified-delivery-time"
                       label="指定送貨時間 *"
                       value={form.deliveryTime}
                       onChange={(value) => setField("deliveryTime", value)}
