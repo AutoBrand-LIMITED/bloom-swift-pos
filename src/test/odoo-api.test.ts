@@ -194,6 +194,32 @@ describe("odoo-api note contracts", () => {
     );
   });
 
+  it("posts a manager recovery to the encoded review-order route", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      operationalOrderId: "order / 42",
+      syncState: "synced",
+      odooOrderId: 42,
+      odooOrderName: "S00042",
+      odooPartnerId: 8,
+      reviewError: null,
+      lastError: null,
+      attemptCount: 4,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { recoverOperationalOrder } = await import("@/lib/odoo-api");
+
+    await expect(recoverOperationalOrder("order / 42")).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders/operational/order%20%2F%2042/recover",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  });
+
   it("preserves the typed day-end outage response and availabilityMessage", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const outage = {

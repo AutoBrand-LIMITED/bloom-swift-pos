@@ -36,6 +36,7 @@ import {
   getSyncErrorCenter,
   hasOdooBackend,
   OdooApiError,
+  recoverOperationalOrder,
   retryOperationalOrder,
   type SyncErrorCenterOrder,
   type SyncErrorCenterResponse,
@@ -212,10 +213,25 @@ const SyncErrorCenter = () => {
     setRetryTarget(null);
     setRetryingId(target.operationalOrderId);
     try {
-      await retryOperationalOrder(target.operationalOrderId);
-      toast.success("已完成手動重試", {
-        description: `${target.traceId} 已重新交畀 Odoo 同步。`,
-      });
+      const recovery = target.syncState === "needs_review";
+      const result = recovery
+        ? await recoverOperationalOrder(target.operationalOrderId)
+        : await retryOperationalOrder(target.operationalOrderId);
+      if (result.syncState === "synced") {
+        toast.success(recovery ? "舊單已成功修復並同步" : "已完成手動重試", {
+          description: result.odooOrderName
+            ? `${target.traceId} → ${result.odooOrderName}`
+            : `${target.traceId} 已同步到 Odoo。`,
+        });
+      } else if (result.syncState === "pending_odoo") {
+        toast.warning("Odoo 暫時未能完成同步", {
+          description: `${target.traceId} 已保留並交畀系統自動重試。`,
+        });
+      } else {
+        toast.error("修復後仍需人工核對", {
+          description: `${target.traceId} 已用最新版本重試，請按新原因處理。`,
+        });
+      }
       refresh();
     } catch (retryError) {
       toast.error("重試未完成", {
@@ -463,6 +479,20 @@ const SyncErrorCenter = () => {
                               {order.retryEligible ? "立即重試" : "等候自動重試時間"}
                             </Button>
                           )}
+                          {order.syncState === "needs_review" && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="min-h-11 gap-2 touch-manipulation"
+                              disabled={Boolean(retryingId)}
+                              onClick={() => setRetryTarget(order)}
+                            >
+                              {retryingId === order.operationalOrderId
+                                ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                                : <RefreshCw className="h-4 w-4" />}
+                              用修正版重試
+                            </Button>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -484,14 +514,23 @@ const SyncErrorCenter = () => {
       <AlertDialog open={Boolean(retryTarget)} onOpenChange={(open) => !open && setRetryTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>確認重試呢一張訂單？</AlertDialogTitle>
+            <AlertDialogTitle>
+              {retryTarget?.syncState === "needs_review"
+                ? "確認用修正版重試呢一張舊單？"
+                : "確認重試呢一張訂單？"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               系統只會重試 {retryTarget?.traceId}（{retryTarget?.posReference}），唔會批量重試其他訂單。
+              {retryTarget?.syncState === "needs_review" && (
+                " 會保留原 checkout UUID、先檢查 Odoo 有冇同一張單，再用目前收件人及重要日子修復邏輯處理。"
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void retry()}>確認重試</AlertDialogAction>
+            <AlertDialogAction onClick={() => void retry()}>
+              {retryTarget?.syncState === "needs_review" ? "確認修復重試" : "確認重試"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

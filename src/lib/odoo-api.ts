@@ -886,6 +886,27 @@ export async function retryOperationalOrder(
   return (await res.json()) as OperationalOrderRetryResponse;
 }
 
+export async function recoverOperationalOrder(
+  operationalOrderId: string,
+  signal?: AbortSignal,
+): Promise<OperationalOrderRetryResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(
+    `${BACKEND_URL}/orders/operational/${encodeURIComponent(operationalOrderId)}/recover`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal,
+    },
+  );
+  if (!res.ok) {
+    return throwApiError(res, `Operational order recovery failed: ${res.status}`);
+  }
+  return (await res.json()) as OperationalOrderRetryResponse;
+}
+
 export async function updateOdooOrderOperationalDetails(
   orderId: number,
   payload: OrderOperationalUpdatePayload,

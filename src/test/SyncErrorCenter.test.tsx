@@ -9,6 +9,7 @@ import type { PosEmployeeIdentity } from "@/lib/pos-auth";
 
 const apiMocks = vi.hoisted(() => ({
   getSyncErrorCenter: vi.fn(),
+  recoverOperationalOrder: vi.fn(),
   retryOperationalOrder: vi.fn(),
 }));
 
@@ -16,6 +17,7 @@ vi.mock("@/lib/odoo-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/odoo-api")>()),
   hasOdooBackend: true,
   getSyncErrorCenter: apiMocks.getSyncErrorCenter,
+  recoverOperationalOrder: apiMocks.recoverOperationalOrder,
   retryOperationalOrder: apiMocks.retryOperationalOrder,
 }));
 
@@ -123,6 +125,11 @@ describe("SyncErrorCenter", () => {
       operationalOrderId: response.orders[1].operationalOrderId,
       syncState: "synced",
     });
+    apiMocks.recoverOperationalOrder.mockResolvedValue({
+      operationalOrderId: response.orders[0].operationalOrderId,
+      syncState: "synced",
+      odooOrderName: "S18001",
+    });
   });
 
   afterEach(() => {
@@ -183,5 +190,21 @@ describe("SyncErrorCenter", () => {
     });
     expect(screen.getByText("收件人重要日子已更新")).toBeVisible();
     expect(screen.queryByText("Odoo 暫時未能連接")).not.toBeInTheDocument();
+  });
+
+  it("requires confirmation before recovering exactly one review order", async () => {
+    renderPage(manager);
+    await screen.findByText("收件人重要日子已更新");
+
+    fireEvent.click(screen.getByRole("button", { name: "用修正版重試" }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("保留原 checkout UUID");
+    fireEvent.click(screen.getByRole("button", { name: "確認修復重試" }));
+
+    await waitFor(() => {
+      expect(apiMocks.recoverOperationalOrder).toHaveBeenCalledWith(
+        response.orders[0].operationalOrderId,
+      );
+    });
+    expect(apiMocks.retryOperationalOrder).not.toHaveBeenCalled();
   });
 });
