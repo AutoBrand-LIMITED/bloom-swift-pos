@@ -449,40 +449,8 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                 />
               </section>
 
-              {form.deliverySplits && form.deliverySplits.length > 0 && (
-                <section className="space-y-3 border-t pt-5" aria-label="額外收貨點">
-                  <div>
-                    <h3 className="text-sm font-semibold">額外收貨點</h3>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      只可更新現有收貨點的履約及聯絡資料；數量、順序及商品分配不會改變。
-                    </p>
-                  </div>
-                  {form.deliverySplits.map((split, index) => (
-                    <OrderDestinationEditCard
-                      key={split.id}
-                      index={index}
-                      split={split}
-                      deliverySlots={deliverySlots}
-                      onChange={(updated) => {
-                        setForm((current) => current ? {
-                          ...current,
-                          deliverySplits: (current.deliverySplits || []).map((entry, entryIndex) => (
-                            entryIndex === index ? updated : entry
-                          )),
-                        } : current);
-                      }}
-                    />
-                  ))}
-                  {!splitIdentityUnchanged && (
-                    <p role="alert" className="text-xs text-destructive">
-                      收貨點識別或商品分配已改變，儲存已停用。
-                    </p>
-                  )}
-                </section>
-              )}
-
-              <section className="space-y-3 border-t pt-5" aria-label="送貨資料">
-                <h3 className="text-sm font-semibold">送貨及收貨人資料</h3>
+              <section className="space-y-3 border-t pt-5" aria-label="收貨點 1">
+                <h3 className="text-sm font-semibold">收貨點 1（主要收貨點）</h3>
                 <div className="space-y-1.5">
                   <Label>收貨方式 *</Label>
                   <Select
@@ -625,6 +593,38 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                 />
                 </>}
               </section>
+
+              {form.deliverySplits && form.deliverySplits.length > 0 && (
+                <section className="space-y-3 border-t pt-5" aria-label="額外收貨點">
+                  <div>
+                    <h3 className="text-sm font-semibold">其餘收貨點</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      只可更新現有收貨點的履約及聯絡資料；數量、順序及商品分配不會改變。
+                    </p>
+                  </div>
+                  {form.deliverySplits.map((split, index) => (
+                    <OrderDestinationEditCard
+                      key={split.id}
+                      index={index}
+                      split={split}
+                      deliverySlots={deliverySlots}
+                      onChange={(updated) => {
+                        setForm((current) => current ? {
+                          ...current,
+                          deliverySplits: (current.deliverySplits || []).map((entry, entryIndex) => (
+                            entryIndex === index ? updated : entry
+                          )),
+                        } : current);
+                      }}
+                    />
+                  ))}
+                  {!splitIdentityUnchanged && (
+                    <p role="alert" className="text-xs text-destructive">
+                      收貨點識別或商品分配已改變，儲存已停用。
+                    </p>
+                  )}
+                </section>
+              )}
 
               {order && order.paymentStatus !== "paid" && (
                 <section className="space-y-3 border-t pt-5" aria-label="補記付款">

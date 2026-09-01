@@ -371,6 +371,12 @@ describe("OrderHistory delivery summary", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    const primaryDestination = screen.getByRole("region", { name: "收貨點 1" });
+    const secondaryDestination = screen.getByRole("region", { name: "額外收貨點 2" });
+    expect(
+      primaryDestination.compareDocumentPosition(secondaryDestination)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getByRole("region", { name: "額外收貨點 2" })).toBeVisible();
     expect(screen.getByRole("region", { name: "額外收貨點 3" })).toBeVisible();
     fireEvent.change(screen.getByLabelText("額外收貨點 2 送貨地址 *"), {
