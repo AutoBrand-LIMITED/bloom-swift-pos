@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyPastAddressToSplit,
   normalizeDeliverySplitsForSubmission,
   normalizeDeliverySplitsForOperationalUpdate,
   operationalSplitIdentityIsUnchanged,
@@ -41,6 +42,51 @@ const split = (quantity = 1): DeliverySplit => ({
 describe("validateDeliverySplits", () => {
   it("accepts an additional destination within the ordered quantity", () => {
     expect(validateDeliverySplits([split()], items)).toBeNull();
+  });
+
+  it("replaces only one split destination with a past address snapshot", () => {
+    const original = {
+      ...split(),
+      deliveryBuilding: "Old Building",
+      deliveryFloor: "9",
+      deliveryUnit: "A",
+      recipientBirthday: "1980-01-01",
+      recipientOccasions: [{ type: "birthday" as const, date: "1980-01-01" }],
+      recipientOccasionsVersion: "a".repeat(64),
+      recipientPartnerId: 80,
+    };
+
+    const applied = applyPastAddressToSplit(original, {
+      address: "香港島 中西區 中環 皇后大道中 1 號",
+      recipientType: "company",
+      recipientCompanyName: "Recipient Limited",
+      recipientName: "Ms Chan",
+      recipientPhone: "61234567",
+      recipientOccasions: [{ type: "anniversary", date: "2000-02-03" }],
+      recipientOccasionsVersion: "b".repeat(64),
+      shippingPartnerId: 84,
+    });
+
+    expect(applied).toMatchObject({
+      id: "split-2",
+      deliveryRegion: "香港島",
+      deliveryDistrict: "中西區",
+      deliveryArea: "中環",
+      deliveryDetail: "皇后大道中 1 號",
+      deliveryAddress: "香港島 中西區 中環 皇后大道中 1 號",
+      deliveryBuilding: "",
+      deliveryFloor: "",
+      deliveryUnit: "",
+      recipientType: "company",
+      recipientCompanyName: "Recipient Limited",
+      recipientName: "Ms Chan",
+      recipientPhone: "61234567",
+      recipientPartnerId: 84,
+      recipientOccasions: [{ type: "anniversary", date: "2000-02-03" }],
+      recipientOccasionsVersion: "b".repeat(64),
+      itemAllocations: original.itemAllocations,
+    });
+    expect(applied).not.toHaveProperty("recipientBirthday");
   });
 
   it("rejects allocations above the original quantity across destinations", () => {

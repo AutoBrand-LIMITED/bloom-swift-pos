@@ -10,12 +10,14 @@ interface CustomerHistoryDockProps {
   customer: DemoCustomer;
   onOpenChange?: (open: boolean) => void;
   onUseAddress?: (selection: DeliveryAddressSelection) => void;
+  addressTargetLabel?: string;
 }
 
 const CustomerHistoryDock = ({
   customer,
   onOpenChange,
   onUseAddress,
+  addressTargetLabel,
 }: CustomerHistoryDockProps) => {
   const [open, setOpen] = useState(true);
 
@@ -35,6 +37,7 @@ const CustomerHistoryDock = ({
         customer={customer}
         onClose={() => setDockOpen(false)}
         onUseAddress={onUseAddress}
+        addressTargetLabel={addressTargetLabel}
       />
     );
   }

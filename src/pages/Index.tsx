@@ -13,6 +13,7 @@ import OrderItemsSection from "@/components/pos/OrderItemsSection";
 import DeliverySection from "@/components/pos/DeliverySection";
 import SplitDeliverySection from "@/components/pos/SplitDeliverySection";
 import {
+  applyPastAddressToSplit,
   normalizeDeliverySplitsForSubmission,
   validateDeliverySplits,
 } from "@/lib/split-delivery";
@@ -110,7 +111,7 @@ import {
   type CheckoutField,
 } from "@/lib/checkout-validation";
 import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pricing";
-import { parseDeliveryAddress } from "@/lib/hk-address";
+import { parseDeliveryAddress, type DeliveryAddressSelection } from "@/lib/hk-address";
 import { checkoutBarLeftOffset, mobileCheckoutBarClassName } from "@/lib/pos-layout";
 import {
   loadCachedPaymentOptions,
@@ -286,6 +287,13 @@ const Index = () => {
   const [deliverySplits, setDeliverySplits] = useState<DeliverySplit[]>(
     () => restoredEmployeePendingSubmission?.order.deliverySplits || [],
   );
+  const [activeHistoryAddressSplitId, setActiveHistoryAddressSplitId] = useState<string>();
+  const activeHistoryAddressSplitIndex = deliverySplits.findIndex(
+    (split) => split.id === activeHistoryAddressSplitId,
+  );
+  const historyAddressTargetLabel = activeHistoryAddressSplitIndex >= 0
+    ? `收貨點 ${activeHistoryAddressSplitIndex + 2}`
+    : "收貨點 1";
 
   // Gift card
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
@@ -898,6 +906,58 @@ const Index = () => {
     );
   }, [applyRecipientSelection, selectedCustomer?.odooPartnerId]);
 
+  const applyHistoryAddressSelection = useCallback((selection: DeliveryAddressSelection) => {
+    if (activeHistoryAddressSplitId && activeHistoryAddressSplitIndex >= 0) {
+      setDeliverySplits((current) => current.map((split) => (
+        split.id === activeHistoryAddressSplitId
+          ? applyPastAddressToSplit(split, selection)
+          : split
+      )));
+      toast.success(`已套用過往送貨地址到收貨點 ${activeHistoryAddressSplitIndex + 2}`);
+      return;
+    }
+
+    const parsed = parseDeliveryAddress(selection.address);
+    setDeliveryRegion(parsed.region);
+    setDeliveryDistrict(parsed.district);
+    setDeliveryArea(parsed.area);
+    setDeliveryDetail(parsed.detail);
+    setDeliveryBuilding("");
+    setDeliveryFloor("");
+    setDeliveryUnit("");
+    const reusedCompanyName = selection.recipientCompanyName || "";
+    setRecipientType(
+      selection.recipientType
+        || (reusedCompanyName.trim() ? "company" : "personal"),
+    );
+    setRecipientCompanyName(reusedCompanyName);
+    setRecipientName(selection.recipientName || "");
+    setRecipientPhone(selection.recipientPhone || "");
+    const occasionState = recipientOccasionsStateFromSelection(selection);
+    setRecipientOccasions(occasionState.value);
+    setRecipientOccasionsKnown(occasionState.known);
+    setRecipientOccasionsVersion(
+      selection.shippingPartnerId
+        ? recipientOccasionsVersionFromSelection(selection)
+        : undefined,
+    );
+    setRecipientPartnerId(selection.shippingPartnerId);
+    setRecipientContact(null);
+    setRecipientContactDraft("");
+    setSaveRecipientNote(false);
+    clearCheckoutErrors(
+      "deliveryAddress",
+      "recipientCompanyName",
+      "recipientName",
+      "recipientPhone",
+    );
+    toast.success("已套用過往送貨地址到收貨點 1");
+  }, [
+    activeHistoryAddressSplitId,
+    activeHistoryAddressSplitIndex,
+    clearCheckoutErrors,
+  ]);
+
   const applyCustomerAndRecipient = useCallback((
     customer: DemoCustomer,
     recipient: NonNullable<DemoCustomer["recipientMatch"]>,
@@ -1017,6 +1077,7 @@ const Index = () => {
     setDeliveryPerson("");
     setFailedDeliveryAction("none");
     setDeliverySplits([]);
+    setActiveHistoryAddressSplitId(undefined);
     setGiftCardEnabled(false);
     setGiftCardMessage("");
     setPaymentStatus("unpaid");
@@ -1137,6 +1198,7 @@ const Index = () => {
     setRecipientOccasionsVersion(order.recipientOccasionsVersion);
     setDeliveryPerson(order.deliveryPerson);
     setDeliverySplits(order.deliverySplits || []);
+    setActiveHistoryAddressSplitId(undefined);
     setGiftCardEnabled(order.giftCardEnabled);
     setGiftCardMessage(order.giftCardMessage);
     setPaymentStatus(order.paymentStatus);
@@ -1851,40 +1913,8 @@ const Index = () => {
             key={selectedCustomer.id}
             customer={selectedCustomer}
             onOpenChange={setCustomerHistoryOpen}
-            onUseAddress={(selection) => {
-              const parsed = parseDeliveryAddress(selection.address);
-              setDeliveryRegion(parsed.region);
-              setDeliveryDistrict(parsed.district);
-              setDeliveryArea(parsed.area);
-              setDeliveryDetail(parsed.detail);
-              const reusedCompanyName = selection.recipientCompanyName || "";
-              setRecipientType(
-                selection.recipientType
-                  || (reusedCompanyName.trim() ? "company" : "personal"),
-              );
-              setRecipientCompanyName(reusedCompanyName);
-              setRecipientName(selection.recipientName || "");
-              setRecipientPhone(selection.recipientPhone || "");
-              const occasionState = recipientOccasionsStateFromSelection(selection);
-              setRecipientOccasions(occasionState.value);
-              setRecipientOccasionsKnown(occasionState.known);
-              setRecipientOccasionsVersion(
-                selection.shippingPartnerId
-                  ? recipientOccasionsVersionFromSelection(selection)
-                  : undefined,
-              );
-              setRecipientPartnerId(selection.shippingPartnerId);
-              setRecipientContact(null);
-              setRecipientContactDraft("");
-              setSaveRecipientNote(false);
-              clearCheckoutErrors(
-                "deliveryAddress",
-                "recipientCompanyName",
-                "recipientName",
-                "recipientPhone",
-              );
-              toast.success("已套用過往送貨地址");
-            }}
+            onUseAddress={applyHistoryAddressSelection}
+            addressTargetLabel={historyAddressTargetLabel}
           />
         )}
 
@@ -2088,7 +2118,13 @@ const Index = () => {
           aria-label="收貨及送貨資料"
           className="scroll-mt-40"
         >
+        <div
+          onFocusCapture={() => setActiveHistoryAddressSplitId(undefined)}
+          onMouseEnter={() => setActiveHistoryAddressSplitId(undefined)}
+          onPointerDownCapture={() => setActiveHistoryAddressSplitId(undefined)}
+        >
         <DeliverySection
+          historyAddressTarget={activeHistoryAddressSplitIndex < 0}
           fulfillmentType={fulfillmentType}
           deliveryDate={deliveryDate}
           deliveryTime={deliveryTime}
@@ -2233,6 +2269,7 @@ const Index = () => {
           failedDeliveryAction={failedDeliveryAction}
           onFailedDeliveryActionChange={setFailedDeliveryAction}
         />
+        </div>
         <GiftCardSection
           title="主要收貨點心意卡"
           enabled={giftCardEnabled}
@@ -2258,6 +2295,10 @@ const Index = () => {
           senderPhone={phone}
           orderingCustomerId={selectedCustomer?.odooPartnerId}
           senderPartnerId={selectedSenderPartnerId}
+          activeHistoryAddressSplitId={
+            activeHistoryAddressSplitIndex >= 0 ? activeHistoryAddressSplitId : undefined
+          }
+          onHistoryAddressTargetChange={setActiveHistoryAddressSplitId}
         />
         </section>
 

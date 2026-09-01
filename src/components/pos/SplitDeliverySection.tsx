@@ -37,6 +37,8 @@ interface SplitDeliverySectionProps {
   senderPhone: string;
   orderingCustomerId?: number;
   senderPartnerId?: number;
+  activeHistoryAddressSplitId?: string;
+  onHistoryAddressTargetChange?: (splitId?: string) => void;
 }
 
 const addressSnapshot = (split: DeliverySplit) => {
@@ -106,7 +108,12 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
     });
   };
 
-  const remove = (id: string) => props.onChange(props.splits.filter((split) => split.id !== id));
+  const remove = (id: string) => {
+    props.onChange(props.splits.filter((split) => split.id !== id));
+    if (props.activeHistoryAddressSplitId === id) {
+      props.onHistoryAddressTargetChange?.();
+    }
+  };
 
   const applyRecipient = (split: DeliverySplit, suggestion: RecipientSuggestion) => {
     const { selection } = resolveRecipientSuggestionForCustomer(
@@ -184,7 +191,19 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
       )}
 
       {props.splits.map((split, index) => (
-        <div key={split.id} className="space-y-3 rounded-xl border-2 border-dashed border-primary/30 p-3">
+        <div
+          key={split.id}
+          role="group"
+          aria-label={`拆單收貨點 ${index + 2}`}
+          onFocusCapture={() => props.onHistoryAddressTargetChange?.(split.id)}
+          onMouseEnter={() => props.onHistoryAddressTargetChange?.(split.id)}
+          onPointerDownCapture={() => props.onHistoryAddressTargetChange?.(split.id)}
+          className={`space-y-3 rounded-xl border-2 border-dashed p-3 transition-colors ${
+            props.activeHistoryAddressSplitId === split.id
+              ? "border-primary bg-primary/[0.03]"
+              : "border-primary/30"
+          }`}
+        >
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold">拆單收貨點 {index + 2}</p>
             <Button type="button" variant="outline" size="sm" onClick={() => remove(split.id)}>
@@ -195,6 +214,7 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
           <DeliverySection
             showFulfillmentSelector
             sectionTitle={`額外收貨資料 ${index + 2}`}
+            historyAddressTarget={props.activeHistoryAddressSplitId === split.id}
             allowLinkedCustomerSelection={false}
             fulfillmentType={split.fulfillmentType || "delivery"}
             deliveryDate={split.deliveryDate}
@@ -347,7 +367,11 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
         variant="outline"
         className="min-h-11 w-full border-dashed"
         disabled={props.splits.length >= 10 || props.items.length === 0}
-        onClick={() => props.onChange([...props.splits, newSplit(props)])}
+        onClick={() => {
+          const split = newSplit(props);
+          props.onChange([...props.splits, split]);
+          props.onHistoryAddressTargetChange?.(split.id);
+        }}
       >
         <Plus className="mr-2 h-4 w-4" />新增另一個收貨點
       </Button>

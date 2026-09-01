@@ -75,6 +75,7 @@ describe("CustomerHistoryPanel resizable history", () => {
         customer={customer}
         onClose={vi.fn()}
         onUseAddress={onUseAddress}
+        addressTargetLabel="收貨點 2"
       />,
     );
 
@@ -89,6 +90,7 @@ describe("CustomerHistoryPanel resizable history", () => {
       name: "使用過往地址 中環皇后大道中 1 號",
     })).toBeVisible();
     expect(screen.getByText("收花人長期備註：到達前先致電")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("將套用到：收貨點 2");
 
     fireEvent.click(screen.getByRole("button", {
       name: "使用過往地址 中環皇后大道中 1 號",

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,6 +25,7 @@ vi.mock("@/lib/odoo-api", () => ({
 
 const Harness = ({ initialSplits = [] }: { initialSplits?: DeliverySplit[] }) => {
   const [splits, setSplits] = useState<DeliverySplit[]>(initialSplits);
+  const [activeHistoryAddressSplitId, setActiveHistoryAddressSplitId] = useState<string>();
   return (
     <>
       <SplitDeliverySection
@@ -45,8 +46,11 @@ const Harness = ({ initialSplits = [] }: { initialSplits?: DeliverySplit[] }) =>
         senderPhone="61234567"
         orderingCustomerId={42}
         senderPartnerId={42}
+        activeHistoryAddressSplitId={activeHistoryAddressSplitId}
+        onHistoryAddressTargetChange={setActiveHistoryAddressSplitId}
       />
       <output data-testid="split-state">{JSON.stringify(splits)}</output>
+      <output data-testid="active-history-address-split">{activeHistoryAddressSplitId || "primary"}</output>
     </>
   );
 };
@@ -104,6 +108,23 @@ describe("SplitDeliverySection fulfillment controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "自取" }));
     expect(screen.getByText(/自取訂單只需選擇日期及時間/)).toBeVisible();
+  });
+
+  it("targets the split destination that the cashier is editing", () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+    fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
+    const splits = JSON.parse(screen.getByTestId("split-state").textContent || "[]");
+    const destinationThree = screen.getByRole("group", { name: "拆單收貨點 3" });
+
+    fireEvent.mouseEnter(destinationThree);
+
+    expect(screen.getByTestId("active-history-address-split")).toHaveTextContent(splits[1].id);
+    expect(within(destinationThree).getByText("過往地址套用目標")).toBeVisible();
+
+    fireEvent.focus(within(destinationThree).getByPlaceholderText("搜尋並選擇 Google 地址"));
+    expect(screen.getByTestId("active-history-address-split")).toHaveTextContent(splits[1].id);
   });
 
   it("applies the sender name and phone to a split destination in one update", () => {

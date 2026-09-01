@@ -16,6 +16,7 @@ interface CustomerHistoryPanelProps {
   customer: DemoCustomer | null;
   onClose: () => void;
   onUseAddress?: (selection: DeliveryAddressSelection) => void;
+  addressTargetLabel?: string;
 }
 
 const formatDateTime = (value?: string) => {
@@ -78,7 +79,12 @@ const samePastAddressIdentity = (
     && normalizeIdentityPart(entry.recipientPhone) === normalizeIdentityPart(history.recipientPhone);
 };
 
-const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHistoryPanelProps) => {
+const CustomerHistoryPanel = ({
+  customer,
+  onClose,
+  onUseAddress,
+  addressTargetLabel = "收貨點 1",
+}: CustomerHistoryPanelProps) => {
   const [odooHistoryState, setOdooHistoryState] = useState<{
     customerId: string;
     data: Pick<DemoCustomer, "history" | "historyCount" | "totalSpent">;
@@ -301,9 +307,14 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
               {/* Past addresses */}
               {pastAddresses.length > 0 && (
                 <div className="p-3 space-y-1.5">
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> 過往送貨地址
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                      <MapPin className="w-3 h-3" /> 過往送貨地址
+                    </p>
+                    <p role="status" className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary">
+                      將套用到：{addressTargetLabel}
+                    </p>
+                  </div>
                   {(showAllAddresses ? pastAddresses : pastAddresses.slice(0, 3)).map((a, i) => (
                     <button
                       key={i}
@@ -341,7 +352,7 @@ const CustomerHistoryPanel = ({ customer, onClose, onUseAddress }: CustomerHisto
                         </p>
                       )}
                       <p className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
-                        點擊使用此地址 →
+                        點擊套用到{addressTargetLabel} →
                       </p>
                     </button>
                   ))}

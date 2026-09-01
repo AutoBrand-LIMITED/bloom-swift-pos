@@ -1,11 +1,13 @@
 import { isValidDeliveryDate, isValidPhoneNumber } from "@/lib/checkout-validation";
 import { PICKUP_LOCATION_ADDRESS } from "@/lib/fulfillment";
+import { parseDeliveryAddress, type DeliveryAddressSelection } from "@/lib/hk-address";
 import {
   normalizeRecipientOccasions,
   ownsRecipientOccasionsField,
   ownsRecipientOccasionsVersionField,
   recipientOccasionsAreUnchanged,
   recipientOccasionsStateFromSelection,
+  recipientOccasionsVersionFromSelection,
   recipientOccasionValidationError,
 } from "@/lib/recipient-occasions";
 import type { DeliverySplit, OrderItem } from "@/types/order";
@@ -13,6 +15,42 @@ import type { DeliverySplit, OrderItem } from "@/types/order";
 export const splitFulfillmentType = (split: DeliverySplit) => (
   split.fulfillmentType || "delivery"
 );
+
+export const applyPastAddressToSplit = (
+  split: DeliverySplit,
+  selection: DeliveryAddressSelection,
+): DeliverySplit => {
+  const address = selection.address.trim();
+  const parsed = parseDeliveryAddress(address);
+  const occasionState = recipientOccasionsStateFromSelection(selection);
+  const occasionVersion = selection.shippingPartnerId
+    ? recipientOccasionsVersionFromSelection(selection)
+    : undefined;
+  const next: DeliverySplit = {
+    ...split,
+    deliveryRegion: parsed.region,
+    deliveryDistrict: parsed.district,
+    deliveryArea: parsed.area,
+    deliveryDetail: parsed.detail,
+    deliveryAddress: address,
+    deliveryGoogleAddress: address,
+    deliveryBuilding: "",
+    deliveryFloor: "",
+    deliveryUnit: "",
+    recipientType: selection.recipientType
+      || (selection.recipientCompanyName?.trim() ? "company" : "personal"),
+    recipientCompanyName: selection.recipientCompanyName || "",
+    recipientName: selection.recipientName || "",
+    recipientPhone: selection.recipientPhone || "",
+    recipientPartnerId: selection.shippingPartnerId || undefined,
+  };
+  delete next.recipientBirthday;
+  if (occasionState.known) next.recipientOccasions = occasionState.value;
+  else delete next.recipientOccasions;
+  if (occasionVersion !== undefined) next.recipientOccasionsVersion = occasionVersion;
+  else delete next.recipientOccasionsVersion;
+  return next;
+};
 
 interface NormalizeDeliverySplitsOptions {
   baselineSplits?: readonly DeliverySplit[];

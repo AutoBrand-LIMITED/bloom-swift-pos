@@ -122,6 +122,7 @@ interface DeliverySectionProps {
   onConfirmNewRecipient?: () => void;
   onDeliveryPersonChange: (v: string) => void;
   onFailedDeliveryActionChange: (v: string) => void;
+  historyAddressTarget?: boolean;
 }
 
 const RECIPIENT_SUGGESTION_CACHE_LIMIT = 100;
@@ -161,6 +162,7 @@ const DeliverySection = ({
   onConfirmNewRecipient,
   onDeliveryPersonChange,
   onFailedDeliveryActionChange,
+  historyAddressTarget = false,
 }: DeliverySectionProps) => {
   const districts = deliveryRegion ? Object.keys(HK_DISTRICTS[deliveryRegion] || {}) : [];
   const areas = deliveryRegion && deliveryDistrict
@@ -693,10 +695,17 @@ const DeliverySection = ({
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
-        <MapPin className="w-4 h-4" />
-        {sectionTitle}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+          <MapPin className="w-4 h-4" />
+          {sectionTitle}
+        </h2>
+        {historyAddressTarget && (
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+            過往地址套用目標
+          </span>
+        )}
+      </div>
       {showFulfillmentSelector && (
       <div className="grid grid-cols-2 gap-2" role="group" aria-label="收貨方式">
         <Button
