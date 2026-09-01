@@ -86,6 +86,7 @@ describe("POS session authentication", () => {
 
     const headers = new Headers(fetchMock.mock.calls[0][1].headers);
     expect(headers.get("Authorization")).toBe("Bearer signed-session");
+    expect(headers.get("X-Client-Trace-Id")).toMatch(/^POS-[A-F0-9]{12}$/);
   });
 
   it("clears an expired session after a 401 response", async () => {

@@ -132,6 +132,42 @@ describe("odoo-api note contracts", () => {
     );
   });
 
+  it("loads the manager sync error center without browser-controlled filters", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const diagnostics = {
+      generatedAt: "2026-09-01T15:00:00+08:00",
+      summary: {
+        pendingCount: 0,
+        syncingCount: 0,
+        needsReviewCount: 0,
+        unresolvedCount: 0,
+        unresolvedValueMinor: 0,
+        oldestAcceptedAt: null,
+      },
+      worker: {
+        status: "unknown",
+        lastStartedAt: null,
+        lastCompletedAt: null,
+        lastSuccessAt: null,
+        lastClaimed: 0,
+        lastSynced: 0,
+        lastRetried: 0,
+        lastNeedsReview: 0,
+      },
+      truncated: false,
+      orders: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(diagnostics));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getSyncErrorCenter } = await import("@/lib/odoo-api");
+
+    await expect(getSyncErrorCenter()).resolves.toEqual(diagnostics);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders/operational/errors",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
   it("posts a manager retry to the encoded operational-order route", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const response = {

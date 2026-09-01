@@ -128,6 +128,68 @@ export interface OperationalOrdersCollectionResponse {
   orders: OperationalOrderCollectionRow[];
 }
 
+export type SyncErrorStage =
+  | "order_validation"
+  | "sales_assignment"
+  | "customer"
+  | "recipient"
+  | "recipient_important_dates"
+  | "long_term_notes"
+  | "delivery"
+  | "odoo_connection"
+  | "odoo_order"
+  | "unknown";
+
+export interface SyncErrorDiagnostic {
+  code: string;
+  stage: SyncErrorStage;
+  title: string;
+  reason: string;
+  action: string;
+  retryable: boolean;
+}
+
+export interface SyncErrorCenterOrder {
+  operationalOrderId: string;
+  traceId: string;
+  posReference: string;
+  acceptedAt: string;
+  updatedAt: string;
+  customerName: string;
+  amountTotalMinor: number;
+  syncState: "pending_odoo" | "syncing" | "needs_review";
+  operatorEmployeeId: number | null;
+  salespersonLabel: string | null;
+  attemptCount: number;
+  nextAttemptAt: string | null;
+  retryEligible: boolean;
+  diagnostic: SyncErrorDiagnostic;
+}
+
+export interface SyncErrorCenterResponse {
+  generatedAt: string;
+  summary: {
+    pendingCount: number;
+    syncingCount: number;
+    needsReviewCount: number;
+    unresolvedCount: number;
+    unresolvedValueMinor: number;
+    oldestAcceptedAt: string | null;
+  };
+  worker: {
+    status: "unknown" | "running" | "succeeded" | "failed";
+    lastStartedAt: string | null;
+    lastCompletedAt: string | null;
+    lastSuccessAt: string | null;
+    lastClaimed: number;
+    lastSynced: number;
+    lastRetried: number;
+    lastNeedsReview: number;
+  };
+  truncated: boolean;
+  orders: SyncErrorCenterOrder[];
+}
+
 export type OperationalOrderRetryResponse = OperationalOrderStatusResponse;
 
 export interface AccountingPaymentOption {
@@ -548,7 +610,7 @@ async function throwApiError<T>(res: Response, fallback: string): Promise<never>
       .filter(Boolean)
       .join("；")
     : "";
-  const message =
+  const baseMessage =
     (typeof detail === "string"
       ? detail
       : Array.isArray(detail)
@@ -557,6 +619,10 @@ async function throwApiError<T>(res: Response, fallback: string): Promise<never>
     body?.reviewError ||
     body?.message ||
     fallback;
+  const traceId = res.headers.get("X-Trace-Id")?.trim();
+  const message = traceId
+    ? `${baseMessage}（追蹤編號：${traceId}）`
+    : baseMessage;
 
   if (res.status === 409) {
     const latest =
@@ -781,6 +847,22 @@ export async function getOperationalOrders(
     return throwApiError(res, `Operational order collection failed: ${res.status}`);
   }
   return (await res.json()) as OperationalOrdersCollectionResponse;
+}
+
+export async function getSyncErrorCenter(
+  signal?: AbortSignal,
+): Promise<SyncErrorCenterResponse> {
+  if (!BACKEND_URL) {
+    throw new OdooApiError("Odoo backend is not configured", 503);
+  }
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/operational/errors`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError(res, `Sync diagnostics failed: ${res.status}`);
+  }
+  return (await res.json()) as SyncErrorCenterResponse;
 }
 
 export async function retryOperationalOrder(

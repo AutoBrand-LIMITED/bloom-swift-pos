@@ -65,6 +65,12 @@ export async function authenticatedFetch(
     ? (() => {
         const headers = new Headers(init.headers);
         headers.set("Authorization", `Bearer ${token}`);
+        if (!headers.has("X-Client-Trace-Id")) {
+          const randomPart = typeof globalThis.crypto?.randomUUID === "function"
+            ? globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 12)
+            : Math.random().toString(16).slice(2).padEnd(12, "0").slice(0, 12);
+          headers.set("X-Client-Trace-Id", `POS-${randomPart.toUpperCase()}`);
+        }
         return { ...init, headers };
       })()
     : init;
