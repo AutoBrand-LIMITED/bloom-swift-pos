@@ -479,7 +479,7 @@ const SyncErrorCenter = () => {
                               {order.retryEligible ? "立即重試" : "等候自動重試時間"}
                             </Button>
                           )}
-                          {order.syncState === "needs_review" && (
+                          {order.syncState === "needs_review" && order.recoveryEligible && (
                             <Button
                               type="button"
                               variant="outline"
@@ -492,6 +492,11 @@ const SyncErrorCenter = () => {
                                 : <RefreshCw className="h-4 w-4" />}
                               用修正版重試
                             </Button>
+                          )}
+                          {order.syncState === "needs_review" && !order.recoveryEligible && (
+                            <span className="text-xs font-medium text-muted-foreground">
+                              需先按上方建議修正資料
+                            </span>
                           )}
                         </div>
                       </CardContent>

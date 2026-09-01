@@ -72,6 +72,7 @@ const response = {
       attemptCount: 2,
       nextAttemptAt: null,
       retryEligible: false,
+      recoveryEligible: true,
       diagnostic: {
         code: "recipient_occasions_stale",
         stage: "recipient_important_dates" as const,
@@ -95,6 +96,7 @@ const response = {
       attemptCount: 1,
       nextAttemptAt: "2026-09-01T14:59:00+08:00",
       retryEligible: true,
+      recoveryEligible: false,
       diagnostic: {
         code: "odoo_temporarily_unavailable",
         stage: "odoo_connection" as const,
@@ -206,5 +208,17 @@ describe("SyncErrorCenter", () => {
       );
     });
     expect(apiMocks.retryOperationalOrder).not.toHaveBeenCalled();
+  });
+
+  it("does not offer recovery when the server requires explicit correction", async () => {
+    apiMocks.getSyncErrorCenter.mockResolvedValue({
+      ...response,
+      orders: [{ ...response.orders[0], recoveryEligible: false }],
+    });
+    renderPage(manager);
+
+    await screen.findByText("收件人重要日子已更新");
+    expect(screen.queryByRole("button", { name: "用修正版重試" })).not.toBeInTheDocument();
+    expect(screen.getByText("需先按上方建議修正資料")).toBeVisible();
   });
 });

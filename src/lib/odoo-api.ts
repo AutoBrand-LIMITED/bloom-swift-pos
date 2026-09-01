@@ -163,6 +163,7 @@ export interface SyncErrorCenterOrder {
   attemptCount: number;
   nextAttemptAt: string | null;
   retryEligible: boolean;
+  recoveryEligible: boolean;
   diagnostic: SyncErrorDiagnostic;
 }
 
