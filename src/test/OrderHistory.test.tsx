@@ -72,7 +72,13 @@ const orderFixture = (overrides: Partial<OrderRecordView> = {}): OrderRecordView
   ...overrides,
 });
 
+const openOrderDetails = (orderName = "S00017") => {
+  const orderButton = screen.queryByRole("button", { name: `查看訂單 ${orderName}` });
+  if (orderButton) fireEvent.click(orderButton);
+};
+
 const openOrderEditSection = (menuItemName: string) => {
+  openOrderDetails();
   fireEvent.keyDown(screen.getByRole("button", { name: "編輯訂單資料" }), { key: "Enter" });
   fireEvent.click(screen.getByRole("menuitem", { name: menuItemName }));
 };
@@ -101,7 +107,7 @@ describe("OrderHistory delivery summary", () => {
     recordOdooOrderPayment.mockReset();
   });
 
-  it("uses a full-screen master-detail layout with independently scrollable panes", () => {
+  it("uses a Shopify-style full-width order index before opening a full-page detail", () => {
     const orders = Array.from({ length: 20 }, (_, index) => orderFixture({
       id: `order-${index + 1}`,
       odooOrderName: `S${String(index + 1).padStart(5, "0")}`,
@@ -111,17 +117,25 @@ describe("OrderHistory delivery summary", () => {
     render(<OrderHistory orders={orders} open onClose={vi.fn()} />);
 
     expect(screen.getByText("訂單記錄 (20)")).toBeVisible();
-    expect(screen.getByRole("complementary", { name: "訂單列表" })).toHaveClass(
-      "md:w-[22rem]",
-      "md:shrink-0",
-    );
+    expect(screen.getByRole("main", { name: "訂單列表" })).toHaveClass("w-full");
     expect(screen.getByTestId("order-history-scroll-area")).toHaveClass("min-h-0", "flex-1");
+    expect(screen.getByRole("tab", { name: "全部訂單 20" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("訂單")).toBeVisible();
+    expect(screen.getByText("落單時間")).toBeVisible();
+    expect(screen.getByText("客戶")).toBeVisible();
+    expect(screen.getByText("送貨／自取")).toBeVisible();
+    expect(screen.getByText("付款狀態")).toBeVisible();
+    expect(screen.getByText("總額")).toBeVisible();
+    expect(screen.queryByTestId("order-history-detail-pane")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "查看訂單 S00020" }));
     expect(screen.getByTestId("order-history-detail-pane")).toHaveClass("overflow-y-auto");
-    expect(screen.getByRole("group", { name: /訂單 S00020/ })).toBeInTheDocument();
+    expect(screen.queryByRole("main", { name: "訂單列表" })).not.toBeInTheDocument();
   });
 
   it("places the edit entry in the top summary and marks product pricing read-only", () => {
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+    openOrderDetails();
 
     const editButton = screen.getByRole("button", { name: "編輯訂單資料" });
     const identitySection = screen.getByRole("region", { name: "訂單身份與時間" });
@@ -134,6 +148,7 @@ describe("OrderHistory delivery summary", () => {
 
   it("opens only the requested section from its three-dot action menu", () => {
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+    openOrderDetails();
 
     fireEvent.keyDown(screen.getByRole("button", { name: "客戶與送花人操作選單" }), { key: "Enter" });
     fireEvent.click(screen.getByRole("menuitem", { name: "修改客戶與送花人" }));
@@ -171,6 +186,7 @@ describe("OrderHistory delivery summary", () => {
       recipientPhone: "",
     })]} open onClose={vi.fn()} />);
 
+    openOrderDetails();
     fireEvent.keyDown(screen.getByRole("button", { name: "備註操作選單" }), { key: "Enter" });
     fireEvent.click(screen.getByRole("menuitem", { name: "修改備註及心意卡" }));
     fireEvent.change(screen.getByLabelText("內部備註"), { target: { value: "只更新備註" } });
@@ -202,8 +218,10 @@ describe("OrderHistory delivery summary", () => {
       }),
     ]} open onClose={vi.fn()} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "查看訂單 S-NEW-OCCASION" }));
     expect(screen.getByText(/週年：2020-06-18/)).toBeInTheDocument();
     expect(screen.getByText(/相識紀念日：2021-09-01/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "返回訂單列表" }));
     fireEvent.click(screen.getByRole("button", { name: "查看訂單 S-LEGACY-BIRTHDAY" }));
     expect(screen.getByText(/收件人生日：1990-01-02/)).toBeInTheDocument();
   });
@@ -320,8 +338,9 @@ describe("OrderHistory delivery summary", () => {
   it("shows the delivery date and frozen slot snapshot", () => {
     render(<OrderHistory orders={[orderFixture({ deliveryTimeMode: "slot", deliverySlotId: 11 })]} open onClose={vi.fn()} />);
 
-    const order = screen.getByRole("group", { name: /訂單 S00017/ });
-    expect(within(order).getByText("送貨：2026-07-18 · 上午 09:00-13:00")).toBeVisible();
+    const order = screen.getByRole("button", { name: "查看訂單 S00017" });
+    expect(within(order).getByText("送貨：2026-07-18")).toBeVisible();
+    expect(within(order).getByText("上午 09:00-13:00")).toBeVisible();
   });
 
   it("labels pickup orders and their store address as pickup", () => {
@@ -336,11 +355,12 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    const order = screen.getByRole("group", { name: /訂單 S00017/ });
-    expect(within(order).getByText("自取：2026-07-18 · 上午 09:00-13:00")).toBeVisible();
-    expect(within(order).queryByText("送貨：2026-07-18 · 上午 09:00-13:00")).not.toBeInTheDocument();
+    const order = screen.getByRole("button", { name: "查看訂單 S00017" });
+    expect(within(order).getByText("自取：2026-07-18")).toBeVisible();
+    expect(within(order).getByText("上午 09:00-13:00")).toBeVisible();
+    expect(within(order).queryByText("送貨：2026-07-18")).not.toBeInTheDocument();
 
-    fireEvent.click(within(order).getByRole("button", { name: "查看訂單 S00017" }));
+    fireEvent.click(order);
     const destinations = screen.getByRole("region", { name: "收貨點與商品分配" });
     expect(within(destinations).getByText("自取地點")).toBeVisible();
     expect(within(destinations).getByText("中西花店門市自取")).toBeVisible();
@@ -361,6 +381,7 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
+    openOrderDetails();
     expect(screen.getByRole("button", { name: "編輯訂單資料" })).toBeVisible();
     openOrderEditSection("修改收貨點與商品分配");
     expect(screen.getByRole("dialog")).toHaveClass(
@@ -408,6 +429,7 @@ describe("OrderHistory delivery summary", () => {
       customerGroup: "Regular",
     })]} open onClose={vi.fn()} />);
 
+    openOrderDetails();
     const businessDetails = screen.getByRole("region", { name: "業務詳情" });
     expect(within(businessDetails).getByText("AC02 — Elma")).toBeVisible();
     expect(within(businessDetails).getByText("Retail")).toBeVisible();
@@ -905,6 +927,7 @@ describe("OrderHistory delivery summary", () => {
       balanceAmount: 0,
     })]} open onClose={vi.fn()} />);
 
+    openOrderDetails();
     expect(screen.queryByRole("button", { name: "付款與會計參考操作選單" })).not.toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole("button", { name: "編輯訂單資料" }), { key: "Enter" });
     expect(screen.queryByRole("menuitem", { name: "補記付款" })).not.toBeInTheDocument();
@@ -916,7 +939,8 @@ describe("OrderHistory delivery summary", () => {
       deliveryTime: "上午 10 時前",
     })]} open onClose={vi.fn()} />);
 
-    expect(screen.getByText("送貨：2026-07-18 · 指定時間：上午 10 時前")).toBeVisible();
+    expect(screen.getByText("送貨：2026-07-18")).toBeVisible();
+    expect(screen.getByText("指定時間：上午 10 時前")).toBeVisible();
   });
 
   it("does not present a failed first Odoo load as an empty day", () => {
@@ -955,6 +979,7 @@ describe("OrderHistory delivery summary", () => {
       }],
     })]} open onClose={vi.fn()} />);
 
+    openOrderDetails();
     expect(screen.getByText("包裝：禮盒 · 備註：白色絲帶")).toBeVisible();
     fireEvent.click(screen.getByText("業務詳情"));
     expect(screen.getByText("accounts@example.com")).toBeVisible();
@@ -1026,23 +1051,23 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("付款狀態篩選"), { target: { value: "unpaid" } });
-    expect(screen.queryByRole("group", { name: /S-PAID/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: /訂單 pending/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "未付款 1" }));
+    expect(screen.queryByRole("button", { name: "查看訂單 S-PAID" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看訂單 pending" })).toBeInTheDocument();
     expect(screen.getByText("訂單記錄 (1/2)")).toBeVisible();
     expect(screen.queryByLabelText("同步狀態篩選")).not.toBeInTheDocument();
     expect(screen.queryByText("全部同步狀態")).not.toBeInTheDocument();
     expect(onSearchQueryChange).not.toHaveBeenCalled();
   });
 
-  it("opens detail from the mobile-first list and provides a 44px back control", () => {
+  it("opens a full-page detail and provides a 44px back control", () => {
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "查看訂單 S00017" }));
     const back = screen.getByRole("button", { name: "返回訂單列表" });
     expect(back).toHaveClass("min-h-11", "touch-manipulation");
     fireEvent.click(back);
-    expect(screen.getByRole("complementary", { name: "訂單列表" })).toHaveClass("flex");
+    expect(screen.getByRole("main", { name: "訂單列表" })).toHaveClass("flex");
   });
 
   it("shows every destination allocation, recipient birthday, card, note, and accounting reference", () => {
@@ -1084,6 +1109,7 @@ describe("OrderHistory delivery summary", () => {
       }],
     })]} open onClose={vi.fn()} />);
 
+    openOrderDetails();
     const primary = screen.getByRole("article", { name: "主要收貨點 1" });
     expect(within(primary).getByText(/收件人生日：1990-01-02/)).toBeVisible();
     expect(within(primary).getByText("生日快樂")).toBeVisible();
@@ -1108,11 +1134,14 @@ describe("OrderHistory delivery summary", () => {
       orderFixture({ id: "local", source: "local", syncState: "unsynced", odooOrderId: undefined, odooOrderName: undefined }),
     ]} open onClose={vi.fn()} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "查看訂單 S00017" }));
     await waitFor(() => expect(requests.map((request) => request.orderId)).toEqual([17]));
+    fireEvent.click(screen.getByRole("button", { name: "返回訂單列表" }));
     fireEvent.click(screen.getByRole("button", { name: "查看訂單 S00018" }));
     await waitFor(() => expect(requests.map((request) => request.orderId)).toEqual([17, 18]));
     expect(requests[0].signal.aborted).toBe(true);
 
+    fireEvent.click(screen.getByRole("button", { name: "返回訂單列表" }));
     fireEvent.click(screen.getByRole("button", { name: "查看訂單 local" }));
     await waitFor(() => expect(requests[1].signal.aborted).toBe(true));
     expect(getOdooOrderEditHistory).toHaveBeenCalledTimes(2);
@@ -1151,6 +1180,7 @@ describe("OrderHistory delivery summary", () => {
       });
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
 
+    openOrderDetails();
     expect(await screen.findByText("timeline unavailable")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "重試修改記錄" }));
     expect(await screen.findByText("Elma")).toBeVisible();
@@ -1178,6 +1208,7 @@ describe("OrderHistory delivery summary", () => {
     });
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
 
+    openOrderDetails();
     await waitFor(() => expect(getOdooOrderEditHistory).toHaveBeenCalledTimes(1));
     openOrderEditSection("修改收貨點與商品分配");
     fireEvent.change(screen.getByLabelText("送貨地址 *"), { target: { value: "新地址" } });
@@ -1202,6 +1233,7 @@ describe("OrderHistory delivery summary", () => {
       onRetryOperationalOrder={onRetryOperationalOrder}
     />);
 
+    openOrderDetails();
     fireEvent.click(screen.getByRole("button", { name: "重試訂單 S00017 Odoo 同步" }));
     await waitFor(() => expect(onRetryOperationalOrder).toHaveBeenCalledWith("operational-17"));
     expect(screen.queryByText("sensitive_backend_trace")).not.toBeInTheDocument();
