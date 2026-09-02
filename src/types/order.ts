@@ -175,6 +175,8 @@ export interface SalesStaff {
   code?: string | null;
   jobTitle?: string | null;
   odooEmployeeId?: number;
+  salesTeamId?: number;
+  salesTeamName?: string;
 }
 
 export interface OdooNamedReference {

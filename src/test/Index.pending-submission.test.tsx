@@ -156,7 +156,7 @@ describe("Index pending recovery without POS authentication", () => {
     })).toBeVisible();
   });
 
-  it("drops a restored legacy Sales Team ID after unlock before a new submission", async () => {
+  it("preserves a restored native Sales Team ID after unlock before a new submission", async () => {
     const pending = pendingSubmission();
     Object.assign(pending.order, {
       salesTeamId: 7,
@@ -170,7 +170,8 @@ describe("Index pending recovery without POS authentication", () => {
 
     render(<MemoryRouter><Index /></MemoryRouter>);
 
-    expect(await screen.findByDisplayValue("Legacy Team")).toBeInTheDocument();
+    expect(await screen.findByText("Legacy Team")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /Sales Team/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {
       name: "核對 Odoo 後解除鎖定（保留資料）",
     }));
@@ -180,8 +181,10 @@ describe("Index pending recovery without POS authentication", () => {
 
     await waitFor(() => expect(localStorage.getItem(UNSYNCED_ORDERS_KEY)).not.toBeNull());
     const submitted = JSON.parse(localStorage.getItem(UNSYNCED_ORDERS_KEY) || "[]") as Order[];
-    expect(submitted[0]).toMatchObject({ department: "Legacy Team" });
-    expect(submitted[0]).not.toHaveProperty("salesTeamId");
+    expect(submitted[0]).toMatchObject({
+      department: "Legacy Team",
+      salesTeamId: 7,
+    });
   });
 
   it("clears a restored primary occasion version when recipient identity changes", async () => {

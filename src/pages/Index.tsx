@@ -39,6 +39,7 @@ import SalesIdSection from "@/components/pos/SalesIdSection";
 import {
   useOdooCustomerGroups,
   useOdooEmployees,
+  useOdooSalesTeams,
 } from "@/hooks/use-odoo-employees";
 import { usePosAuth } from "@/components/auth/PosAuthContext";
 import { posAuthRequired } from "@/lib/pos-auth";
@@ -185,6 +186,11 @@ const Index = () => {
     loading: staffLoading,
     error: staffError,
   } = useOdooEmployees();
+  const {
+    teams: salesTeams,
+    loading: salesTeamsLoading,
+    error: salesTeamsError,
+  } = useOdooSalesTeams(employee?.role === "manager");
   const {
     groups: customerGroups,
     loading: customerGroupsLoading,
@@ -705,6 +711,21 @@ const Index = () => {
   }, [employee, restoredEmployeePendingSubmission]);
 
   useEffect(() => {
+    if (restoredEmployeePendingSubmission || employeePendingSubmission) return;
+    const selectedSalesperson = staff.find(
+      (candidate) => candidate.odooEmployeeId === salespersonEmployeeId,
+    );
+    if (!selectedSalesperson) return;
+    setSalesTeamId(selectedSalesperson.salesTeamId);
+    setDepartment(selectedSalesperson.salesTeamName || "");
+  }, [
+    employeePendingSubmission,
+    restoredEmployeePendingSubmission,
+    salespersonEmployeeId,
+    staff,
+  ]);
+
+  useEffect(() => {
     if (!hasOdooBackend) return;
     const controller = new AbortController();
     setPaymentOptionsLoading(true);
@@ -1031,6 +1052,9 @@ const Index = () => {
   }, [applyCustomerSelection, applyRecipientSelection, selectedCustomer?.odooPartnerId]);
 
   const resetOrderForm = useCallback(() => {
+    const defaultSalesperson = staff.find(
+      (candidate) => candidate.odooEmployeeId === employee?.id,
+    );
     setPhone("");
     setCustomerName("");
     setCustomerCode("");
@@ -1045,8 +1069,8 @@ const Index = () => {
     setSenderDoNumber("");
     setRecipientDoNumber("");
     setSourceReference("");
-    setDepartment("");
-    setSalesTeamId(undefined);
+    setDepartment(defaultSalesperson?.salesTeamName || "");
+    setSalesTeamId(defaultSalesperson?.salesTeamId);
     setTerms("");
     setCheckoutErrors({});
     setSelectedCustomer(null);
@@ -1101,7 +1125,7 @@ const Index = () => {
     setSalesId(employee?.salesLabel || "");
     setOperatorEmployeeId(employee?.id);
     setSalespersonEmployeeId(employee?.id);
-  }, [employee]);
+  }, [employee, staff]);
 
   const handleClearForm = useCallback(() => {
     if (pendingSubmission) {
@@ -1134,11 +1158,19 @@ const Index = () => {
       return;
     }
     setPendingSubmission(null);
-    setSalesTeamId(undefined);
+    if (Object.prototype.hasOwnProperty.call(pendingSubmission.order, "salesTeamId")) {
+      setSalesTeamId(pendingSubmission.order.salesTeamId);
+    } else {
+      const selectedSalesperson = staff.find(
+        (candidate) => candidate.odooEmployeeId === salespersonEmployeeId,
+      );
+      setSalesTeamId(selectedSalesperson?.salesTeamId);
+      setDepartment(selectedSalesperson?.salesTeamName || department);
+    }
     setCheckoutId(crypto.randomUUID());
     setPaymentIdempotencyKey(crypto.randomUUID());
     toast.success("已解除待確認狀態；表格資料已保留，可以修改後再提交。");
-  }, [employee, pendingSubmission]);
+  }, [department, employee, pendingSubmission, salespersonEmployeeId, staff]);
 
   useEffect(() => {
     if (!restoredEmployeePendingSubmission) return;
@@ -1931,18 +1963,24 @@ const Index = () => {
           salesId={salesId}
           salespersonEmployeeId={salespersonEmployeeId}
           department={department}
+          salesTeamId={salesTeamId}
+          salesTeams={salesTeams}
+          salesTeamsLoading={salesTeamsLoading}
+          salesTeamsError={salesTeamsError}
           staff={staff}
           staffLoading={staffLoading}
           staffError={staffError}
           locked={Boolean(pendingSubmission)}
           employee={employee}
-          onSalespersonChange={(label, employeeId) => {
+          onSalespersonChange={(label, employeeId, linkedTeamId, linkedTeamName) => {
             setSalesId(label);
             setSalespersonEmployeeId(employeeId);
+            setDepartment(linkedTeamName || "");
+            setSalesTeamId(linkedTeamId);
           }}
-          onSalesTeamChange={(label) => {
-            setDepartment(label);
-            setSalesTeamId(undefined);
+          onSalesTeamChange={(teamId, teamName) => {
+            setDepartment(teamName);
+            setSalesTeamId(teamId);
           }}
         />
 

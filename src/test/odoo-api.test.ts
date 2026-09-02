@@ -462,6 +462,31 @@ describe("odoo-api note contracts", () => {
     );
   });
 
+  it("maps the Sales Team linked on each Odoo employee", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([{
+      id: 95,
+      name: "Elma",
+      job_title: "Sales",
+      department_id: [3, "Retail Department"],
+      sales_team_id: [7, "Retail Sales"],
+      work_email: "elma@example.com",
+      barcode: "AC02",
+    }]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOdooEmployees } = await import("@/lib/odoo-api");
+
+    await expect(getOdooEmployees()).resolves.toEqual([{
+      id: "AC02",
+      name: "Elma",
+      code: "AC02",
+      jobTitle: "Sales",
+      odooEmployeeId: 95,
+      salesTeamId: 7,
+      salesTeamName: "Retail Sales",
+    }]);
+  });
+
   it("keeps search results lightweight until a customer is selected", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([{

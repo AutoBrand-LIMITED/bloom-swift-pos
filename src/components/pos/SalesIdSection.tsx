@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -11,22 +10,38 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Check, ChevronsUpDown, UserCheck } from "lucide-react";
 import { salesStaffDisplayName } from "@/hooks/use-odoo-employees";
 import { cn } from "@/lib/utils";
 import type { PosEmployeeIdentity } from "@/lib/pos-auth";
-import type { SalesStaff } from "@/types/order";
+import type { OdooNamedReference, SalesStaff } from "@/types/order";
 
 interface SalesIdSectionProps {
   salesId: string;
   salespersonEmployeeId?: number;
   department: string;
+  salesTeamId?: number;
+  salesTeams?: OdooNamedReference[];
+  salesTeamsLoading?: boolean;
+  salesTeamsError?: string | null;
   staff: SalesStaff[];
   staffLoading?: boolean;
   staffError?: string | null;
   locked?: boolean;
-  onSalespersonChange: (label: string, employeeId: number) => void;
-  onSalesTeamChange: (label: string) => void;
+  onSalespersonChange: (
+    label: string,
+    employeeId: number,
+    salesTeamId?: number,
+    salesTeamName?: string,
+  ) => void;
+  onSalesTeamChange: (salesTeamId: number | undefined, salesTeamName: string) => void;
   employee?: PosEmployeeIdentity | null;
 }
 
@@ -34,6 +49,10 @@ const SalesIdSection = ({
   salesId,
   salespersonEmployeeId,
   department,
+  salesTeamId,
+  salesTeams = [],
+  salesTeamsLoading = false,
+  salesTeamsError,
   staff,
   staffLoading = false,
   staffError,
@@ -46,6 +65,19 @@ const SalesIdSection = ({
   const selectedStaff = staff.find((candidate) => candidate.odooEmployeeId === salespersonEmployeeId);
   const salespersonIsLegacySnapshot = salespersonEmployeeId === undefined && Boolean(salesId.trim());
   const salespersonDisabled = locked || staffLoading || Boolean(staffError) || staff.length === 0;
+  const selectedTeam = salesTeams.find((team) => team.id === salesTeamId);
+  const salesTeamName = selectedTeam?.name
+    || (selectedStaff && selectedStaff.salesTeamId === salesTeamId
+      ? selectedStaff.salesTeamName
+      : undefined)
+    || department.trim();
+  const hasLinkedSalesTeam = Boolean(selectedStaff?.salesTeamId && selectedStaff.salesTeamName);
+  const managerCanOverride = employee?.role === "manager";
+  const salesTeamIsOverridden = Boolean(
+    managerCanOverride
+    && salesTeamId
+    && salesTeamId !== selectedStaff?.salesTeamId,
+  );
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -117,6 +149,8 @@ const SalesIdSection = ({
                             onSalespersonChange(
                               salesStaffDisplayName(candidate),
                               candidate.odooEmployeeId!,
+                              candidate.salesTeamId,
+                              candidate.salesTeamName,
                             );
                             setSalespersonOpen(false);
                           }}
@@ -144,17 +178,68 @@ const SalesIdSection = ({
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Sales Team（選填）</Label>
-          <Input
-            aria-label="Sales Team（選填）"
-            value={department}
-            disabled={locked}
-            maxLength={200}
-            placeholder="輸入 Sales Team"
-            className="min-h-11 touch-manipulation text-sm"
-            onChange={(event) => onSalesTeamChange(event.target.value)}
-          />
-          <p className="text-[10px] text-muted-foreground">自由輸入訂單快照；不會自動配對 Odoo Sales Team。</p>
+          <Label className="text-xs">Sales Team</Label>
+          {managerCanOverride ? (
+            <Select
+              value={salesTeamId ? String(salesTeamId) : "unassigned"}
+              disabled={
+                locked
+                || !selectedStaff
+                || salesTeamsLoading
+                || Boolean(salesTeamsError)
+              }
+              onValueChange={(value) => {
+                if (value === "unassigned") {
+                  onSalesTeamChange(undefined, "");
+                  return;
+                }
+                const team = salesTeams.find((candidate) => candidate.id === Number(value));
+                if (team) onSalesTeamChange(team.id, team.name);
+              }}
+            >
+              <SelectTrigger aria-label="Sales Team" className="min-h-11 touch-manipulation text-sm">
+                <SelectValue placeholder={salesTeamsLoading ? "正在載入 Odoo Sales Team..." : "選擇 Sales Team"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned" disabled={hasLinkedSalesTeam}>
+                  {hasLinkedSalesTeam ? "請跟隨 Employee 預設" : "未指定"}
+                </SelectItem>
+                {salesTeamId && !salesTeams.some((team) => team.id === salesTeamId) && (
+                  <SelectItem value={String(salesTeamId)} disabled>
+                    {salesTeamName || `Sales Team #${salesTeamId}`}
+                  </SelectItem>
+                )}
+                {salesTeams.map((team) => (
+                  <SelectItem key={team.id} value={String(team.id)}>{team.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div
+              className={cn(
+                "flex min-h-11 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-medium",
+                !salesTeamName && "text-amber-700",
+              )}
+              aria-label="Sales Team"
+              data-sales-team-id={salesTeamId || undefined}
+            >
+              {salesTeamName || "未連結 Sales Team"}
+            </div>
+          )}
+          <p className={cn(
+            "text-[10px] text-muted-foreground",
+            (selectedStaff && !hasLinkedSalesTeam) || salesTeamsError ? "text-amber-700" : undefined,
+          )}>
+            {salesTeamsError
+              ? "未能同步 Odoo Sales Team；暫時唔可以主管覆寫。"
+              : salesTeamIsOverridden
+                ? `今張訂單由主管覆寫；Employee 預設仍為 ${selectedStaff?.salesTeamName || "未指定"}。`
+                : selectedStaff && !hasLinkedSalesTeam
+                  ? "請先於 Odoo Employees 連結 Sales Team；未連結訂單不會計入 Team 統計。"
+                  : managerCanOverride
+                    ? "預設跟隨 Odoo Employee；主管只會覆寫今張訂單。"
+                    : "由 Odoo Employees 連結；選擇負責銷售員後會自動帶入。"}
+          </p>
         </div>
       </div>
     </div>

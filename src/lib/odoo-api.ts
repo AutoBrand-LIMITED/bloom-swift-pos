@@ -62,6 +62,7 @@ interface OdooEmployee {
   name: string;
   job_title: string | null;
   department_id: [number, string] | null;
+  sales_team_id: [number, string] | null;
   work_email: string | null;
   barcode: string | null;
 }
@@ -1440,6 +1441,8 @@ export async function getOdooEmployees(signal?: AbortSignal): Promise<SalesStaff
       code,
       jobTitle: employee.job_title,
       odooEmployeeId: employee.id,
+      salesTeamId: employee.sales_team_id?.[0],
+      salesTeamName: employee.sales_team_id?.[1],
     }];
   });
 }
