@@ -224,6 +224,84 @@ const SectionEditMenu = ({
   );
 };
 
+const OrderEditHistoryPanel = ({
+  eligible,
+  history,
+  status,
+  error,
+  onRetry,
+}: {
+  eligible: boolean;
+  history: OdooOrderEditHistory | null;
+  status: "idle" | "loading" | "success" | "error";
+  error: string | null;
+  onRetry: () => void;
+}) => (
+  <DetailSection
+    title="修改記錄"
+    actions={status === "success" && history ? (
+      <Badge variant="outline" aria-label={`${history.entries.length} 次修改`}>
+        {history.entries.length} 次修改
+      </Badge>
+    ) : undefined}
+  >
+    {!eligible ? (
+      <p className="text-sm text-muted-foreground">此訂單尚未有 Odoo 訂單記錄，因此暫時未能顯示修改記錄。</p>
+    ) : status === "loading" ? (
+      <p aria-live="polite" className="flex items-center gap-2 text-sm text-muted-foreground">
+        <LoaderCircle className="h-4 w-4 animate-spin" /> 正在載入修改記錄…
+      </p>
+    ) : status === "error" ? (
+      <div role="alert" className="flex flex-col items-start gap-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+        <span className="flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error || "未能載入修改記錄。"}
+        </span>
+        <Button variant="outline" className="min-h-11 gap-2 touch-manipulation" onClick={onRetry}>
+          <RefreshCw className="h-4 w-4" /> 重試修改記錄
+        </Button>
+      </div>
+    ) : status === "success" && history?.entries.length === 0 ? (
+      <p className="text-sm text-muted-foreground">暫無修改記錄。</p>
+    ) : status === "success" && history ? (
+      <div className="space-y-4">
+        {history.truncated && (
+          <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            修改記錄較多；目前只顯示最新 100 筆。
+          </p>
+        )}
+        <ol className="space-y-4">
+          {history.entries.map((entry) => (
+            <li key={String(entry.id)} className="relative border-l-2 border-border pl-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  <UserRound className="h-4 w-4" />
+                  {entry.operatorName || (entry.operatorEmployeeId ? `員工 #${entry.operatorEmployeeId}` : "未知操作員")}
+                </p>
+                <time className="text-xs text-muted-foreground" dateTime={entry.changedAt}>
+                  {formatDateTime(entry.changedAt)}
+                </time>
+              </div>
+              <ul className="mt-3 space-y-2">
+                {entry.changes.map((change, index) => (
+                  <li key={`${change.field}-${index}`} className="rounded-md bg-muted/50 p-3 text-sm">
+                    <p className="font-medium">{change.label}</p>
+                    <p className="mt-1 break-words text-muted-foreground">
+                      <span>{formatHistoryValue(change.oldValue)}</span>
+                      <span aria-hidden="true"> → </span>
+                      <span className="text-foreground">{formatHistoryValue(change.newValue)}</span>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ol>
+      </div>
+    ) : null}
+  </DetailSection>
+);
+
 const DestinationCard = ({
   title,
   fulfillmentType,
@@ -371,6 +449,9 @@ const OrderDetail = ({
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="break-all font-mono text-xl font-bold sm:text-2xl">{orderIdentity(order)}</h2>
             <Badge variant={payment.variant}>{payment.label}</Badge>
+            {historyStatus === "success" && history && (
+              <Badge variant="outline">修改 {history.entries.length} 次</Badge>
+            )}
             {syncAttention && (
               <Badge variant="outline" className={syncAttention.className}>{syncAttention.label}</Badge>
             )}
@@ -400,6 +481,14 @@ const OrderDetail = ({
           ["付款記錄", order.odooPaymentName || (order.odooPaymentId ? `#${order.odooPaymentId}` : "—")],
         ]} />
       </DetailSection>
+
+      <OrderEditHistoryPanel
+        eligible={historyEligible}
+        history={history}
+        status={historyStatus}
+        error={historyError}
+        onRetry={onRetryHistory}
+      />
 
       <DetailSection
         title="客戶與送花人"
@@ -627,62 +716,6 @@ const OrderDetail = ({
         </div>
       </DetailSection>
 
-      <DetailSection title="修改記錄">
-        {!historyEligible ? (
-          <p className="text-sm text-muted-foreground">此訂單尚未有 Odoo 訂單記錄，因此暫時未能顯示修改記錄。</p>
-        ) : historyStatus === "loading" ? (
-          <p aria-live="polite" className="flex items-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircle className="h-4 w-4 animate-spin" /> 正在載入修改記錄…
-          </p>
-        ) : historyStatus === "error" ? (
-          <div role="alert" className="flex flex-col items-start gap-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-            <span className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {historyError || "未能載入修改記錄。"}
-            </span>
-            <Button variant="outline" className="min-h-11 gap-2 touch-manipulation" onClick={onRetryHistory}>
-              <RefreshCw className="h-4 w-4" /> 重試修改記錄
-            </Button>
-          </div>
-        ) : historyStatus === "success" && history?.entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">暫無修改記錄。</p>
-        ) : historyStatus === "success" && history ? (
-          <div className="space-y-4">
-            {history.truncated && (
-              <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-                修改記錄較多；目前只顯示最新 100 筆。
-              </p>
-            )}
-            <ol className="space-y-4">
-              {history.entries.map((entry) => (
-              <li key={String(entry.id)} className="relative border-l-2 border-border pl-4">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="flex items-center gap-2 text-sm font-medium">
-                    <UserRound className="h-4 w-4" />
-                    {entry.operatorName || (entry.operatorEmployeeId ? `員工 #${entry.operatorEmployeeId}` : "未知操作員")}
-                  </p>
-                  <time className="text-xs text-muted-foreground" dateTime={entry.changedAt}>
-                    {formatDateTime(entry.changedAt)}
-                  </time>
-                </div>
-                <ul className="mt-3 space-y-2">
-                  {entry.changes.map((change, index) => (
-                    <li key={`${change.field}-${index}`} className="rounded-md bg-muted/50 p-3 text-sm">
-                      <p className="font-medium">{change.label}</p>
-                      <p className="mt-1 break-words text-muted-foreground">
-                        <span>{formatHistoryValue(change.oldValue)}</span>
-                        <span aria-hidden="true"> → </span>
-                        <span className="text-foreground">{formatHistoryValue(change.newValue)}</span>
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-              ))}
-            </ol>
-          </div>
-        ) : null}
-      </DetailSection>
     </div>
   );
 };

@@ -1105,6 +1105,17 @@ describe("OrderHistory delivery summary", () => {
             oldValue: "<b>舊地址</b>",
             newValue: "<script>新地址</script>",
           }],
+        }, {
+          id: "payment-1",
+          changedAt: "2026-08-03T10:05:00+08:00",
+          operatorEmployeeId: 174,
+          operatorName: "Testing",
+          changes: [{
+            field: "payment_status",
+            label: "付款狀態",
+            oldValue: "unpaid",
+            newValue: "paid",
+          }],
         }],
       });
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
@@ -1112,9 +1123,19 @@ describe("OrderHistory delivery summary", () => {
     expect(await screen.findByText("timeline unavailable")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "重試修改記錄" }));
     expect(await screen.findByText("Elma")).toBeVisible();
+    const auditSection = screen.getByRole("region", { name: "修改記錄" });
     expect(screen.getByText("修改記錄較多；目前只顯示最新 100 筆。")).toBeVisible();
     expect(screen.getByText("<b>舊地址</b>")).toBeVisible();
     expect(screen.getByText("<script>新地址</script>")).toBeVisible();
+    expect(within(auditSection).getByText("Testing")).toBeVisible();
+    expect(within(auditSection).getByText("付款狀態")).toBeVisible();
+    expect(screen.getByLabelText("2 次修改")).toBeVisible();
+    expect(screen.getByText("修改 2 次")).toBeVisible();
+
+    const identitySection = screen.getByRole("region", { name: "訂單身份與時間" });
+    const customerSection = screen.getByRole("region", { name: "客戶與送花人" });
+    expect(identitySection.compareDocumentPosition(auditSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(auditSection.compareDocumentPosition(customerSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.querySelector("script")).toBeNull();
   });
 
