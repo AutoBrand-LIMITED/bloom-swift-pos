@@ -7,6 +7,7 @@ import type { OrderRecordView } from "@/lib/order-records";
 const {
   getAccountingPaymentOptions,
   getDeliverySlots,
+  getOdooOrderEditHistory,
   getOdooCustomerGroups,
   getOdooEmployees,
   getOdooSalesTeams,
@@ -15,6 +16,7 @@ const {
 } = vi.hoisted(() => ({
   getAccountingPaymentOptions: vi.fn(),
   getDeliverySlots: vi.fn(),
+  getOdooOrderEditHistory: vi.fn(),
   getOdooCustomerGroups: vi.fn(),
   getOdooEmployees: vi.fn(),
   getOdooSalesTeams: vi.fn(),
@@ -26,6 +28,7 @@ vi.mock("@/lib/odoo-api", () => ({
   hasOdooBackend: true,
   getAccountingPaymentOptions,
   getDeliverySlots,
+  getOdooOrderEditHistory,
   getOdooCustomerGroups,
   getOdooEmployees,
   getOdooSalesTeams,
@@ -76,6 +79,8 @@ describe("OrderHistory delivery summary", () => {
       { id: 11, displayLabel: "上午 09:00-13:00", startTime: "09:00", endTime: "13:00" },
       { id: 12, displayLabel: "下午 13:00-18:00", startTime: "13:00", endTime: "18:00" },
     ]);
+    getOdooOrderEditHistory.mockReset();
+    getOdooOrderEditHistory.mockImplementation(() => new Promise(() => {}));
     getOdooEmployees.mockReset();
     getOdooEmployees.mockResolvedValue([]);
     getOdooSalesTeams.mockReset();
@@ -91,7 +96,7 @@ describe("OrderHistory delivery summary", () => {
     recordOdooOrderPayment.mockReset();
   });
 
-  it("keeps a fixed drawer with an independently scrollable order list", () => {
+  it("uses a full-screen master-detail layout with independently scrollable panes", () => {
     const orders = Array.from({ length: 20 }, (_, index) => orderFixture({
       id: `order-${index + 1}`,
       odooOrderName: `S${String(index + 1).padStart(5, "0")}`,
@@ -101,7 +106,12 @@ describe("OrderHistory delivery summary", () => {
     render(<OrderHistory orders={orders} open onClose={vi.fn()} />);
 
     expect(screen.getByText("訂單記錄 (20)")).toBeVisible();
+    expect(screen.getByRole("complementary", { name: "訂單列表" })).toHaveClass(
+      "md:w-[22rem]",
+      "md:shrink-0",
+    );
     expect(screen.getByTestId("order-history-scroll-area")).toHaveClass("min-h-0", "flex-1");
+    expect(screen.getByTestId("order-history-detail-pane")).toHaveClass("overflow-y-auto");
     expect(screen.getByRole("group", { name: /訂單 S00020/ })).toBeInTheDocument();
   });
 
@@ -109,16 +119,22 @@ describe("OrderHistory delivery summary", () => {
     render(<OrderHistory orders={[
       orderFixture({
         id: "new-occasion",
+        odooOrderName: "S-NEW-OCCASION",
         recipientOccasions: [
           { type: "anniversary", date: "2020-06-18" },
           { type: "other", label: "相識紀念日", date: "2021-09-01" },
         ],
       }),
-      orderFixture({ id: "legacy-birthday", recipientBirthday: "1990-01-02" }),
+      orderFixture({
+        id: "legacy-birthday",
+        odooOrderName: "S-LEGACY-BIRTHDAY",
+        recipientBirthday: "1990-01-02",
+      }),
     ]} open onClose={vi.fn()} />);
 
     expect(screen.getByText(/週年：2020-06-18/)).toBeInTheDocument();
     expect(screen.getByText(/相識紀念日：2021-09-01/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "查看訂單 S-LEGACY-BIRTHDAY" }));
     expect(screen.getByText(/收件人生日：1990-01-02/)).toBeInTheDocument();
   });
 
@@ -223,10 +239,10 @@ describe("OrderHistory delivery summary", () => {
     expect(within(order).getByText("自取：2026-07-18 · 上午 09:00-13:00")).toBeVisible();
     expect(within(order).queryByText("送貨：2026-07-18 · 上午 09:00-13:00")).not.toBeInTheDocument();
 
-    fireEvent.click(within(order).getByText("業務詳情"));
-    expect(within(order).getByText("自取地點")).toBeVisible();
-    expect(within(order).getByText("中西花店門市自取")).toBeVisible();
-    expect(within(order).queryByText("送貨地址")).not.toBeInTheDocument();
+    fireEvent.click(within(order).getByRole("button", { name: "查看訂單 S00017" }));
+    const destinations = screen.getByRole("region", { name: "收貨點與商品分配" });
+    expect(within(destinations).getByText("自取地點")).toBeVisible();
+    expect(within(destinations).getByText("中西花店門市自取")).toBeVisible();
   });
 
   it("edits an existing Odoo order and refreshes the drawer", async () => {
@@ -277,6 +293,8 @@ describe("OrderHistory delivery summary", () => {
       writeDate: "2026-08-03 10:01:00",
     });
     render(<OrderHistory orders={[orderFixture({
+      customerType: "company",
+      companyName: "Flower Company Limited",
       salesId: "AC02 — Elma",
       salespersonEmployeeId: 95,
       salesTeamId: 7,
@@ -307,6 +325,10 @@ describe("OrderHistory delivery summary", () => {
     expect(payload).not.toHaveProperty("salespersonEmployeeId");
     expect(payload).not.toHaveProperty("salesTeamId");
     expect(payload).not.toHaveProperty("customerGroupId");
+    expect(payload).toMatchObject({
+      customerType: "company",
+      companyName: "Flower Company Limited",
+    });
   });
 
   it("edits every existing split destination while preserving IDs and item allocations", async () => {
@@ -797,8 +819,8 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(screen.getByText("業務詳情"));
     expect(screen.getByText("accounts@example.com")).toBeVisible();
     expect(screen.getByText("香港中環花園道 1 號")).toBeVisible();
-    expect(screen.queryByText("PO-300")).not.toBeInTheDocument();
-    expect(screen.queryByText("Net 30")).not.toBeInTheDocument();
+    expect(screen.getByText("PO-300")).toBeVisible();
+    expect(screen.getByText("Net 30")).toBeVisible();
   });
 
   it("keeps accepted orders visible without exposing backend sync details", () => {
@@ -835,5 +857,192 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.queryByText(/odoo_unavailable/)).not.toBeInTheDocument();
     expect(screen.queryByText(/customer_conflict/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /重試 Odoo 同步/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("已同步")).not.toBeInTheDocument();
+    expect(screen.queryByText("待傳送")).not.toBeInTheDocument();
+    expect(screen.getAllByText("同步延誤").length).toBeGreaterThan(0);
+    expect(screen.getByText("需主管處理")).toBeVisible();
+  });
+
+  it("filters payment status without exposing a routine sync-status filter", () => {
+    const onSearchQueryChange = vi.fn();
+    const orders = [
+      orderFixture({ id: "paid", odooOrderName: "S-PAID", paymentStatus: "paid" }),
+      orderFixture({
+        id: "pending",
+        odooOrderName: undefined,
+        source: "operational",
+        syncState: "pending_odoo",
+        paymentStatus: "unpaid",
+      }),
+    ];
+    render(
+      <OrderHistory
+        orders={orders}
+        open
+        onClose={vi.fn()}
+        searchQuery="Wong"
+        searchPhase="success"
+        onSearchQueryChange={onSearchQueryChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("付款狀態篩選"), { target: { value: "unpaid" } });
+    expect(screen.queryByRole("group", { name: /S-PAID/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /訂單 pending/ })).toBeInTheDocument();
+    expect(screen.getByText("訂單記錄 (1/2)")).toBeVisible();
+    expect(screen.queryByLabelText("同步狀態篩選")).not.toBeInTheDocument();
+    expect(screen.queryByText("全部同步狀態")).not.toBeInTheDocument();
+    expect(onSearchQueryChange).not.toHaveBeenCalled();
+  });
+
+  it("opens detail from the mobile-first list and provides a 44px back control", () => {
+    render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "查看訂單 S00017" }));
+    const back = screen.getByRole("button", { name: "返回訂單列表" });
+    expect(back).toHaveClass("min-h-11", "touch-manipulation");
+    fireEvent.click(back);
+    expect(screen.getByRole("complementary", { name: "訂單列表" })).toHaveClass("flex");
+  });
+
+  it("shows every destination allocation, recipient birthday, card, note, and accounting reference", () => {
+    render(<OrderHistory orders={[orderFixture({
+      recipientBirthday: "1990-01-02",
+      giftCardEnabled: true,
+      giftCardMessage: "生日快樂",
+      odooInvoiceId: 21,
+      odooInvoiceName: "INV/2026/00021",
+      odooPaymentId: 31,
+      odooPaymentName: "PBNK1/2026/00031",
+      items: [{ id: "line-1", name: "花束", price: 680, quantity: 2 }],
+      deliverySplits: [{
+        id: "destination-2",
+        fulfillmentType: "delivery",
+        deliveryDate: "2026-07-19",
+        deliveryTimeMode: "specified",
+        deliveryTime: "下午 4 時前",
+        deliveryRegion: "九龍",
+        deliveryDistrict: "觀塘區",
+        deliveryArea: "觀塘",
+        deliveryDetail: "巧明街 6 號",
+        deliveryAddress: "九龍觀塘巧明街 6 號",
+        deliveryGoogleAddress: "",
+        deliveryBuilding: "巧運大廈",
+        deliveryFloor: "7",
+        deliveryUnit: "A",
+        recipientType: "personal",
+        recipientCompanyName: "",
+        recipientName: "Second Recipient",
+        recipientPhone: "62345678",
+        recipientBirthday: "1985-11-12",
+        deliveryPerson: "Driver B",
+        failedDeliveryAction: "return_store",
+        deliveryNote: "Call first",
+        giftCardEnabled: true,
+        giftCardMessage: "Get well soon",
+        itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+      }],
+    })]} open onClose={vi.fn()} />);
+
+    const primary = screen.getByRole("article", { name: "主要收貨點 1" });
+    expect(within(primary).getByText(/收件人生日：1990-01-02/)).toBeVisible();
+    expect(within(primary).getByText("生日快樂")).toBeVisible();
+    expect(within(primary).getByText("× 1")).toBeVisible();
+    const split = screen.getByRole("article", { name: "額外收貨點 2" });
+    expect(within(split).getByText(/收件人生日：1985-11-12/)).toBeVisible();
+    expect(within(split).getByText("Call first")).toBeVisible();
+    expect(within(split).getByText("Get well soon")).toBeVisible();
+    expect(screen.getAllByText("INV/2026/00021").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PBNK1/2026/00031").length).toBeGreaterThan(0);
+  });
+
+  it("loads edit history only for the selected synced Odoo order and aborts stale requests", async () => {
+    const requests: Array<{ orderId: number; signal: AbortSignal }> = [];
+    getOdooOrderEditHistory.mockImplementation((orderId: number, signal: AbortSignal) => {
+      requests.push({ orderId, signal });
+      return new Promise(() => {});
+    });
+    render(<OrderHistory orders={[
+      orderFixture({ id: "first", odooOrderId: 17, odooOrderName: "S00017" }),
+      orderFixture({ id: "second", odooOrderId: 18, odooOrderName: "S00018" }),
+      orderFixture({ id: "local", source: "local", syncState: "unsynced", odooOrderId: undefined, odooOrderName: undefined }),
+    ]} open onClose={vi.fn()} />);
+
+    await waitFor(() => expect(requests.map((request) => request.orderId)).toEqual([17]));
+    fireEvent.click(screen.getByRole("button", { name: "查看訂單 S00018" }));
+    await waitFor(() => expect(requests.map((request) => request.orderId)).toEqual([17, 18]));
+    expect(requests[0].signal.aborted).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "查看訂單 local" }));
+    await waitFor(() => expect(requests[1].signal.aborted).toBe(true));
+    expect(getOdooOrderEditHistory).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("此訂單尚未有 Odoo 訂單記錄，因此暫時未能顯示修改記錄。")).toBeVisible();
+  });
+
+  it("shows independent history error, retry, timeline, and escaped values", async () => {
+    getOdooOrderEditHistory
+      .mockRejectedValueOnce(new Error("timeline unavailable"))
+      .mockResolvedValueOnce({
+        orderId: 17,
+        truncated: true,
+        entries: [{
+          id: "edit-1",
+          changedAt: "2026-08-03T10:01:00+08:00",
+          operatorEmployeeId: 95,
+          operatorName: "Elma",
+          changes: [{
+            field: null,
+            label: "送貨地址",
+            oldValue: "<b>舊地址</b>",
+            newValue: "<script>新地址</script>",
+          }],
+        }],
+      });
+    render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+
+    expect(await screen.findByText("timeline unavailable")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "重試修改記錄" }));
+    expect(await screen.findByText("Elma")).toBeVisible();
+    expect(screen.getByText("修改記錄較多；目前只顯示最新 100 筆。")).toBeVisible();
+    expect(screen.getByText("<b>舊地址</b>")).toBeVisible();
+    expect(screen.getByText("<script>新地址</script>")).toBeVisible();
+    expect(document.querySelector("script")).toBeNull();
+  });
+
+  it("refreshes edit history after a successful order edit", async () => {
+    getOdooOrderEditHistory.mockResolvedValue({ orderId: 17, entries: [], truncated: false });
+    updateOdooOrderOperationalDetails.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+
+    await waitFor(() => expect(getOdooOrderEditHistory).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    fireEvent.change(screen.getByLabelText("送貨地址 *"), { target: { value: "新地址" } });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => expect(getOdooOrderEditHistory).toHaveBeenCalledTimes(2));
+  });
+
+  it("allows an eligible manager to retry an operational order without exposing raw sync errors", async () => {
+    const onRetryOperationalOrder = vi.fn().mockResolvedValue(undefined);
+    render(<OrderHistory
+      orders={[orderFixture({
+        source: "operational",
+        syncState: "pending_odoo",
+        operationalOrderId: "operational-17",
+        operationalRetryEligible: true,
+        operationalLastError: "sensitive_backend_trace",
+      })]}
+      open
+      onClose={vi.fn()}
+      canRetryOperationalOrders
+      onRetryOperationalOrder={onRetryOperationalOrder}
+    />);
+
+    fireEvent.click(screen.getByRole("button", { name: "重試訂單 S00017 Odoo 同步" }));
+    await waitFor(() => expect(onRetryOperationalOrder).toHaveBeenCalledWith("operational-17"));
+    expect(screen.queryByText("sensitive_backend_trace")).not.toBeInTheDocument();
   });
 });

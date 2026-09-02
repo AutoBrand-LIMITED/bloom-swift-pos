@@ -62,6 +62,8 @@ interface OrderEditDialogProps {
 const formFromOrder = (order: OrderRecordView): OrderOperationalUpdate => ({
   salesId: order.salesId || "",
   customerName: order.customerName || "",
+  customerType: order.customerType || "personal",
+  companyName: order.companyName || "",
   senderName: order.senderName || order.customerName || "",
   phone: order.phone || "",
   customerEmail: order.customerEmail || "",

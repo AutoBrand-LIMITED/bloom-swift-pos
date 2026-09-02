@@ -84,6 +84,7 @@ import {
   getOperationalOrders,
   getOdooOrderRecords,
   searchOdooOrderRecords,
+  retryOperationalOrder,
   getAccountingPaymentOptions,
   allowLocalOnlyOrders,
   hasOdooBackend,
@@ -128,6 +129,7 @@ import {
 } from "@/lib/order-records";
 import {
   loadOperationalOrders,
+  applyOperationalOrderStatus,
   mergeOperationalOrderSources,
   newlyReviewedOperationalOrder,
   saveOperationalOrdersForScope,
@@ -394,6 +396,22 @@ const Index = () => {
     remoteOrdersDate,
     remoteOrdersQuery,
   ]);
+
+  const handleOperationalOrderRetry = useCallback(async (operationalOrderId: string) => {
+    if (employee?.role !== "manager") {
+      throw new Error("只有主管可以重試 Odoo 同步。");
+    }
+    const status = await retryOperationalOrder(operationalOrderId);
+    setOperationalOrders((current) => {
+      const next = applyOperationalOrderStatus(current, status);
+      operationalOrdersRef.current = next;
+      saveOperationalOrdersForScope(employee.id, next);
+      return next;
+    });
+    if (status.syncState === "synced") {
+      setOrderRecordsRefreshKey((key) => key + 1);
+    }
+  }, [employee?.id, employee?.role]);
 
   useEffect(() => {
     operationalOrdersRef.current = operationalOrders;
@@ -2473,6 +2491,8 @@ const Index = () => {
         truncated={orderRecordsTruncated}
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
+        canRetryOperationalOrders={employee?.role === "manager"}
+        onRetryOperationalOrder={handleOperationalOrderRetry}
       />
     </div>
   );

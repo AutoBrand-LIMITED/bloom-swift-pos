@@ -1020,6 +1020,8 @@ describe("odoo-api note contracts", () => {
       customerGroupId: 12,
       fulfillmentType: "delivery" as const,
       customerName: "Jay",
+      customerType: "company" as const,
+      companyName: "Flower Company Limited",
       senderName: "Jay",
       phone: "67610707",
       customerEmail: "",
@@ -1110,6 +1112,39 @@ describe("odoo-api note contracts", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/accounting/payment-options",
       expect.objectContaining({ headers: { "Content-Type": "application/json" } })
+    );
+  });
+
+  it("loads the typed Odoo order edit-history contract with an abort signal", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      orderId: 17,
+      truncated: false,
+      entries: [{
+        id: "edit-1",
+        changedAt: "2026-08-03T10:01:00+08:00",
+        operatorEmployeeId: 95,
+        operatorName: "Elma",
+        changes: [{
+          field: null,
+          label: "送貨地址",
+          oldValue: "中環",
+          newValue: "觀塘",
+        }],
+      }],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+    const { getOdooOrderEditHistory } = await import("@/lib/odoo-api");
+
+    await expect(getOdooOrderEditHistory(17, controller.signal)).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders/17/history",
+      expect.objectContaining({
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+      }),
     );
   });
 

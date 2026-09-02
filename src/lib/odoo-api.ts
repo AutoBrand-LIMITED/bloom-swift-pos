@@ -275,6 +275,8 @@ export interface OrderOperationalUpdate {
   /** Legacy snapshots are retained for old orders and safe display. */
   salesId: string;
   customerName: string;
+  customerType: "personal" | "company";
+  companyName: string;
   senderName: string;
   phone: string;
   customerEmail: string;
@@ -320,6 +322,27 @@ export type OrderOperationalUpdatePayload = Omit<
 export interface OrderOperationalUpdateResponse {
   id: number;
   writeDate: string;
+}
+
+export interface OdooOrderEditHistoryChange {
+  field: string | null;
+  label: string;
+  oldValue: string | null;
+  newValue: string | null;
+}
+
+export interface OdooOrderEditHistoryEntry {
+  id: string | number;
+  changedAt: string;
+  operatorEmployeeId: number | null;
+  operatorName: string;
+  changes: OdooOrderEditHistoryChange[];
+}
+
+export interface OdooOrderEditHistory {
+  orderId: number;
+  entries: OdooOrderEditHistoryEntry[];
+  truncated: boolean;
 }
 
 export class OdooConflictError<T = unknown> extends Error {
@@ -972,6 +995,27 @@ export async function recordOdooOrderPayment(
   }
 
   return (await res.json()) as OrderPaymentUpdateResponse;
+}
+
+export async function getOdooOrderEditHistory(
+  orderId: number,
+  signal?: AbortSignal,
+): Promise<OdooOrderEditHistory> {
+  if (!BACKEND_URL) return { orderId, entries: [], truncated: false };
+
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}/history`, {
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+
+  if (!res.ok) {
+    return throwApiError<OdooOrderEditHistory>(
+      res,
+      `Odoo order edit history failed: ${res.status}`,
+    );
+  }
+
+  return (await res.json()) as OdooOrderEditHistory;
 }
 
 export async function getAccountingPaymentOptions(signal?: AbortSignal): Promise<AccountingPaymentOption[]> {
