@@ -87,7 +87,7 @@ describe("print layout contract", () => {
     expect(html).toContain("PRIVATE CARD MESSAGE");
     expect(html).toContain(".batch-print-document + .batch-print-document");
     expect(html).toContain("page-break-before: always");
-    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(2);
+    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(1);
   });
 
   it("omits message cards from all-documents when no destination card is enabled", () => {
@@ -317,18 +317,18 @@ describe("print layout contract", () => {
     expect(html).not.toContain("<script>alert");
   });
 
-  it("renders warehouse and dispatch picking copies as separate full A4 pages", () => {
+  it("renders one full-page picking sheet for a single destination", () => {
     const html = generatePickingList(orderFixture());
 
     expect(html).toContain('data-print-document="picking-list"');
     expect(html).toContain("min-height: 194mm");
     expect(html).not.toContain("overflow: hidden");
     expect(html).toContain('<main class="print-document picking-document picking-document--full-page"');
-    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(2);
+    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(1);
     expect(html).not.toContain('class="tear-line"');
   });
 
-  it("prints an independent picking-list pair for every split destination", () => {
+  it("prints one independent picking list for every split destination", () => {
     const html = generatePickingList(orderFixture({
       odooOrderName: "S17816",
       items: [
@@ -344,16 +344,16 @@ describe("print layout contract", () => {
     const destinationOne = copies.filter((copy) => copy.getAttribute("data-picking-destination") === "1");
     const destinationTwo = copies.filter((copy) => copy.getAttribute("data-picking-destination") === "2");
 
-    expect(copies).toHaveLength(4);
-    expect(destinationOne).toHaveLength(2);
-    expect(destinationTwo).toHaveLength(2);
+    expect(copies).toHaveLength(2);
+    expect(destinationOne).toHaveLength(1);
+    expect(destinationTwo).toHaveLength(1);
     expect(destinationOne.every((copy) => copy.getAttribute("data-picking-reference") === "S17816-1")).toBe(true);
     expect(destinationTwo.every((copy) => copy.getAttribute("data-picking-reference") === "S17816-2")).toBe(true);
     expect(destinationOne.every((copy) => copy.textContent?.includes("Glass vase"))).toBe(true);
     expect(destinationOne.every((copy) => copy.textContent?.includes("Rose bouquet"))).toBe(true);
     expect(destinationTwo.every((copy) => copy.textContent?.includes("Rose bouquet"))).toBe(true);
     expect(destinationTwo.every((copy) => !copy.textContent?.includes("Glass vase"))).toBe(true);
-    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(4);
+    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(2);
   });
 
   it("assigns an order-level price adjustment to the first split picking list only", () => {
@@ -394,7 +394,7 @@ describe("print layout contract", () => {
     }));
 
     expect(html).toContain('<main class="print-document picking-document picking-document--full-page picking-document--dense"');
-    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(2);
+    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(1);
     expect(html).not.toContain('class="tear-line"');
   });
 });
@@ -512,19 +512,20 @@ describe("print document privacy", () => {
 
     for (const item of items) expect(html).toContain(item.name);
     expect(html).toContain('<main class="print-document picking-document picking-document--full-page picking-document--dense"');
-    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(2);
+    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(1);
     expect(html).not.toContain('class="tear-line"');
     expect(html).not.toContain("overflow: hidden");
   });
 
-  it("renders two explicit full-page picking copies with the order reference", () => {
+  it("renders one explicit full-page picking sheet with the order reference", () => {
     const html = generatePickingList(orderFixture());
     const parsed = new DOMParser().parseFromString(html, "text/html");
     const copies = [...parsed.querySelectorAll("[data-picking-copy]")];
 
-    expect(html).toContain('data-picking-copy="warehouse"');
-    expect(html).toContain('data-picking-copy="dispatch"');
-    expect(copies).toHaveLength(2);
+    expect(html).toContain('data-picking-copy="destination"');
+    expect(html).not.toContain('data-picking-copy="warehouse"');
+    expect(html).not.toContain('data-picking-copy="dispatch"');
+    expect(copies).toHaveLength(1);
     expect(copies.every((copy) => copy.getAttribute("data-picking-reference") === "S17738")).toBe(true);
     expect(copies.every((copy) => copy.textContent?.includes("S17738"))).toBe(true);
   });

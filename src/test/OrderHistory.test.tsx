@@ -125,7 +125,8 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText("客戶")).toBeVisible();
     expect(screen.getByText("送貨／自取")).toBeVisible();
     expect(screen.getByText("付款狀態")).toBeVisible();
-    expect(screen.getByText("總額")).toBeVisible();
+    expect(screen.getByText("總額／操作")).toBeVisible();
+    expect(screen.getByRole("button", { name: "全部列印訂單 S00020" })).toBeVisible();
     expect(screen.queryByTestId("order-history-detail-pane")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "查看訂單 S00020" }));
@@ -133,17 +134,17 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.queryByRole("main", { name: "訂單列表" })).not.toBeInTheDocument();
   });
 
-  it("places the edit entry in the top summary and marks product pricing read-only", () => {
+  it("places edit and print actions in the top summary and removes the bottom operation section", () => {
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
     openOrderDetails();
 
     const editButton = screen.getByRole("button", { name: "編輯訂單資料" });
+    const printAllButton = screen.getByRole("button", { name: "全部列印" });
     const identitySection = screen.getByRole("region", { name: "訂單身份與時間" });
     expect(editButton.compareDocumentPosition(identitySection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(printAllButton.compareDocumentPosition(identitySection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "產品與價錢" })).getByText("唯讀")).toBeVisible();
-    expect(within(screen.getByRole("region", { name: "操作" })).queryByRole("button", {
-      name: "編輯訂單資料",
-    })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "操作" })).not.toBeInTheDocument();
   });
 
   it("opens only the requested section from its three-dot action menu", () => {

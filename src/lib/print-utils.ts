@@ -660,16 +660,14 @@ export function generatePickingList(order: Order): string {
   const usesDenseLayout = destinations.some(({ order: destinationOrder }) => (
     destinationUsesDenseLayout(destinationOrder)
   ));
-  const copy = (
+  const sheet = (
     destinationOrder: Order,
     reference: string,
     destinationIndex: number,
-    kind: "warehouse" | "dispatch",
-    subtitle: string,
   ) => `
     <section
       class="pick-copy"
-      data-picking-copy="${kind}"
+      data-picking-copy="destination"
       data-picking-destination="${destinationIndex}"
       data-picking-reference="${escapeHtml(reference)}"
       data-page-format="landscape-full-page"
@@ -678,7 +676,7 @@ export function generatePickingList(order: Order): string {
         <div>
           <div class="brand-name">中西花店</div>
           <h1>執貨單</h1>
-          <div class="english-title">${subtitle}${destinations.length > 1 ? ` · ${destinationIndex}/${destinations.length}` : ""}</div>
+          <div class="english-title">PICKING LIST${destinations.length > 1 ? ` · ${destinationIndex}/${destinations.length}` : ""}</div>
         </div>
         ${privateDocumentMeta(destinationOrder, reference)}
       </header>
@@ -687,10 +685,11 @@ export function generatePickingList(order: Order): string {
       ${pickingInstructions(destinationOrder)}
       <div class="pick-signature">執貨員核對及簽署 / CHECKED BY</div>
     </section>`;
-  const copies = destinations.flatMap(({ order: destinationOrder, reference }, index) => [
-    copy(destinationOrder, reference, index + 1, "warehouse", "PICKING LIST · 倉庫聯"),
-    copy(destinationOrder, reference, index + 1, "dispatch", "PICKING LIST · 出貨聯"),
-  ]).join("\n");
+  const copies = destinations
+    .map(({ order: destinationOrder, reference }, index) => (
+      sheet(destinationOrder, reference, index + 1)
+    ))
+    .join("\n");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>執貨單 - ${escapeHtml(orderReference(order))}</title>
     <style>${commonStyles}

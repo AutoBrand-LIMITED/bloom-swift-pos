@@ -17,25 +17,38 @@ interface PrintButtonsProps {
   size?: "sm" | "default";
 }
 
+interface PrintAllButtonProps extends PrintButtonsProps {
+  ariaLabel?: string;
+}
+
+const safePrint = (generate: () => string) => {
+  try {
+    printDocument(generate());
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "文件產生失敗，請聯絡管理員。");
+  }
+};
+
+export const PrintAllButton = ({ order, size = "sm", ariaLabel }: PrintAllButtonProps) => (
+  <Button
+    size={size}
+    className="min-h-11 gap-1.5 touch-manipulation text-xs"
+    aria-label={ariaLabel}
+    onClick={(event) => {
+      event.stopPropagation();
+      safePrint(() => generateAllDocuments(order));
+    }}
+  >
+    <Printer className="h-3.5 w-3.5" /> 全部列印
+  </Button>
+);
+
 const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
   const hasMessageCards = hasEnabledMessageCards(order);
-  const safePrint = (generate: () => string) => {
-    try {
-      printDocument(generate());
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "文件產生失敗，請聯絡管理員。");
-    }
-  };
 
   return (
     <div className="flex flex-wrap gap-1.5">
-    <Button
-      size={size}
-      className="gap-1.5 text-xs"
-      onClick={(e) => { e.stopPropagation(); safePrint(() => generateAllDocuments(order)); }}
-    >
-      <Printer className="w-3.5 h-3.5" /> 全部列印
-    </Button>
+    <PrintAllButton order={order} size={size} />
     <Button
       variant="outline"
       size={size}

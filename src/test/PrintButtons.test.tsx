@@ -36,7 +36,9 @@ describe("PrintButtons", () => {
     const order = { id: "order-1" } as Order;
 
     render(<PrintButtons order={order} />);
-    fireEvent.click(screen.getByRole("button", { name: "全部列印" }));
+    const printAllButton = screen.getByRole("button", { name: "全部列印" });
+    expect(printAllButton).toHaveClass("min-h-11", "touch-manipulation");
+    fireEvent.click(printAllButton);
 
     expect(generateAllDocuments).toHaveBeenCalledOnce();
     expect(generateAllDocuments).toHaveBeenCalledWith(order);

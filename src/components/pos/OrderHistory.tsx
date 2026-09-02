@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 import OrderEditDialog, { type OrderEditSection } from "@/components/pos/OrderEditDialog";
-import PrintButtons from "@/components/pos/PrintButtons";
+import PrintButtons, { PrintAllButton } from "@/components/pos/PrintButtons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -456,13 +456,34 @@ const OrderDetail = ({
             本機訂單 ID：<span className="break-all font-mono">{order.id}</span>
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
+        <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:max-w-[70%] sm:items-end">
           <p className="font-mono text-2xl font-bold">{formatMoney(order.finalPrice)}</p>
-          {availableEditSections.length > 0 && (
-            <OrderEditMenu
-              onEdit={onEdit}
-              availableSections={availableEditSections}
-            />
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end [&_button]:min-h-11 [&_button]:touch-manipulation">
+            {availableEditSections.length > 0 && (
+              <OrderEditMenu
+                onEdit={onEdit}
+                availableSections={availableEditSections}
+              />
+            )}
+            <PrintButtons order={order} size="default" />
+            {canRetry && order.operationalOrderId && (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 gap-2 touch-manipulation"
+                disabled={retryingOperationalOrderId === order.operationalOrderId}
+                onClick={() => onRetryOperationalOrder(order)}
+                aria-label={`重試訂單 ${orderIdentity(order)} Odoo 同步`}
+              >
+                {retryingOperationalOrderId === order.operationalOrderId
+                  ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                  : <RefreshCw className="h-4 w-4" />}
+                重試 Odoo 同步
+              </Button>
+            )}
+          </div>
+          {operationalRetryError && (
+            <p role="alert" className="text-sm text-destructive">{operationalRetryError}</p>
           )}
         </div>
       </div>
@@ -670,32 +691,6 @@ const OrderDetail = ({
         ]} />
       </DetailSection>
 
-      <DetailSection title="操作">
-        <div className="space-y-3">
-          {canRetry && order.operationalOrderId && (
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-11 gap-2 touch-manipulation"
-              disabled={retryingOperationalOrderId === order.operationalOrderId}
-              onClick={() => onRetryOperationalOrder(order)}
-              aria-label={`重試訂單 ${orderIdentity(order)} Odoo 同步`}
-            >
-              {retryingOperationalOrderId === order.operationalOrderId
-                ? <LoaderCircle className="h-4 w-4 animate-spin" />
-                : <RefreshCw className="h-4 w-4" />}
-              重試 Odoo 同步
-            </Button>
-          )}
-          {operationalRetryError && (
-            <p role="alert" className="text-sm text-destructive">{operationalRetryError}</p>
-          )}
-          <div className="[&_button]:min-h-11 [&_button]:touch-manipulation">
-            <PrintButtons order={order} size="default" />
-          </div>
-        </div>
-      </DetailSection>
-
     </div>
   );
 };
@@ -854,40 +849,46 @@ const OrderHistory = ({
   ) : (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div
-        className="hidden grid-cols-[minmax(7.5rem,0.8fr)_minmax(10rem,1.1fr)_minmax(9rem,1fr)_minmax(14rem,1.5fr)_minmax(8rem,0.8fr)_minmax(7.5rem,0.7fr)] gap-4 border-b border-border bg-muted/40 px-5 py-3 text-xs font-semibold text-muted-foreground md:grid"
+        className="hidden grid-cols-[minmax(0,1fr)_16rem] gap-4 border-b border-border bg-muted/40 py-3 text-xs font-semibold text-muted-foreground xl:grid"
         aria-hidden="true"
       >
-        <span>訂單</span>
-        <span>落單時間</span>
-        <span>客戶</span>
-        <span>送貨／自取</span>
-        <span>付款狀態</span>
-        <span className="text-right">總額</span>
+        <div className="grid grid-cols-[minmax(7.5rem,0.8fr)_minmax(10rem,1.1fr)_minmax(9rem,1fr)_minmax(14rem,1.5fr)_minmax(8rem,0.8fr)] gap-4 px-5">
+          <span>訂單</span>
+          <span>落單時間</span>
+          <span>客戶</span>
+          <span>送貨／自取</span>
+          <span>付款狀態</span>
+        </div>
+        <span className="px-5 text-right">總額／操作</span>
       </div>
       <div className="divide-y divide-border">
       {filteredOrders.map((order) => {
         const payment = statusBadge[order.paymentStatus];
         const syncAttention = syncAttentionBadge(order);
+        const identity = orderIdentity(order);
         return (
-          <button
+          <article
             key={order.id}
-            type="button"
-            className="grid min-h-11 w-full touch-manipulation gap-3 bg-card px-4 py-4 text-left transition-colors active:bg-muted/70 focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:grid-cols-[minmax(7.5rem,0.8fr)_minmax(10rem,1.1fr)_minmax(9rem,1fr)_minmax(14rem,1.5fr)_minmax(8rem,0.8fr)_minmax(7.5rem,0.7fr)] md:items-center md:gap-4 md:px-5"
-            onClick={() => openOrder(order)}
-            aria-label={`查看訂單 ${orderIdentity(order)}`}
+            className="grid bg-card xl:grid-cols-[minmax(0,1fr)_16rem] xl:items-stretch xl:gap-4"
           >
-            <div className="flex items-start justify-between gap-3 md:block">
+          <button
+            type="button"
+            className="grid min-h-11 w-full touch-manipulation gap-3 px-4 py-4 text-left transition-colors active:bg-muted/70 focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring xl:grid-cols-[minmax(7.5rem,0.8fr)_minmax(10rem,1.1fr)_minmax(9rem,1fr)_minmax(14rem,1.5fr)_minmax(8rem,0.8fr)] xl:items-center xl:gap-4 xl:px-5"
+            onClick={() => openOrder(order)}
+            aria-label={`查看訂單 ${identity}`}
+          >
+            <div className="flex items-start justify-between gap-3 xl:block">
               <div className="min-w-0">
                 <p className="truncate font-mono text-base font-bold text-primary">{order.odooOrderName || "未有 Odoo 編號"}</p>
                 {!order.odooOrderName && (
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">{order.id}</p>
                 )}
               </div>
-              <p className="shrink-0 font-mono text-base font-bold md:hidden">{formatMoney(order.finalPrice)}</p>
+              <p className="shrink-0 font-mono text-base font-bold xl:hidden">{formatMoney(order.finalPrice)}</p>
             </div>
-            <p className="flex items-center gap-1.5 text-sm text-muted-foreground md:block">
-              <Clock3 className="h-4 w-4 shrink-0 md:hidden" />
-              <span className="md:hidden">落單：</span>{formatDateTime(order.createdAt)}
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground xl:block">
+              <Clock3 className="h-4 w-4 shrink-0 xl:hidden" />
+              <span className="xl:hidden">落單：</span>{formatDateTime(order.createdAt)}
             </p>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{order.customerName || order.phone || "未有客戶名稱"}</p>
@@ -896,7 +897,7 @@ const OrderHistory = ({
               )}
             </div>
             <p className="flex items-start gap-1.5 text-sm">
-              <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 md:hidden" />
+              <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 xl:hidden" />
               <span>
                 <span className="font-medium">{fulfillmentLabel(order.fulfillmentType)}：{order.deliveryDate || "未指定日期"}</span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">{deliveryTimeLabel(order)}</span>
@@ -908,11 +909,27 @@ const OrderHistory = ({
                 <Badge variant="outline" className={syncAttention.className}>{syncAttention.label}</Badge>
               )}
             </div>
-            <div className="hidden text-right md:block">
-              <p className="font-mono text-sm font-bold">{formatMoney(order.finalPrice)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">查看詳情 →</p>
-            </div>
           </button>
+          <div className="flex items-center justify-between gap-2 border-t border-border px-4 pb-4 pt-3 xl:flex-col xl:items-end xl:justify-center xl:border-t-0 xl:px-5 xl:py-4">
+            <p className="hidden font-mono text-sm font-bold xl:block">{formatMoney(order.finalPrice)}</p>
+            <div className="flex flex-wrap justify-end gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="min-h-11 touch-manipulation text-xs"
+                onClick={() => openOrder(order)}
+                aria-label={`查看詳情 ${identity}`}
+              >
+                查看詳情 →
+              </Button>
+              <PrintAllButton
+                order={order}
+                ariaLabel={`全部列印訂單 ${identity}`}
+              />
+            </div>
+          </div>
+          </article>
         );
       })}
       </div>
