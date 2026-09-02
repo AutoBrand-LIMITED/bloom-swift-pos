@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import type { RecipientOccasion, RecipientOccasionType } from "@/types/order";
 interface RecipientOccasionEditorProps {
   label?: string;
   occasions: readonly RecipientOccasion[];
+  deliveryDate: string;
   onChange: (occasions: RecipientOccasion[]) => void;
   disabled?: boolean;
 }
@@ -25,12 +27,38 @@ const OCCASION_TYPES = Object.entries(RECIPIENT_OCCASION_LABELS) as Array<[
   string,
 ]>;
 
+const monthDayLabel = (date: string) => {
+  const match = /^(?:\d{4})-(\d{2})-(\d{2})$/.exec(date.trim());
+  if (!match) return "尚未設定";
+  return `${Number(match[1])} 月 ${Number(match[2])} 日`;
+};
+
 const RecipientOccasionEditor = ({
   label = "收花人重要日子",
   occasions,
+  deliveryDate,
   onChange,
   disabled = false,
 }: RecipientOccasionEditorProps) => {
+  const previousDeliveryDate = useRef(deliveryDate);
+
+  useEffect(() => {
+    const previousDate = previousDeliveryDate.current;
+    if (!deliveryDate || deliveryDate === previousDate) return;
+    previousDeliveryDate.current = deliveryDate;
+
+    const shouldFollowDeliveryDate = (occasion: RecipientOccasion) => (
+      occasion.autoDateFromDelivery === true
+    );
+    if (!occasions.some(shouldFollowDeliveryDate)) return;
+
+    onChange(occasions.map((occasion) => (
+      shouldFollowDeliveryDate(occasion)
+        ? { ...occasion, date: deliveryDate }
+        : { ...occasion }
+    )));
+  }, [deliveryDate, occasions, onChange]);
+
   const update = (index: number, changes: Partial<RecipientOccasion>) => {
     onChange(occasions.map((occasion, candidateIndex) => (
       candidateIndex === index ? { ...occasion, ...changes } : { ...occasion }
@@ -47,13 +75,22 @@ const RecipientOccasionEditor = ({
           variant="outline"
           size="sm"
           className="min-h-11 touch-manipulation"
-          disabled={disabled}
-          onClick={() => onChange([...occasions, { type: "birthday", date: "" }])}
+          disabled={disabled || !deliveryDate}
+          onClick={() => onChange([...occasions, {
+            type: "birthday",
+            date: deliveryDate,
+            autoDateFromDelivery: true,
+          }])}
           aria-label={`新增${label}`}
         >
           <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />新增
         </Button>
       </div>
+      <p className="text-[11px] text-muted-foreground">
+        {deliveryDate
+          ? "日期自動跟收貨點送貨日；無需輸入年份。"
+          : "請先選擇這個收貨點的送貨日期。"}
+      </p>
       {occasions.length === 0 ? (
         <p className="text-[11px] text-muted-foreground">未有重要日子；需要時可新增多項。</p>
       ) : occasions.map((occasion, index) => {
@@ -85,15 +122,12 @@ const RecipientOccasionEditor = ({
             </div>
             <div className="space-y-1">
               <Label className="text-[11px]">日期</Label>
-              <Input
-                type="date"
-                required
-                disabled={disabled}
-                value={occasion.date}
-                onChange={(event) => update(index, { date: event.target.value })}
+              <div
                 aria-label={`${rowLabel} 日期`}
-                className="min-h-11 touch-manipulation"
-              />
+                className="flex min-h-11 items-center rounded-md border border-input bg-muted/20 px-3 text-sm"
+              >
+                {monthDayLabel(occasion.date)}
+              </div>
             </div>
             <Button
               type="button"

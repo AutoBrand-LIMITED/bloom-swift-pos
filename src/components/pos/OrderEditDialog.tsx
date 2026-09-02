@@ -694,6 +694,7 @@ const OrderEditDialog = ({
                 <RecipientOccasionEditor
                   label="主要收貨點收花人重要日子"
                   occasions={recipientOccasionsStateFromSelection(form).value}
+                  deliveryDate={form.deliveryDate}
                   onChange={(recipientOccasions) => {
                     setForm((current) => {
                       if (!current) return current;

@@ -258,7 +258,7 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onRecipientSuggestionSelect).toHaveBeenCalledWith(suggestion);
   });
 
-  it("edits repeatable recipient occasions independently", () => {
+  it("edits repeatable recipient occasion types without asking for a full date", () => {
     const onRecipientOccasionsChange = vi.fn();
     renderSection({
       recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
@@ -266,12 +266,13 @@ describe("DeliverySection delivery time controls", () => {
     });
 
     const birthday = screen.getByLabelText("收貨方式 收花人重要日子 1 日期");
-    expect(birthday).toHaveValue("1990-01-02");
+    expect(birthday).toHaveTextContent("1 月 2 日");
 
-    fireEvent.change(birthday, { target: { value: "1985-11-12" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "收貨方式 收花人重要日子 1 類型" }));
+    fireEvent.click(screen.getByRole("option", { name: "週年" }));
     expect(onRecipientOccasionsChange).toHaveBeenCalledWith([{
-      type: "birthday",
-      date: "1985-11-12",
+      type: "anniversary",
+      date: "1990-01-02",
     }]);
   });
 

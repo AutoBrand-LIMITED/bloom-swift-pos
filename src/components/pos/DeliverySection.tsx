@@ -1230,6 +1230,7 @@ const DeliverySection = ({
         <RecipientOccasionEditor
           label={`${sectionTitle} 收花人重要日子`}
           occasions={recipientOccasions || []}
+          deliveryDate={deliveryDate}
           onChange={onRecipientOccasionsChange}
         />
         {recipientLookupPhase !== "idle" && (

@@ -722,9 +722,8 @@ describe("OrderHistory delivery summary", () => {
     );
 
     openOrderEditSection("修改收貨點與商品分配");
-    fireEvent.change(screen.getByLabelText("主要收貨點收花人重要日子 1 日期"), {
-      target: { value: "1991-02-03" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "主要收貨點收花人重要日子 1 類型" }));
+    fireEvent.click(screen.getByRole("option", { name: "週年" }));
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("未有最新版本");
@@ -749,9 +748,8 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.change(screen.getByLabelText("收貨人／聯絡人姓名 *"), {
       target: { value: "Changed Recipient" },
     });
-    fireEvent.change(screen.getByLabelText("主要收貨點收花人重要日子 1 日期"), {
-      target: { value: "1991-02-03" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "主要收貨點收花人重要日子 1 類型" }));
+    fireEvent.click(screen.getByRole("option", { name: "週年" }));
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("未有最新版本");

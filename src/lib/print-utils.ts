@@ -2,6 +2,8 @@ import type { DeliverySplit, Order, OrderItem } from "@/types/order";
 import {
   normalizeDiscountPercent,
   orderItemTotal,
+  orderItemsTotal,
+  roundMoney,
 } from "@/lib/order-pricing";
 import { renderSafeMarkdown } from "@/lib/safe-markdown";
 
@@ -211,11 +213,11 @@ function receiptMeta(order: Order): string {
   `;
 }
 
-function privateDocumentMeta(order: Order): string {
+function privateDocumentMeta(order: Order, reference = orderReference(order)): string {
   return `
     <div class="pick-reference">
       ${fieldRows([
-        ["訂單編號", orderReference(order)],
+        ["訂單編號", reference],
         ["開單日期", createdAtLabel(order)],
       ])}
     </div>
@@ -249,6 +251,12 @@ function itemsTable(order: Order, showPrice: boolean): string {
   }
   if (showPrice && order.urgentFee > 0) {
     extras.push(`<tr><td colspan="3">急單費</td><td class="num">$${order.urgentFee.toLocaleString()}</td></tr>`);
+  }
+  const orderAdjustment = roundMoney(
+    order.finalPrice - orderItemsTotal(order.items) - order.deliveryFee - order.urgentFee,
+  );
+  if (showPrice && orderAdjustment !== 0) {
+    extras.push(`<tr><td colspan="3">訂單金額調整</td><td class="num">$${orderAdjustment.toLocaleString()}</td></tr>`);
   }
 
   return `
@@ -470,9 +478,14 @@ function resolveDeliveryAllocations(order: Order): ResolvedDeliveryAllocations {
 }
 
 function splitAsOrder(order: Order, split: DeliverySplit, items: OrderItem[]): Order {
+  const itemSubtotal = items.reduce((total, item) => total + orderItemTotal(item), 0);
   return {
     ...order,
     items,
+    deliveryFee: 0,
+    urgentFee: 0,
+    subtotal: itemSubtotal,
+    finalPrice: itemSubtotal,
     fulfillmentType: split.fulfillmentType || "delivery",
     deliveryDate: split.deliveryDate,
     deliveryTimeMode: split.deliveryTimeMode,
@@ -502,9 +515,23 @@ function deliveryDestinations(order: Order): Array<{ order: Order; reference: st
 
   const reference = orderReference(order);
   const resolved = resolveDeliveryAllocations(order);
+  const primarySubtotal = resolved.primaryItems.reduce(
+    (total, item) => total + orderItemTotal(item),
+    0,
+  );
+  const orderAdjustment = roundMoney(
+    order.finalPrice - orderItemsTotal(order.items) - order.deliveryFee - order.urgentFee,
+  );
   return [
     {
-      order: { ...order, items: resolved.primaryItems },
+      order: {
+        ...order,
+        items: resolved.primaryItems,
+        subtotal: primarySubtotal,
+        finalPrice: roundMoney(
+          primarySubtotal + order.deliveryFee + order.urgentFee + orderAdjustment,
+        ),
+      },
       reference: `${reference}-D1`,
     },
     ...splits.map((split, index) => ({
@@ -512,6 +539,17 @@ function deliveryDestinations(order: Order): Array<{ order: Order; reference: st
       reference: `${reference}-D${index + 2}`,
     })),
   ];
+}
+
+function pickingDestinations(order: Order): Array<{ order: Order; reference: string }> {
+  const destinations = deliveryDestinations(order);
+  if (destinations.length === 1) return destinations;
+
+  const reference = orderReference(order);
+  return destinations.map((destination, index) => ({
+    ...destination,
+    reference: `${reference}-${index + 1}`,
+  }));
 }
 
 function messageCardDestinations(order: Order) {
@@ -598,38 +636,61 @@ export function generateMessageCards(order: Order): string {
 
 /** 倉庫執貨單 */
 export function generatePickingList(order: Order): string {
-  const estimatedItemLines = order.items.reduce(
-    (total, item) => total + Math.max(1, Math.ceil(item.name.length / 70)),
-    0,
-  );
-  const estimatedDetailLines = Math.ceil(order.deliveryAddress.length / 100)
-    + Math.ceil(order.deliveryNote.length / 100)
-    + Math.ceil(deliveryTimeLabel(order).length / 40)
-    + Math.ceil((order.recipientCompanyName?.length || 0) / 50)
-    + Math.ceil(order.recipientName.length / 50);
-  const hasDiscountRows = order.items.some(
-    (item) => normalizeDiscountPercent(item.discountPercent) > 0,
-  );
-  const feeRowCount = Number(order.deliveryFee > 0) + Number(order.urgentFee > 0);
-  const usesDenseLayout = order.items.length >= 4
-    || hasDiscountRows
-    || feeRowCount > 1
-    || estimatedItemLines + estimatedDetailLines > 8;
-  const copy = (kind: "warehouse" | "dispatch", subtitle: string) => `
-    <section class="pick-copy" data-picking-copy="${kind}" data-page-format="landscape-full-page">
+  const destinations = pickingDestinations(order);
+  const destinationUsesDenseLayout = (destinationOrder: Order) => {
+    const estimatedItemLines = destinationOrder.items.reduce(
+      (total, item) => total + Math.max(1, Math.ceil(item.name.length / 70)),
+      0,
+    );
+    const estimatedDetailLines = Math.ceil(destinationOrder.deliveryAddress.length / 100)
+      + Math.ceil(destinationOrder.deliveryNote.length / 100)
+      + Math.ceil(deliveryTimeLabel(destinationOrder).length / 40)
+      + Math.ceil((destinationOrder.recipientCompanyName?.length || 0) / 50)
+      + Math.ceil(destinationOrder.recipientName.length / 50);
+    const hasDiscountRows = destinationOrder.items.some(
+      (item) => normalizeDiscountPercent(item.discountPercent) > 0,
+    );
+    const feeRowCount = Number(destinationOrder.deliveryFee > 0)
+      + Number(destinationOrder.urgentFee > 0);
+    return destinationOrder.items.length >= 4
+      || hasDiscountRows
+      || feeRowCount > 1
+      || estimatedItemLines + estimatedDetailLines > 8;
+  };
+  const usesDenseLayout = destinations.some(({ order: destinationOrder }) => (
+    destinationUsesDenseLayout(destinationOrder)
+  ));
+  const copy = (
+    destinationOrder: Order,
+    reference: string,
+    destinationIndex: number,
+    kind: "warehouse" | "dispatch",
+    subtitle: string,
+  ) => `
+    <section
+      class="pick-copy"
+      data-picking-copy="${kind}"
+      data-picking-destination="${destinationIndex}"
+      data-picking-reference="${escapeHtml(reference)}"
+      data-page-format="landscape-full-page"
+    >
       <header class="pick-header">
         <div>
           <div class="brand-name">中西花店</div>
           <h1>執貨單</h1>
-          <div class="english-title">${subtitle}</div>
+          <div class="english-title">${subtitle}${destinations.length > 1 ? ` · ${destinationIndex}/${destinations.length}` : ""}</div>
         </div>
-        ${privateDocumentMeta(order)}
+        ${privateDocumentMeta(destinationOrder, reference)}
       </header>
-      ${pickingDeliveryInfo(order)}
-      <div class="pick-table-wrap">${itemsTable(order, true)}</div>
-      ${pickingInstructions(order)}
+      ${pickingDeliveryInfo(destinationOrder)}
+      <div class="pick-table-wrap">${itemsTable(destinationOrder, true)}</div>
+      ${pickingInstructions(destinationOrder)}
       <div class="pick-signature">執貨員核對及簽署 / CHECKED BY</div>
     </section>`;
+  const copies = destinations.flatMap(({ order: destinationOrder, reference }, index) => [
+    copy(destinationOrder, reference, index + 1, "warehouse", "PICKING LIST · 倉庫聯"),
+    copy(destinationOrder, reference, index + 1, "dispatch", "PICKING LIST · 出貨聯"),
+  ]).join("\n");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>執貨單 - ${escapeHtml(orderReference(order))}</title>
     <style>${commonStyles}
@@ -726,8 +787,7 @@ export function generatePickingList(order: Order): string {
       }
     </style></head><body class="picking-sheet">
     <main class="print-document picking-document picking-document--full-page${usesDenseLayout ? " picking-document--dense" : ""}" data-print-document="picking-list">
-      ${copy("warehouse", "PICKING LIST · 倉庫聯")}
-      ${copy("dispatch", "PICKING LIST · 出貨聯")}
+      ${copies}
     </main>
   </body></html>`;
 }

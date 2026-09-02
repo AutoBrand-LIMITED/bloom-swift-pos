@@ -620,6 +620,16 @@ describe("pending Odoo submission", () => {
     });
   });
 
+  it("strips POS-only automatic-date provenance before submitting occasions", () => {
+    expect(recipientOccasionFieldsForSubmission([{
+      type: "birthday",
+      date: "2026-09-02",
+      autoDateFromDelivery: true,
+    }], true)).toEqual({
+      recipientOccasions: [{ type: "birthday", date: "2026-09-02" }],
+    });
+  });
+
   it("submits a primary suggestion's explicit occasion version with its array", () => {
     const suggestion = {
       recipientOccasions: [{ type: "anniversary" as const, date: "2020-06-18" }],

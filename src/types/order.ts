@@ -27,6 +27,8 @@ export interface RecipientOccasion {
   type: RecipientOccasionType;
   label?: string;
   date: string;
+  /** POS-only provenance; removed by normalizeRecipientOccasions before API submission. */
+  autoDateFromDelivery?: true;
 }
 
 export interface DeliverySplitItemAllocation {

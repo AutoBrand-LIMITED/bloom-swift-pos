@@ -218,6 +218,7 @@ const OrderDestinationEditCard = ({
       <RecipientOccasionEditor
         label={`${title} 收花人重要日子`}
         occasions={recipientOccasionsStateFromSelection(split).value}
+        deliveryDate={split.deliveryDate}
         onChange={(recipientOccasions) => {
           const next = { ...split, recipientOccasions };
           delete next.recipientBirthday;

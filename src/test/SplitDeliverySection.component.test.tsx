@@ -196,12 +196,8 @@ describe("SplitDeliverySection fulfillment controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "新增額外收貨資料 2 收花人重要日子" }));
     fireEvent.click(screen.getByRole("button", { name: "新增額外收貨資料 3 收花人重要日子" }));
-    fireEvent.change(screen.getByLabelText("額外收貨資料 2 收花人重要日子 1 日期"), {
-      target: { value: "1990-01-02" },
-    });
-    fireEvent.change(screen.getByLabelText("額外收貨資料 3 收花人重要日子 1 日期"), {
-      target: { value: "1985-11-12" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "額外收貨資料 3 收花人重要日子 1 類型" }));
+    fireEvent.click(screen.getByRole("option", { name: "週年" }));
     fireEvent.click(screen.getByRole("switch", { name: "拆單收貨點 2 心意卡開關" }));
     fireEvent.change(screen.getByLabelText("拆單收貨點 2 心意卡內容"), {
       target: { value: "Destination two" },
@@ -213,12 +209,20 @@ describe("SplitDeliverySection fulfillment controls", () => {
 
     const state = JSON.parse(screen.getByTestId("split-state").textContent || "[]");
     expect(state[0]).toMatchObject({
-      recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+      recipientOccasions: [{
+        type: "birthday",
+        date: "2026-08-18",
+        autoDateFromDelivery: true,
+      }],
       giftCardEnabled: true,
       giftCardMessage: "Destination two",
     });
     expect(state[1]).toMatchObject({
-      recipientOccasions: [{ type: "birthday", date: "1985-11-12" }],
+      recipientOccasions: [{
+        type: "anniversary",
+        date: "2026-08-18",
+        autoDateFromDelivery: true,
+      }],
       giftCardEnabled: true,
       giftCardMessage: "Destination three",
     });
@@ -259,9 +263,8 @@ describe("SplitDeliverySection fulfillment controls", () => {
         recipientOccasionsVersion: "recipient-85-v4",
       });
 
-    fireEvent.change(screen.getByLabelText("額外收貨資料 2 收花人重要日子 1 日期"), {
-      target: { value: "" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "額外收貨資料 2 收花人重要日子 1 類型" }));
+    fireEvent.click(screen.getByRole("option", { name: "週年" }));
     fireEvent.click(screen.getByRole("switch", { name: "拆單收貨點 2 心意卡開關" }));
     fireEvent.change(screen.getByLabelText("拆單收貨點 2 心意卡內容"), {
       target: { value: "Keep the binding" },
@@ -269,7 +272,7 @@ describe("SplitDeliverySection fulfillment controls", () => {
     expect(JSON.parse(screen.getByTestId("split-state").textContent || "[]")[0])
       .toMatchObject({
         recipientPartnerId: 85,
-        recipientOccasions: [{ type: "birthday", date: "" }],
+        recipientOccasions: [{ type: "anniversary", date: "1990-01-02" }],
         recipientOccasionsVersion: "recipient-85-v4",
       });
 
@@ -351,9 +354,6 @@ describe("SplitDeliverySection fulfillment controls", () => {
     ]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "新增額外收貨資料 2 收花人重要日子" }));
-    fireEvent.change(screen.getByLabelText("額外收貨資料 2 收花人重要日子 1 日期"), {
-      target: { value: "1990-01-02" },
-    });
     fireEvent.click(screen.getByRole("switch", { name: "拆單收貨點 3 心意卡開關" }));
     fireEvent.change(screen.getByLabelText("拆單收貨點 3 心意卡內容"), {
       target: { value: "D3 card" },
@@ -362,7 +362,11 @@ describe("SplitDeliverySection fulfillment controls", () => {
     const state = JSON.parse(screen.getByTestId("split-state").textContent || "[]");
     expect(state[0]).toMatchObject({
       recipientPartnerId: 85,
-      recipientOccasions: [{ type: "birthday", date: "1990-01-02" }],
+      recipientOccasions: [{
+        type: "birthday",
+        date: "2026-08-18",
+        autoDateFromDelivery: true,
+      }],
     });
     expect(state[1]).toMatchObject({
       recipientPartnerId: 86,

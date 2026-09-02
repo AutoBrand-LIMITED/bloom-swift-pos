@@ -328,6 +328,59 @@ describe("print layout contract", () => {
     expect(html).not.toContain('class="tear-line"');
   });
 
+  it("prints an independent picking-list pair for every split destination", () => {
+    const html = generatePickingList(orderFixture({
+      odooOrderName: "S17816",
+      items: [
+        { id: "line-1", name: "Rose bouquet", price: 680, quantity: 3 },
+        { id: "line-2", name: "Glass vase", price: 250, quantity: 1 },
+      ],
+      deliverySplits: [splitFixture({
+        itemAllocations: [{ itemId: "line-1", itemName: "Rose bouquet", quantity: 1 }],
+      })],
+    }));
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    const copies = [...parsed.querySelectorAll("[data-picking-copy]")];
+    const destinationOne = copies.filter((copy) => copy.getAttribute("data-picking-destination") === "1");
+    const destinationTwo = copies.filter((copy) => copy.getAttribute("data-picking-destination") === "2");
+
+    expect(copies).toHaveLength(4);
+    expect(destinationOne).toHaveLength(2);
+    expect(destinationTwo).toHaveLength(2);
+    expect(destinationOne.every((copy) => copy.getAttribute("data-picking-reference") === "S17816-1")).toBe(true);
+    expect(destinationTwo.every((copy) => copy.getAttribute("data-picking-reference") === "S17816-2")).toBe(true);
+    expect(destinationOne.every((copy) => copy.textContent?.includes("Glass vase"))).toBe(true);
+    expect(destinationOne.every((copy) => copy.textContent?.includes("Rose bouquet"))).toBe(true);
+    expect(destinationTwo.every((copy) => copy.textContent?.includes("Rose bouquet"))).toBe(true);
+    expect(destinationTwo.every((copy) => !copy.textContent?.includes("Glass vase"))).toBe(true);
+    expect(html.match(/data-page-format="landscape-full-page"/g)).toHaveLength(4);
+  });
+
+  it("assigns an order-level price adjustment to the first split picking list only", () => {
+    const html = generatePickingList(orderFixture({
+      odooOrderName: "S17816",
+      items: [
+        { id: "line-1", name: "Rose bouquet", price: 100, quantity: 3 },
+        { id: "line-2", name: "Glass vase", price: 50, quantity: 1 },
+      ],
+      deliveryFee: 20,
+      subtotal: 350,
+      finalPrice: 300,
+      priceOverridden: true,
+      deliverySplits: [splitFixture({
+        itemAllocations: [{ itemId: "line-1", itemName: "Rose bouquet", quantity: 1 }],
+      })],
+    }));
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    const destinationOne = parsed.querySelector('[data-picking-reference="S17816-1"]');
+    const destinationTwo = parsed.querySelector('[data-picking-reference="S17816-2"]');
+
+    expect(destinationOne?.textContent).toContain("訂單金額調整");
+    expect(destinationOne?.querySelector(".total-row .num")?.textContent).toBe("$200");
+    expect(destinationTwo?.textContent).not.toContain("訂單金額調整");
+    expect(destinationTwo?.querySelector(".total-row .num")?.textContent).toBe("$100");
+  });
+
   it("uses separate full pages when two discounted items and fee rows need more space", () => {
     const html = generatePickingList(orderFixture({
       items: [
@@ -466,10 +519,14 @@ describe("print document privacy", () => {
 
   it("renders two explicit full-page picking copies with the order reference", () => {
     const html = generatePickingList(orderFixture());
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    const copies = [...parsed.querySelectorAll("[data-picking-copy]")];
 
     expect(html).toContain('data-picking-copy="warehouse"');
     expect(html).toContain('data-picking-copy="dispatch"');
-    expect(html.split("S17738")).toHaveLength(4);
+    expect(copies).toHaveLength(2);
+    expect(copies.every((copy) => copy.getAttribute("data-picking-reference") === "S17738")).toBe(true);
+    expect(copies.every((copy) => copy.textContent?.includes("S17738"))).toBe(true);
   });
 
   it("prints delivery details when recipient phone is the only populated field", () => {

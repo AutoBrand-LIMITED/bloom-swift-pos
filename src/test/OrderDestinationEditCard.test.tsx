@@ -93,24 +93,26 @@ describe("OrderDestinationEditCard fulfillment switching", () => {
     }));
   });
 
-  it("edits a split recipient occasion without changing destination identity", () => {
+  it("adds a split recipient occasion using that destination delivery date", () => {
     const onChange = vi.fn();
     render(
       <OrderDestinationEditCard
         index={0}
-        split={splitFixture("delivery")}
+        split={{ ...splitFixture("delivery"), recipientOccasions: [] }}
         deliverySlots={[]}
         onChange={onChange}
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("額外收貨點 2 收花人重要日子 1 日期"), {
-      target: { value: "1985-11-12" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "新增額外收貨點 2 收花人重要日子" }));
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
       id: "split-2",
-      recipientOccasions: [{ type: "birthday", date: "1985-11-12" }],
+      recipientOccasions: [{
+        type: "birthday",
+        date: "2026-08-27",
+        autoDateFromDelivery: true,
+      }],
       recipientOccasionsVersion: "recipient-85-v4",
       recipientPartnerId: 85,
       itemAllocations: [{ itemId: "line-1", itemName: "Bouquet", quantity: 1 }],

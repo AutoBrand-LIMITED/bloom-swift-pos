@@ -110,9 +110,9 @@ describe("Index pending recovery without POS authentication", () => {
     expect(await screen.findByDisplayValue("Private Recipient Limited")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Private Contact")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Private delivery address")).toBeInTheDocument();
-    expect(screen.getByLabelText("收貨方式 收花人重要日子 1 日期")).toHaveValue("1990-01-02");
-    expect(screen.getByLabelText("額外收貨資料 2 收花人重要日子 1 日期")).toHaveValue("1985-11-12");
-    expect(screen.getByLabelText("額外收貨資料 3 收花人重要日子 1 日期")).toHaveValue("1978-06-30");
+    expect(screen.getByLabelText("收貨方式 收花人重要日子 1 日期")).toHaveTextContent("1 月 2 日");
+    expect(screen.getByLabelText("額外收貨資料 2 收花人重要日子 1 日期")).toHaveTextContent("11 月 12 日");
+    expect(screen.getByLabelText("額外收貨資料 3 收花人重要日子 1 日期")).toHaveTextContent("6 月 30 日");
     expect(screen.getByLabelText("主要收貨點心意卡內容")).toHaveValue("D1 private card");
     expect(screen.getByLabelText("拆單收貨點 2 心意卡內容")).toHaveValue("D2 private card");
     expect(screen.getByLabelText("拆單收貨點 3 心意卡內容")).toHaveValue("D3 private card");
@@ -140,7 +140,7 @@ describe("Index pending recovery without POS authentication", () => {
     expect(screen.queryByText(/系統已恢復這部瀏覽器的未確認訂單/)).not.toBeInTheDocument();
   });
 
-  it("keeps the D1 recipient partner binding after a birthday-only edit", async () => {
+  it("keeps the D1 recipient partner binding after an occasion-only edit", async () => {
     localStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(pendingSubmission()));
 
     render(<MemoryRouter><Index /></MemoryRouter>);
@@ -148,9 +148,8 @@ describe("Index pending recovery without POS authentication", () => {
     expect(await screen.findByRole("button", {
       name: "重新載入收花人長期備註",
     })).toBeVisible();
-    fireEvent.change(screen.getByLabelText("收貨方式 收花人重要日子 1 日期"), {
-      target: { value: "1991-02-03" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "收貨方式 收花人重要日子 1 類型" }));
+    fireEvent.click(screen.getByRole("option", { name: "週年" }));
     expect(screen.getByRole("button", {
       name: "重新載入收花人長期備註",
     })).toBeVisible();
