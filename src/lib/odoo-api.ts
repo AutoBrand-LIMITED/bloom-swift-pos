@@ -1571,14 +1571,17 @@ export async function getReceivableDetail(
 }
 
 export async function getOdooOrderRecords(
-  date: string,
+  date?: string,
   signal?: AbortSignal,
 ): Promise<OdooOrderRecordsResponse> {
   if (!BACKEND_URL) {
-    return { date, generatedAt: "", truncated: false, orders: [] };
+    return { ...(date ? { date } : {}), generatedAt: "", truncated: false, orders: [] };
   }
 
-  const res = await authenticatedFetch(`${BACKEND_URL}/orders?date=${encodeURIComponent(date)}`, {
+  const params = new URLSearchParams();
+  if (date) params.set("date", date);
+  const queryString = params.toString();
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders${queryString ? `?${queryString}` : ""}`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });

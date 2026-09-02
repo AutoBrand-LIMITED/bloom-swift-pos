@@ -208,7 +208,7 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText(/收件人生日：1990-01-02/)).toBeInTheDocument();
   });
 
-  it("offers an accessible Hong Kong order-date field and date-scoped search", () => {
+  it("offers an optional order-date filter and can clear a date-scoped search", () => {
     const onSearchQueryChange = vi.fn();
     const onSelectedDateChange = vi.fn();
     render(
@@ -224,7 +224,7 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    const dateInput = screen.getByLabelText("香港落單日期");
+    const dateInput = screen.getByLabelText("落單日期（選填）");
     expect(dateInput).toHaveAttribute("type", "date");
     expect(dateInput).toHaveValue("2026-07-19");
     expect(dateInput).toHaveClass("min-h-11", "touch-manipulation");
@@ -233,9 +233,40 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByRole("textbox", { name: "搜尋訂單" })).toHaveValue("accounts@example.com");
     expect(screen.getByText("2026-07-19 搜尋結果：0 筆")).toBeVisible();
     expect(screen.getByText("未找到 2026-07-19 符合資料的訂單")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "清除落單日期篩選" }));
+    expect(onSelectedDateChange).toHaveBeenCalledWith("");
     fireEvent.click(screen.getByRole("button", { name: "清除訂單搜尋" }));
     expect(onSearchQueryChange).toHaveBeenCalledWith("");
-    expect(onSelectedDateChange).toHaveBeenCalledTimes(1);
+    expect(onSelectedDateChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows newest-first guidance and cross-date search when no date is selected", () => {
+    const { rerender } = render(
+      <OrderHistory
+        orders={[orderFixture()]}
+        open
+        onClose={vi.fn()}
+        selectedDate=""
+        onSelectedDateChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("落單日期（選填）")).toHaveValue("");
+    expect(screen.getByPlaceholderText("搜尋訂單號碼、電話、電郵、客戶或地址")).toBeVisible();
+    expect(screen.getByText("顯示最新訂單，按落單時間由新至舊排列；日期只在需要時篩選。")).toBeVisible();
+
+    rerender(
+      <OrderHistory
+        orders={[orderFixture()]}
+        open
+        onClose={vi.fn()}
+        selectedDate=""
+        searchQuery="S00017"
+        onSearchQueryChange={vi.fn()}
+        searchPhase="success"
+      />,
+    );
+    expect(screen.getByText("跨日期搜尋結果：1 筆")).toBeVisible();
   });
 
   it("does not show a stale count or false zero while a remote search is unsettled", () => {

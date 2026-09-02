@@ -1192,6 +1192,24 @@ describe("odoo-api note contracts", () => {
     );
   });
 
+  it("loads the latest Odoo order records when no date filter is supplied", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      generatedAt: "2026-07-19T13:00:00+08:00",
+      truncated: false,
+      orders: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOdooOrderRecords } = await import("@/lib/odoo-api");
+
+    await expect(getOdooOrderRecords()).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
   it("searches Odoo orders with an encoded query and optional order date", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const response = {

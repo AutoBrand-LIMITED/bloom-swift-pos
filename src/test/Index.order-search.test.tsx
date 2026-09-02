@@ -97,18 +97,17 @@ describe("Index correlated order search", () => {
     odooMocks.getOdooProducts.mockResolvedValue([]);
   });
 
-  it("defaults to today in Hong Kong and fetches a changed date without text", async () => {
-    const today = hongKongBusinessDate();
-
+  it("loads recent orders by default and applies an optional date filter", async () => {
     render(<MemoryRouter><Index /></MemoryRouter>);
     fireEvent.click(screen.getByRole("button", { name: /訂單記錄/ }));
 
-    const dateInput = screen.getByLabelText("香港落單日期");
-    expect(dateInput).toHaveValue(today);
+    const dateInput = screen.getByLabelText("落單日期（選填）");
+    expect(dateInput).toHaveValue("");
     await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
-      today,
+      undefined,
       expect.any(AbortSignal),
     ));
+    expect(screen.getByText(/顯示最新訂單，按落單時間由新至舊排列/)).toBeVisible();
 
     fireEvent.change(dateInput, { target: { value: "2026-08-25" } });
     await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
@@ -116,10 +115,15 @@ describe("Index correlated order search", () => {
       expect.any(AbortSignal),
     ));
     expect(screen.getByText(/顯示 2026-08-25 的落單記錄/)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除落單日期篩選" }));
+    await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenLastCalledWith(
+      undefined,
+      expect.any(AbortSignal),
+    ));
   });
 
   it("correlates combined search by query and date and ignores the stale date response", async () => {
-    const today = hongKongBusinessDate();
     const first = deferredResponse();
     const second = deferredResponse();
     odooMocks.searchOdooOrderRecords.mockImplementation((
@@ -127,7 +131,7 @@ describe("Index correlated order search", () => {
       _signal: AbortSignal,
       date?: string,
     ) => (
-      date === today ? first.promise : second.promise
+      date === undefined ? first.promise : second.promise
     ));
 
     render(<MemoryRouter><Index /></MemoryRouter>);
@@ -136,23 +140,23 @@ describe("Index correlated order search", () => {
 
     const search = screen.getByRole("textbox", { name: "搜尋訂單" });
     fireEvent.change(search, { target: { value: "Alpha" } });
-    expect(screen.getAllByText(`等待搜尋 ${today} 的訂單...`).length).toBeGreaterThan(0);
-    expect(screen.queryByText(`未找到 ${today} 符合資料的訂單`)).not.toBeInTheDocument();
+    expect(screen.getAllByText("等待跨日期搜尋訂單...").length).toBeGreaterThan(0);
+    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
 
     await waitFor(
       () => expect(odooMocks.searchOdooOrderRecords).toHaveBeenCalledWith(
         "Alpha",
         expect.any(AbortSignal),
-        today,
+        undefined,
       ),
       { timeout: 1_000 },
     );
-    expect(screen.getAllByText(`正在搜尋 ${today} 的訂單...`).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("正在跨日期搜尋訂單...").length).toBeGreaterThan(0);
 
-    fireEvent.change(screen.getByLabelText("香港落單日期"), {
+    fireEvent.change(screen.getByLabelText("落單日期（選填）"), {
       target: { value: "2026-08-25" },
     });
-    expect(screen.queryByText(`未找到 ${today} 符合資料的訂單`)).not.toBeInTheDocument();
+    expect(screen.queryByText("未找到符合資料的訂單")).not.toBeInTheDocument();
     await waitFor(
       () => expect(odooMocks.searchOdooOrderRecords).toHaveBeenCalledWith(
         "Alpha",
@@ -184,17 +188,16 @@ describe("Index correlated order search", () => {
     expect(screen.queryByText("Old Match")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "清除訂單搜尋" }));
-    expect(screen.getByLabelText("香港落單日期")).toHaveValue("2026-08-25");
+    expect(screen.getByLabelText("落單日期（選填）")).toHaveValue("2026-08-25");
     await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
       "2026-08-25",
       expect.any(AbortSignal),
     ));
   });
 
-  it("filters local fallback rows by Hong Kong created-at date before display", async () => {
+  it("shows recent local fallback rows across dates until a date filter is applied", async () => {
     const now = new Date();
     const previous = new Date(now.getTime() - 24 * 60 * 60 * 1_000);
-    const today = hongKongBusinessDate(now);
     const previousDate = hongKongBusinessDate(previous);
     localStorage.setItem(UNSYNCED_ORDERS_KEY, JSON.stringify([
       orderFixture(31, "Local Today", { createdAt: now.toISOString() }),
@@ -205,15 +208,15 @@ describe("Index correlated order search", () => {
     render(<MemoryRouter><Index /></MemoryRouter>);
     fireEvent.click(screen.getByRole("button", { name: /訂單記錄/ }));
     await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
-      today,
+      undefined,
       expect.any(AbortSignal),
     ));
 
     expect(screen.getAllByText("Local Today")[0]).toBeVisible();
-    expect(screen.queryByText("Local Previous")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Local Previous")[0]).toBeVisible();
     expect(screen.queryByText("Malformed Local")).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("香港落單日期"), {
+    fireEvent.change(screen.getByLabelText("落單日期（選填）"), {
       target: { value: previousDate },
     });
     expect((await screen.findAllByText("Local Previous"))[0]).toBeVisible();

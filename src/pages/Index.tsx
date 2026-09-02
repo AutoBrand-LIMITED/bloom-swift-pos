@@ -171,6 +171,7 @@ const orderCreatedOnHongKongDate = (
   order: Pick<Order, "createdAt">,
   businessDate: string,
 ): boolean => {
+  if (!businessDate) return true;
   const createdAt = new Date(order.createdAt);
   return Number.isFinite(createdAt.getTime())
     && hongKongBusinessDate(createdAt) === businessDate;
@@ -329,7 +330,7 @@ const Index = () => {
   const [remoteOrdersQuery, setRemoteOrdersQuery] = useState("");
   const [remoteOrdersDate, setRemoteOrdersDate] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [orderHistoryDate, setOrderHistoryDate] = useState(() => hongKongBusinessDate());
+  const [orderHistoryDate, setOrderHistoryDate] = useState("");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [debouncedOrderSearchQuery, setDebouncedOrderSearchQuery] = useState("");
   const [orderSearchPhase, setOrderSearchPhase] = useState<
@@ -518,8 +519,8 @@ const Index = () => {
     if (requestQuery.length >= 2) setOrderSearchPhase("searching");
 
     const request = debouncedOrderSearchQuery.length >= 2
-      ? searchOdooOrderRecords(debouncedOrderSearchQuery, controller.signal, requestDate)
-      : getOdooOrderRecords(requestDate, controller.signal);
+      ? searchOdooOrderRecords(debouncedOrderSearchQuery, controller.signal, requestDate || undefined)
+      : getOdooOrderRecords(requestDate || undefined, controller.signal);
 
     request
       .then((response) => {
@@ -2441,7 +2442,6 @@ const Index = () => {
         onClose={() => setHistoryOpen(false)}
         selectedDate={orderHistoryDate}
         onSelectedDateChange={(value) => {
-          if (!value) return;
           setOrderHistoryDate(value);
           setOrderRecordsError(null);
           setOrderRecordsTruncated(false);

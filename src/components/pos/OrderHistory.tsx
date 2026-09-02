@@ -804,7 +804,7 @@ const OrderHistory = ({
   const searchActive = normalizedSearch.length >= 2;
   const searchSettled = searchActive && searchPhase === "success";
   const showOrderCount = !searchActive || searchSettled;
-  const selectedDateLabel = selectedDate || "所選日期";
+  const selectedDateLabel = selectedDate || "全部日期";
   const filtersActive = paymentFilter !== "all";
   const countLabel = filtersActive ? `${filteredOrders.length}/${orders.length}` : String(orders.length);
 
@@ -825,8 +825,12 @@ const OrderHistory = ({
     searchPhase === "error" ? null : (
       <p aria-live="polite" className="p-8 text-center text-muted-foreground">
         {searchPhase === "debouncing"
-          ? `等待搜尋 ${selectedDateLabel} 的訂單...`
-          : `正在搜尋 ${selectedDateLabel} 的訂單...`}
+          ? selectedDate
+            ? `等待搜尋 ${selectedDateLabel} 的訂單...`
+            : "等待跨日期搜尋訂單..."
+          : selectedDate
+            ? `正在搜尋 ${selectedDateLabel} 的訂單...`
+            : "正在跨日期搜尋訂單..."}
       </p>
     )
   ) : orders.length === 0 && !loaded ? (
@@ -836,8 +840,12 @@ const OrderHistory = ({
       {searchNeedsMoreInput
         ? "請輸入至少 2 個字元開始搜尋"
         : searchActive
-          ? `未找到 ${selectedDateLabel} 符合資料的訂單`
-          : `${selectedDateLabel} 暫無訂單`}
+          ? selectedDate
+            ? `未找到 ${selectedDateLabel} 符合資料的訂單`
+            : "未找到符合資料的訂單"
+          : selectedDate
+            ? `${selectedDateLabel} 暫無訂單`
+            : "暫無訂單"}
     </p>
   ) : filteredOrders.length === 0 ? (
     <p className="p-8 text-center text-muted-foreground">沒有符合付款狀態篩選的訂單</p>
@@ -917,41 +925,13 @@ const OrderHistory = ({
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <aside className={`${mobileDetailOpen && selectedOrder ? "hidden" : "flex"} min-h-0 w-full flex-col border-border bg-muted/10 md:flex md:w-[22rem] md:shrink-0 md:border-r lg:w-[25rem]`} aria-label="訂單列表">
           <div className="shrink-0 space-y-2 border-b border-border p-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label htmlFor="order-history-date" className="text-xs font-medium text-foreground">香港落單日期</label>
-                <Input
-                  id="order-history-date"
-                  type="date"
-                  aria-label="香港落單日期"
-                  value={selectedDate}
-                  onChange={(event) => onSelectedDateChange?.(event.target.value)}
-                  className="min-h-11 touch-manipulation text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="order-history-payment-filter" className="text-xs font-medium text-foreground">付款狀態</label>
-                <select
-                  id="order-history-payment-filter"
-                  aria-label="付款狀態篩選"
-                  value={paymentFilter}
-                  onChange={(event) => setPaymentFilter(event.target.value as PaymentFilter)}
-                  className="min-h-11 w-full touch-manipulation rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <option value="all">全部付款狀態</option>
-                  <option value="unpaid">未付款</option>
-                  <option value="deposit">已付訂金</option>
-                  <option value="paid">已付款</option>
-                </select>
-              </div>
-            </div>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label="搜尋訂單"
                 value={searchQuery}
                 onChange={(event) => onSearchQueryChange?.(event.target.value)}
-                placeholder="搜尋電郵、電話、下單人、地址或收貨人"
+                placeholder="搜尋訂單號碼、電話、電郵、客戶或地址"
                 className="min-h-11 pl-9 pr-11 text-sm"
                 maxLength={200}
                 autoComplete="off"
@@ -969,20 +949,70 @@ const OrderHistory = ({
                 </Button>
               )}
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label htmlFor="order-history-date" className="text-xs font-medium text-foreground">落單日期（選填）</label>
+                <div className="flex gap-1">
+                  <Input
+                    id="order-history-date"
+                    type="date"
+                    aria-label="落單日期（選填）"
+                    value={selectedDate}
+                    onChange={(event) => onSelectedDateChange?.(event.target.value)}
+                    className="min-h-11 min-w-0 touch-manipulation px-2 text-sm"
+                  />
+                  {selectedDate && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="清除落單日期篩選"
+                      className="min-h-11 min-w-11 shrink-0 touch-manipulation"
+                      onClick={() => onSelectedDateChange?.("")}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="order-history-payment-filter" className="text-xs font-medium text-foreground">付款狀態</label>
+                <select
+                  id="order-history-payment-filter"
+                  aria-label="付款狀態篩選"
+                  value={paymentFilter}
+                  onChange={(event) => setPaymentFilter(event.target.value as PaymentFilter)}
+                  className="min-h-11 w-full touch-manipulation rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="all">全部付款狀態</option>
+                  <option value="unpaid">未付款</option>
+                  <option value="deposit">已付訂金</option>
+                  <option value="paid">已付款</option>
+                </select>
+              </div>
+            </div>
             <p className="text-[11px] text-muted-foreground">
               {searchNeedsMoreInput
                 ? "請輸入至少 2 個字元"
                 : searchActive
                   ? searchPhase === "debouncing"
-                    ? `等待搜尋 ${selectedDateLabel} 的訂單...`
+                    ? selectedDate
+                      ? `等待搜尋 ${selectedDateLabel} 的訂單...`
+                      : "等待跨日期搜尋訂單..."
                     : searchPhase === "searching"
-                      ? `正在搜尋 ${selectedDateLabel} 的訂單...`
+                      ? selectedDate
+                        ? `正在搜尋 ${selectedDateLabel} 的訂單...`
+                        : "正在跨日期搜尋訂單..."
                       : searchSettled
-                        ? `${selectedDateLabel} 搜尋結果：${orders.length} 筆`
+                        ? selectedDate
+                          ? `${selectedDateLabel} 搜尋結果：${orders.length} 筆`
+                          : `跨日期搜尋結果：${orders.length} 筆`
                         : searchPhase === "error"
                           ? "搜尋未完成，請重試"
                           : "準備搜尋..."
-                  : `顯示 ${selectedDateLabel} 的落單記錄；文字搜尋只會查找該日期。`}
+                  : selectedDate
+                    ? `顯示 ${selectedDateLabel} 的落單記錄，按時間由新至舊排列。`
+                    : "顯示最新訂單，按落單時間由新至舊排列；日期只在需要時篩選。"}
             </p>
           </div>
 
@@ -992,8 +1022,12 @@ const OrderHistory = ({
                 <p aria-live="polite" className="flex items-center gap-2 text-xs text-muted-foreground">
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                   {searchActive
-                    ? `正在 Odoo 搜尋 ${selectedDateLabel} 的訂單`
-                    : `正在從 Odoo 載入 ${selectedDateLabel} 的落單記錄`}
+                    ? selectedDate
+                      ? `正在 Odoo 搜尋 ${selectedDateLabel} 的訂單`
+                      : "正在 Odoo 跨日期搜尋訂單"
+                    : selectedDate
+                      ? `正在從 Odoo 載入 ${selectedDateLabel} 的落單記錄`
+                      : "正在從 Odoo 載入最新訂單"}
                 </p>
               )}
               {error && (
@@ -1017,7 +1051,9 @@ const OrderHistory = ({
                 <p className="text-xs text-amber-700">
                   {searchActive
                     ? "搜尋結果超過顯示上限，請輸入更完整資料收窄結果。"
-                    : "當日訂單超過顯示上限，完整記錄請到 Odoo 查看。"}
+                    : selectedDate
+                      ? "當日訂單超過顯示上限，完整記錄請到 Odoo 查看。"
+                      : "目前只顯示最新 100 張訂單；可用搜尋或日期篩選收窄結果。"}
                 </p>
               )}
             </div>
