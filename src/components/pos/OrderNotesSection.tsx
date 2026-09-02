@@ -2,7 +2,6 @@ import { AlertTriangle, Contact, MessageSquareText, RefreshCw, Save, Truck } fro
 import CustomerFlags from "@/components/pos/CustomerFlags";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { DemoCustomer } from "@/data/demo-customers";
@@ -18,8 +17,6 @@ interface OrderNotesSectionProps {
   onDeliveryNoteChange: (value: string) => void;
   onInternalNoteChange: (value: string) => void;
   senderCustomer: DemoCustomer | null;
-  hasSenderIdentity: boolean;
-  hasRecipientIdentity: boolean;
   recipientPartnerId?: number;
   recipientContact: PartnerNoteRecord | null;
   senderContactDraft: string;
@@ -28,10 +25,6 @@ interface OrderNotesSectionProps {
   onRecipientContactDraftChange: (value: string) => void;
   onSaveSenderContact: () => void;
   onSaveRecipientContact: () => void;
-  saveSenderNote: boolean;
-  saveRecipientNote: boolean;
-  onSaveSenderNoteChange: (checked: boolean) => void;
-  onSaveRecipientNoteChange: (checked: boolean) => void;
   onRefreshSender?: () => void;
   onRefreshRecipient?: () => void;
   refreshingSender?: boolean;
@@ -49,8 +42,6 @@ const OrderNotesSection = ({
   onDeliveryNoteChange,
   onInternalNoteChange,
   senderCustomer,
-  hasSenderIdentity,
-  hasRecipientIdentity,
   recipientPartnerId,
   recipientContact,
   senderContactDraft,
@@ -59,10 +50,6 @@ const OrderNotesSection = ({
   onRecipientContactDraftChange,
   onSaveSenderContact,
   onSaveRecipientContact,
-  saveSenderNote,
-  saveRecipientNote,
-  onSaveSenderNoteChange,
-  onSaveRecipientNoteChange,
   onRefreshSender,
   onRefreshRecipient,
   refreshingSender = false,
@@ -71,8 +58,6 @@ const OrderNotesSection = ({
   savingRecipient = false,
   conflict,
 }: OrderNotesSectionProps) => {
-  const senderCanPersist = hasSenderIdentity && Boolean(senderNote.trim());
-  const recipientCanPersist = hasRecipientIdentity && Boolean(deliveryNote.trim());
   const senderContactCanSave = Boolean(
     senderCustomer?.odooPartnerId &&
     senderCustomer.writeDate &&
@@ -190,19 +175,8 @@ const OrderNotesSection = ({
             className="min-h-20 text-xs leading-relaxed"
             maxLength={5000}
           />
-          <div className="flex min-h-11 items-center gap-2">
-            <Checkbox
-              id="save-sender-note"
-              checked={saveSenderNote}
-              onCheckedChange={(checked) => onSaveSenderNoteChange(checked === true)}
-              disabled={!senderCanPersist}
-            />
-            <Label htmlFor="save-sender-note" className="text-xs leading-relaxed">
-              同時將今次送花人備註複製到客戶長期備註
-            </Label>
-          </div>
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            不勾選也會把送花人備註保存於本張訂單；勾選後才會供日後搜尋同一客戶時重用。
+            此欄內容會長期儲存於客戶聯絡人，日後搜尋同一客戶時會自動載入；上方送花人備註只屬本張訂單。
           </p>
         </div>
 
@@ -252,19 +226,8 @@ const OrderNotesSection = ({
             className="min-h-20 text-xs leading-relaxed"
             maxLength={5000}
           />
-          <div className="flex min-h-11 items-center gap-2">
-            <Checkbox
-              id="save-recipient-note"
-              checked={saveRecipientNote}
-              onCheckedChange={(checked) => onSaveRecipientNoteChange(checked === true)}
-              disabled={!recipientCanPersist}
-            />
-            <Label htmlFor="save-recipient-note" className="text-xs leading-relaxed">
-              同時將今次送貨備註複製到收花人長期備註
-            </Label>
-          </div>
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            不勾選也會把送貨備註保存於本張訂單；勾選後才會供日後搜尋同一收花人時重用。
+            此欄內容會長期儲存於收花人聯絡人，日後搜尋同一收花人時會自動載入；上方送貨備註只屬本張訂單。
           </p>
         </div>
       </div>

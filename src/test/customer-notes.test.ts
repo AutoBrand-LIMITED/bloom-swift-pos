@@ -1,16 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  appendPersistentNote,
   buildPartnerNoteMutation,
   getManagedCustomerFlags,
 } from "@/lib/customer-notes";
 
 describe("customer note helpers", () => {
-  it("appends an order note without duplicating the same persistent note", () => {
-    expect(appendPersistentNote("Existing", "New note")).toBe("Existing\n\nNew note");
-    expect(appendPersistentNote("Existing\n\nNew note", "New note")).toBe("Existing\n\nNew note");
-  });
-
   it("keeps managed flags read-only and excludes unrelated CRM tags from display", () => {
     expect(getManagedCustomerFlags([
       { id: 1, name: "VIP", managed: true },
@@ -37,13 +31,7 @@ describe("customer note helpers", () => {
     });
   });
 
-  it("appends an order note once and omits unchanged values", () => {
-    expect(buildPartnerNoteMutation({
-      draft: "Permanent",
-      currentComment: "Permanent",
-      appendNote: "Call first",
-      shouldAppend: true,
-    })).toEqual({ commentText: "Permanent\n\nCall first" });
+  it("omits unchanged long-term note values", () => {
     expect(buildPartnerNoteMutation({
       draft: "Permanent",
       currentComment: "Permanent",

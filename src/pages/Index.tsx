@@ -241,8 +241,6 @@ const Index = () => {
   const [senderNote, setSenderNote] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
   const [internalNote, setInternalNote] = useState("");
-  const [saveSenderNote, setSaveSenderNote] = useState(false);
-  const [saveRecipientNote, setSaveRecipientNote] = useState(false);
   const [recipientPartnerId, setRecipientPartnerId] = useState<number | undefined>();
   const [recipientContact, setRecipientContact] = useState<PartnerNoteRecord | null>(null);
   const [senderContactDraft, setSenderContactDraft] = useState("");
@@ -780,7 +778,6 @@ const Index = () => {
   const resetRecipientPersistence = useCallback(() => {
     clearRecipientPersistenceBinding();
     setRecipientContactDraft("");
-    setSaveRecipientNote(false);
   }, [clearRecipientPersistenceBinding]);
 
   const detachSelectedCustomerProfile = useCallback(() => {
@@ -795,7 +792,6 @@ const Index = () => {
     setCustomerGroupId(undefined);
     setCustomerGroupExpectedWriteDate(undefined);
     setSenderContactDraft("");
-    setSaveSenderNote(false);
     resetRecipientPersistence();
   }, [resetRecipientPersistence]);
 
@@ -837,7 +833,6 @@ const Index = () => {
       "billingAddress",
     );
     setSenderContactDraft(customer.commentText || "");
-    setSaveSenderNote(false);
     setNotesConflict(null);
     resetRecipientPersistence();
   }, [clearCheckoutErrors, customerGroups, resetRecipientPersistence]);
@@ -873,7 +868,6 @@ const Index = () => {
     setCustomerGroupId(undefined);
     setCustomerGroupExpectedWriteDate(undefined);
     setSenderContactDraft("");
-    setSaveSenderNote(false);
     resetRecipientPersistence();
     clearCheckoutErrors("customerName", "phone", "companyName", "customerEmail", "billingAddress");
   }, [clearCheckoutErrors, resetRecipientPersistence]);
@@ -894,7 +888,6 @@ const Index = () => {
     setRecipientPartnerId(selection.shippingPartnerId || undefined);
     setRecipientContact(null);
     setRecipientContactDraft("");
-    setSaveRecipientNote(false);
     setNotesConflict((current) => current?.target === "recipient" ? null : current);
     if (selection.deliveryAddress) {
       const parsed = parseDeliveryAddress(selection.deliveryAddress);
@@ -962,7 +955,6 @@ const Index = () => {
     setRecipientPartnerId(selection.shippingPartnerId);
     setRecipientContact(null);
     setRecipientContactDraft("");
-    setSaveRecipientNote(false);
     clearCheckoutErrors(
       "deliveryAddress",
       "recipientCompanyName",
@@ -1066,8 +1058,6 @@ const Index = () => {
     setSenderNote("");
     setDeliveryNote("");
     setInternalNote("");
-    setSaveSenderNote(false);
-    setSaveRecipientNote(false);
     setRecipientPartnerId(undefined);
     setRecipientContact(null);
     setSenderContactDraft("");
@@ -1594,8 +1584,6 @@ const Index = () => {
       : buildPartnerNoteMutation({
           draft: senderContactDraft,
           currentComment: selectedCustomer?.commentText || "",
-          appendNote: senderNote,
-          shouldAppend: saveSenderNote,
           targetPartnerId: selectedCustomer?.odooPartnerId,
           expectedWriteDate: selectedCustomer?.writeDate,
         });
@@ -1604,8 +1592,6 @@ const Index = () => {
       : buildPartnerNoteMutation({
           draft: recipientContactDraft,
           currentComment: recipientContact?.commentText || "",
-          appendNote: deliveryNote,
-          shouldAppend: saveRecipientNote,
           targetPartnerId: recipientPartnerId,
           expectedWriteDate: recipientContact?.writeDate,
         });
@@ -2268,7 +2254,6 @@ const Index = () => {
             setRecipientPartnerId(selectedSenderPartnerId);
             setRecipientContact(null);
             setRecipientContactDraft("");
-            setSaveRecipientNote(false);
             setNotesConflict((current) => current?.target === "recipient" ? null : current);
             clearCheckoutErrors("recipientCompanyName", "recipientName", "recipientPhone");
           }}
@@ -2337,14 +2322,6 @@ const Index = () => {
           }}
           onInternalNoteChange={setInternalNote}
           senderCustomer={selectedCustomer}
-          hasSenderIdentity={Boolean(phone.trim() || customerName.trim())}
-          hasRecipientIdentity={Boolean(
-            recipientPartnerId
-              || recipientCompanyName.trim()
-              || recipientName.trim()
-              || recipientPhone.trim()
-              || deliveryDetail.trim()
-          )}
           recipientPartnerId={recipientPartnerId}
           recipientContact={recipientContact}
           senderContactDraft={senderContactDraft}
@@ -2353,10 +2330,6 @@ const Index = () => {
           onRecipientContactDraftChange={setRecipientContactDraft}
           onSaveSenderContact={() => void saveSenderContactComment()}
           onSaveRecipientContact={() => void saveRecipientContactComment()}
-          saveSenderNote={saveSenderNote}
-          saveRecipientNote={saveRecipientNote}
-          onSaveSenderNoteChange={setSaveSenderNote}
-          onSaveRecipientNoteChange={setSaveRecipientNote}
           onRefreshSender={() => void refreshSenderContact()}
           onRefreshRecipient={() => void refreshRecipientContact()}
           refreshingSender={refreshingSender}

@@ -33,8 +33,6 @@ const callbacks = {
   onRecipientContactDraftChange: vi.fn(),
   onSaveSenderContact: vi.fn(),
   onSaveRecipientContact: vi.fn(),
-  onSaveSenderNoteChange: vi.fn(),
-  onSaveRecipientNoteChange: vi.fn(),
   onRefreshSender: vi.fn(),
   onRefreshRecipient: vi.fn(),
 };
@@ -47,13 +45,9 @@ describe("OrderNotesSection", () => {
         deliveryNote="Call first"
         internalNote="Use stock from cooler B"
         senderCustomer={senderCustomer}
-        hasSenderIdentity
-        hasRecipientIdentity={false}
         recipientContact={null}
         senderContactDraft="Updated persistent note"
         recipientContactDraft=""
-        saveSenderNote={false}
-        saveRecipientNote={false}
         {...callbacks}
       />
     );
@@ -71,27 +65,23 @@ describe("OrderNotesSection", () => {
     expect(callbacks.onSaveSenderContact).toHaveBeenCalledOnce();
   });
 
-  it("keeps both persistent-note fields editable for brand-new contacts", () => {
+  it("keeps both long-term-note fields editable without copy checkboxes", () => {
     const { rerender } = render(
       <OrderNotesSection
         senderNote="Sender note"
         deliveryNote="Delivery note"
         internalNote=""
         senderCustomer={senderCustomer}
-        hasSenderIdentity
-        hasRecipientIdentity
         recipientContact={null}
         senderContactDraft={senderCustomer.commentText || ""}
         recipientContactDraft=""
-        saveSenderNote={false}
-        saveRecipientNote={false}
         {...callbacks}
       />
     );
 
-    expect(screen.getByRole("checkbox", { name: /同時將今次送貨備註複製到收花人長期備註/ })).toBeEnabled();
-    expect(screen.getByText(/不勾選也會把送花人備註保存於本張訂單/)).toBeVisible();
-    expect(screen.getByText(/不勾選也會把送貨備註保存於本張訂單/)).toBeVisible();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByText(/此欄內容會長期儲存於客戶聯絡人/)).toBeVisible();
+    expect(screen.getByText(/此欄內容會長期儲存於收花人聯絡人/)).toBeVisible();
     expect(screen.getByLabelText("收花人長期備註")).toBeEnabled();
     fireEvent.change(screen.getByLabelText("收花人長期備註"), {
       target: { value: "New recipient note" },
@@ -104,19 +94,15 @@ describe("OrderNotesSection", () => {
         deliveryNote="Delivery note"
         internalNote=""
         senderCustomer={senderCustomer}
-        hasSenderIdentity
-        hasRecipientIdentity
         recipientPartnerId={84}
         recipientContact={recipientContact}
         senderContactDraft={senderCustomer.commentText || ""}
         recipientContactDraft="Updated recipient note"
-        saveSenderNote={false}
-        saveRecipientNote={false}
         {...callbacks}
       />
     );
 
-    expect(screen.getByRole("checkbox", { name: /同時將今次送貨備註複製到收花人長期備註/ })).toBeEnabled();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.getByLabelText("收花人長期備註")).toBeEnabled();
     expect(screen.getByLabelText("收花人長期備註")).toHaveValue("Updated recipient note");
   });
@@ -128,13 +114,9 @@ describe("OrderNotesSection", () => {
         deliveryNote=""
         internalNote=""
         senderCustomer={senderCustomer}
-        hasSenderIdentity
-        hasRecipientIdentity={false}
         recipientContact={null}
         senderContactDraft={senderCustomer.commentText || ""}
         recipientContactDraft=""
-        saveSenderNote={false}
-        saveRecipientNote={false}
         conflict={{ target: "sender", message: "Reload the latest Odoo value." }}
         {...callbacks}
       />

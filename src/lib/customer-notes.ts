@@ -14,20 +14,9 @@ export function getManagedCustomerFlags(tags: CustomerTag[] = []): CustomerTag[]
   return tags.filter((tag) => tag.managed === true || managedFlagNames.has(tag.name));
 }
 
-export function appendPersistentNote(current: string, note: string): string {
-  const existing = current.trim();
-  const incoming = note.trim();
-  if (!incoming) return existing;
-  if (!existing) return incoming;
-  if (existing === incoming || existing.split(/\n{2,}/).includes(incoming)) return existing;
-  return `${existing}\n\n${incoming}`;
-}
-
 interface BuildPartnerNoteMutationOptions {
   draft: string;
   currentComment?: string;
-  appendNote?: string;
-  shouldAppend?: boolean;
   targetPartnerId?: number;
   expectedWriteDate?: string;
 }
@@ -35,16 +24,13 @@ interface BuildPartnerNoteMutationOptions {
 export function buildPartnerNoteMutation({
   draft,
   currentComment = "",
-  appendNote = "",
-  shouldAppend = false,
   targetPartnerId,
   expectedWriteDate,
 }: BuildPartnerNoteMutationOptions): PartnerNoteMutation | undefined {
-  const finalComment = shouldAppend ? appendPersistentNote(draft, appendNote) : draft;
-  if (finalComment === currentComment) return undefined;
+  if (draft === currentComment) return undefined;
 
   return {
-    commentText: finalComment,
+    commentText: draft,
     ...(targetPartnerId ? { targetPartnerId } : {}),
     ...(expectedWriteDate ? { expectedWriteDate } : {}),
   };
