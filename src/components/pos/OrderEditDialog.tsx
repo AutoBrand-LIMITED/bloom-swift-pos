@@ -25,7 +25,11 @@ import { Textarea } from "@/components/ui/textarea";
 import OrderDestinationEditCard from "@/components/pos/OrderDestinationEditCard";
 import QuarterHourTimeSelect from "@/components/pos/QuarterHourTimeSelect";
 import RecipientOccasionEditor from "@/components/pos/RecipientOccasionEditor";
-import { isValidPhoneNumber } from "@/lib/checkout-validation";
+import {
+  isValidDeliveryDate,
+  isValidEmailAddress,
+  isValidPhoneNumber,
+} from "@/lib/checkout-validation";
 import {
   normalizeDeliverySplitsForOperationalUpdate,
   operationalSplitIdentityIsUnchanged,
@@ -44,20 +48,42 @@ import {
   getAccountingPaymentOptions,
   getDeliverySlots,
   recordOdooOrderPayment,
-  updateOdooOrderOperationalDetails,
+  updateOdooOrderSection,
   type AccountingPaymentOption,
   type DeliverySlot,
   type OrderOperationalUpdate,
-  type OrderOperationalUpdatePayload,
+  type OrderSectionUpdate,
 } from "@/lib/odoo-api";
 import type { OrderRecordView } from "@/lib/order-records";
 
+export type OrderEditSection = "customer" | "delivery" | "notes" | "payment";
+
 interface OrderEditDialogProps {
   order: OrderRecordView | null;
+  section: OrderEditSection;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }
+
+const sectionCopy: Record<OrderEditSection, { title: string; description: string }> = {
+  customer: {
+    title: "修改客戶與送花人",
+    description: "只會顯示及修改客戶、聯絡及送花人資料。其他訂單內容不會在此畫面更改。",
+  },
+  delivery: {
+    title: "修改收貨點與商品分配",
+    description: "只可更新現有收貨點的履約及聯絡資料；收貨點數量、順序及商品分配保持唯讀。",
+  },
+  notes: {
+    title: "修改備註及心意卡",
+    description: "只會修改心意卡、送花人備註、送貨備註及內部備註。",
+  },
+  payment: {
+    title: "補記付款",
+    description: "付款會直接記錄到 Odoo Accounting，並保留收款及操作記錄。",
+  },
+};
 
 const formFromOrder = (order: OrderRecordView): OrderOperationalUpdate => ({
   salesId: order.salesId || "",
@@ -120,7 +146,13 @@ const formFromOrder = (order: OrderRecordView): OrderOperationalUpdate => ({
   expectedWriteDate: order.writeDate || "",
 });
 
-const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialogProps) => {
+const OrderEditDialog = ({
+  order,
+  section,
+  open,
+  onOpenChange,
+  onSaved,
+}: OrderEditDialogProps) => {
   const [form, setForm] = useState<OrderOperationalUpdate | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,15 +174,16 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
     setError(null);
     const outstanding = order.balanceAmount ?? Math.max(0, order.finalPrice - order.depositAmount);
     setPaymentAmount(outstanding > 0 ? outstanding.toFixed(2) : "");
+    setPaymentMethod("");
     setPaymentReference("");
     const now = new Date();
     const timezoneOffset = now.getTimezoneOffset() * 60_000;
     setPaymentReceivedAt(new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 16));
     setPaymentKey(crypto.randomUUID());
-  }, [open, order]);
+  }, [open, order, section]);
 
   useEffect(() => {
-    if (!open || !order) return;
+    if (!open || !order || section !== "delivery") return;
     const controller = new AbortController();
     setDeliverySlotsLoading(true);
     setDeliverySlotsError(null);
@@ -168,10 +201,10 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
         if (!controller.signal.aborted) setDeliverySlotsLoading(false);
       });
     return () => controller.abort();
-  }, [open, order]);
+  }, [open, order, section]);
 
   useEffect(() => {
-    if (!open || !order || order.paymentStatus === "paid") return;
+    if (!open || !order || section !== "payment" || order.paymentStatus === "paid") return;
     const controller = new AbortController();
     setPaymentOptionsLoading(true);
     getAccountingPaymentOptions(controller.signal)
@@ -189,7 +222,7 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
         if (!controller.signal.aborted) setPaymentOptionsLoading(false);
       });
     return () => controller.abort();
-  }, [open, order]);
+  }, [open, order, section]);
 
   const selectableDeliverySlots = [...deliverySlots];
   if (
@@ -227,29 +260,53 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
       setError("呢張訂單未有完整 Odoo 編輯資料，請重新整理後再試。");
       return;
     }
-    if (!form.customerName.trim() || !form.senderName.trim()) {
-      setError("客戶名稱及送花人名稱不能留空。");
-      return;
-    }
-    if (!isValidPhoneNumber(form.phone)) {
-      setError("請輸入有效嘅下單人電話。");
-      return;
-    }
-    if (!form.deliveryDate || !form.deliveryTime.trim()) {
-      setError("日期及時間不能留空。");
-      return;
-    }
-    if (form.fulfillmentType === "delivery") {
-      if (!form.deliveryAddress.trim() || !form.recipientName.trim()) {
-        setError("送貨地址及收貨人姓名不能留空。");
+    if (section === "customer") {
+      if (!form.customerName.trim() || !form.senderName.trim()) {
+        setError("客戶名稱及送花人名稱不能留空。");
         return;
       }
-      if (!isValidPhoneNumber(form.recipientPhone)) {
-        setError("請輸入有效嘅收貨人電話。");
+      if (!isValidPhoneNumber(form.phone)) {
+        setError("請輸入有效嘅下單人電話。");
         return;
       }
-      if (form.recipientType === "company" && !form.recipientCompanyName.trim()) {
-        setError("公司收貨人必須填寫公司名稱。");
+      if (!isValidEmailAddress(form.customerEmail)) {
+        setError("請輸入有效嘅客戶電郵。");
+        return;
+      }
+      if (form.customerType === "company" && !form.companyName.trim()) {
+        setError("公司客戶必須填寫公司名稱。");
+        return;
+      }
+    }
+    if (section === "delivery") {
+      if (!isValidDeliveryDate(form.deliveryDate) || !form.deliveryTime.trim()) {
+        setError("請輸入有效嘅日期及時間。");
+        return;
+      }
+      if (form.fulfillmentType === "delivery") {
+        if (!form.deliveryAddress.trim() || !form.recipientName.trim()) {
+          setError("送貨地址及收貨人姓名不能留空。");
+          return;
+        }
+        if (!isValidPhoneNumber(form.recipientPhone)) {
+          setError("請輸入有效嘅收貨人電話。");
+          return;
+        }
+        if (form.recipientType === "company" && !form.recipientCompanyName.trim()) {
+          setError("公司收貨人必須填寫公司名稱。");
+          return;
+        }
+      }
+    }
+    if (section === "notes") {
+      const noteLengthError = [
+        [form.giftCardMessage, 2000, "心意卡內容"],
+        [form.senderNote, 1000, "送花人備註"],
+        [form.deliveryNote, 1000, "送貨備註"],
+        [form.internalNote, 3000, "內部備註"],
+      ].find(([value, limit]) => String(value).length > Number(limit));
+      if (noteLengthError) {
+        setError(`${noteLengthError[2]}不可多於 ${noteLengthError[1]} 個字。`);
         return;
       }
     }
@@ -258,7 +315,7 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
       primaryOccasionState.value,
       order,
     );
-    if (primaryOccasionsChanged) {
+    if (section === "delivery" && primaryOccasionsChanged) {
       const occasionError = recipientOccasionValidationError(
         primaryOccasionState.value,
         "主要收貨點收花人",
@@ -272,13 +329,14 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
       typeof value === "string" && value.trim().length > 0
     );
     if (
-      primaryOccasionsChanged
+      section === "delivery"
+      && primaryOccasionsChanged
       && !hasCurrentOccasionsVersion(form.recipientOccasionsVersion)
     ) {
       setError("主要收貨點收花人重要日子已修改，但未有最新版本。請重新整理訂單，或重新選擇收花人後再試。");
       return;
     }
-    for (let index = 0; index < (form.deliverySplits || []).length; index += 1) {
+    for (let index = 0; section === "delivery" && index < (form.deliverySplits || []).length; index += 1) {
       const split = form.deliverySplits?.[index];
       const baseline = order.deliverySplits?.[index];
       if (!split || !baseline || split.id !== baseline.id) continue;
@@ -292,49 +350,91 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
         return;
       }
     }
-    const deliverySplits = normalizeDeliverySplitsForOperationalUpdate(
-      form.deliverySplits || [],
-      { baselineSplits: order.deliverySplits || [] },
-    );
-    const splitValidationError = validateOperationalDeliverySplits(deliverySplits);
-    if (splitValidationError) {
-      setError(splitValidationError);
-      return;
-    }
-    if (!operationalSplitIdentityIsUnchanged(order.deliverySplits || [], deliverySplits)) {
-      setError("額外收貨點識別或商品分配已改變，請重新整理訂單後再試。");
-      return;
+    const deliverySplits = section === "delivery"
+      ? normalizeDeliverySplitsForOperationalUpdate(
+          form.deliverySplits || [],
+          { baselineSplits: order.deliverySplits || [] },
+        )
+      : [];
+    if (section === "delivery") {
+      const splitValidationError = validateOperationalDeliverySplits(deliverySplits);
+      if (splitValidationError) {
+        setError(splitValidationError);
+        return;
+      }
+      if (!operationalSplitIdentityIsUnchanged(order.deliverySplits || [], deliverySplits)) {
+        setError("額外收貨點識別或商品分配已改變，請重新整理訂單後再試。");
+        return;
+      }
     }
 
     setSaving(true);
     setError(null);
     try {
-      const {
-        salesId: _salesId,
-        department: _department,
-        customerGroup: _customerGroup,
-        recipientBirthday: _recipientBirthday,
-        recipientPartnerId: rawRecipientPartnerId,
-        recipientOccasions: rawRecipientOccasions,
-        recipientOccasionsVersion: rawRecipientOccasionsVersion,
-        ...operationalForm
-      } = form;
-      const operationalPayload: OrderOperationalUpdatePayload = {
-        ...operationalForm,
-        ...(rawRecipientPartnerId !== undefined
-          ? { recipientPartnerId: rawRecipientPartnerId }
-          : {}),
-        ...(primaryOccasionsChanged
-          ? {
-              recipientOccasions: normalizeRecipientOccasions(primaryOccasionState.value),
-              ...(hasCurrentOccasionsVersion(rawRecipientOccasionsVersion)
-                ? { recipientOccasionsVersion: rawRecipientOccasionsVersion }
-                : {}),
-            }
-          : {}),
-        deliverySplits,
-      };
-      await updateOdooOrderOperationalDetails(order.odooOrderId, operationalPayload);
+      let update: OrderSectionUpdate;
+      if (section === "customer") {
+        update = {
+          section,
+          data: {
+            customerName: form.customerName,
+            customerType: form.customerType,
+            companyName: form.companyName,
+            senderName: form.senderName,
+            phone: form.phone,
+            customerEmail: form.customerEmail,
+            billingAddress: form.billingAddress,
+            expectedWriteDate: form.expectedWriteDate,
+          },
+        };
+      } else if (section === "notes") {
+        update = {
+          section,
+          data: {
+            giftCardMessage: form.giftCardMessage,
+            senderNote: form.senderNote,
+            deliveryNote: form.deliveryNote,
+            internalNote: form.internalNote,
+            expectedWriteDate: form.expectedWriteDate,
+          },
+        };
+      } else if (section === "delivery") {
+        update = {
+          section: "delivery",
+          data: {
+            fulfillmentType: form.fulfillmentType,
+            deliveryDate: form.deliveryDate,
+            deliveryTimeMode: form.deliveryTimeMode,
+            deliverySlotId: form.deliverySlotId,
+            deliveryTime: form.deliveryTime,
+            deliveryAddress: form.deliveryAddress,
+            deliveryGoogleAddress: form.deliveryGoogleAddress,
+            deliveryBuilding: form.deliveryBuilding,
+            deliveryFloor: form.deliveryFloor,
+            deliveryUnit: form.deliveryUnit,
+            deliverySplits,
+            recipientType: form.recipientType,
+            recipientCompanyName: form.recipientCompanyName,
+            recipientName: form.recipientName,
+            recipientPhone: form.recipientPhone,
+            ...(form.recipientPartnerId !== undefined
+              ? { recipientPartnerId: form.recipientPartnerId }
+              : {}),
+            ...(primaryOccasionsChanged
+              ? {
+                  recipientOccasions: normalizeRecipientOccasions(primaryOccasionState.value),
+                  ...(hasCurrentOccasionsVersion(form.recipientOccasionsVersion)
+                    ? { recipientOccasionsVersion: form.recipientOccasionsVersion }
+                    : {}),
+                }
+              : {}),
+            deliveryPerson: form.deliveryPerson,
+            expectedWriteDate: form.expectedWriteDate,
+          },
+        };
+      } else {
+        throw new Error("付款資料必須使用獨立收款流程。");
+      }
+      await updateOdooOrderSection(order.odooOrderId, update);
       toast.success("訂單資料已更新到 Odoo");
       onOpenChange(false);
       onSaved();
@@ -364,6 +464,15 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
       setError("請選擇付款方式，並填寫付款參考編號及收款時間。");
       return;
     }
+    if (paymentReference.trim().length > 120) {
+      setError("付款參考編號不可多於 120 個字。");
+      return;
+    }
+    const parsedPaymentReceivedAt = new Date(paymentReceivedAt);
+    if (!Number.isFinite(parsedPaymentReceivedAt.getTime())) {
+      setError("請輸入有效嘅收款日期及時間。");
+      return;
+    }
 
     setRecordingPayment(true);
     setError(null);
@@ -372,7 +481,7 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
         amount,
         paymentMethod,
         paymentReference: paymentReference.trim(),
-        paymentReceivedAt: new Date(paymentReceivedAt).toISOString(),
+        paymentReceivedAt: parsedPaymentReceivedAt.toISOString(),
         paymentIdempotencyKey: paymentKey || crypto.randomUUID(),
       });
       toast.success(
@@ -394,19 +503,18 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
     && form
     && operationalSplitIdentityIsUnchanged(order.deliverySplits || [], form.deliverySplits || []),
   );
+  const activeSectionCopy = sectionCopy[section];
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !saving && !recordingPayment && onOpenChange(nextOpen)}>
-      <DialogContent className="h-[92dvh] max-h-[92dvh] max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
+      <DialogContent className="max-h-[92dvh] max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12">
-          <DialogTitle>編輯訂單 {order?.odooOrderName || ""}</DialogTitle>
-          <DialogDescription>
-            更新客戶、收貨及送貨資料；未付及訂金訂單亦可在下方補記付款。產品及價錢請使用 Odoo 更正流程。
-          </DialogDescription>
+          <DialogTitle>{activeSectionCopy.title} {order?.odooOrderName || ""}</DialogTitle>
+          <DialogDescription>{activeSectionCopy.description}</DialogDescription>
         </DialogHeader>
 
         {form && (
-          <ScrollArea className="h-full min-h-0" data-testid="order-edit-scroll-area">
+          <ScrollArea className="max-h-[calc(92dvh-11rem)] min-h-0" data-testid="order-edit-scroll-area">
             <div className="space-y-5 p-5">
               {error && (
                 <div role="alert" className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
@@ -415,26 +523,8 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                 </div>
               )}
 
-              <section className="space-y-3" aria-label="銷售歸屬">
-                <h3 className="text-sm font-semibold">銷售歸屬</h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <SnapshotField
-                    label="負責銷售員"
-                    value={form.salesId}
-                    fallbackId={order?.salespersonEmployeeId}
-                    fallbackPrefix="員工"
-                  />
-                  <SnapshotField
-                    label="Sales Team"
-                    value={form.department}
-                    fallbackId={order?.salesTeamId}
-                    fallbackPrefix="Sales Team"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">歷史銷售歸屬只供查閱；如需重新指派，請在 Odoo 處理。</p>
-              </section>
-
-              <section className="space-y-3 border-t pt-5" aria-label="客戶資料">
+              {section === "customer" && (
+              <section className="space-y-3" aria-label="客戶資料">
                 <h3 className="text-sm font-semibold">客戶資料</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="下單人／客戶名稱 *" value={form.customerName} onChange={(value) => setField("customerName", value)} />
@@ -442,16 +532,36 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                   <Field label="送花人名稱 *" value={form.senderName} onChange={(value) => setField("senderName", value)} />
                   <Field label="客戶電郵" value={form.customerEmail} onChange={(value) => setField("customerEmail", value)} type="email" />
                 </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>客戶類型 *</Label>
+                    <Select
+                      value={form.customerType}
+                      onValueChange={(value: "personal" | "company") => {
+                        setForm((current) => current ? {
+                          ...current,
+                          customerType: value,
+                          companyName: value === "personal" ? "" : current.companyName,
+                        } : current);
+                      }}
+                    >
+                      <SelectTrigger aria-label="客戶類型 *" className="min-h-11"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="personal">個人</SelectItem>
+                        <SelectItem value="company">公司</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {form.customerType === "company" && (
+                    <Field label="公司名稱 *" value={form.companyName} onChange={(value) => setField("companyName", value)} />
+                  )}
+                </div>
                 <TextField label="帳單地址" value={form.billingAddress} onChange={(value) => setField("billingAddress", value)} />
-                <SnapshotField
-                  label="客戶群組"
-                  value={form.customerGroup}
-                  fallbackId={order?.customerGroupId}
-                  fallbackPrefix="Contact Tag"
-                />
               </section>
+              )}
 
-              <section className="space-y-3 border-t pt-5" aria-label="收貨點 1">
+              {section === "delivery" && (<>
+              <section className="space-y-3" aria-label="收貨點 1">
                 <h3 className="text-sm font-semibold">收貨點 1（主要收貨點）</h3>
                 <div className="space-y-1.5">
                   <Label>收貨方式 *</Label>
@@ -627,9 +737,10 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                   )}
                 </section>
               )}
+              </>)}
 
-              {order && order.paymentStatus !== "paid" && (
-                <section className="space-y-3 border-t pt-5" aria-label="補記付款">
+              {section === "payment" && order && order.paymentStatus !== "paid" && (
+                <section className="space-y-3" aria-label="補記付款">
                   <div>
                     <h3 className="text-sm font-semibold">補記付款</h3>
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -654,26 +765,22 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
                     <Field label="付款參考編號 *" value={paymentReference} onChange={setPaymentReference} />
                     <Field label="收款日期及時間 *" value={paymentReceivedAt} onChange={setPaymentReceivedAt} type="datetime-local" />
                   </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleRecordPayment}
-                    disabled={recordingPayment || saving || paymentOptionsLoading}
-                    className="min-h-11 gap-2"
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    {recordingPayment ? "入帳中..." : "記錄付款到 Odoo"}
-                  </Button>
                 </section>
               )}
 
-              <section className="space-y-3 border-t pt-5" aria-label="備註資料">
+              {section === "payment" && order?.paymentStatus === "paid" && (
+                <p className="text-sm text-muted-foreground">呢張訂單已完成付款，毋須再補記付款。</p>
+              )}
+
+              {section === "notes" && (
+              <section className="space-y-3" aria-label="備註資料">
                 <h3 className="text-sm font-semibold">備註及心意卡</h3>
                 <TextField label="心意卡內容" value={form.giftCardMessage} onChange={(value) => setField("giftCardMessage", value)} />
                 <TextField label="送花人備註" value={form.senderNote} onChange={(value) => setField("senderNote", value)} />
                 <TextField label="送貨備註" value={form.deliveryNote} onChange={(value) => setField("deliveryNote", value)} />
                 <TextField label="內部備註" value={form.internalNote} onChange={(value) => setField("internalNote", value)} />
               </section>
+              )}
             </div>
           </ScrollArea>
         )}
@@ -682,9 +789,28 @@ const OrderEditDialog = ({ order, open, onOpenChange, onSaved }: OrderEditDialog
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving || recordingPayment}>
             取消
           </Button>
-          <Button type="button" onClick={handleSave} disabled={saving || recordingPayment || !form || !splitIdentityUnchanged} className="min-h-11 gap-2">
-            <Save className="h-4 w-4" /> {saving ? "儲存中..." : "儲存到 Odoo"}
-          </Button>
+          {section === "payment" ? (
+            order?.paymentStatus !== "paid" && (
+              <Button
+                type="button"
+                onClick={handleRecordPayment}
+                disabled={recordingPayment || saving || paymentOptionsLoading}
+                className="min-h-11 gap-2"
+              >
+                <CreditCard className="h-4 w-4" />
+                {recordingPayment ? "入帳中..." : "記錄付款到 Odoo"}
+              </Button>
+            )
+          ) : (
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || recordingPayment || !form || (section === "delivery" && !splitIdentityUnchanged)}
+              className="min-h-11 gap-2"
+            >
+              <Save className="h-4 w-4" /> {saving ? "儲存中..." : "儲存到 Odoo"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -713,33 +839,6 @@ const Field = ({
     />
   </div>
 );
-
-const SnapshotField = ({
-  label,
-  value,
-  fallbackId,
-  fallbackPrefix,
-}: {
-  label: string;
-  value?: string;
-  fallbackId?: number;
-  fallbackPrefix: string;
-}) => {
-  const displayValue = value?.trim()
-    || (fallbackId !== undefined ? `${fallbackPrefix} #${fallbackId}` : "未指定");
-
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <div
-        className="flex min-h-11 items-center rounded-md border bg-muted/40 px-3 text-sm"
-        aria-label={label}
-      >
-        {displayValue}
-      </div>
-    </div>
-  );
-};
 
 const TextField = ({
   label,

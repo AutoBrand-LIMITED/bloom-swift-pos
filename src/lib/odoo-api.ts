@@ -319,6 +319,56 @@ export type OrderOperationalUpdatePayload = Omit<
   "salesId" | "department" | "customerGroup"
 >;
 
+export type OrderCustomerSectionUpdatePayload = Pick<
+  OrderOperationalUpdate,
+  | "customerName"
+  | "customerType"
+  | "companyName"
+  | "senderName"
+  | "phone"
+  | "customerEmail"
+  | "billingAddress"
+  | "expectedWriteDate"
+>;
+
+export type OrderDeliverySectionUpdatePayload = Pick<
+  OrderOperationalUpdate,
+  | "fulfillmentType"
+  | "deliveryDate"
+  | "deliveryTimeMode"
+  | "deliverySlotId"
+  | "deliveryTime"
+  | "deliveryAddress"
+  | "deliveryGoogleAddress"
+  | "deliveryBuilding"
+  | "deliveryFloor"
+  | "deliveryUnit"
+  | "deliverySplits"
+  | "recipientType"
+  | "recipientCompanyName"
+  | "recipientName"
+  | "recipientPhone"
+  | "recipientPartnerId"
+  | "recipientOccasions"
+  | "recipientOccasionsVersion"
+  | "deliveryPerson"
+  | "expectedWriteDate"
+>;
+
+export type OrderNotesSectionUpdatePayload = Pick<
+  OrderOperationalUpdate,
+  | "giftCardMessage"
+  | "senderNote"
+  | "deliveryNote"
+  | "internalNote"
+  | "expectedWriteDate"
+>;
+
+export type OrderSectionUpdate =
+  | { section: "customer"; data: OrderCustomerSectionUpdatePayload }
+  | { section: "delivery"; data: OrderDeliverySectionUpdatePayload }
+  | { section: "notes"; data: OrderNotesSectionUpdatePayload };
+
 export interface OrderOperationalUpdateResponse {
   id: number;
   writeDate: string;
@@ -965,6 +1015,35 @@ export async function updateOdooOrderOperationalDetails(
     return throwApiError<OrderOperationalUpdateResponse>(
       res,
       `Odoo order update failed: ${res.status}`,
+    );
+  }
+
+  return (await res.json()) as OrderOperationalUpdateResponse;
+}
+
+export async function updateOdooOrderSection(
+  orderId: number,
+  update: OrderSectionUpdate,
+  signal?: AbortSignal,
+): Promise<OrderOperationalUpdateResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+
+  const res = await authenticatedFetch(
+    `${BACKEND_URL}/orders/${orderId}/sections/${update.section}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(update.data),
+      signal,
+    },
+  );
+
+  if (!res.ok) {
+    return throwApiError<OrderOperationalUpdateResponse>(
+      res,
+      `Odoo order ${update.section} update failed: ${res.status}`,
     );
   }
 

@@ -2,22 +2,32 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertCircle,
   ArrowLeft,
+  Banknote,
   CalendarDays,
   ClipboardList,
   Clock3,
   LoaderCircle,
   MapPin,
+  MoreHorizontal,
   Pencil,
   RefreshCw,
   Search,
+  StickyNote,
+  Truck,
   UserRound,
   X,
 } from "lucide-react";
 
-import OrderEditDialog from "@/components/pos/OrderEditDialog";
+import OrderEditDialog, { type OrderEditSection } from "@/components/pos/OrderEditDialog";
 import PrintButtons from "@/components/pos/PrintButtons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -114,12 +124,105 @@ const InfoGrid = ({ rows }: { rows: Array<[string, ReactNode]> }) => (
   </dl>
 );
 
-const DetailSection = ({ title, children }: { title: string; children: ReactNode }) => (
+const DetailSection = ({
+  title,
+  actions,
+  children,
+}: {
+  title: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) => (
   <section className="rounded-xl border border-border bg-card p-4 sm:p-5" aria-label={title}>
-    <h3 className="mb-4 text-sm font-semibold tracking-wide text-foreground">{title}</h3>
+    <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
+      <h3 className="text-sm font-semibold tracking-wide text-foreground">{title}</h3>
+      {actions}
+    </div>
     {children}
   </section>
 );
+
+const editSections: Array<{
+  section: OrderEditSection;
+  label: string;
+  icon: typeof UserRound;
+}> = [
+  { section: "customer", label: "修改客戶與送花人", icon: UserRound },
+  { section: "delivery", label: "修改收貨點與商品分配", icon: Truck },
+  { section: "notes", label: "修改備註及心意卡", icon: StickyNote },
+  { section: "payment", label: "補記付款", icon: Banknote },
+];
+
+const OrderEditMenu = ({
+  onEdit,
+  availableSections,
+}: {
+  onEdit: (section: OrderEditSection) => void;
+  availableSections: OrderEditSection[];
+}) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-11 gap-2 touch-manipulation"
+        aria-label="編輯訂單資料"
+      >
+        <Pencil className="h-4 w-4" /> 編輯訂單資料／補記付款
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="min-w-60">
+      {editSections
+        .filter(({ section }) => availableSections.includes(section))
+        .map(({ section, label, icon: Icon }) => (
+          <DropdownMenuItem
+            key={section}
+            className="min-h-11 gap-2 touch-manipulation"
+            onSelect={() => onEdit(section)}
+          >
+            <Icon className="h-4 w-4" /> {label}
+          </DropdownMenuItem>
+        ))}
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
+
+const SectionEditMenu = ({
+  title,
+  section,
+  onEdit,
+}: {
+  title: string;
+  section: OrderEditSection;
+  onEdit: (section: OrderEditSection) => void;
+}) => {
+  const config = editSections.find((entry) => entry.section === section);
+  if (!config) return null;
+  const Icon = config.icon;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="min-h-11 min-w-11 shrink-0 touch-manipulation"
+          aria-label={`${title}操作選單`}
+        >
+          <MoreHorizontal className="h-5 w-5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          className="min-h-11 gap-2 touch-manipulation"
+          onSelect={() => onEdit(section)}
+        >
+          <Icon className="h-4 w-4" /> {config.label}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
 
 const DestinationCard = ({
   title,
@@ -216,7 +319,7 @@ const OrderDetail = ({
   historyStatus: "idle" | "loading" | "success" | "error";
   historyError: string | null;
   onRetryHistory: () => void;
-  onEdit: () => void;
+  onEdit: (section: OrderEditSection) => void;
   canRetryOperationalOrders: boolean;
   retryingOperationalOrderId: string | null;
   operationalRetryError: string | null;
@@ -241,8 +344,20 @@ const OrderDetail = ({
     }))
     .filter((allocation) => allocation.quantity > 0);
   const productsSubtotal = order.items.reduce((total, item) => total + orderItemTotal(item), 0);
-  const editable = order.source === "odoo"
-    && Boolean(order.odooOrderId && order.writeDate && order.deliveryTimeMode);
+  const operationalEditable = order.source === "odoo"
+    && Boolean(order.odooOrderId && order.writeDate);
+  const deliveryEditable = operationalEditable && Boolean(order.deliveryTimeMode);
+  const outstandingAmount = order.balanceAmount
+    ?? Math.max(0, order.finalPrice - order.depositAmount);
+  const paymentEditable = order.source === "odoo"
+    && Boolean(order.odooOrderId)
+    && order.paymentStatus !== "paid"
+    && outstandingAmount > 0;
+  const availableEditSections: OrderEditSection[] = [
+    ...(operationalEditable ? ["customer" as const, "notes" as const] : []),
+    ...(deliveryEditable ? ["delivery" as const] : []),
+    ...(paymentEditable ? ["payment" as const] : []),
+  ];
   const canRetry = canRetryOperationalOrders
     && Boolean(order.operationalOrderId && order.operationalRetryEligible);
   const historyEligible = order.source === "odoo"
@@ -264,7 +379,15 @@ const OrderDetail = ({
             本機訂單 ID：<span className="break-all font-mono">{order.id}</span>
           </p>
         </div>
-        <p className="shrink-0 font-mono text-2xl font-bold">{formatMoney(order.finalPrice)}</p>
+        <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
+          <p className="font-mono text-2xl font-bold">{formatMoney(order.finalPrice)}</p>
+          {availableEditSections.length > 0 && (
+            <OrderEditMenu
+              onEdit={onEdit}
+              availableSections={availableEditSections}
+            />
+          )}
+        </div>
       </div>
 
       <DetailSection title="訂單身份與時間">
@@ -278,7 +401,12 @@ const OrderDetail = ({
         ]} />
       </DetailSection>
 
-      <DetailSection title="客戶與送花人">
+      <DetailSection
+        title="客戶與送花人"
+        actions={operationalEditable ? (
+          <SectionEditMenu title="客戶與送花人" section="customer" onEdit={onEdit} />
+        ) : undefined}
+      >
         <InfoGrid rows={[
           ["客戶名稱", order.customerName || "—"],
           ["客戶編號", order.customerCode || "—"],
@@ -291,7 +419,12 @@ const OrderDetail = ({
         ]} />
       </DetailSection>
 
-      <DetailSection title="收貨點與商品分配">
+      <DetailSection
+        title="收貨點與商品分配"
+        actions={deliveryEditable ? (
+          <SectionEditMenu title="收貨點與商品分配" section="delivery" onEdit={onEdit} />
+        ) : undefined}
+      >
         <div className="space-y-3">
           <DestinationCard
             title="主要收貨點 1"
@@ -352,7 +485,10 @@ const OrderDetail = ({
         </div>
       </DetailSection>
 
-      <DetailSection title="產品與價錢">
+      <DetailSection
+        title="產品與價錢"
+        actions={<Badge variant="outline">唯讀</Badge>}
+      >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b text-xs text-muted-foreground">
@@ -420,7 +556,12 @@ const OrderDetail = ({
         </dl>
       </DetailSection>
 
-      <DetailSection title="付款與會計參考">
+      <DetailSection
+        title="付款與會計參考"
+        actions={paymentEditable ? (
+          <SectionEditMenu title="付款與會計參考" section="payment" onEdit={onEdit} />
+        ) : undefined}
+      >
         <InfoGrid rows={[
           ["付款狀態", payment.label],
           ["付款方式", order.paymentMethod || "—"],
@@ -433,7 +574,12 @@ const OrderDetail = ({
         ]} />
       </DetailSection>
 
-      <DetailSection title="備註">
+      <DetailSection
+        title="備註"
+        actions={operationalEditable ? (
+          <SectionEditMenu title="備註" section="notes" onEdit={onEdit} />
+        ) : undefined}
+      >
         <InfoGrid rows={[
           ["送花人備註", order.senderNote || "—"],
           ["送貨備註", order.deliveryNote || "—"],
@@ -457,17 +603,6 @@ const OrderDetail = ({
 
       <DetailSection title="操作">
         <div className="space-y-3">
-          {editable && (
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-11 gap-2 touch-manipulation"
-              onClick={onEdit}
-              aria-label="編輯訂單資料"
-            >
-              <Pencil className="h-4 w-4" /> 編輯訂單資料／補記付款
-            </Button>
-          )}
           {canRetry && order.operationalOrderId && (
             <Button
               type="button"
@@ -571,7 +706,10 @@ const OrderHistory = ({
   canRetryOperationalOrders = false,
   onRetryOperationalOrder,
 }: OrderHistoryProps) => {
-  const [editingOrder, setEditingOrder] = useState<OrderRecordView | null>(null);
+  const [editingOrder, setEditingOrder] = useState<{
+    order: OrderRecordView;
+    section: OrderEditSection;
+  } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
@@ -881,7 +1019,7 @@ const OrderHistory = ({
                   historyStatus={historyStatus}
                   historyError={historyError}
                   onRetryHistory={() => setHistoryRefreshKey((key) => key + 1)}
-                  onEdit={() => setEditingOrder(selectedOrder)}
+                  onEdit={(section) => setEditingOrder({ order: selectedOrder, section })}
                   canRetryOperationalOrders={canRetryOperationalOrders}
                   retryingOperationalOrderId={retryingOperationalOrderId}
                   operationalRetryError={operationalRetryError}
@@ -901,7 +1039,8 @@ const OrderHistory = ({
       </div>
 
       <OrderEditDialog
-        order={editingOrder}
+        order={editingOrder?.order || null}
+        section={editingOrder?.section || "customer"}
         open={Boolean(editingOrder)}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setEditingOrder(null);

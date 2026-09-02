@@ -1097,6 +1097,31 @@ describe("odoo-api note contracts", () => {
     );
   });
 
+  it("patches only the selected order section through the section endpoint", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = { id: 17, writeDate: "2026-08-03 10:01:00" };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { updateOdooOrderSection } = await import("@/lib/odoo-api");
+    const data = {
+      giftCardMessage: "Happy birthday",
+      senderNote: "Call sender",
+      deliveryNote: "Call before delivery",
+      internalNote: "Only this section changes",
+      expectedWriteDate: "2026-08-03 10:00:00",
+    };
+
+    await expect(updateOdooOrderSection(17, { section: "notes", data }))
+      .resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders/17/sections/notes",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    );
+  });
+
   it("loads only backend-approved accounting payment options", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const options = [

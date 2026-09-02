@@ -12,7 +12,7 @@ const {
   getOdooEmployees,
   getOdooSalesTeams,
   recordOdooOrderPayment,
-  updateOdooOrderOperationalDetails,
+  updateOdooOrderSection,
 } = vi.hoisted(() => ({
   getAccountingPaymentOptions: vi.fn(),
   getDeliverySlots: vi.fn(),
@@ -21,7 +21,7 @@ const {
   getOdooEmployees: vi.fn(),
   getOdooSalesTeams: vi.fn(),
   recordOdooOrderPayment: vi.fn(),
-  updateOdooOrderOperationalDetails: vi.fn(),
+  updateOdooOrderSection: vi.fn(),
 }));
 
 vi.mock("@/lib/odoo-api", () => ({
@@ -33,7 +33,7 @@ vi.mock("@/lib/odoo-api", () => ({
   getOdooEmployees,
   getOdooSalesTeams,
   recordOdooOrderPayment,
-  updateOdooOrderOperationalDetails,
+  updateOdooOrderSection,
 }));
 
 const orderFixture = (overrides: Partial<OrderRecordView> = {}): OrderRecordView => ({
@@ -72,6 +72,11 @@ const orderFixture = (overrides: Partial<OrderRecordView> = {}): OrderRecordView
   ...overrides,
 });
 
+const openOrderEditSection = (menuItemName: string) => {
+  fireEvent.keyDown(screen.getByRole("button", { name: "編輯訂單資料" }), { key: "Enter" });
+  fireEvent.click(screen.getByRole("menuitem", { name: menuItemName }));
+};
+
 describe("OrderHistory delivery summary", () => {
   beforeEach(() => {
     getDeliverySlots.mockReset();
@@ -87,7 +92,7 @@ describe("OrderHistory delivery summary", () => {
     getOdooSalesTeams.mockResolvedValue([]);
     getOdooCustomerGroups.mockReset();
     getOdooCustomerGroups.mockResolvedValue([]);
-    updateOdooOrderOperationalDetails.mockReset();
+    updateOdooOrderSection.mockReset();
     getAccountingPaymentOptions.mockReset();
     getAccountingPaymentOptions.mockResolvedValue([
       { code: "cash_other", label: "現金／其他" },
@@ -113,6 +118,71 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByTestId("order-history-scroll-area")).toHaveClass("min-h-0", "flex-1");
     expect(screen.getByTestId("order-history-detail-pane")).toHaveClass("overflow-y-auto");
     expect(screen.getByRole("group", { name: /訂單 S00020/ })).toBeInTheDocument();
+  });
+
+  it("places the edit entry in the top summary and marks product pricing read-only", () => {
+    render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+
+    const editButton = screen.getByRole("button", { name: "編輯訂單資料" });
+    const identitySection = screen.getByRole("region", { name: "訂單身份與時間" });
+    expect(editButton.compareDocumentPosition(identitySection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "產品與價錢" })).getByText("唯讀")).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "操作" })).queryByRole("button", {
+      name: "編輯訂單資料",
+    })).not.toBeInTheDocument();
+  });
+
+  it("opens only the requested section from its three-dot action menu", () => {
+    render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "客戶與送花人操作選單" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "修改客戶與送花人" }));
+
+    expect(screen.getByRole("heading", { name: /修改客戶與送花人/ })).toBeVisible();
+    expect(screen.getByLabelText("下單人／客戶名稱 *")).toBeVisible();
+    expect(screen.queryByLabelText("送貨地址 *")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("內部備註")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("付款參考編號 *")).not.toBeInTheDocument();
+    expect(getDeliverySlots).not.toHaveBeenCalled();
+    expect(getAccountingPaymentOptions).not.toHaveBeenCalled();
+  });
+
+  it("validates only fields owned by the focused customer section", async () => {
+    render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
+
+    openOrderEditSection("修改客戶與送花人");
+    fireEvent.change(screen.getByLabelText("客戶電郵"), { target: { value: "invalid-email" } });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("有效嘅客戶電郵");
+    expect(updateOdooOrderSection).not.toHaveBeenCalled();
+  });
+
+  it("saves notes without validating unrelated legacy customer or delivery fields", async () => {
+    updateOdooOrderSection.mockResolvedValue({
+      id: 17,
+      writeDate: "2026-08-03 10:01:00",
+    });
+    render(<OrderHistory orders={[orderFixture({
+      phone: "",
+      deliveryDate: "",
+      deliveryAddress: "",
+      recipientName: "",
+      recipientPhone: "",
+    })]} open onClose={vi.fn()} />);
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "備註操作選單" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "修改備註及心意卡" }));
+    fireEvent.change(screen.getByLabelText("內部備註"), { target: { value: "只更新備註" } });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => expect(updateOdooOrderSection).toHaveBeenCalledWith(
+      17,
+      {
+        section: "notes",
+        data: expect.objectContaining({ internalNote: "只更新備註" }),
+      },
+    ));
   });
 
   it("shows new occasions and converted legacy birthdays in history snapshots", () => {
@@ -246,7 +316,7 @@ describe("OrderHistory delivery summary", () => {
   });
 
   it("edits an existing Odoo order and refreshes the drawer", async () => {
-    updateOdooOrderOperationalDetails.mockResolvedValue({
+    updateOdooOrderSection.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
     });
@@ -260,13 +330,14 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    expect(screen.getByRole("button", { name: "編輯訂單資料" })).toBeVisible();
+    openOrderEditSection("修改收貨點與商品分配");
     expect(screen.getByRole("dialog")).toHaveClass(
-      "h-[92dvh]",
+      "max-h-[92dvh]",
       "grid-rows-[auto_minmax(0,1fr)_auto]",
     );
     const editScrollArea = screen.getByTestId("order-edit-scroll-area");
-    expect(editScrollArea).toHaveClass("h-full", "min-h-0");
+    expect(editScrollArea).toHaveClass("max-h-[calc(92dvh-11rem)]", "min-h-0");
     expect(
       editScrollArea.querySelector("[data-radix-scroll-area-viewport]"),
     ).toHaveStyle({ overflowY: "scroll" });
@@ -276,19 +347,22 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     await waitFor(() => {
-      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+      expect(updateOdooOrderSection).toHaveBeenCalledWith(
         17,
-        expect.objectContaining({
-          deliveryAddress: "觀塘新地址",
-          expectedWriteDate: "2026-08-03 10:00:00",
-        }),
+        {
+          section: "delivery",
+          data: expect.objectContaining({
+            deliveryAddress: "觀塘新地址",
+            expectedWriteDate: "2026-08-03 10:00:00",
+          }),
+        },
       );
     });
     expect(onOrderUpdated).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps historical assignment and customer group values as read-only snapshots", async () => {
-    updateOdooOrderOperationalDetails.mockResolvedValue({
+  it("keeps historical assignment and customer group values outside the focused customer editor", async () => {
+    updateOdooOrderSection.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
     });
@@ -303,11 +377,16 @@ describe("OrderHistory delivery summary", () => {
       customerGroup: "Regular",
     })]} open onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
-    expect(await screen.findByLabelText("負責銷售員")).toHaveTextContent("AC02 — Elma");
-    expect(screen.getByLabelText("Sales Team")).toHaveTextContent("Retail");
-    expect(screen.getByLabelText("客戶群組")).toHaveTextContent("Regular");
-    expect(screen.getByText(/歷史銷售歸屬只供查閱/)).toBeVisible();
+    const businessDetails = screen.getByRole("region", { name: "業務詳情" });
+    expect(within(businessDetails).getByText("AC02 — Elma")).toBeVisible();
+    expect(within(businessDetails).getByText("Retail")).toBeVisible();
+    expect(within(businessDetails).getByText("Regular")).toBeVisible();
+
+    openOrderEditSection("修改客戶與送花人");
+    expect(screen.getByRole("heading", { name: /修改客戶與送花人/ })).toBeVisible();
+    expect(screen.queryByLabelText("負責銷售員")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Sales Team")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("客戶群組")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: /負責銷售員/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: /Sales Team/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: /客戶群組/ })).not.toBeInTheDocument();
@@ -317,14 +396,18 @@ describe("OrderHistory delivery summary", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
-    await waitFor(() => expect(updateOdooOrderOperationalDetails).toHaveBeenCalled());
-    const payload = updateOdooOrderOperationalDetails.mock.calls[0][1];
+    await waitFor(() => expect(updateOdooOrderSection).toHaveBeenCalled());
+    const update = updateOdooOrderSection.mock.calls[0][1];
+    const payload = update.data;
+    expect(update.section).toBe("customer");
     expect(payload).not.toHaveProperty("salesId");
     expect(payload).not.toHaveProperty("department");
     expect(payload).not.toHaveProperty("customerGroup");
     expect(payload).not.toHaveProperty("salespersonEmployeeId");
     expect(payload).not.toHaveProperty("salesTeamId");
     expect(payload).not.toHaveProperty("customerGroupId");
+    expect(payload).not.toHaveProperty("deliveryAddress");
+    expect(payload).not.toHaveProperty("internalNote");
     expect(payload).toMatchObject({
       customerType: "company",
       companyName: "Flower Company Limited",
@@ -332,7 +415,7 @@ describe("OrderHistory delivery summary", () => {
   });
 
   it("edits every existing split destination while preserving IDs and item allocations", async () => {
-    updateOdooOrderOperationalDetails.mockResolvedValue({
+    updateOdooOrderSection.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
     });
@@ -392,7 +475,7 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    openOrderEditSection("修改收貨點與商品分配");
     const primaryDestination = screen.getByRole("region", { name: "收貨點 1" });
     const secondaryDestination = screen.getByRole("region", { name: "額外收貨點 2" });
     expect(
@@ -410,29 +493,32 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     await waitFor(() => {
-      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+      expect(updateOdooOrderSection).toHaveBeenCalledWith(
         17,
-        expect.objectContaining({
-          deliverySplits: [
-            expect.objectContaining({
-              id: "destination-2",
-              deliveryAddress: "九龍觀塘鴻圖道新地址",
-              itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
-            }),
-            expect.objectContaining({
-              id: "destination-3",
-              fulfillmentType: "pickup",
-              recipientName: "Updated Pickup Contact",
-              itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
-            }),
-          ],
-        }),
+        {
+          section: "delivery",
+          data: expect.objectContaining({
+            deliverySplits: [
+              expect.objectContaining({
+                id: "destination-2",
+                deliveryAddress: "九龍觀塘鴻圖道新地址",
+                itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+              }),
+              expect.objectContaining({
+                id: "destination-3",
+                fulfillmentType: "pickup",
+                recipientName: "Updated Pickup Contact",
+                itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
+              }),
+            ],
+          }),
+        },
       );
     });
   });
 
   it("sends explicit D1 and split occasion clears while retaining the split partner binding", async () => {
-    updateOdooOrderOperationalDetails.mockResolvedValue({
+    updateOdooOrderSection.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
     });
@@ -476,7 +562,7 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    openOrderEditSection("修改收貨點與商品分配");
     fireEvent.click(screen.getByRole("button", {
       name: "移除主要收貨點收花人重要日子 1",
     }));
@@ -486,25 +572,28 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     await waitFor(() => {
-      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+      expect(updateOdooOrderSection).toHaveBeenCalledWith(
         17,
-        expect.objectContaining({
-          recipientPartnerId: 84,
-          recipientOccasions: [],
-          recipientOccasionsVersion: "recipient-84-v3",
-          deliverySplits: [expect.objectContaining({
-            id: "destination-2",
+        {
+          section: "delivery",
+          data: expect.objectContaining({
+            recipientPartnerId: 84,
             recipientOccasions: [],
-            recipientOccasionsVersion: "recipient-85-v4",
-            recipientPartnerId: 85,
-          })],
-        }),
+            recipientOccasionsVersion: "recipient-84-v3",
+            deliverySplits: [expect.objectContaining({
+              id: "destination-2",
+              recipientOccasions: [],
+              recipientOccasionsVersion: "recipient-85-v4",
+              recipientPartnerId: 85,
+            })],
+          }),
+        },
       );
     });
   });
 
   it("omits unchanged legacy occasion fields during unrelated primary and split edits", async () => {
-    updateOdooOrderOperationalDetails.mockResolvedValue({
+    updateOdooOrderSection.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
     });
@@ -547,17 +636,16 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
-    fireEvent.change(screen.getByLabelText("送花人名稱 *"), {
-      target: { value: "Updated Sender" },
-    });
+    openOrderEditSection("修改收貨點與商品分配");
     fireEvent.change(screen.getByLabelText("額外收貨點 2 送貨地址 *"), {
       target: { value: "九龍觀塘巧明街 8 號" },
     });
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
-    await waitFor(() => expect(updateOdooOrderOperationalDetails).toHaveBeenCalledTimes(1));
-    const payload = updateOdooOrderOperationalDetails.mock.calls[0][1];
+    await waitFor(() => expect(updateOdooOrderSection).toHaveBeenCalledTimes(1));
+    const update = updateOdooOrderSection.mock.calls[0][1];
+    const payload = update.data;
+    expect(update.section).toBe("delivery");
     expect(payload).toHaveProperty("recipientPartnerId", 84);
     expect(payload).not.toHaveProperty("recipientOccasions");
     expect(payload).not.toHaveProperty("recipientOccasionsVersion");
@@ -580,7 +668,7 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    openOrderEditSection("修改收貨點與商品分配");
     fireEvent.change(screen.getByLabelText("主要收貨點收花人重要日子 1 日期"), {
       target: { value: "1991-02-03" },
     });
@@ -588,7 +676,7 @@ describe("OrderHistory delivery summary", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("未有最新版本");
     expect(screen.getByRole("alert")).toHaveTextContent("重新選擇收花人");
-    expect(updateOdooOrderOperationalDetails).not.toHaveBeenCalled();
+    expect(updateOdooOrderSection).not.toHaveBeenCalled();
   });
 
   it("blocks occasion changes after recipient identity detaches the current version", async () => {
@@ -604,7 +692,7 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    openOrderEditSection("修改收貨點與商品分配");
     fireEvent.change(screen.getByLabelText("收貨人／聯絡人姓名 *"), {
       target: { value: "Changed Recipient" },
     });
@@ -614,11 +702,11 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("未有最新版本");
-    expect(updateOdooOrderOperationalDetails).not.toHaveBeenCalled();
+    expect(updateOdooOrderSection).not.toHaveBeenCalled();
   });
 
   it("clears only the primary recipient binding when its identity is edited", async () => {
-    updateOdooOrderOperationalDetails.mockResolvedValue({
+    updateOdooOrderSection.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
     });
@@ -661,14 +749,18 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    openOrderEditSection("修改收貨點與商品分配");
     fireEvent.change(screen.getByLabelText("收貨人／聯絡人姓名 *"), {
       target: { value: "Changed Primary Recipient" },
     });
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     await waitFor(() => {
-      const payload = updateOdooOrderOperationalDetails.mock.calls[0]?.[1];
+      const update = updateOdooOrderSection.mock.calls[0]?.[1];
+      const payload = update?.data;
+      expect(update?.section).toBe("delivery");
+      expect(payload).toBeDefined();
+      if (!payload) return;
       expect(payload).not.toHaveProperty("recipientPartnerId");
       expect(payload).not.toHaveProperty("recipientOccasionsVersion");
       expect(payload.deliverySplits).toEqual([
@@ -682,38 +774,41 @@ describe("OrderHistory delivery summary", () => {
   });
 
   it("allows an existing order to select a different standard delivery slot", async () => {
-    updateOdooOrderOperationalDetails.mockResolvedValue({
+    updateOdooOrderSection.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
     });
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    openOrderEditSection("修改收貨點與商品分配");
     await waitFor(() => expect(getDeliverySlots).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("combobox", { name: "標準送貨時段 *" }));
     fireEvent.click(await screen.findByRole("option", { name: "下午 13:00-18:00" }));
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     await waitFor(() => {
-      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+      expect(updateOdooOrderSection).toHaveBeenCalledWith(
         17,
-        expect.objectContaining({
-          deliveryTimeMode: "slot",
-          deliverySlotId: 12,
-          deliveryTime: "下午 13:00-18:00",
-        }),
+        {
+          section: "delivery",
+          data: expect.objectContaining({
+            deliveryTimeMode: "slot",
+            deliverySlotId: 12,
+            deliveryTime: "下午 13:00-18:00",
+          }),
+        },
       );
     });
   });
 
   it("allows switching an existing standard slot to a specified delivery time", async () => {
-    updateOdooOrderOperationalDetails.mockResolvedValue({
+    updateOdooOrderSection.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
     });
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    openOrderEditSection("修改收貨點與商品分配");
     fireEvent.click(screen.getByRole("combobox", { name: "送貨時間模式 *" }));
     fireEvent.click(screen.getByRole("option", { name: "指定時間" }));
     fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 * 小時" }));
@@ -723,13 +818,16 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     await waitFor(() => {
-      expect(updateOdooOrderOperationalDetails).toHaveBeenCalledWith(
+      expect(updateOdooOrderSection).toHaveBeenCalledWith(
         17,
-        expect.objectContaining({
-          deliveryTimeMode: "specified",
-          deliverySlotId: undefined,
-          deliveryTime: "15:15",
-        }),
+        {
+          section: "delivery",
+          data: expect.objectContaining({
+            deliveryTimeMode: "specified",
+            deliverySlotId: undefined,
+            deliveryTime: "15:15",
+          }),
+        },
       );
     });
   });
@@ -752,7 +850,7 @@ describe("OrderHistory delivery summary", () => {
       balanceAmount: 680,
     })]} open onClose={vi.fn()} onOrderUpdated={onOrderUpdated} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    openOrderEditSection("補記付款");
     await waitFor(() => expect(getAccountingPaymentOptions).toHaveBeenCalledTimes(1));
     fireEvent.change(screen.getByLabelText("付款參考編號 *"), {
       target: { value: "FPS-680" },
@@ -768,6 +866,17 @@ describe("OrderHistory delivery summary", () => {
       }));
     });
     expect(onOrderUpdated).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides payment actions when an unpaid label has no outstanding balance", () => {
+    render(<OrderHistory orders={[orderFixture({
+      paymentStatus: "unpaid",
+      balanceAmount: 0,
+    })]} open onClose={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "付款與會計參考操作選單" })).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "編輯訂單資料" }), { key: "Enter" });
+    expect(screen.queryByRole("menuitem", { name: "補記付款" })).not.toBeInTheDocument();
   });
 
   it("marks specified delivery time explicitly", () => {
@@ -1011,14 +1120,14 @@ describe("OrderHistory delivery summary", () => {
 
   it("refreshes edit history after a successful order edit", async () => {
     getOdooOrderEditHistory.mockResolvedValue({ orderId: 17, entries: [], truncated: false });
-    updateOdooOrderOperationalDetails.mockResolvedValue({
+    updateOdooOrderSection.mockResolvedValue({
       id: 17,
       writeDate: "2026-08-03 10:01:00",
     });
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
 
     await waitFor(() => expect(getOdooOrderEditHistory).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole("button", { name: "編輯訂單資料" }));
+    openOrderEditSection("修改收貨點與商品分配");
     fireEvent.change(screen.getByLabelText("送貨地址 *"), { target: { value: "新地址" } });
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
