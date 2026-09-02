@@ -308,7 +308,6 @@ const DestinationCard = ({
   deliveryTimeMode,
   deliveryTime,
   address,
-  addressParts,
   recipientType,
   recipientCompanyName,
   recipientName,
@@ -327,7 +326,6 @@ const DestinationCard = ({
   deliveryTimeMode?: "slot" | "specified";
   deliveryTime: string;
   address: string;
-  addressParts: string[];
   recipientType?: "personal" | "company";
   recipientCompanyName?: string;
   recipientName: string;
@@ -349,7 +347,6 @@ const DestinationCard = ({
       ["日期", deliveryDate || "未指定日期"],
       ["時間", deliveryTimeLabel({ deliveryTimeMode, deliveryTime })],
       [fulfillmentType === "pickup" ? "自取地點" : "地址", address || "—"],
-      ["地址補充", addressParts.filter(Boolean).join(" · ") || "—"],
       ["收件類型", recipientType === "company" ? "公司" : "個人"],
       ["收貨公司", recipientCompanyName || "—"],
       ["收貨人／聯絡人", recipientName || "—"],
@@ -521,12 +518,6 @@ const OrderDetail = ({
             deliveryTimeMode={order.deliveryTimeMode}
             deliveryTime={order.deliveryTime}
             address={order.deliveryAddress}
-            addressParts={[
-              order.deliveryGoogleAddress || "",
-              order.deliveryBuilding ? `大廈：${order.deliveryBuilding}` : "",
-              order.deliveryFloor ? `樓層：${order.deliveryFloor}` : "",
-              order.deliveryUnit ? `單位：${order.deliveryUnit}` : "",
-            ]}
             recipientType={order.recipientType}
             recipientCompanyName={order.recipientCompanyName}
             recipientName={order.recipientName}
@@ -547,16 +538,6 @@ const OrderDetail = ({
               deliveryTimeMode={split.deliveryTimeMode}
               deliveryTime={split.deliveryTime}
               address={split.deliveryAddress}
-              addressParts={[
-                split.deliveryRegion,
-                split.deliveryDistrict,
-                split.deliveryArea,
-                split.deliveryDetail,
-                split.deliveryGoogleAddress,
-                split.deliveryBuilding ? `大廈：${split.deliveryBuilding}` : "",
-                split.deliveryFloor ? `樓層：${split.deliveryFloor}` : "",
-                split.deliveryUnit ? `單位：${split.deliveryUnit}` : "",
-              ]}
               recipientType={split.recipientType}
               recipientCompanyName={split.recipientCompanyName}
               recipientName={split.recipientName}

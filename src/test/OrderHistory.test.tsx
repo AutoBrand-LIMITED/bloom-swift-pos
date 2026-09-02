@@ -1113,6 +1113,9 @@ describe("OrderHistory delivery summary", () => {
     expect(within(primary).getByText("生日快樂")).toBeVisible();
     expect(within(primary).getByText("× 1")).toBeVisible();
     const split = screen.getByRole("article", { name: "額外收貨點 2" });
+    expect(within(split).getByText("九龍觀塘巧明街 6 號")).toBeVisible();
+    expect(within(split).queryByText("地址補充")).not.toBeInTheDocument();
+    expect(within(split).queryByText(/九龍 · 觀塘區 · 觀塘/)).not.toBeInTheDocument();
     expect(within(split).getByText(/收件人生日：1985-11-12/)).toBeVisible();
     expect(within(split).getByText("Call first")).toBeVisible();
     expect(within(split).getByText("Get well soon")).toBeVisible();
