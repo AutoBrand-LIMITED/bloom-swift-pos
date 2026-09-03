@@ -31,7 +31,12 @@ import {
   normalizeCustomerIdentityName,
   normalizePhoneNumber,
 } from "@/lib/checkout-validation";
-import { phoneLocalDigits, phoneMatchesQuery, phoneSearchRank } from "@/lib/phone-utils";
+import {
+  phoneLocalDigits,
+  phoneMatchesQuery,
+  phoneSearchQueryKey,
+  phoneSearchRank,
+} from "@/lib/phone-utils";
 import {
   customerResolutionIdentityKey,
   type CustomerResolutionState,
@@ -187,7 +192,7 @@ const CustomerSection = ({
     const controller = new AbortController();
     const source = activeDropdown;
     const requestQuery = source === "phone"
-      ? normalizedDebouncedPhone
+      ? phoneSearchQueryKey(debouncedSearch)
       : trimmed.toLocaleLowerCase();
     const requestId = searchRequestRef.current + 1;
     searchRequestRef.current = requestId;
@@ -210,7 +215,11 @@ const CustomerSection = ({
             ? account.contacts
             : prefixCustomers,
         }))
-      : searchOdooCustomers(trimmed, controller.signal, "general").then((customers) => ({
+      : searchOdooCustomers(
+          source === "phone" ? requestQuery : trimmed,
+          controller.signal,
+          "general",
+        ).then((customers) => ({
           account: null,
           customers,
         }));
@@ -246,7 +255,7 @@ const CustomerSection = ({
   }, [activeDropdown, debouncedSearch, normalizedDebouncedPhone, retryKey]);
 
   const currentSearchKey = activeDropdown === "phone"
-    ? normalizedSearchPhone
+    ? phoneSearchQueryKey(search)
     : search.trim().toLocaleLowerCase();
   const completedCurrentSearch = completedOdooSearch?.source === activeDropdown
     && completedOdooSearch.query === currentSearchKey;
@@ -312,7 +321,7 @@ const CustomerSection = ({
   // 「同客戶相同」係指實際下單人／聯絡人；公司名稱只屬於帳戶資料。
   const orderingCustomerName = customerName.trim() || selectedCustomer?.name.trim() || "";
   const normalizedCurrentPhone = normalizePhoneNumber(phone);
-  const currentPhoneSearchKey = phoneLocalDigits(phone);
+  const currentPhoneSearchKey = phoneSearchQueryKey(phone);
   const normalizedCurrentCustomerName = normalizeCustomerIdentityName(customerName);
   const canStartNewCustomerWithCode = Boolean(
     hasOdooBackend
@@ -372,7 +381,7 @@ const CustomerSection = ({
       && currentSearchKey === queryForSource(activeDropdown),
   );
   const activeDebouncedKey = activeDropdown === "phone"
-    ? normalizedDebouncedPhone
+    ? phoneSearchQueryKey(debouncedSearch)
     : debouncedSearch.trim().toLocaleLowerCase();
   let customerResolutionPhase: CustomerResolutionState["phase"] = "idle";
   if (!hasOdooBackend || selectedCustomerConfirmed || isNewCustomerConfirmed) {

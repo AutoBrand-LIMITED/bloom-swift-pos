@@ -255,7 +255,7 @@ describe("CustomerSection gift sender", () => {
 
     expect(screen.getByRole("combobox", { name: "客戶群組（選填）" })).toBeDisabled();
     expect(screen.getByText(/未能同步 Odoo Contact Tags；不會提供未驗證選項/)).toBeVisible();
-    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Corporate|VIP Wholesale/ })).not.toBeInTheDocument();
   });
 
   it("uses the ordering contact instead of the company name for a company customer", () => {
@@ -358,6 +358,24 @@ describe("CustomerSection gift sender", () => {
     expect(newCustomerCode).toHaveValue(" NEW-001 ");
     expect(screen.getByText(/連同新客戶資料儲存到 Odoo/)).toBeInTheDocument();
     expect(screen.queryByText(/系統未有符合此電話及聯絡人名稱/)).not.toBeInTheDocument();
+  });
+
+  it("preserves an international country code when searching Odoo customers", async () => {
+    searchOdooCustomers.mockResolvedValue([]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "國家或地區區號" }), {
+      target: { value: "SG" },
+    });
+    fireEvent.change(screen.getByLabelText(/下單人電話/), {
+      target: { value: "81234567" },
+    });
+
+    await waitFor(() => expect(searchOdooCustomers).toHaveBeenCalledWith(
+      "+6581234567",
+      expect.any(AbortSignal),
+      "general",
+    ));
   });
 
   it("lets an existing Odoo customer without a Customer ID receive one", () => {

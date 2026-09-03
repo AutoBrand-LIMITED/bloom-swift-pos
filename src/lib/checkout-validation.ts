@@ -71,11 +71,6 @@ export function normalizeCustomerIdentityName(value: string): string {
 export function isValidPhoneNumber(value: string): boolean {
   const phone = value.trim();
   if (!phone || !ALLOWED_PHONE_CHARACTERS.test(phone)) return false;
-
-  if (phone.startsWith("+") && !/^(?:\+852|\+853)/.test(phone.replace(/[ ()-]/g, ""))) {
-    const digits = phone.replace(/\D/g, "");
-    return digits.length >= 8 && digits.length <= 15;
-  }
   return isValidSupportedPhone(phone);
 }
 
