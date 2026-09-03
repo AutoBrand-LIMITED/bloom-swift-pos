@@ -505,6 +505,8 @@ describe("odoo-api note contracts", () => {
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
+      paymentTermId: 3,
+      paymentTerm: "30 Days",
       recipientBirthday: "1970-01-01",
       recipientMatch: {
         name: "Mary Wong",
@@ -527,6 +529,8 @@ describe("odoo-api note contracts", () => {
       customerType: "company",
       companyName: "Alice Limited",
       billingAddress: "1 Flower Market Road",
+      paymentTermId: 3,
+      paymentTerm: "30 Days",
       customerGroupId: 12,
       customerGroup: "Corporate",
       writeDate: "2026-08-29 09:15:00",

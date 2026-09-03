@@ -810,6 +810,7 @@ const Index = () => {
     setCustomerType(emptyProfile.customerType);
     setCompanyName(emptyProfile.companyName);
     setBillingAddress(emptyProfile.billingAddress);
+    setTerms("");
     setCustomerGroup("");
     setCustomerGroupId(undefined);
     setCustomerGroupExpectedWriteDate(undefined);
@@ -841,6 +842,7 @@ const Index = () => {
     setCustomerType(customer.customerType || "personal");
     setCompanyName(customer.companyName || "");
     setBillingAddress(customer.billingAddress || "");
+    setTerms(customer.paymentTerm || "");
     setCustomerGroup(customer.customerGroup || "");
     setCustomerGroupId(verifiedCustomerGroupId);
     // Keep the selected Odoo partner version even when it has no group yet.
@@ -886,6 +888,7 @@ const Index = () => {
     setCustomerType(emptyProfile.customerType);
     setCompanyName(emptyProfile.companyName);
     setBillingAddress(emptyProfile.billingAddress);
+    setTerms("");
     setCustomerGroup("");
     setCustomerGroupId(undefined);
     setCustomerGroupExpectedWriteDate(undefined);

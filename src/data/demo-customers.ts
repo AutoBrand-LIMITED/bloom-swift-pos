@@ -13,6 +13,8 @@ export interface DemoCustomer {
   customerType?: "personal" | "company";
   companyName?: string;
   billingAddress?: string;
+  paymentTermId?: number;
+  paymentTerm?: string;
   customerGroupId?: number;
   customerGroup?: string;
   commentText?: string;

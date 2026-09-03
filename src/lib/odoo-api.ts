@@ -20,6 +20,8 @@ interface OdooPartner {
   customerType?: "personal" | "company";
   companyName?: string | null;
   billingAddress?: string | null;
+  paymentTermId?: number | null;
+  paymentTerm?: string | null;
   customerGroupId?: number | null;
   customerGroup?: string | null;
   recipientMatch?: {
@@ -1208,6 +1210,8 @@ function mapOdooPartner(p: OdooPartner): DemoCustomer {
     customerType: p.customerType || "personal",
     companyName: p.companyName || undefined,
     billingAddress: p.billingAddress || undefined,
+    paymentTermId: p.paymentTermId ?? undefined,
+    paymentTerm: p.paymentTerm?.trim() || undefined,
     customerGroupId,
     customerGroup,
     customerCode: p.customerCode || undefined,
