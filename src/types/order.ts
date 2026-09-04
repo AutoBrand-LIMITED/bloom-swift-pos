@@ -17,6 +17,13 @@ export interface OrderItem {
 }
 
 export type PaymentStatus = "unpaid" | "paid" | "deposit";
+export type OrderCancellationResolution = "void" | "refund" | "credit";
+export type OrderCancellationStatus =
+  | "closed"
+  | "refund_pending"
+  | "refunded"
+  | "credit_available"
+  | "credit_used";
 export type DeliveryTimeMode = "slot" | "specified";
 export type RecipientType = "personal" | "company";
 export type FulfillmentType = "delivery" | "pickup";
@@ -93,6 +100,8 @@ export interface Order {
   salesTeamId?: number;
   /** Optional native Odoo Contact Tag used as this customer's group. */
   customerGroupId?: number;
+  /** Native Odoo ordering customer (res.partner). */
+  customerId?: number;
   /** Odoo customer concurrency token captured when the Customer Group was selected. */
   customerGroupExpectedWriteDate?: string;
   customerName: string;
@@ -158,6 +167,10 @@ export interface Order {
   customerNoteMutation?: PartnerNoteMutation;
   recipientNoteMutation?: PartnerNoteMutation;
   recipientPartnerId?: number;
+  /** Cancelled order this order replaces. */
+  replacementOrderId?: number;
+  /** Cancelled order whose posted credit note is applied to this order. */
+  customerCreditSourceOrderId?: number;
   /** Legacy local/imported orders used one internal notes field. */
   notes?: string;
   createdAt: string;
@@ -167,6 +180,19 @@ export interface Order {
   odooInvoiceName?: string;
   odooPaymentId?: number;
   odooPaymentName?: string;
+  orderState?: "draft" | "sent" | "sale" | "cancel";
+  editableUntil?: string;
+  editLocked?: boolean;
+  cancellationResolution?: OrderCancellationResolution;
+  cancellationStatus?: OrderCancellationStatus;
+  cancellationReason?: string;
+  cancelledAt?: string;
+  creditNoteId?: number;
+  creditNoteName?: string;
+  creditBalance?: number;
+  replacementOrderName?: string;
+  customerCreditSourceOrderName?: string;
+  customerCreditApplied?: number;
   /** Odoo concurrency token used when editing an existing order. */
   writeDate?: string;
 }

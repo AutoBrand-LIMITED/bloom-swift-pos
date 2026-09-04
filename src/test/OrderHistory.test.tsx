@@ -5,6 +5,7 @@ import OrderHistory from "@/components/pos/OrderHistory";
 import type { OrderRecordView } from "@/lib/order-records";
 
 const {
+  cancelOdooOrder,
   getAccountingPaymentOptions,
   getDeliverySlots,
   getOdooOrderEditHistory,
@@ -14,6 +15,7 @@ const {
   recordOdooOrderPayment,
   updateOdooOrderSection,
 } = vi.hoisted(() => ({
+  cancelOdooOrder: vi.fn(),
   getAccountingPaymentOptions: vi.fn(),
   getDeliverySlots: vi.fn(),
   getOdooOrderEditHistory: vi.fn(),
@@ -26,6 +28,7 @@ const {
 
 vi.mock("@/lib/odoo-api", () => ({
   hasOdooBackend: true,
+  cancelOdooOrder,
   getAccountingPaymentOptions,
   getDeliverySlots,
   getOdooOrderEditHistory,
@@ -85,6 +88,7 @@ const openOrderEditSection = (menuItemName: string) => {
 
 describe("OrderHistory delivery summary", () => {
   beforeEach(() => {
+    cancelOdooOrder.mockReset();
     getDeliverySlots.mockReset();
     getDeliverySlots.mockResolvedValue([
       { id: 11, displayLabel: "上午 09:00-13:00", startTime: "09:00", endTime: "13:00" },
@@ -186,6 +190,72 @@ describe("OrderHistory delivery summary", () => {
     );
     expect(screen.getByRole("button", { name: "編輯訂單資料" })).toBeEnabled();
     expect(screen.queryByText("Junior 員工只可以修改自己開立嘅訂單。")).not.toBeInTheDocument();
+  });
+
+  it("hard-locks an order after seven days even for a Manager", () => {
+    render(
+      <OrderHistory
+        orders={[orderFixture({
+          operatorEmployeeId: 174,
+          editLocked: true,
+          editableUntil: "2026-07-22",
+        })]}
+        open
+        onClose={vi.fn()}
+        currentEmployeeId={95}
+        currentEmployeeRole="manager"
+      />,
+    );
+
+    openOrderDetails();
+    expect(screen.getByRole("button", { name: "編輯訂單資料" })).toBeDisabled();
+    expect(screen.getByText("已鎖單")).toBeVisible();
+    expect(screen.getByText(/任何人都唔可以直接改原單/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "取消訂單／建立替代單" })).toBeEnabled();
+  });
+
+  it("lets a Manager cancel a paid order to Customer Credit and start a linked replacement", async () => {
+    cancelOdooOrder.mockResolvedValue({
+      idempotentReplay: false,
+      orderId: 17,
+      orderName: "S00017",
+      resolution: "credit",
+      status: "credit_available",
+      creditNote: { id: 71, name: "RINV/2026/00071" },
+      creditBalanceMinor: 68000,
+      writeDate: "2026-08-03 10:02:00",
+    });
+    const onOrderUpdated = vi.fn();
+    const onStartReplacement = vi.fn();
+    const paidOrder = orderFixture({ operatorEmployeeId: 174, customerId: 42 });
+    render(
+      <OrderHistory
+        orders={[paidOrder]}
+        open
+        onClose={vi.fn()}
+        currentEmployeeId={95}
+        currentEmployeeRole="manager"
+        onOrderUpdated={onOrderUpdated}
+        onStartReplacement={onStartReplacement}
+      />,
+    );
+
+    openOrderDetails();
+    fireEvent.click(screen.getByRole("button", { name: "取消訂單／建立替代單" }));
+    expect(screen.getByRole("radio", { name: /保留 Customer Credit/ })).toBeChecked();
+    fireEvent.change(screen.getByLabelText("取消原因 *"), {
+      target: { value: "  客人要改送貨日期  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "確認取消" }));
+
+    await waitFor(() => {
+      expect(cancelOdooOrder).toHaveBeenCalledWith(17, {
+        resolution: "credit",
+        reason: "客人要改送貨日期",
+      });
+    });
+    expect(onOrderUpdated).toHaveBeenCalledTimes(1);
+    expect(onStartReplacement).toHaveBeenCalledWith(paidOrder, "credit");
   });
 
   it("opens only the requested section from its three-dot action menu", () => {

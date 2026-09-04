@@ -31,6 +31,7 @@ import type {
   FulfillmentType,
   Order,
   OrderItem,
+  OrderCancellationResolution,
   PaymentStatus,
   RecipientOccasion,
   RecipientType,
@@ -316,6 +317,12 @@ const Index = () => {
   );
   const [checkoutId, setCheckoutId] = useState(
     () => restoredEmployeePendingSubmission?.order.id || crypto.randomUUID(),
+  );
+  const [replacementOrderId, setReplacementOrderId] = useState<number | undefined>(
+    restoredEmployeePendingSubmission?.order.replacementOrderId,
+  );
+  const [customerCreditSourceOrderId, setCustomerCreditSourceOrderId] = useState<number | undefined>(
+    restoredEmployeePendingSubmission?.order.customerCreditSourceOrderId,
   );
   const [paymentOptions, setPaymentOptions] = useState<AccountingPaymentOption[]>(loadCachedPaymentOptions);
   const [paymentOptionsLoading, setPaymentOptionsLoading] = useState(false);
@@ -1123,12 +1130,106 @@ const Index = () => {
     setPaymentReceivedAt("");
     setPaymentIdempotencyKey(crypto.randomUUID());
     setCheckoutId(crypto.randomUUID());
+    setReplacementOrderId(undefined);
+    setCustomerCreditSourceOrderId(undefined);
     setPriceOverridden(false);
     setManualPrice(null);
     setSalesId(employee?.salesLabel || "");
     setOperatorEmployeeId(employee?.id);
     setSalespersonEmployeeId(employee?.id);
   }, [employee, staff]);
+
+  const handleStartReplacement = useCallback(async (
+    order: Order,
+    resolution: OrderCancellationResolution,
+  ) => {
+    if (!order.odooOrderId || !order.customerId) {
+      toast.error("原單缺少 Odoo 客戶或訂單編號，未能安全建立替代單。");
+      return;
+    }
+    if (pendingSubmission) {
+      toast.error("請先處理目前待確認訂單，再建立替代單。");
+      return;
+    }
+
+    let latestCustomer: DemoCustomer;
+    try {
+      latestCustomer = await getOdooCustomer(order.customerId);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? `原單已取消，但未能讀取客戶最新資料：${error.message}`
+          : "原單已取消，但未能讀取客戶最新資料。",
+      );
+      return;
+    }
+
+    resetOrderForm();
+    applyCustomerSelection(latestCustomer);
+    setSenderName(order.senderName || order.customerName);
+    setSenderDoNumber(order.senderDoNumber || "");
+    setRecipientDoNumber(order.recipientDoNumber || "");
+    setSourceReference(order.sourceReference || "");
+    setDepartment(order.department || "");
+    setSalesTeamId(order.salesTeamId);
+    setItems(order.items.map((item) => ({ ...item })));
+    setDeliveryFee(order.deliveryFee);
+    setUrgentFee(order.urgentFee);
+    setSenderNote(order.senderNote || "");
+    setDeliveryNote(order.deliveryNote || "");
+    setInternalNote(order.internalNote || "");
+    setFulfillmentType(order.fulfillmentType || "delivery");
+    setDeliveryDate(order.deliveryDate);
+    setDeliveryTimeMode(order.deliveryTimeMode);
+    setDeliverySlotId(order.deliverySlotId);
+    setDeliveryTime(order.deliveryTime);
+    const parsedAddress = parseDeliveryAddress(
+      order.deliveryGoogleAddress || order.deliveryAddress,
+    );
+    setDeliveryRegion(parsedAddress.region);
+    setDeliveryDistrict(parsedAddress.district);
+    setDeliveryArea(parsedAddress.area);
+    setDeliveryDetail(parsedAddress.detail);
+    setDeliveryBuilding(order.deliveryBuilding || "");
+    setDeliveryFloor(order.deliveryFloor || "");
+    setDeliveryUnit(order.deliveryUnit || "");
+    setDeliverySplits((order.deliverySplits || []).map((split) => ({
+      ...split,
+      itemAllocations: split.itemAllocations.map((allocation) => ({ ...allocation })),
+    })));
+    setRecipientType(order.recipientType || "personal");
+    setRecipientCompanyName(order.recipientCompanyName || "");
+    setRecipientName(order.recipientName);
+    setRecipientPhone(order.recipientPhone);
+    setRecipientPartnerId(order.recipientPartnerId);
+    setRecipientOccasions(order.recipientOccasions || []);
+    setRecipientOccasionsKnown(order.recipientOccasions !== undefined);
+    setRecipientOccasionsVersion(order.recipientOccasionsVersion);
+    setDeliveryPerson(order.deliveryPerson);
+    setGiftCardEnabled(order.giftCardEnabled);
+    setGiftCardMessage(order.giftCardMessage);
+    setPaymentStatus("unpaid");
+    setDepositAmount(0);
+    setPaymentMethod("");
+    setPaymentReference("");
+    setPaymentReceivedAt("");
+    setPaymentIdempotencyKey(crypto.randomUUID());
+    setCheckoutId(crypto.randomUUID());
+    setReplacementOrderId(order.odooOrderId);
+    setCustomerCreditSourceOrderId(
+      resolution === "credit" ? order.odooOrderId : undefined,
+    );
+    setPriceOverridden(order.priceOverridden);
+    setManualPrice(order.priceOverridden ? order.finalPrice : null);
+    setSalesId(order.salesId);
+    setSalespersonEmployeeId(order.salespersonEmployeeId);
+    setHistoryOpen(false);
+    toast.success(
+      resolution === "credit"
+        ? `已複製 ${order.odooOrderName || "原單"}；新單會自動套用 Customer Credit。`
+        : `已複製 ${order.odooOrderName || "原單"} 成替代單。`,
+    );
+  }, [applyCustomerSelection, pendingSubmission, resetOrderForm]);
 
   const handleClearForm = useCallback(() => {
     if (pendingSubmission) {
@@ -1252,6 +1353,8 @@ const Index = () => {
     setPaymentReceivedAt(order.paymentReceivedAt || "");
     setPaymentIdempotencyKey(order.paymentIdempotencyKey || crypto.randomUUID());
     setCheckoutId(order.id);
+    setReplacementOrderId(order.replacementOrderId);
+    setCustomerCreditSourceOrderId(order.customerCreditSourceOrderId);
     setPriceOverridden(order.priceOverridden);
     setManualPrice(order.priceOverridden ? order.finalPrice : null);
     setSalesId(order.salesId);
@@ -1724,6 +1827,8 @@ const Index = () => {
       ...(customerNoteMutation ? { customerNoteMutation } : {}),
       ...(recipientNoteMutation ? { recipientNoteMutation } : {}),
       recipientPartnerId,
+      ...(replacementOrderId !== undefined ? { replacementOrderId } : {}),
+      ...(customerCreditSourceOrderId !== undefined ? { customerCreditSourceOrderId } : {}),
       createdAt: pendingSubmission?.order.createdAt || new Date().toISOString(),
     };
     const currentOptions = pendingSubmission
@@ -1805,14 +1910,30 @@ const Index = () => {
         reviewFailure = needsOdooReview
           ? odooOrder.reviewError || "訂單需要管理員核對。"
           : null;
+        const accountingResidual = odooOrder.accounting?.amountResidualMinor;
+        const accountingSettled = odooOrder.accounting
+          ? (
+              odooOrder.accounting.amountReceivedMinor
+              + odooOrder.accounting.creditAppliedMinor
+            ) / 100
+          : undefined;
         syncedOrder = {
           ...order,
+          customerId: odooOrder.partnerId ?? order.customerId,
           odooOrderId: odooOrder.id ?? undefined,
           odooOrderName: odooOrder.name ?? undefined,
           odooInvoiceId: odooOrder.accounting?.invoice.id,
           odooInvoiceName: odooOrder.accounting?.invoice.name,
           odooPaymentId: odooOrder.accounting?.payment?.id,
           odooPaymentName: odooOrder.accounting?.payment?.name,
+          ...(accountingResidual !== undefined ? {
+            paymentStatus: accountingResidual === 0
+              ? "paid"
+              : accountingSettled ? "deposit" : "unpaid",
+            depositAmount: accountingSettled || 0,
+            balanceAmount: accountingResidual / 100,
+            customerCreditApplied: (odooOrder.accounting?.creditAppliedMinor || 0) / 100,
+          } : {}),
         };
         if ((isPendingOdooSync || needsOdooReview) && operatorEmployeeId !== undefined) {
           const tracked: OperationalOrderRecord = {
@@ -2388,6 +2509,12 @@ const Index = () => {
           aria-label="付款及確認"
           className="scroll-mt-40"
         >
+        {customerCreditSourceOrderId && (
+          <div className="mb-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <strong>Customer Credit 會在 Odoo 自動套用。</strong>
+            <p className="mt-1 text-xs">新單如有餘額，建立後再用「補記付款」收取；今次唔可以同時登記另一種付款。</p>
+          </div>
+        )}
         <PaymentSection
           subtotal={subtotal}
           finalPrice={finalPrice}
@@ -2397,6 +2524,10 @@ const Index = () => {
           onResetPrice={resetPrice}
           paymentStatus={paymentStatus}
           onPaymentStatusChange={(status) => {
+            if (customerCreditSourceOrderId && status !== "unpaid") {
+              toast.error("使用 Customer Credit 嘅替代單要先以未付款提交；餘額建立後再補記。");
+              return;
+            }
             setPaymentStatus(status);
             if (status === "unpaid") {
               setPaymentMethod("");
@@ -2505,6 +2636,7 @@ const Index = () => {
         truncated={orderRecordsTruncated}
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
+        onStartReplacement={handleStartReplacement}
         canRetryOperationalOrders={employee?.role === "manager"}
         onRetryOperationalOrder={handleOperationalOrderRetry}
         currentEmployeeId={employee?.id}

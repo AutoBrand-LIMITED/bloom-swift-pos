@@ -3,6 +3,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Banknote,
+  Ban,
   CalendarDays,
   ClipboardList,
   Clock3,
@@ -16,6 +17,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import OrderEditDialog, { type OrderEditSection } from "@/components/pos/OrderEditDialog";
 import PrintButtons, { PrintAllButton } from "@/components/pos/PrintButtons";
@@ -28,8 +30,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  cancelOdooOrder,
   getOdooOrderEditHistory,
   type OdooOrderEditHistory,
 } from "@/lib/odoo-api";
@@ -37,7 +51,7 @@ import type { OrderRecordView } from "@/lib/order-records";
 import type { PosEmployeeRole } from "@/lib/pos-auth";
 import { formatRecipientOccasions } from "@/lib/recipient-occasions";
 import { orderItemTotal } from "@/lib/order-pricing";
-import type { DeliverySplit, PaymentStatus } from "@/types/order";
+import type { DeliverySplit, OrderCancellationResolution, PaymentStatus } from "@/types/order";
 
 interface OrderHistoryProps {
   orders: OrderRecordView[];
@@ -55,6 +69,10 @@ interface OrderHistoryProps {
   truncated?: boolean;
   onRetry?: () => void;
   onOrderUpdated?: () => void;
+  onStartReplacement?: (
+    order: OrderRecordView,
+    resolution: OrderCancellationResolution,
+  ) => void;
   canRetryOperationalOrders?: boolean;
   onRetryOperationalOrder?: (operationalOrderId: string) => Promise<void>;
   currentEmployeeId?: number;
@@ -68,6 +86,20 @@ const statusBadge: Record<PaymentStatus, { label: string; variant: "destructive"
   paid: { label: "已付款", variant: "default" },
   deposit: { label: "已付訂金", variant: "secondary" },
 };
+
+const cancellationResolutionLabel = {
+  void: "Void（未收款沖銷）",
+  refund: "安排退款",
+  credit: "保留 Customer Credit",
+} as const;
+
+const cancellationStatusLabel = {
+  closed: "已沖銷",
+  refund_pending: "等待會計退款",
+  refunded: "已退款",
+  credit_available: "Customer Credit 可用",
+  credit_used: "Customer Credit 已用完",
+} as const;
 
 const syncAttentionBadge = (order: OrderRecordView): { label: string; className: string } | null => {
   if (order.syncState === "needs_review") {
@@ -395,6 +427,8 @@ const OrderDetail = ({
   operationalRetryError,
   onRetryOperationalOrder,
   canEditOrder,
+  canCancelOrder,
+  onCancelOrder,
 }: {
   order: OrderRecordView;
   history: OdooOrderEditHistory | null;
@@ -407,6 +441,8 @@ const OrderDetail = ({
   operationalRetryError: string | null;
   onRetryOperationalOrder: (order: OrderRecordView) => void;
   canEditOrder: boolean;
+  canCancelOrder: boolean;
+  onCancelOrder: () => void;
 }) => {
   const payment = statusBadge[order.paymentStatus];
   const syncAttention = syncAttentionBadge(order);
@@ -428,6 +464,7 @@ const OrderDetail = ({
     .filter((allocation) => allocation.quantity > 0);
   const productsSubtotal = order.items.reduce((total, item) => total + orderItemTotal(item), 0);
   const operationalEditable = order.source === "odoo"
+    && order.orderState !== "cancel"
     && Boolean(order.odooOrderId && order.writeDate);
   const deliveryEditable = operationalEditable && Boolean(order.deliveryTimeMode);
   const outstandingAmount = order.balanceAmount
@@ -454,6 +491,12 @@ const OrderDetail = ({
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="break-all font-mono text-xl font-bold sm:text-2xl">{orderIdentity(order)}</h2>
             <Badge variant={payment.variant}>{payment.label}</Badge>
+            {order.orderState === "cancel" && <Badge variant="destructive">已取消</Badge>}
+            {order.editLocked && order.orderState !== "cancel" && (
+              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                已鎖單
+              </Badge>
+            )}
             {historyStatus === "success" && history && (
               <Badge variant="outline">修改 {history.entries.length} 次</Badge>
             )}
@@ -476,6 +519,16 @@ const OrderDetail = ({
               />
             )}
             <PrintButtons order={order} size="default" />
+            {canCancelOrder && (
+              <Button
+                type="button"
+                variant="destructive"
+                className="min-h-11 gap-2 touch-manipulation"
+                onClick={onCancelOrder}
+              >
+                <Ban className="h-4 w-4" /> 取消訂單／建立替代單
+              </Button>
+            )}
             {canRetry && order.operationalOrderId && (
               <Button
                 type="button"
@@ -497,7 +550,9 @@ const OrderDetail = ({
           )}
           {!canEditOrder && availableEditSections.length > 0 && (
             <p role="status" className="text-sm text-amber-700">
-              Junior 員工只可以修改自己開立嘅訂單。
+              {order.editLocked
+                ? `訂單已過七日修改期（可修改至 ${order.editableUntil || "期限日"}）；任何人都唔可以直接改原單。`
+                : "Junior 員工只可以修改自己開立嘅訂單。"}
             </p>
           )}
         </div>
@@ -511,8 +566,30 @@ const OrderDetail = ({
           ["最後更新", formatDateTime(order.writeDate)],
           ["發票", order.odooInvoiceName || (order.odooInvoiceId ? `#${order.odooInvoiceId}` : "—")],
           ["付款記錄", order.odooPaymentName || (order.odooPaymentId ? `#${order.odooPaymentId}` : "—")],
+          ["修改期限", order.editableUntil || "—"],
+          ["替代原單", order.replacementOrderName || (order.replacementOrderId ? `#${order.replacementOrderId}` : "—")],
+          ["已套用 Customer Credit", order.customerCreditSourceOrderId
+            ? formatMoney(order.customerCreditApplied)
+            : "—"],
         ]} />
       </DetailSection>
+
+      {order.orderState === "cancel" && (
+        <DetailSection title="取消及退款／Customer Credit">
+          <InfoGrid rows={[
+            ["處理方式", order.cancellationResolution
+              ? cancellationResolutionLabel[order.cancellationResolution]
+              : "—"],
+            ["狀態", order.cancellationStatus
+              ? cancellationStatusLabel[order.cancellationStatus]
+              : "—"],
+            ["原因", order.cancellationReason || "—"],
+            ["取消時間", formatDateTime(order.cancelledAt)],
+            ["Credit Note", order.creditNoteName || (order.creditNoteId ? `#${order.creditNoteId}` : "—")],
+            ["尚餘退款／Credit", formatMoney(order.creditBalance)],
+          ]} />
+        </DetailSection>
+      )}
 
       <OrderEditHistoryPanel
         eligible={historyEligible}
@@ -726,6 +803,7 @@ const OrderHistory = ({
   truncated = false,
   onRetry,
   onOrderUpdated,
+  onStartReplacement,
   canRetryOperationalOrders = false,
   onRetryOperationalOrder,
   currentEmployeeId,
@@ -743,6 +821,12 @@ const OrderHistory = ({
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [retryingOperationalOrderId, setRetryingOperationalOrderId] = useState<string | null>(null);
   const [operationalRetryError, setOperationalRetryError] = useState<string | null>(null);
+  const [cancellingOrder, setCancellingOrder] = useState<OrderRecordView | null>(null);
+  const [cancellationResolution, setCancellationResolution] = useState<OrderCancellationResolution>("void");
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [createReplacement, setCreateReplacement] = useState(true);
+  const [cancellationSubmitting, setCancellationSubmitting] = useState(false);
+  const [cancellationError, setCancellationError] = useState<string | null>(null);
 
   const filteredOrders = useMemo(() => orders.filter((order) => (
     paymentFilter === "all" || order.paymentStatus === paymentFilter
@@ -756,12 +840,20 @@ const OrderHistory = ({
     : undefined;
   const editIdentityConfigured = currentEmployeeId !== undefined
     || currentEmployeeRole !== undefined;
-  const canEditSelectedOrder = !editIdentityConfigured
+  const canEditSelectedOrder = Boolean(selectedOrder
+    && selectedOrder.orderState !== "cancel"
+    && !selectedOrder?.editLocked
+    && (!editIdentityConfigured
     || currentEmployeeRole === "manager"
     || Boolean(
       currentEmployeeId !== undefined
       && selectedOrder?.operatorEmployeeId === currentEmployeeId,
-    );
+    )));
+  const canCancelSelectedOrder = Boolean(currentEmployeeRole === "manager"
+    && selectedOrder?.source === "odoo"
+    && selectedOrder.syncState === "synced"
+    && selectedOrder.orderState !== "cancel"
+    && selectedOrder.odooOrderId);
 
   useEffect(() => {
     if (!open || !selectedHistoryOrderId) {
@@ -840,6 +932,49 @@ const OrderHistory = ({
       setOperationalRetryError(retryError instanceof Error ? retryError.message : "未能重試 Odoo 同步。");
     } finally {
       setRetryingOperationalOrderId(null);
+    }
+  };
+
+  const openCancellation = (order: OrderRecordView) => {
+    const receivedAmount = order.paymentStatus === "paid"
+      ? order.finalPrice
+      : order.paymentStatus === "deposit" ? order.depositAmount : 0;
+    setCancellingOrder(order);
+    setCancellationResolution(receivedAmount > 0 ? "credit" : "void");
+    setCancellationReason("");
+    setCreateReplacement(true);
+    setCancellationError(null);
+  };
+
+  const handleCancellation = async () => {
+    if (!cancellingOrder?.odooOrderId || cancellationSubmitting) return;
+    if (!cancellationReason.trim()) {
+      setCancellationError("請輸入取消原因。");
+      return;
+    }
+    setCancellationSubmitting(true);
+    setCancellationError(null);
+    try {
+      const result = await cancelOdooOrder(cancellingOrder.odooOrderId, {
+        resolution: cancellationResolution,
+        reason: cancellationReason.trim(),
+      });
+      toast.success(
+        result.status === "refund_pending"
+          ? "訂單已取消並建立 Credit Note；退款正等待會計付款。"
+          : result.status === "credit_available"
+            ? "訂單已取消，Customer Credit 已保留。"
+            : "訂單已取消並完成沖銷。",
+      );
+      setCancellingOrder(null);
+      onOrderUpdated?.();
+      if (createReplacement && onStartReplacement) {
+        onStartReplacement(cancellingOrder, cancellationResolution);
+      }
+    } catch (error) {
+      setCancellationError(error instanceof Error ? error.message : "未能取消訂單。");
+    } finally {
+      setCancellationSubmitting(false);
     }
   };
 
@@ -1169,6 +1304,8 @@ const OrderHistory = ({
                   operationalRetryError={operationalRetryError}
                   onRetryOperationalOrder={handleOperationalRetry}
                   canEditOrder={canEditSelectedOrder}
+                  canCancelOrder={canCancelSelectedOrder}
+                  onCancelOrder={() => openCancellation(selectedOrder)}
                 />
           </main>
         )}
@@ -1186,6 +1323,85 @@ const OrderHistory = ({
           onOrderUpdated?.();
         }}
       />
+
+      <Dialog
+        open={Boolean(cancellingOrder)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !cancellationSubmitting) setCancellingOrder(null);
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>取消訂單 {cancellingOrder ? orderIdentity(cancellingOrder) : ""}</DialogTitle>
+            <DialogDescription>
+              原單會永久保留並鎖定。已付款訂單會在 Odoo 建立 Posted Credit Note，唔會假裝已經由銀行退款。
+            </DialogDescription>
+          </DialogHeader>
+
+          {cancellingOrder && (() => {
+            const receivedAmount = cancellingOrder.paymentStatus === "paid"
+              ? cancellingOrder.finalPrice
+              : cancellingOrder.paymentStatus === "deposit" ? cancellingOrder.depositAmount : 0;
+            return (
+              <div className="space-y-5">
+                <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                  已收款：<strong>{formatMoney(receivedAmount)}</strong>
+                </div>
+                {receivedAmount > 0 ? (
+                  <RadioGroup
+                    value={cancellationResolution}
+                    onValueChange={(value) => setCancellationResolution(value as OrderCancellationResolution)}
+                    className="gap-3"
+                    aria-label="取消後款項處理"
+                  >
+                    <Label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+                      <RadioGroupItem value="credit" className="mt-0.5" />
+                      <span><strong>保留 Customer Credit</strong><span className="mt-1 block text-xs text-muted-foreground">建立替代單時自動套用，來源及餘額會留在 Odoo。</span></span>
+                    </Label>
+                    <Label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+                      <RadioGroupItem value="refund" className="mt-0.5" />
+                      <span><strong>安排退款</strong><span className="mt-1 block text-xs text-muted-foreground">建立 Credit Note 後標記待會計退款；實際付款後先會變成 Refunded。</span></span>
+                    </Label>
+                  </RadioGroup>
+                ) : (
+                  <p className="rounded-lg border p-3 text-sm">未收到款項，系統會以「Void」沖銷發票。</p>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="order-cancellation-reason">取消原因 *</Label>
+                  <Textarea
+                    id="order-cancellation-reason"
+                    value={cancellationReason}
+                    onChange={(event) => setCancellationReason(event.target.value)}
+                    maxLength={1000}
+                    placeholder="例如：客戶要求更改送貨日期，原單已過修改期"
+                  />
+                </div>
+
+                <Label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+                  <input
+                    type="checkbox"
+                    checked={createReplacement}
+                    onChange={(event) => setCreateReplacement(event.target.checked)}
+                    className="mt-0.5 h-4 w-4"
+                  />
+                  <span><strong>取消後複製成新訂單</strong><span className="mt-1 block text-xs text-muted-foreground">新單會記錄原單編號；選 Customer Credit 時會自動套用可用結餘。</span></span>
+                </Label>
+                {cancellationError && <p role="alert" className="text-sm text-destructive">{cancellationError}</p>}
+              </div>
+            );
+          })()}
+
+          <DialogFooter>
+            <Button variant="outline" disabled={cancellationSubmitting} onClick={() => setCancellingOrder(null)}>
+              返回
+            </Button>
+            <Button variant="destructive" disabled={cancellationSubmitting} onClick={handleCancellation}>
+              {cancellationSubmitting ? "處理中…" : "確認取消"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

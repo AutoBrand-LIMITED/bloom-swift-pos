@@ -1,5 +1,13 @@
 import type { CustomerTag, DemoCustomer, PurchaseRecord } from "@/data/demo-customers";
-import type { DeliverySplit, OdooNamedReference, Order, RecipientOccasion, SalesStaff } from "@/types/order";
+import type {
+  DeliverySplit,
+  OdooNamedReference,
+  Order,
+  OrderCancellationResolution,
+  OrderCancellationStatus,
+  RecipientOccasion,
+  SalesStaff,
+} from "@/types/order";
 import { authenticatedFetch } from "@/lib/pos-auth";
 import { normalizePurchasePaymentStatus } from "@/lib/customer-utils";
 import { hasRecipientBirthdayField } from "@/lib/recipient-birthday";
@@ -90,7 +98,19 @@ export interface OdooOrderResponse {
     payment: { id: number; name: string } | null;
     amountReceivedMinor: number;
     amountResidualMinor: number;
+    creditAppliedMinor: number;
   } | null;
+}
+
+export interface OrderCancellationResponse {
+  idempotentReplay: boolean;
+  orderId: number;
+  orderName: string;
+  resolution: OrderCancellationResolution;
+  status: OrderCancellationStatus;
+  creditNote: { id: number; name: string } | null;
+  creditBalanceMinor: number;
+  writeDate: string;
 }
 
 export interface OperationalOrderStatusResponse {
@@ -1077,6 +1097,29 @@ export async function recordOdooOrderPayment(
   }
 
   return (await res.json()) as OrderPaymentUpdateResponse;
+}
+
+export async function cancelOdooOrder(
+  orderId: number,
+  payload: { resolution: OrderCancellationResolution; reason: string },
+  signal?: AbortSignal,
+): Promise<OrderCancellationResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/${orderId}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<OrderCancellationResponse>(
+      res,
+      `Odoo order cancellation failed: ${res.status}`,
+    );
+  }
+  return (await res.json()) as OrderCancellationResponse;
 }
 
 export async function getOdooOrderEditHistory(
