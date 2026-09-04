@@ -128,7 +128,7 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText("落單時間")).toBeVisible();
     expect(screen.getByText("客戶")).toBeVisible();
     expect(screen.getByText("送貨／自取")).toBeVisible();
-    expect(screen.getByText("付款狀態")).toBeVisible();
+    expect(screen.getByText("訂單狀態")).toBeVisible();
     expect(screen.getByText("總額／操作")).toBeVisible();
     expect(screen.getByRole("button", { name: "全部列印訂單 S00020" })).toBeVisible();
     expect(screen.queryByTestId("order-history-detail-pane")).not.toBeInTheDocument();
@@ -136,6 +136,42 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(screen.getByRole("button", { name: "查看訂單 S00020" }));
     expect(screen.getByTestId("order-history-detail-pane")).toHaveClass("overflow-y-auto");
     expect(screen.queryByRole("main", { name: "訂單列表" })).not.toBeInTheDocument();
+  });
+
+  it("shows only the final cancelled or refunded status instead of the old payment status", () => {
+    const cancelledOrder = orderFixture({
+      id: "cancelled-order",
+      odooOrderName: "S17840",
+      orderState: "cancel",
+      cancellationResolution: "credit",
+      cancellationStatus: "credit_used",
+    });
+    const refundedOrder = orderFixture({
+      id: "refunded-order",
+      odooOrderName: "S17842",
+      orderState: "cancel",
+      cancellationResolution: "refund",
+      cancellationStatus: "refunded",
+    });
+
+    render(<OrderHistory orders={[cancelledOrder, refundedOrder]} open onClose={vi.fn()} />);
+
+    const cancelledRow = screen.getByRole("button", { name: "查看訂單 S17840" });
+    expect(within(cancelledRow).getByText("已取消")).toBeVisible();
+    expect(within(cancelledRow).queryByText("已付款")).not.toBeInTheDocument();
+
+    const refundedRow = screen.getByRole("button", { name: "查看訂單 S17842" });
+    expect(within(refundedRow).getByText("已退款")).toBeVisible();
+    expect(within(refundedRow).queryByText("已付款")).not.toBeInTheDocument();
+
+    expect(screen.getByRole("tab", { name: "已付款 0" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "已取消 1" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "已退款 1" })).toBeVisible();
+
+    fireEvent.click(cancelledRow);
+    const detail = screen.getByTestId("order-history-detail-pane");
+    expect(within(detail).getAllByText("已取消").length).toBeGreaterThan(0);
+    expect(within(detail).queryByText("已付款")).not.toBeInTheDocument();
   });
 
   it("places edit and print actions in the top summary and removes the bottom operation section", () => {

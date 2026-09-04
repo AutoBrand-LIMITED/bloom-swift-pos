@@ -79,12 +79,20 @@ interface OrderHistoryProps {
   currentEmployeeRole?: PosEmployeeRole;
 }
 
-type PaymentFilter = "all" | PaymentStatus;
+type OrderStatus = PaymentStatus | "cancelled" | "refunded";
+type OrderStatusFilter = "all" | OrderStatus;
 
-const statusBadge: Record<PaymentStatus, { label: string; variant: "destructive" | "default" | "secondary" }> = {
+const statusBadge: Record<OrderStatus, { label: string; variant: "destructive" | "default" | "secondary" }> = {
   unpaid: { label: "未付款", variant: "destructive" },
   paid: { label: "已付款", variant: "default" },
   deposit: { label: "已付訂金", variant: "secondary" },
+  cancelled: { label: "已取消", variant: "destructive" },
+  refunded: { label: "已退款", variant: "secondary" },
+};
+
+const effectiveOrderStatus = (order: OrderRecordView): OrderStatus => {
+  if (order.orderState !== "cancel") return order.paymentStatus;
+  return order.cancellationStatus === "refunded" ? "refunded" : "cancelled";
 };
 
 const cancellationResolutionLabel = {
@@ -444,7 +452,7 @@ const OrderDetail = ({
   canCancelOrder: boolean;
   onCancelOrder: () => void;
 }) => {
-  const payment = statusBadge[order.paymentStatus];
+  const displayStatus = statusBadge[effectiveOrderStatus(order)];
   const syncAttention = syncAttentionBadge(order);
   const splitAllocatedByItem = new Map<string, number>();
   (order.deliverySplits || []).forEach((split) => {
@@ -490,8 +498,7 @@ const OrderDetail = ({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="break-all font-mono text-xl font-bold sm:text-2xl">{orderIdentity(order)}</h2>
-            <Badge variant={payment.variant}>{payment.label}</Badge>
-            {order.orderState === "cancel" && <Badge variant="destructive">已取消</Badge>}
+            <Badge variant={displayStatus.variant}>{displayStatus.label}</Badge>
             {order.editLocked && order.orderState !== "cancel" && (
               <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
                 已鎖單
@@ -745,7 +752,7 @@ const OrderDetail = ({
         ) : undefined}
       >
         <InfoGrid rows={[
-          ["付款狀態", payment.label],
+          ["目前狀態", displayStatus.label],
           ["付款方式", order.paymentMethod || "—"],
           ["付款參考編號", order.paymentReference || "—"],
           ["收款時間", formatDateTime(order.paymentReceivedAt)],
@@ -814,7 +821,7 @@ const OrderHistory = ({
     section: OrderEditSection;
   } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("all");
   const [history, setHistory] = useState<OdooOrderEditHistory | null>(null);
   const [historyStatus, setHistoryStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -829,8 +836,8 @@ const OrderHistory = ({
   const [cancellationError, setCancellationError] = useState<string | null>(null);
 
   const filteredOrders = useMemo(() => orders.filter((order) => (
-    paymentFilter === "all" || order.paymentStatus === paymentFilter
-  )), [orders, paymentFilter]);
+    orderStatusFilter === "all" || effectiveOrderStatus(order) === orderStatusFilter
+  )), [orders, orderStatusFilter]);
   const selectedOrder = selectedOrderId
     ? orders.find((order) => order.id === selectedOrderId) || null
     : null;
@@ -896,13 +903,15 @@ const OrderHistory = ({
   const searchSettled = searchActive && searchPhase === "success";
   const showOrderCount = !searchActive || searchSettled;
   const selectedDateLabel = selectedDate || "全部日期";
-  const filtersActive = paymentFilter !== "all";
+  const filtersActive = orderStatusFilter !== "all";
   const countLabel = filtersActive ? `${filteredOrders.length}/${orders.length}` : String(orders.length);
-  const paymentTabs: Array<{ value: PaymentFilter; label: string; count: number }> = [
+  const orderStatusTabs: Array<{ value: OrderStatusFilter; label: string; count: number }> = [
     { value: "all", label: "全部訂單", count: orders.length },
-    { value: "unpaid", label: "未付款", count: orders.filter((order) => order.paymentStatus === "unpaid").length },
-    { value: "deposit", label: "已付訂金", count: orders.filter((order) => order.paymentStatus === "deposit").length },
-    { value: "paid", label: "已付款", count: orders.filter((order) => order.paymentStatus === "paid").length },
+    { value: "unpaid", label: "未付款", count: orders.filter((order) => effectiveOrderStatus(order) === "unpaid").length },
+    { value: "deposit", label: "已付訂金", count: orders.filter((order) => effectiveOrderStatus(order) === "deposit").length },
+    { value: "paid", label: "已付款", count: orders.filter((order) => effectiveOrderStatus(order) === "paid").length },
+    { value: "cancelled", label: "已取消", count: orders.filter((order) => effectiveOrderStatus(order) === "cancelled").length },
+    { value: "refunded", label: "已退款", count: orders.filter((order) => effectiveOrderStatus(order) === "refunded").length },
   ];
 
   const openOrder = (order: OrderRecordView) => {
@@ -1005,7 +1014,7 @@ const OrderHistory = ({
             : "暫無訂單"}
     </p>
   ) : filteredOrders.length === 0 ? (
-    <p className="p-8 text-center text-muted-foreground">沒有符合付款狀態篩選的訂單</p>
+    <p className="p-8 text-center text-muted-foreground">沒有符合訂單狀態篩選的訂單</p>
   ) : (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div
@@ -1017,13 +1026,13 @@ const OrderHistory = ({
           <span>落單時間</span>
           <span>客戶</span>
           <span>送貨／自取</span>
-          <span>付款狀態</span>
+          <span>訂單狀態</span>
         </div>
         <span className="px-5 text-right">總額／操作</span>
       </div>
       <div className="divide-y divide-border">
       {filteredOrders.map((order) => {
-        const payment = statusBadge[order.paymentStatus];
+        const displayStatus = statusBadge[effectiveOrderStatus(order)];
         const syncAttention = syncAttentionBadge(order);
         const identity = orderIdentity(order);
         return (
@@ -1064,7 +1073,7 @@ const OrderHistory = ({
               </span>
             </p>
             <div className="flex flex-wrap items-center gap-1.5">
-              <Badge variant={payment.variant}>{payment.label}</Badge>
+              <Badge variant={displayStatus.variant}>{displayStatus.label}</Badge>
               {syncAttention && (
                 <Badge variant="outline" className={syncAttention.className}>{syncAttention.label}</Badge>
               )}
@@ -1135,19 +1144,19 @@ const OrderHistory = ({
           <main className="flex h-full min-h-0 w-full flex-col bg-muted/10" aria-label="訂單列表">
             <div className="shrink-0 border-b border-border bg-card">
               <div className="mx-auto w-full max-w-[1500px] px-3 pt-2 sm:px-5">
-                <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="付款狀態">
-                  {paymentTabs.map((tab) => (
+                <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="訂單狀態">
+                  {orderStatusTabs.map((tab) => (
                     <button
                       key={tab.value}
                       type="button"
                       role="tab"
-                      aria-selected={paymentFilter === tab.value}
+                      aria-selected={orderStatusFilter === tab.value}
                       className={`min-h-11 shrink-0 touch-manipulation border-b-2 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                        paymentFilter === tab.value
+                        orderStatusFilter === tab.value
                           ? "border-primary text-foreground"
                           : "border-transparent text-muted-foreground active:bg-muted/70"
                       }`}
-                      onClick={() => setPaymentFilter(tab.value)}
+                      onClick={() => setOrderStatusFilter(tab.value)}
                     >
                       {tab.label} <span className="ml-1 text-xs">{tab.count}</span>
                     </button>
