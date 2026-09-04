@@ -147,6 +147,47 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.queryByRole("region", { name: "操作" })).not.toBeInTheDocument();
   });
 
+  it("lets a Junior edit only their own order and lets a Manager edit another employee order", () => {
+    const ownOrder = orderFixture({ operatorEmployeeId: 95 });
+    const { rerender } = render(
+      <OrderHistory
+        orders={[ownOrder]}
+        open
+        onClose={vi.fn()}
+        currentEmployeeId={95}
+        currentEmployeeRole="staff"
+      />,
+    );
+    openOrderDetails();
+    expect(screen.getByRole("button", { name: "編輯訂單資料" })).toBeEnabled();
+
+    const anotherEmployeeOrder = orderFixture({ operatorEmployeeId: 174 });
+    rerender(
+      <OrderHistory
+        orders={[anotherEmployeeOrder]}
+        open
+        onClose={vi.fn()}
+        currentEmployeeId={95}
+        currentEmployeeRole="staff"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "編輯訂單資料" })).toBeDisabled();
+    expect(screen.getByText("Junior 員工只可以修改自己開立嘅訂單。")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "客戶與送花人操作選單" })).not.toBeInTheDocument();
+
+    rerender(
+      <OrderHistory
+        orders={[anotherEmployeeOrder]}
+        open
+        onClose={vi.fn()}
+        currentEmployeeId={95}
+        currentEmployeeRole="manager"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "編輯訂單資料" })).toBeEnabled();
+    expect(screen.queryByText("Junior 員工只可以修改自己開立嘅訂單。")).not.toBeInTheDocument();
+  });
+
   it("opens only the requested section from its three-dot action menu", () => {
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
     openOrderDetails();

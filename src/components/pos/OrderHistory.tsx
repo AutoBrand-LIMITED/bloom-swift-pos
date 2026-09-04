@@ -34,6 +34,7 @@ import {
   type OdooOrderEditHistory,
 } from "@/lib/odoo-api";
 import type { OrderRecordView } from "@/lib/order-records";
+import type { PosEmployeeRole } from "@/lib/pos-auth";
 import { formatRecipientOccasions } from "@/lib/recipient-occasions";
 import { orderItemTotal } from "@/lib/order-pricing";
 import type { DeliverySplit, PaymentStatus } from "@/types/order";
@@ -56,6 +57,8 @@ interface OrderHistoryProps {
   onOrderUpdated?: () => void;
   canRetryOperationalOrders?: boolean;
   onRetryOperationalOrder?: (operationalOrderId: string) => Promise<void>;
+  currentEmployeeId?: number;
+  currentEmployeeRole?: PosEmployeeRole;
 }
 
 type PaymentFilter = "all" | PaymentStatus;
@@ -155,9 +158,11 @@ const editSections: Array<{
 const OrderEditMenu = ({
   onEdit,
   availableSections,
+  disabled = false,
 }: {
   onEdit: (section: OrderEditSection) => void;
   availableSections: OrderEditSection[];
+  disabled?: boolean;
 }) => (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
@@ -166,6 +171,8 @@ const OrderEditMenu = ({
         variant="outline"
         className="min-h-11 gap-2 touch-manipulation"
         aria-label="編輯訂單資料"
+        disabled={disabled}
+        title={disabled ? "Junior 員工只可以修改自己開立嘅訂單" : undefined}
       >
         <Pencil className="h-4 w-4" /> 編輯訂單資料／補記付款
       </Button>
@@ -387,6 +394,7 @@ const OrderDetail = ({
   retryingOperationalOrderId,
   operationalRetryError,
   onRetryOperationalOrder,
+  canEditOrder,
 }: {
   order: OrderRecordView;
   history: OdooOrderEditHistory | null;
@@ -398,6 +406,7 @@ const OrderDetail = ({
   retryingOperationalOrderId: string | null;
   operationalRetryError: string | null;
   onRetryOperationalOrder: (order: OrderRecordView) => void;
+  canEditOrder: boolean;
 }) => {
   const payment = statusBadge[order.paymentStatus];
   const syncAttention = syncAttentionBadge(order);
@@ -463,6 +472,7 @@ const OrderDetail = ({
               <OrderEditMenu
                 onEdit={onEdit}
                 availableSections={availableEditSections}
+                disabled={!canEditOrder}
               />
             )}
             <PrintButtons order={order} size="default" />
@@ -484,6 +494,11 @@ const OrderDetail = ({
           </div>
           {operationalRetryError && (
             <p role="alert" className="text-sm text-destructive">{operationalRetryError}</p>
+          )}
+          {!canEditOrder && availableEditSections.length > 0 && (
+            <p role="status" className="text-sm text-amber-700">
+              Junior 員工只可以修改自己開立嘅訂單。
+            </p>
           )}
         </div>
       </div>
@@ -509,7 +524,7 @@ const OrderDetail = ({
 
       <DetailSection
         title="客戶與送花人"
-        actions={operationalEditable ? (
+        actions={operationalEditable && canEditOrder ? (
           <SectionEditMenu title="客戶與送花人" section="customer" onEdit={onEdit} />
         ) : undefined}
       >
@@ -527,7 +542,7 @@ const OrderDetail = ({
 
       <DetailSection
         title="收貨點與商品分配"
-        actions={deliveryEditable ? (
+        actions={deliveryEditable && canEditOrder ? (
           <SectionEditMenu title="收貨點與商品分配" section="delivery" onEdit={onEdit} />
         ) : undefined}
       >
@@ -648,7 +663,7 @@ const OrderDetail = ({
 
       <DetailSection
         title="付款與會計參考"
-        actions={paymentEditable ? (
+        actions={paymentEditable && canEditOrder ? (
           <SectionEditMenu title="付款與會計參考" section="payment" onEdit={onEdit} />
         ) : undefined}
       >
@@ -666,7 +681,7 @@ const OrderDetail = ({
 
       <DetailSection
         title="備註"
-        actions={operationalEditable ? (
+        actions={operationalEditable && canEditOrder ? (
           <SectionEditMenu title="備註" section="notes" onEdit={onEdit} />
         ) : undefined}
       >
@@ -713,6 +728,8 @@ const OrderHistory = ({
   onOrderUpdated,
   canRetryOperationalOrders = false,
   onRetryOperationalOrder,
+  currentEmployeeId,
+  currentEmployeeRole,
 }: OrderHistoryProps) => {
   const [editingOrder, setEditingOrder] = useState<{
     order: OrderRecordView;
@@ -737,6 +754,14 @@ const OrderHistory = ({
     && selectedOrder.syncState === "synced"
     ? selectedOrder.odooOrderId
     : undefined;
+  const editIdentityConfigured = currentEmployeeId !== undefined
+    || currentEmployeeRole !== undefined;
+  const canEditSelectedOrder = !editIdentityConfigured
+    || currentEmployeeRole === "manager"
+    || Boolean(
+      currentEmployeeId !== undefined
+      && selectedOrder?.operatorEmployeeId === currentEmployeeId,
+    );
 
   useEffect(() => {
     if (!open || !selectedHistoryOrderId) {
@@ -1134,11 +1159,16 @@ const OrderHistory = ({
                   historyStatus={historyStatus}
                   historyError={historyError}
                   onRetryHistory={() => setHistoryRefreshKey((key) => key + 1)}
-                  onEdit={(section) => setEditingOrder({ order: selectedOrder, section })}
+                  onEdit={(section) => {
+                    if (canEditSelectedOrder) {
+                      setEditingOrder({ order: selectedOrder, section });
+                    }
+                  }}
                   canRetryOperationalOrders={canRetryOperationalOrders}
                   retryingOperationalOrderId={retryingOperationalOrderId}
                   operationalRetryError={operationalRetryError}
                   onRetryOperationalOrder={handleOperationalRetry}
+                  canEditOrder={canEditSelectedOrder}
                 />
           </main>
         )}

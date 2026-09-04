@@ -2507,6 +2507,8 @@ const Index = () => {
         onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
         canRetryOperationalOrders={employee?.role === "manager"}
         onRetryOperationalOrder={handleOperationalOrderRetry}
+        currentEmployeeId={employee?.id}
+        currentEmployeeRole={employee?.role}
       />
     </div>
   );
