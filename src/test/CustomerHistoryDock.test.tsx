@@ -48,7 +48,7 @@ describe("CustomerHistoryDock", () => {
     vi.restoreAllMocks();
   });
 
-  it("closes the inline panel without losing the selected customer and reopens it from the right rail", () => {
+  it("closes the inline panel without losing the selected customer and reopens it from the left rail", () => {
     mockDesktopDock(true);
     const onOpenChange = vi.fn();
     render(
@@ -71,6 +71,8 @@ describe("CustomerHistoryDock", () => {
     expect(screen.queryByRole("region", { name: "Jay 客戶記錄面板" })).not.toBeInTheDocument();
     const reopen = screen.getByRole("button", { name: "打開 Jay 客戶記錄" });
     expect(reopen).toBeVisible();
+    expect(reopen.closest("aside")).toHaveClass("border-r");
+    expect(reopen.closest("aside")).not.toHaveClass("order-last", "border-l");
 
     fireEvent.click(reopen);
 

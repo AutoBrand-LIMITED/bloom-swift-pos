@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { PanelLeftOpen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
@@ -63,7 +63,7 @@ const CustomerHistoryDock = ({
     <aside
       aria-label="已摺疊的客戶記錄"
       className={inlineHistory
-        ? "order-last sticky top-[49px] z-auto flex h-[calc(100vh-49px)] w-14 shrink-0 justify-center border-l border-border bg-card/80 pt-3 backdrop-blur-sm"
+        ? "sticky top-[49px] z-auto flex h-[calc(100vh-49px)] w-14 shrink-0 justify-center border-r border-border bg-card/80 pt-3 backdrop-blur-sm"
         : "fixed bottom-24 left-3 z-50 flex justify-center rounded-xl border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm"}
     >
       <Button
@@ -76,9 +76,7 @@ const CustomerHistoryDock = ({
         title="打開客戶記錄"
         onClick={() => setDockOpen(true)}
       >
-        {inlineHistory
-          ? <PanelRightOpen className="h-4 w-4" />
-          : <PanelLeftOpen className="h-4 w-4" />}
+        <PanelLeftOpen className="h-4 w-4" />
         <span className={inlineHistory ? "[writing-mode:vertical-rl] tracking-widest" : undefined}>
           客戶記錄
         </span>

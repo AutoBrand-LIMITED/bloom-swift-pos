@@ -121,7 +121,7 @@ describe("CustomerHistoryPanel resizable history", () => {
     expect(screen.getByText("白色絲帶")).toBeVisible();
   });
 
-  it("uses a right-side inline column on landscape iPad without covering the order form", () => {
+  it("uses a left-side inline column on landscape iPad without covering the order form", () => {
     render(
       <CustomerHistoryPanel
         customer={customer}
@@ -132,13 +132,12 @@ describe("CustomerHistoryPanel resizable history", () => {
 
     const panel = screen.getByRole("complementary", { name: "客戶記錄面板" });
     expect(panel).toHaveClass(
-      "order-last",
       "sticky",
       "w-[360px]",
       "shrink-0",
-      "border-l",
+      "border-r",
     );
-    expect(panel).not.toHaveClass("fixed", "left-0", "border-r", "shadow-2xl");
+    expect(panel).not.toHaveClass("fixed", "left-0", "order-last", "border-l", "shadow-2xl");
   });
 
   it("keeps different recipients at the same address as separate choices", () => {

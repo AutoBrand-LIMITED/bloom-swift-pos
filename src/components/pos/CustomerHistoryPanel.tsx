@@ -217,7 +217,7 @@ const CustomerHistoryPanel = ({
     <aside
       aria-label="客戶記錄面板"
       className={inline
-        ? "order-last sticky top-[49px] z-auto flex h-[calc(100vh-49px)] w-[360px] shrink-0 flex-col overflow-hidden border-l border-border bg-card"
+        ? "sticky top-[49px] z-auto flex h-[calc(100vh-49px)] w-[360px] shrink-0 flex-col overflow-hidden border-r border-border bg-card"
         : "fixed inset-y-0 left-0 z-50 flex h-dvh w-[360px] max-w-[88vw] shrink-0 flex-col overflow-hidden border-r border-border bg-card shadow-2xl"}
     >
       {/* Header */}
