@@ -9,6 +9,7 @@ import {
   Clock3,
   LoaderCircle,
   MoreHorizontal,
+  PackageOpen,
   Pencil,
   RefreshCw,
   Search,
@@ -20,6 +21,7 @@ import {
 import { toast } from "sonner";
 
 import OrderEditDialog, { type OrderEditSection } from "@/components/pos/OrderEditDialog";
+import OrderProductCorrectionDialog from "@/components/pos/OrderProductCorrectionDialog";
 import PrintButtons, { PrintAllButton } from "@/components/pos/PrintButtons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -197,11 +199,15 @@ const editSections: Array<{
 
 const OrderEditMenu = ({
   onEdit,
+  onEditProducts,
   availableSections,
+  productsAvailable,
   disabled = false,
 }: {
   onEdit: (section: OrderEditSection) => void;
+  onEditProducts: () => void;
   availableSections: OrderEditSection[];
+  productsAvailable: boolean;
   disabled?: boolean;
 }) => (
   <DropdownMenu>
@@ -218,6 +224,14 @@ const OrderEditMenu = ({
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="min-w-60">
+      {productsAvailable && (
+        <DropdownMenuItem
+          className="min-h-11 gap-2 touch-manipulation"
+          onSelect={onEditProducts}
+        >
+          <PackageOpen className="h-4 w-4" /> 修改商品／計算差額
+        </DropdownMenuItem>
+      )}
       {editSections
         .filter(({ section }) => availableSections.includes(section))
         .map(({ section, label, icon: Icon }) => (
@@ -430,6 +444,7 @@ const OrderDetail = ({
   historyError,
   onRetryHistory,
   onEdit,
+  onEditProducts,
   canRetryOperationalOrders,
   retryingOperationalOrderId,
   operationalRetryError,
@@ -444,6 +459,7 @@ const OrderDetail = ({
   historyError: string | null;
   onRetryHistory: () => void;
   onEdit: (section: OrderEditSection) => void;
+  onEditProducts: () => void;
   canRetryOperationalOrders: boolean;
   retryingOperationalOrderId: string | null;
   operationalRetryError: string | null;
@@ -521,7 +537,9 @@ const OrderDetail = ({
             {availableEditSections.length > 0 && (
               <OrderEditMenu
                 onEdit={onEdit}
+                onEditProducts={onEditProducts}
                 availableSections={availableEditSections}
+                productsAvailable={operationalEditable}
                 disabled={!canEditOrder}
               />
             )}
@@ -676,7 +694,16 @@ const OrderDetail = ({
 
       <DetailSection
         title="產品與價錢"
-        actions={<Badge variant="outline">唯讀</Badge>}
+        actions={operationalEditable && canEditOrder ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 gap-2 touch-manipulation"
+            onClick={onEditProducts}
+          >
+            <PackageOpen className="h-4 w-4" /> 修改商品／計算差額
+          </Button>
+        ) : <Badge variant="outline">唯讀</Badge>}
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -820,6 +847,7 @@ const OrderHistory = ({
     order: OrderRecordView;
     section: OrderEditSection;
   } | null>(null);
+  const [productEditingOrder, setProductEditingOrder] = useState<OrderRecordView | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("all");
   const [history, setHistory] = useState<OdooOrderEditHistory | null>(null);
@@ -1308,6 +1336,9 @@ const OrderHistory = ({
                       setEditingOrder({ order: selectedOrder, section });
                     }
                   }}
+                  onEditProducts={() => {
+                    if (canEditSelectedOrder) setProductEditingOrder(selectedOrder);
+                  }}
                   canRetryOperationalOrders={canRetryOperationalOrders}
                   retryingOperationalOrderId={retryingOperationalOrderId}
                   operationalRetryError={operationalRetryError}
@@ -1326,6 +1357,18 @@ const OrderHistory = ({
         open={Boolean(editingOrder)}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setEditingOrder(null);
+        }}
+        onSaved={() => {
+          setHistoryRefreshKey((key) => key + 1);
+          onOrderUpdated?.();
+        }}
+      />
+
+      <OrderProductCorrectionDialog
+        order={productEditingOrder}
+        open={Boolean(productEditingOrder)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setProductEditingOrder(null);
         }}
         onSaved={() => {
           setHistoryRefreshKey((key) => key + 1);

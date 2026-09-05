@@ -193,6 +193,8 @@ export interface Order {
   replacementOrderName?: string;
   customerCreditSourceOrderName?: string;
   customerCreditApplied?: number;
+  /** Number of posted product correction batches recorded in Odoo. */
+  productCorrectionCount?: number;
   /** Odoo concurrency token used when editing an existing order. */
   writeDate?: string;
 }

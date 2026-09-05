@@ -11,7 +11,10 @@ const {
   getOdooOrderEditHistory,
   getOdooCustomerGroups,
   getOdooEmployees,
+  getOdooProducts,
   getOdooSalesTeams,
+  previewOdooOrderProductCorrection,
+  applyOdooOrderProductCorrection,
   recordOdooOrderPayment,
   updateOdooOrderSection,
 } = vi.hoisted(() => ({
@@ -21,7 +24,10 @@ const {
   getOdooOrderEditHistory: vi.fn(),
   getOdooCustomerGroups: vi.fn(),
   getOdooEmployees: vi.fn(),
+  getOdooProducts: vi.fn(),
   getOdooSalesTeams: vi.fn(),
+  previewOdooOrderProductCorrection: vi.fn(),
+  applyOdooOrderProductCorrection: vi.fn(),
   recordOdooOrderPayment: vi.fn(),
   updateOdooOrderSection: vi.fn(),
 }));
@@ -34,7 +40,10 @@ vi.mock("@/lib/odoo-api", () => ({
   getOdooOrderEditHistory,
   getOdooCustomerGroups,
   getOdooEmployees,
+  getOdooProducts,
   getOdooSalesTeams,
+  previewOdooOrderProductCorrection,
+  applyOdooOrderProductCorrection,
   recordOdooOrderPayment,
   updateOdooOrderSection,
 }));
@@ -98,6 +107,8 @@ describe("OrderHistory delivery summary", () => {
     getOdooOrderEditHistory.mockImplementation(() => new Promise(() => {}));
     getOdooEmployees.mockReset();
     getOdooEmployees.mockResolvedValue([]);
+    getOdooProducts.mockReset();
+    getOdooProducts.mockResolvedValue([]);
     getOdooSalesTeams.mockReset();
     getOdooSalesTeams.mockResolvedValue([]);
     getOdooCustomerGroups.mockReset();
@@ -109,6 +120,8 @@ describe("OrderHistory delivery summary", () => {
       { code: "bank_in_fps", label: "轉數快" },
     ]);
     recordOdooOrderPayment.mockReset();
+    previewOdooOrderProductCorrection.mockReset();
+    applyOdooOrderProductCorrection.mockReset();
   });
 
   it("uses a Shopify-style full-width order index before opening a full-page detail", () => {
@@ -183,8 +196,106 @@ describe("OrderHistory delivery summary", () => {
     const identitySection = screen.getByRole("region", { name: "訂單身份與時間" });
     expect(editButton.compareDocumentPosition(identitySection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(printAllButton.compareDocumentPosition(identitySection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(screen.getByRole("region", { name: "產品與價錢" })).getByText("唯讀")).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "產品與價錢" }))
+      .getByRole("button", { name: "修改商品／計算差額" })).toBeVisible();
     expect(screen.queryByRole("region", { name: "操作" })).not.toBeInTheDocument();
+  });
+
+  it("previews and posts an auditable product correction", async () => {
+    getOdooProducts.mockResolvedValue([{
+      id: 301,
+      name: "花束",
+      price: 680,
+      productCode: "B001",
+      imageUrl: "",
+      categoryId: 8,
+      categoryName: "花束",
+      templateId: 300,
+      barcode: null,
+      availableInPos: true,
+      displaySequence: 1,
+      availableFrom: null,
+      availableUntil: null,
+    }]);
+    previewOdooOrderProductCorrection.mockResolvedValue({
+      orderId: 17,
+      orderName: "S00017",
+      sourceRevision: "2026-08-03 10:00:01",
+      oldTotalMinor: 68000,
+      newTotalMinor: 136000,
+      creditAmountMinor: 0,
+      chargeAmountMinor: 68000,
+      netDeltaMinor: 68000,
+      amountResidualMinor: 68000,
+      customerCreditMinor: 0,
+      creditLines: [],
+      chargeLines: [],
+    });
+    applyOdooOrderProductCorrection.mockResolvedValue({
+      idempotentReplay: false,
+      correction: { id: 9, name: "PCOR/2026/00009" },
+      orderId: 17,
+      orderName: "S00017",
+      writeDate: "2026-08-03 10:00:02",
+      oldTotalMinor: 68000,
+      newTotalMinor: 136000,
+      creditAmountMinor: 0,
+      chargeAmountMinor: 68000,
+      netDeltaMinor: 68000,
+      amountResidualMinor: 68000,
+      customerCreditMinor: 0,
+      settlementDisposition: "customer_credit",
+      creditNote: null,
+      supplementInvoice: { id: 88, name: "INV/2026/00088" },
+    });
+    const onOrderUpdated = vi.fn();
+    render(<OrderHistory
+      orders={[orderFixture({
+        items: [{
+          id: "line-1",
+          name: "花束",
+          price: 680,
+          quantity: 1,
+          productId: 301,
+          productCode: "B001",
+          catalogPrice: 680,
+          discountPercent: 0,
+        }],
+      })]}
+      open
+      onClose={vi.fn()}
+      onOrderUpdated={onOrderUpdated}
+    />);
+    openOrderDetails();
+
+    fireEvent.click(within(screen.getByRole("region", { name: "產品與價錢" }))
+      .getByRole("button", { name: "修改商品／計算差額" }));
+    expect(await screen.findByRole("heading", { name: "修改訂單商品 · S00017" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "增加 花束 數量" }));
+    fireEvent.click(screen.getByRole("button", { name: "重新計算差額" }));
+
+    await waitFor(() => expect(previewOdooOrderProductCorrection).toHaveBeenCalledWith(
+      17,
+      expect.objectContaining({
+        expectedWriteDate: "2026-08-03 10:00:00",
+        items: [expect.objectContaining({ id: "line-1", productId: 301, quantity: 2 })],
+      }),
+    ));
+    expect(await screen.findByText("HK$1,360.00")).toBeVisible();
+    fireEvent.change(screen.getByLabelText("修改原因 *"), {
+      target: { value: "客人追加一份花束" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "確認修改並入帳" }));
+
+    await waitFor(() => expect(applyOdooOrderProductCorrection).toHaveBeenCalledWith(
+      17,
+      expect.objectContaining({
+        expectedWriteDate: "2026-08-03 10:00:01",
+        reason: "客人追加一份花束",
+        settlementDisposition: "customer_credit",
+      }),
+    ));
+    expect(onOrderUpdated).toHaveBeenCalledTimes(1);
   });
 
   it("lets a Junior edit only their own order and lets a Manager edit another employee order", () => {

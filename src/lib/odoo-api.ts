@@ -5,6 +5,7 @@ import type {
   Order,
   OrderCancellationResolution,
   OrderCancellationStatus,
+  OrderItem,
   RecipientOccasion,
   SalesStaff,
 } from "@/types/order";
@@ -238,6 +239,61 @@ export interface OrderPaymentUpdateResponse {
   paymentStatus: "paid" | "deposit";
   writeDate: string;
   idempotentReplay: boolean;
+}
+
+export interface OrderProductCorrectionSplit {
+  id: string;
+  itemAllocations: Array<{
+    itemId: string;
+    itemName: string;
+    quantity: number;
+  }>;
+}
+
+export interface OrderProductCorrectionPreviewPayload {
+  items: OrderItem[];
+  splitAllocations?: OrderProductCorrectionSplit[];
+  expectedWriteDate: string;
+}
+
+export interface OrderProductCorrectionPayload
+  extends OrderProductCorrectionPreviewPayload {
+  requestKey: string;
+  reason: string;
+  settlementDisposition: "customer_credit" | "refund_pending";
+}
+
+export interface OrderProductCorrectionPreview {
+  orderId: number;
+  orderName: string;
+  sourceRevision: string;
+  oldTotalMinor: number;
+  newTotalMinor: number;
+  creditAmountMinor: number;
+  chargeAmountMinor: number;
+  netDeltaMinor: number;
+  amountResidualMinor: number;
+  customerCreditMinor: number;
+  creditLines: OrderItem[];
+  chargeLines: OrderItem[];
+}
+
+export interface OrderProductCorrectionResponse {
+  idempotentReplay: boolean;
+  correction: { id: number; name: string };
+  orderId: number;
+  orderName: string;
+  writeDate: string;
+  oldTotalMinor: number;
+  newTotalMinor: number;
+  creditAmountMinor: number;
+  chargeAmountMinor: number;
+  netDeltaMinor: number;
+  amountResidualMinor: number;
+  customerCreditMinor: number;
+  settlementDisposition: "customer_credit" | "refund_pending";
+  creditNote: { id: number; name: string } | null;
+  supplementInvoice: { id: number; name: string } | null;
 }
 
 export interface DeliverySlot {
@@ -1097,6 +1153,58 @@ export async function recordOdooOrderPayment(
   }
 
   return (await res.json()) as OrderPaymentUpdateResponse;
+}
+
+export async function previewOdooOrderProductCorrection(
+  orderId: number,
+  payload: OrderProductCorrectionPreviewPayload,
+  signal?: AbortSignal,
+): Promise<OrderProductCorrectionPreview> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(
+    `${BACKEND_URL}/orders/${orderId}/product-corrections/preview`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    },
+  );
+  if (!res.ok) {
+    return throwApiError<OrderProductCorrectionPreview>(
+      res,
+      `Odoo product correction preview failed: ${res.status}`,
+    );
+  }
+  return (await res.json()) as OrderProductCorrectionPreview;
+}
+
+export async function applyOdooOrderProductCorrection(
+  orderId: number,
+  payload: OrderProductCorrectionPayload,
+  signal?: AbortSignal,
+): Promise<OrderProductCorrectionResponse> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(
+    `${BACKEND_URL}/orders/${orderId}/product-corrections`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    },
+  );
+  if (!res.ok) {
+    return throwApiError<OrderProductCorrectionResponse>(
+      res,
+      `Odoo product correction failed: ${res.status}`,
+    );
+  }
+  return (await res.json()) as OrderProductCorrectionResponse;
 }
 
 export async function cancelOdooOrder(
