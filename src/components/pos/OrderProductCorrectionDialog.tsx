@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  ArrowDownRight,
+  ArrowRight,
+  ArrowRightLeft,
+  ArrowUpRight,
   Calculator,
+  CheckCircle2,
   LoaderCircle,
   Minus,
   PackagePlus,
@@ -50,6 +55,8 @@ const money = (minor: number) => `${minor < 0 ? "-" : ""}HK$${(Math.abs(minor) /
   maximumFractionDigits: 2,
 })}`;
 
+const signedMoney = (minor: number) => `${minor > 0 ? "+" : ""}${money(minor)}`;
+
 const cloneItems = (items: readonly OrderItem[]): OrderItem[] => items.map((item) => ({
   ...item,
   quantity: Math.max(1, Math.round(item.quantity)),
@@ -94,6 +101,60 @@ const allocatedQuantity = (
   itemId: string,
 ) => splits.reduce((total, split) => total + allocationQuantity(split, itemId), 0);
 
+type ProductChange =
+  | { kind: "replaced"; before: OrderItem; after: OrderItem; deltaMinor: number }
+  | { kind: "removed"; before: OrderItem; deltaMinor: number }
+  | { kind: "added"; after: OrderItem; deltaMinor: number }
+  | { kind: "quantity"; before: OrderItem; after: OrderItem; deltaMinor: number };
+
+const itemTotalMinor = (item: OrderItem) => Math.round(orderItemTotal(item) * 100);
+
+const productIdentityChanged = (before: OrderItem, after: OrderItem) => (
+  before.productId !== after.productId
+  || before.name !== after.name
+  || before.productCode !== after.productCode
+  || before.price !== after.price
+);
+
+const buildProductChanges = (
+  beforeItems: readonly OrderItem[],
+  afterItems: readonly OrderItem[],
+): ProductChange[] => {
+  const beforeById = new Map(beforeItems.map((item) => [item.id, item]));
+  const afterById = new Map(afterItems.map((item) => [item.id, item]));
+  const changes: ProductChange[] = [];
+
+  beforeItems.forEach((before) => {
+    const after = afterById.get(before.id);
+    if (!after) {
+      changes.push({ kind: "removed", before, deltaMinor: -itemTotalMinor(before) });
+      return;
+    }
+    const deltaMinor = itemTotalMinor(after) - itemTotalMinor(before);
+    if (productIdentityChanged(before, after)) {
+      changes.push({ kind: "replaced", before, after, deltaMinor });
+    } else if (before.quantity !== after.quantity) {
+      changes.push({ kind: "quantity", before, after, deltaMinor });
+    }
+  });
+
+  afterItems.forEach((after) => {
+    if (!beforeById.has(after.id)) {
+      changes.push({ kind: "added", after, deltaMinor: itemTotalMinor(after) });
+    }
+  });
+  return changes;
+};
+
+const changeKindLabel = (change: ProductChange) => {
+  switch (change.kind) {
+    case "replaced": return "更換";
+    case "removed": return "刪除";
+    case "added": return "新增";
+    case "quantity": return "數量";
+  }
+};
+
 const OrderProductCorrectionDialog = ({
   order,
   open,
@@ -106,8 +167,10 @@ const OrderProductCorrectionDialog = ({
   const [query, setQuery] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [replacementItemId, setReplacementItemId] = useState<string | null>(null);
   const [preview, setPreview] = useState<OrderProductCorrectionPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  const [previewRetry, setPreviewRetry] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [reason, setReason] = useState("");
   const [settlement, setSettlement] = useState<"customer_credit" | "refund_pending">(
@@ -121,7 +184,9 @@ const OrderProductCorrectionDialog = ({
     setItems(cloneItems(order.items));
     setSplits(initialSplits(order));
     setQuery("");
+    setReplacementItemId(null);
     setPreview(null);
+    setPreviewRetry(0);
     setReason("");
     setSettlement("customer_credit");
     setRequestKey("");
@@ -165,6 +230,40 @@ const OrderProductCorrectionDialog = ({
       || JSON.stringify(splits) !== JSON.stringify(initialSplits(order));
   }, [items, order, splits]);
 
+  const originalItems = useMemo(() => order ? cloneItems(order.items) : [], [order]);
+  const productChanges = useMemo(
+    () => buildProductChanges(originalItems, items),
+    [items, originalItems],
+  );
+  const instantOldTotalMinor = useMemo(
+    () => originalItems.reduce((total, item) => total + itemTotalMinor(item), 0),
+    [originalItems],
+  );
+  const instantNewTotalMinor = useMemo(
+    () => items.reduce((total, item) => total + itemTotalMinor(item), 0),
+    [items],
+  );
+  const instantDeltaMinor = instantNewTotalMinor - instantOldTotalMinor;
+  const resultOldTotalMinor = preview?.oldTotalMinor ?? instantOldTotalMinor;
+  const resultNewTotalMinor = preview?.newTotalMinor ?? instantNewTotalMinor;
+  const resultDeltaMinor = preview?.netDeltaMinor ?? instantDeltaMinor;
+  const hasReplacement = productChanges.some((change) => change.kind === "replaced")
+    || (
+      productChanges.some((change) => change.kind === "removed")
+      && productChanges.some((change) => change.kind === "added")
+    );
+  const changeSummaryLabels = [
+    hasReplacement ? "更換商品" : "",
+    productChanges.some((change) => change.kind === "removed") && !hasReplacement ? "刪除商品" : "",
+    productChanges.some((change) => change.kind === "added") && !hasReplacement ? "新增商品" : "",
+    productChanges.some((change) => change.kind === "quantity") ? "調整數量" : "",
+  ].filter(Boolean);
+  const previewBlockReason = !order?.odooOrderId || !order.writeDate
+    ? "呢張訂單未有完整 Odoo 編輯資料，請重新載入後再試。"
+    : items.some((item) => !item.productId)
+      ? "尚有商品未連結 Odoo Product ID；請刪除或使用「更換」揀選正確商品。"
+      : null;
+
   const invalidatePreview = () => {
     setPreview(null);
     setRequestKey("");
@@ -177,7 +276,23 @@ const OrderProductCorrectionDialog = ({
     invalidatePreview();
   };
 
-  const addProduct = (product: OdooProduct) => {
+  const selectProduct = (product: OdooProduct) => {
+    if (replacementItemId) {
+      replaceItems(items.map((item) => item.id === replacementItemId ? {
+        ...item,
+        name: product.name,
+        price: product.price,
+        catalogPrice: product.price,
+        discountPercent: 0,
+        priceOverrideReason: "",
+        productId: product.id,
+        productCode: product.productCode,
+        categoryId: product.categoryId,
+        categoryName: product.categoryName,
+      } : item));
+      setReplacementItemId(null);
+      return;
+    }
     replaceItems([
       ...items,
       {
@@ -223,36 +338,39 @@ const OrderProductCorrectionDialog = ({
     invalidatePreview();
   };
 
-  const handlePreview = async () => {
-    if (!order?.odooOrderId || !order.writeDate) {
-      setError("呢張訂單未有完整 Odoo 編輯資料，請重新載入後再試。");
+  useEffect(() => {
+    if (!open || !changed || previewBlockReason || !order?.odooOrderId || !order.writeDate) {
+      setPreviewing(false);
       return;
     }
-    if (!changed) {
-      setError("商品內容未有更改。");
-      return;
-    }
-    if (items.some((item) => !item.productId)) {
-      setError("舊單有商品未連結 Odoo Product ID，請先由管理員修正商品 mapping。");
-      return;
-    }
-    setPreviewing(true);
-    setError(null);
-    try {
-      const result = await previewOdooOrderProductCorrection(order.odooOrderId, {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setPreviewing(true);
+      setError(null);
+      previewOdooOrderProductCorrection(order.odooOrderId!, {
         items,
         ...(splits.length > 0 ? { splitAllocations: splits } : {}),
-        expectedWriteDate: order.writeDate,
-      });
-      setPreview(result);
-      setRequestKey(crypto.randomUUID());
-    } catch (previewError) {
-      setPreview(null);
-      setError(previewError instanceof Error ? previewError.message : "未能計算商品差額");
-    } finally {
-      setPreviewing(false);
-    }
-  };
+        expectedWriteDate: order.writeDate!,
+      }, controller.signal)
+        .then((result) => {
+          if (controller.signal.aborted) return;
+          setPreview(result);
+          setRequestKey(crypto.randomUUID());
+        })
+        .catch((previewError: unknown) => {
+          if (controller.signal.aborted) return;
+          setPreview(null);
+          setError(previewError instanceof Error ? previewError.message : "未能計算商品差額");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setPreviewing(false);
+        });
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [changed, items, open, order?.odooOrderId, order?.writeDate, previewBlockReason, previewRetry, splits]);
 
   const handleApply = async () => {
     if (!order?.odooOrderId || !preview) return;
@@ -289,15 +407,6 @@ const OrderProductCorrectionDialog = ({
     }
   };
 
-  const canPreview = Boolean(
-    order?.odooOrderId
-    && order.writeDate
-    && items.length > 0
-    && changed
-    && !previewing
-    && !submitting,
-  );
-
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => {
       if (!submitting) onOpenChange(nextOpen);
@@ -312,16 +421,108 @@ const OrderProductCorrectionDialog = ({
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="space-y-5 p-5">
+            <section className="space-y-3 rounded-xl border bg-card p-4" aria-label="即時商品變動摘要">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Calculator className="h-4 w-4" />
+                  <h3 className="font-semibold">今次修改結果</h3>
+                </div>
+                {changed && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {changeSummaryLabels.map((label) => <Badge key={label} variant="outline">{label}</Badge>)}
+                  </div>
+                )}
+              </div>
+
+              {!changed ? (
+                <p className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">
+                  尚未修改商品；更換、刪除、加入或調整數量後，呢度會即時顯示差額。
+                </p>
+              ) : (
+                <>
+                  <div className={`flex items-start gap-3 rounded-lg border p-4 ${
+                    resultDeltaMinor > 0
+                      ? "border-amber-300 bg-amber-50 text-amber-950"
+                      : resultDeltaMinor < 0
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                        : "border-sky-200 bg-sky-50 text-sky-950"
+                  }`}>
+                    {resultDeltaMinor > 0 ? (
+                      <ArrowUpRight className="mt-0.5 h-5 w-5 shrink-0" />
+                    ) : resultDeltaMinor < 0 ? (
+                      <ArrowDownRight className="mt-0.5 h-5 w-5 shrink-0" />
+                    ) : (
+                      <ArrowRight className="mt-0.5 h-5 w-5 shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">
+                        {resultDeltaMinor > 0
+                          ? `多咗 ${money(resultDeltaMinor)}，需要向客戶補收`
+                          : resultDeltaMinor < 0
+                            ? `少咗 ${money(Math.abs(resultDeltaMinor))}，需要退款或保留 Customer Credit`
+                            : "商品總額冇變，唔需要補收或退款"}
+                      </p>
+                      <p className="mt-1 flex flex-wrap items-center gap-2 text-sm opacity-80">
+                        <span>修改前 {money(resultOldTotalMinor)}</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                        <span>修改後 {money(resultNewTotalMinor)}</span>
+                        {previewing ? (
+                          <span className="inline-flex items-center gap-1"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Odoo 核對中</span>
+                        ) : preview ? (
+                          <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Odoo 已核對</span>
+                        ) : null}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 lg:grid-cols-2">
+                    {productChanges.map((change, index) => (
+                      <div key={`${change.kind}-${index}`} className="flex items-center gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
+                        <Badge variant="secondary" className="shrink-0">{changeKindLabel(change)}</Badge>
+                        <div className="min-w-0 flex-1">
+                          {change.kind === "replaced" ? (
+                            <p className="font-medium">
+                              <span>{change.before.name} × {change.before.quantity}</span>
+                              <ArrowRight className="mx-2 inline h-3.5 w-3.5" />
+                              <span>{change.after.name} × {change.after.quantity}</span>
+                            </p>
+                          ) : change.kind === "removed" ? (
+                            <p className="font-medium">{change.before.name} × {change.before.quantity}</p>
+                          ) : change.kind === "added" ? (
+                            <p className="font-medium">{change.after.name} × {change.after.quantity}</p>
+                          ) : (
+                            <p className="font-medium">{change.after.name}：{change.before.quantity} → {change.after.quantity}</p>
+                          )}
+                        </div>
+                        <span className={`shrink-0 font-mono font-semibold ${
+                          change.deltaMinor > 0 ? "text-amber-700" : change.deltaMinor < 0 ? "text-emerald-700" : "text-muted-foreground"
+                        }`}>{signedMoney(change.deltaMinor)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {previewBlockReason && (
+                    <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {previewBlockReason}
+                    </p>
+                  )}
+                </>
+              )}
+            </section>
+
             <section className="space-y-3 rounded-xl border bg-card p-4" aria-label="目前商品">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="font-semibold">目前商品</h3>
+                <h3 className="font-semibold">修改後商品清單</h3>
                 <Badge variant="outline">{items.length} 項</Badge>
               </div>
               {items.map((item) => (
-                <div key={item.id} className="rounded-lg border bg-muted/20 p-3">
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_10rem_3rem] sm:items-end">
+                <div key={item.id} className={`rounded-lg border p-3 ${replacementItemId === item.id ? "border-primary bg-primary/5" : "bg-muted/20"}`}>
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_10rem_8rem] sm:items-end">
                     <div className="min-w-0">
-                      <p className="font-medium">{item.name}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{item.name}</p>
+                        {replacementItemId === item.id && <Badge>選擇新商品中</Badge>}
+                      </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {[item.productCode, item.categoryName].filter(Boolean).join(" · ") || "未有 Product ID"}
                       </p>
@@ -365,17 +566,34 @@ const OrderProductCorrectionDialog = ({
                         </Button>
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive"
-                      aria-label={`刪除 ${item.name}`}
-                      disabled={items.length <= 1}
-                      onClick={() => replaceItems(items.filter((entry) => entry.id !== item.id))}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={`更換 ${item.name}`}
+                        onClick={() => {
+                          setReplacementItemId(item.id);
+                          setQuery("");
+                        }}
+                      >
+                        <ArrowRightLeft className="mr-1.5 h-4 w-4" /> 更換
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        aria-label={`刪除 ${item.name}`}
+                        disabled={items.length <= 1}
+                        onClick={() => {
+                          if (replacementItemId === item.id) setReplacementItemId(null);
+                          replaceItems(items.filter((entry) => entry.id !== item.id));
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="mt-3 flex justify-between border-t pt-2 text-xs">
                     <span className="text-muted-foreground">主要收貨點：{Math.max(0, item.quantity - allocatedQuantity(splits, item.id))}</span>
@@ -386,10 +604,22 @@ const OrderProductCorrectionDialog = ({
             </section>
 
             <section className="space-y-3 rounded-xl border bg-card p-4" aria-label="加入商品">
-              <div className="flex items-center gap-2">
-                <PackagePlus className="h-4 w-4" />
-                <h3 className="font-semibold">加入 Odoo 商品</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {replacementItemId ? <ArrowRightLeft className="h-4 w-4" /> : <PackagePlus className="h-4 w-4" />}
+                  <h3 className="font-semibold">{replacementItemId ? "選擇替換商品" : "加入 Odoo 商品"}</h3>
+                </div>
+                {replacementItemId && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setReplacementItemId(null)}>
+                    取消更換
+                  </Button>
+                )}
               </div>
+              {replacementItemId && (
+                <p className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+                  揀選下方商品後，會直接取代「<strong>{items.find((item) => item.id === replacementItemId)?.name}</strong>」，原有數量及收貨點分配會保留。
+                </p>
+              )}
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -410,8 +640,11 @@ const OrderProductCorrectionDialog = ({
                     <button
                       key={product.id}
                       type="button"
-                      onClick={() => addProduct(product)}
-                      className="rounded-lg border p-3 text-left transition-colors hover:border-primary hover:bg-primary/5"
+                      onClick={() => selectProduct(product)}
+                      aria-label={replacementItemId
+                        ? `以 ${product.name} 更換目前商品`
+                        : `加入 ${product.name}`}
+                      className="min-h-20 touch-manipulation rounded-lg border p-3 text-left transition-colors active:scale-[0.99] active:border-primary active:bg-primary/5"
                     >
                       <span className="line-clamp-2 text-sm font-medium">{product.name}</span>
                       <span className="mt-1 flex justify-between gap-2 text-xs text-muted-foreground">
@@ -457,10 +690,19 @@ const OrderProductCorrectionDialog = ({
             <section className="space-y-4 rounded-xl border bg-card p-4" aria-label="商品差額計算">
               <div className="flex items-center gap-2">
                 <Calculator className="h-4 w-4" />
-                <h3 className="font-semibold">Odoo 差額計算</h3>
+                <h3 className="font-semibold">Odoo 入帳結果（自動）</h3>
               </div>
               {!preview ? (
-                <p className="text-sm text-muted-foreground">完成商品修改後，先計算差額再確認入帳。</p>
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {previewing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                  {!changed
+                    ? "修改商品後，系統會自動核對 Credit Note／補充發票。"
+                    : previewBlockReason
+                      ? previewBlockReason
+                      : previewing
+                        ? "正在同 Odoo 自動核對會計差額…"
+                        : "等待 Odoo 核對結果…"}
+                </p>
               ) : (
                 <>
                   <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -527,20 +769,34 @@ const OrderProductCorrectionDialog = ({
             </section>
 
             {error && (
-              <p role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
-              </p>
+              <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                <span className="flex min-w-0 flex-1 items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+                </span>
+                {changed && !previewBlockReason && !submitting && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setPreviewRetry((value) => value + 1)}>
+                    重新核對
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </ScrollArea>
 
-        <DialogFooter className="shrink-0 border-t px-5 py-4">
+        <DialogFooter className="shrink-0 border-t px-5 py-4 sm:items-center">
+          <div className="mr-auto flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+            {previewing ? (
+              <><LoaderCircle className="h-4 w-4 animate-spin" /> 自動計算中…</>
+            ) : preview ? (
+              <><CheckCircle2 className="h-4 w-4 text-emerald-600" /> 差額已由 Odoo 核對</>
+            ) : changed ? (
+              <><AlertCircle className="h-4 w-4" /> 等待差額核對</>
+            ) : (
+              "尚未修改商品"
+            )}
+          </div>
           <Button variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>返回</Button>
-          <Button variant="outline" disabled={!canPreview} onClick={() => void handlePreview()}>
-            {previewing ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
-            重新計算差額
-          </Button>
-          <Button disabled={!preview || submitting} onClick={() => void handleApply()}>
+          <Button disabled={!preview || !reason.trim() || submitting} onClick={() => void handleApply()}>
             {submitting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
             確認修改並入帳
           </Button>

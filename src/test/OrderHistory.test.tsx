@@ -272,7 +272,7 @@ describe("OrderHistory delivery summary", () => {
       .getByRole("button", { name: "修改商品／計算差額" }));
     expect(await screen.findByRole("heading", { name: "修改訂單商品 · S00017" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "增加 花束 數量" }));
-    fireEvent.click(screen.getByRole("button", { name: "重新計算差額" }));
+    expect(screen.getByText("多咗 HK$680.00，需要向客戶補收")).toBeVisible();
 
     await waitFor(() => expect(previewOdooOrderProductCorrection).toHaveBeenCalledWith(
       17,
@@ -280,6 +280,7 @@ describe("OrderHistory delivery summary", () => {
         expectedWriteDate: "2026-08-03 10:00:00",
         items: [expect.objectContaining({ id: "line-1", productId: 301, quantity: 2 })],
       }),
+      expect.any(AbortSignal),
     ));
     expect(await screen.findByText("HK$1,360.00")).toBeVisible();
     fireEvent.change(screen.getByLabelText("修改原因 *"), {
@@ -296,6 +297,134 @@ describe("OrderHistory delivery summary", () => {
       }),
     ));
     expect(onOrderUpdated).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a product replacement and calculates the increase automatically", async () => {
+    getOdooProducts.mockResolvedValue([{
+      id: 302,
+      name: "百合花束",
+      price: 800,
+      productCode: "LILY",
+      imageUrl: "",
+      categoryId: 8,
+      categoryName: "花束",
+      templateId: 302,
+      barcode: null,
+      availableInPos: true,
+      displaySequence: 1,
+      availableFrom: null,
+      availableUntil: null,
+    }]);
+    previewOdooOrderProductCorrection.mockResolvedValue({
+      orderId: 17,
+      orderName: "S00017",
+      sourceRevision: "2026-08-03 10:00:01",
+      oldTotalMinor: 68000,
+      newTotalMinor: 80000,
+      creditAmountMinor: 68000,
+      chargeAmountMinor: 80000,
+      netDeltaMinor: 12000,
+      amountResidualMinor: 12000,
+      customerCreditMinor: 0,
+      creditLines: [],
+      chargeLines: [],
+    });
+    render(<OrderHistory
+      orders={[orderFixture({
+        items: [{
+          id: "line-1",
+          name: "花束",
+          price: 680,
+          quantity: 1,
+          catalogPrice: 680,
+          discountPercent: 0,
+        }],
+      })]}
+      open
+      onClose={vi.fn()}
+    />);
+    openOrderDetails();
+
+    fireEvent.click(within(screen.getByRole("region", { name: "產品與價錢" }))
+      .getByRole("button", { name: "修改商品／計算差額" }));
+    fireEvent.click(await screen.findByRole("button", { name: "更換 花束" }));
+    fireEvent.click(await screen.findByRole("button", { name: "以 百合花束 更換目前商品" }));
+
+    expect(screen.getByText("更換商品")).toBeVisible();
+    expect(screen.getByText("花束 × 1")).toBeVisible();
+    expect(screen.getByText("百合花束 × 1")).toBeVisible();
+    expect(screen.getByText("多咗 HK$120.00，需要向客戶補收")).toBeVisible();
+    await waitFor(() => expect(previewOdooOrderProductCorrection).toHaveBeenCalledWith(
+      17,
+      expect.objectContaining({
+        items: [expect.objectContaining({
+          id: "line-1",
+          productId: 302,
+          name: "百合花束",
+        })],
+      }),
+      expect.any(AbortSignal),
+    ));
+  });
+
+  it("labels a removed product and calculates the reduction automatically", async () => {
+    previewOdooOrderProductCorrection.mockResolvedValue({
+      orderId: 17,
+      orderName: "S00017",
+      sourceRevision: "2026-08-03 10:00:01",
+      oldTotalMinor: 80300,
+      newTotalMinor: 68000,
+      creditAmountMinor: 12300,
+      chargeAmountMinor: 0,
+      netDeltaMinor: -12300,
+      amountResidualMinor: 0,
+      customerCreditMinor: 12300,
+      creditLines: [],
+      chargeLines: [],
+    });
+    render(<OrderHistory
+      orders={[orderFixture({
+        items: [
+          {
+            id: "line-1",
+            name: "花束",
+            price: 680,
+            quantity: 1,
+            productId: 301,
+            productCode: "B001",
+            catalogPrice: 680,
+            discountPercent: 0,
+          },
+          {
+            id: "line-2",
+            name: "朱古力",
+            price: 123,
+            quantity: 1,
+            productId: 402,
+            productCode: "CHOCO",
+            catalogPrice: 123,
+            discountPercent: 0,
+          },
+        ],
+      })]}
+      open
+      onClose={vi.fn()}
+    />);
+    openOrderDetails();
+
+    fireEvent.click(within(screen.getByRole("region", { name: "產品與價錢" }))
+      .getByRole("button", { name: "修改商品／計算差額" }));
+    fireEvent.click(await screen.findByRole("button", { name: "刪除 朱古力" }));
+
+    expect(screen.getByText("刪除商品")).toBeVisible();
+    expect(screen.getByText("少咗 HK$123.00，需要退款或保留 Customer Credit")).toBeVisible();
+    await waitFor(() => expect(previewOdooOrderProductCorrection).toHaveBeenCalledWith(
+      17,
+      expect.objectContaining({
+        items: [expect.objectContaining({ id: "line-1", productId: 301 })],
+      }),
+      expect.any(AbortSignal),
+    ));
   });
 
   it("lets a Junior edit only their own order and lets a Manager edit another employee order", () => {
