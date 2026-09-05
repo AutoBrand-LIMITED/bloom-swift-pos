@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "中西花店 POS 結帳系統",
+  "short_name": "中西花店 POS",
+  "description": "中西花店訂單及收款系統",
+  "lang": "zh-Hant",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf9f7",
+  "theme_color": "#357a5a",
+  "icons": [
+    {
+      "src": "/pos-app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pos-app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
