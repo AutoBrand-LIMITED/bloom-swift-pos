@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   generateAllDocuments,
   generateDeliveryNote,
   generateMessageCards,
   generatePickingList,
   generateReceipt,
+  printDocument,
 } from "@/lib/print-utils";
 import type { DeliverySplit, Order } from "@/types/order";
 
@@ -73,6 +74,38 @@ const documentGenerators = [
   ["picking list", generatePickingList],
   ["message card", generateMessageCards],
 ] as const;
+
+describe("print launcher", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("runs printing inside a normal print tab without blocking the POS timer", () => {
+    const write = vi.fn();
+    const close = vi.fn();
+    const print = vi.fn();
+    const printTabSetTimeout = vi.fn((callback: TimerHandler) => {
+      if (typeof callback === "function") callback();
+      return 1;
+    });
+    const printTab = {
+      document: { write, close },
+      print,
+      setTimeout: printTabSetTimeout,
+    } as unknown as Window;
+    const open = vi.spyOn(window, "open").mockReturnValue(printTab);
+    const posSetTimeout = vi.spyOn(window, "setTimeout");
+
+    printDocument("<html><body>all documents</body></html>");
+
+    expect(open).toHaveBeenCalledWith("", "_blank");
+    expect(write).toHaveBeenCalledWith("<html><body>all documents</body></html>");
+    expect(close).toHaveBeenCalledOnce();
+    expect(printTabSetTimeout).toHaveBeenCalledWith(expect.any(Function), 300);
+    expect(posSetTimeout).not.toHaveBeenCalled();
+    expect(print).toHaveBeenCalledOnce();
+  });
+});
 
 describe("print layout contract", () => {
   it("bundles all enabled document types into one print job with page breaks", () => {

@@ -844,14 +844,19 @@ export function generateAllDocuments(order: Order): string {
     </body></html>`;
 }
 
-/** Open a print window with the given HTML */
+/** Open a dedicated print tab so the cashier can keep using the POS. */
 export function printDocument(html: string) {
-  const win = window.open("", "_blank", "width=800,height=900");
+  // Supplying popup dimensions makes Chrome open a separate popup window. On
+  // macOS its native print dialog can block the POS window as well. A regular
+  // tab keeps the print flow isolated from the cashier screen.
+  const win = window.open("", "_blank");
   if (!win) return;
   win.document.write(html);
   win.document.close();
-  // Small delay to let styles load
-  setTimeout(() => {
+
+  // Schedule printing from the print tab's own event loop. Calling print from
+  // a timer owned by the POS tab keeps that tab blocked until the dialog ends.
+  win.setTimeout(() => {
     win.print();
   }, 300);
 }
