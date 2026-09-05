@@ -343,8 +343,34 @@ describe("OrderHistory delivery summary", () => {
           name: "花束",
           price: 680,
           quantity: 1,
+          productId: 301,
+          productCode: "B001",
           catalogPrice: 680,
           discountPercent: 0,
+        }],
+        deliverySplits: [{
+          id: "destination-2",
+          fulfillmentType: "delivery",
+          deliveryDate: "2026-07-19",
+          deliveryTimeMode: "specified",
+          deliveryTime: "下午 4 時前",
+          deliveryRegion: "九龍",
+          deliveryDistrict: "觀塘區",
+          deliveryArea: "觀塘",
+          deliveryDetail: "巧明街 6 號",
+          deliveryAddress: "九龍觀塘巧明街 6 號",
+          deliveryGoogleAddress: "九龍觀塘巧明街 6 號",
+          deliveryBuilding: "巧運大廈",
+          deliveryFloor: "7",
+          deliveryUnit: "A",
+          recipientType: "personal",
+          recipientCompanyName: "",
+          recipientName: "Second Recipient",
+          recipientPhone: "62345678",
+          deliveryPerson: "Driver B",
+          failedDeliveryAction: "none",
+          deliveryNote: "Call first",
+          itemAllocations: [{ itemId: "line-1", itemName: "花束", quantity: 1 }],
         }],
       })]}
       open
@@ -361,17 +387,24 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText("花束 × 1")).toBeVisible();
     expect(screen.getByText("百合花束 × 1")).toBeVisible();
     expect(screen.getByText("多咗 HK$120.00，需要向客戶補收")).toBeVisible();
-    await waitFor(() => expect(previewOdooOrderProductCorrection).toHaveBeenCalledWith(
-      17,
-      expect.objectContaining({
-        items: [expect.objectContaining({
-          id: "line-1",
-          productId: 302,
-          name: "百合花束",
-        })],
-      }),
-      expect.any(AbortSignal),
-    ));
+    await waitFor(() => {
+      const payload = previewOdooOrderProductCorrection.mock.calls.at(-1)?.[1];
+      expect(payload).toBeDefined();
+      expect(payload.items).toEqual([expect.objectContaining({
+        productId: 302,
+        name: "百合花束",
+      })]);
+      const replacementId = payload.items[0].id;
+      expect(replacementId).not.toBe("line-1");
+      expect(payload.splitAllocations).toEqual([expect.objectContaining({
+        id: "destination-2",
+        itemAllocations: [{
+          itemId: replacementId,
+          itemName: "百合花束",
+          quantity: 1,
+        }],
+      })]);
+    });
   });
 
   it("labels a removed product and calculates the reduction automatically", async () => {

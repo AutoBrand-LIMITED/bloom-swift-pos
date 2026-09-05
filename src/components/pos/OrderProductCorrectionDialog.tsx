@@ -118,12 +118,30 @@ const productIdentityChanged = (before: OrderItem, after: OrderItem) => (
 const buildProductChanges = (
   beforeItems: readonly OrderItem[],
   afterItems: readonly OrderItem[],
+  replacementOrigins: Readonly<Record<string, string>> = {},
 ): ProductChange[] => {
   const beforeById = new Map(beforeItems.map((item) => [item.id, item]));
   const afterById = new Map(afterItems.map((item) => [item.id, item]));
+  const replacementsByOriginalId = new Map<string, OrderItem>();
+  Object.entries(replacementOrigins).forEach(([replacementId, originalId]) => {
+    const replacement = afterById.get(replacementId);
+    if (replacement) replacementsByOriginalId.set(originalId, replacement);
+  });
+  const pairedReplacementIds = new Set<string>();
   const changes: ProductChange[] = [];
 
   beforeItems.forEach((before) => {
+    const replacement = replacementsByOriginalId.get(before.id);
+    if (replacement) {
+      pairedReplacementIds.add(replacement.id);
+      changes.push({
+        kind: "replaced",
+        before,
+        after: replacement,
+        deltaMinor: itemTotalMinor(replacement) - itemTotalMinor(before),
+      });
+      return;
+    }
     const after = afterById.get(before.id);
     if (!after) {
       changes.push({ kind: "removed", before, deltaMinor: -itemTotalMinor(before) });
@@ -138,6 +156,7 @@ const buildProductChanges = (
   });
 
   afterItems.forEach((after) => {
+    if (pairedReplacementIds.has(after.id)) return;
     if (!beforeById.has(after.id)) {
       changes.push({ kind: "added", after, deltaMinor: itemTotalMinor(after) });
     }
@@ -167,6 +186,7 @@ const OrderProductCorrectionDialog = ({
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [replacementItemId, setReplacementItemId] = useState<string | null>(null);
+  const [replacementOrigins, setReplacementOrigins] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<OrderProductCorrectionPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [previewRetry, setPreviewRetry] = useState(0);
@@ -184,6 +204,7 @@ const OrderProductCorrectionDialog = ({
     setSplits(initialSplits(order));
     setQuery("");
     setReplacementItemId(null);
+    setReplacementOrigins({});
     setPreview(null);
     setPreviewRetry(0);
     setReason("");
@@ -231,8 +252,8 @@ const OrderProductCorrectionDialog = ({
 
   const originalItems = useMemo(() => order ? cloneItems(order.items) : [], [order]);
   const productChanges = useMemo(
-    () => buildProductChanges(originalItems, items),
-    [items, originalItems],
+    () => buildProductChanges(originalItems, items, replacementOrigins),
+    [items, originalItems, replacementOrigins],
   );
   const instantOldTotalMinor = useMemo(
     () => originalItems.reduce((total, item) => total + itemTotalMinor(item), 0),
@@ -277,8 +298,15 @@ const OrderProductCorrectionDialog = ({
 
   const selectProduct = (product: OdooProduct) => {
     if (replacementItemId) {
-      replaceItems(items.map((item) => item.id === replacementItemId ? {
-        ...item,
+      const currentItem = items.find((item) => item.id === replacementItemId);
+      if (!currentItem) return;
+      const originalItem = originalItems.find((item) => item.id === replacementItemId);
+      const replacementId = originalItem && originalItem.productId !== product.id
+        ? crypto.randomUUID()
+        : replacementItemId;
+      const replacementItem: OrderItem = {
+        ...currentItem,
+        id: replacementId,
         name: product.name,
         price: product.price,
         catalogPrice: product.price,
@@ -288,7 +316,30 @@ const OrderProductCorrectionDialog = ({
         productCode: product.productCode,
         categoryId: product.categoryId,
         categoryName: product.categoryName,
-      } : item));
+      };
+      const nextItems = items.map((item) => (
+        item.id === replacementItemId ? replacementItem : item
+      ));
+      setItems(nextItems);
+      setSplits((current) => clampSplitAllocations(current.map((split) => ({
+        ...split,
+        itemAllocations: split.itemAllocations.map((allocation) => (
+          allocation.itemId === replacementItemId
+            ? {
+              ...allocation,
+              itemId: replacementId,
+              itemName: replacementItem.name,
+            }
+            : allocation
+        )),
+      })), nextItems));
+      if (originalItem && replacementId !== replacementItemId) {
+        setReplacementOrigins((current) => ({
+          ...current,
+          [replacementId]: replacementItemId,
+        }));
+      }
+      invalidatePreview();
       setReplacementItemId(null);
       return;
     }
@@ -591,6 +642,12 @@ const OrderProductCorrectionDialog = ({
                         disabled={items.length <= 1}
                         onClick={() => {
                           if (replacementItemId === item.id) setReplacementItemId(null);
+                          setReplacementOrigins((current) => {
+                            if (!current[item.id]) return current;
+                            const next = { ...current };
+                            delete next[item.id];
+                            return next;
+                          });
                           replaceItems(items.filter((entry) => entry.id !== item.id));
                         }}
                       >
