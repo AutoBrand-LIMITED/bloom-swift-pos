@@ -8,11 +8,16 @@ vi.mock("@/components/pos/CustomerHistoryPanel", () => ({
   default: ({
     customer,
     onClose,
+    inline,
   }: {
     customer: DemoCustomer;
     onClose: () => void;
+    inline?: boolean;
   }) => (
-    <section aria-label={`${customer.name} 客戶記錄面板`}>
+    <section
+      aria-label={`${customer.name} 客戶記錄面板`}
+      data-inline={inline ? "true" : "false"}
+    >
       <button type="button" onClick={onClose}>關閉客戶記錄</button>
     </section>
   ),
@@ -43,7 +48,7 @@ describe("CustomerHistoryDock", () => {
     vi.restoreAllMocks();
   });
 
-  it("closes the panel without losing the selected customer and reopens it from the left rail", () => {
+  it("closes the inline panel without losing the selected customer and reopens it from the right rail", () => {
     mockDesktopDock(true);
     const onOpenChange = vi.fn();
     render(
@@ -54,6 +59,11 @@ describe("CustomerHistoryDock", () => {
     );
 
     expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    expect(screen.getByRole("region", { name: "Jay 客戶記錄面板" })).toHaveAttribute(
+      "data-inline",
+      "true",
+    );
+    expect(window.matchMedia).toHaveBeenCalledWith(expect.stringContaining("orientation: landscape"));
 
     fireEvent.click(screen.getByRole("button", { name: "關閉客戶記錄" }));
 
@@ -87,11 +97,14 @@ describe("CustomerHistoryDock", () => {
     render(<CustomerHistoryDock customer={customer} />);
 
     const dock = screen.getByRole("complementary", { name: "已摺疊的客戶記錄" });
-    expect(dock).toHaveClass("fixed", "bottom-24", "left-3", "xl:sticky");
+    expect(dock).toHaveClass("fixed", "bottom-24", "left-3");
     expect(dock).not.toHaveClass("w-14", "shrink-0");
     expect(screen.queryByRole("region", { name: "Jay 客戶記錄面板" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "打開 Jay 客戶記錄" }));
-    expect(screen.getByRole("region", { name: "Jay 客戶記錄面板" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Jay 客戶記錄面板" })).toHaveAttribute(
+      "data-inline",
+      "false",
+    );
   });
 });

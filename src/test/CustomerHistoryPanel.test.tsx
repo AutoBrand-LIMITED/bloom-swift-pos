@@ -80,8 +80,8 @@ describe("CustomerHistoryPanel resizable history", () => {
     );
 
     const panel = screen.getByRole("complementary", { name: "客戶記錄面板" });
-    expect(panel).toHaveClass("fixed", "inset-y-0", "left-0", "shadow-2xl", "xl:sticky");
-    expect(panel).not.toHaveClass("lg:sticky");
+    expect(panel).toHaveClass("fixed", "inset-y-0", "left-0", "border-r", "shadow-2xl");
+    expect(panel).not.toHaveClass("sticky", "order-last", "border-l");
 
     expect(screen.getByRole("separator", {
       name: "上下拖拉以調整客戶資料與購買記錄高度",
@@ -119,6 +119,26 @@ describe("CustomerHistoryPanel resizable history", () => {
     expect(screen.queryByText("PO-300")).not.toBeInTheDocument();
     expect(screen.queryByText("Net 30")).not.toBeInTheDocument();
     expect(screen.getByText("白色絲帶")).toBeVisible();
+  });
+
+  it("uses a right-side inline column on landscape iPad without covering the order form", () => {
+    render(
+      <CustomerHistoryPanel
+        customer={customer}
+        onClose={vi.fn()}
+        inline
+      />,
+    );
+
+    const panel = screen.getByRole("complementary", { name: "客戶記錄面板" });
+    expect(panel).toHaveClass(
+      "order-last",
+      "sticky",
+      "w-[360px]",
+      "shrink-0",
+      "border-l",
+    );
+    expect(panel).not.toHaveClass("fixed", "left-0", "border-r", "shadow-2xl");
   });
 
   it("keeps different recipients at the same address as separate choices", () => {
