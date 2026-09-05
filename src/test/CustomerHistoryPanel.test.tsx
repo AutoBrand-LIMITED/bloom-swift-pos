@@ -80,7 +80,8 @@ describe("CustomerHistoryPanel resizable history", () => {
     );
 
     const panel = screen.getByRole("complementary", { name: "客戶記錄面板" });
-    expect(panel).toHaveClass("fixed", "inset-y-0", "left-0", "lg:sticky");
+    expect(panel).toHaveClass("fixed", "inset-y-0", "left-0", "shadow-2xl", "xl:sticky");
+    expect(panel).not.toHaveClass("lg:sticky");
 
     expect(screen.getByRole("separator", {
       name: "上下拖拉以調整客戶資料與購買記錄高度",

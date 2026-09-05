@@ -214,7 +214,7 @@ const CustomerHistoryPanel = ({
   return (
     <aside
       aria-label="客戶記錄面板"
-      className="fixed inset-y-0 left-0 z-50 flex h-dvh w-[360px] max-w-[85vw] shrink-0 flex-col overflow-hidden border-r border-border bg-card lg:sticky lg:top-[49px] lg:z-auto lg:h-[calc(100vh-49px)]"
+      className="fixed inset-y-0 left-0 z-50 flex h-dvh w-[360px] max-w-[88vw] shrink-0 flex-col overflow-hidden border-r border-border bg-card shadow-2xl xl:sticky xl:top-[49px] xl:z-auto xl:h-[calc(100vh-49px)] xl:shadow-none"
     >
       {/* Header */}
       <div className="p-3 border-b border-border flex items-center justify-between">
@@ -225,7 +225,7 @@ const CustomerHistoryPanel = ({
         <Button
           variant="ghost"
           size="icon"
-          className="h-11 w-11"
+          className="h-11 w-11 touch-manipulation"
           aria-label="關閉客戶記錄"
           title="關閉客戶記錄"
           onClick={onClose}

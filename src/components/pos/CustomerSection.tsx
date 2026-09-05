@@ -105,6 +105,7 @@ const CustomerSection = ({
 }: CustomerSectionProps) => {
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
   const [search, setSearch] = useState("");
+  const [customerCodeSearchDraft, setCustomerCodeSearchDraft] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [odooCustomers, setOdooCustomers] = useState<DemoCustomer[]>([]);
   const [customerAccount, setCustomerAccount] = useState<CustomerAccountLookup | null>(null);
@@ -130,7 +131,7 @@ const CustomerSection = ({
     || customerGroups.length === 0;
 
   useEffect(() => {
-    const handleOutsidePointerDown = (event: PointerEvent) => {
+    const handleOutsideClick = (event: MouseEvent) => {
       const target = event.target;
       if (
         target instanceof Element
@@ -140,9 +141,15 @@ const CustomerSection = ({
       }
       setActiveDropdown(null);
     };
-    document.addEventListener("pointerdown", handleOutsidePointerDown);
-    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown);
+    // A touch scroll starts with pointerdown. Waiting for click prevents iPad
+    // scrolling from being mistaken for an outside tap that closes the lookup.
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
+
+  useEffect(() => {
+    setCustomerCodeSearchDraft(selectedCustomer?.customerCode || customerCode || "");
+  }, [customerCode, selectedCustomer?.customerCode, selectedCustomer?.id]);
 
   // Keep only real imported/local customers here. Odoo results are merged below.
   const allCustomers = useMemo(() => {
@@ -440,6 +447,7 @@ const CustomerSection = ({
     const customer = { ...c };
     delete customer.recipientMatch;
     onCustomerSelect(customer);
+    setCustomerCodeSearchDraft(customer.customerCode || "");
     setActiveDropdown(null);
     setSearch("");
   };
@@ -453,6 +461,7 @@ const CustomerSection = ({
     const recipient = customer.recipientMatch;
     delete customer.recipientMatch;
     onCustomerAndRecipientSelect(customer, recipient);
+    setCustomerCodeSearchDraft(customer.customerCode || "");
     setActiveDropdown(null);
     setSearch("");
   };
@@ -556,7 +565,9 @@ const CustomerSection = ({
                 className="min-h-11 w-full touch-manipulation"
                 onClick={(event) => {
                   event.stopPropagation();
-                  onCustomerCodeChange(search.trim());
+                  const confirmedCode = search.trim();
+                  onCustomerCodeChange(confirmedCode);
+                  setCustomerCodeSearchDraft(confirmedCode);
                   setActiveDropdown(null);
                   setSearch("");
                   window.requestAnimationFrame(() => phoneInputRef.current?.focus());
@@ -588,6 +599,7 @@ const CustomerSection = ({
                 onClick={(event) => {
                   event.stopPropagation();
                   onStartNewCustomerUnderAccount?.(customerAccount.customerCode);
+                  setCustomerCodeSearchDraft(customerAccount.customerCode);
                   setActiveDropdown(null);
                   setSearch("");
                   window.requestAnimationFrame(() => phoneInputRef.current?.focus());
@@ -620,6 +632,7 @@ const CustomerSection = ({
                   onClick={(event) => {
                     event.stopPropagation();
                     setSearch(code);
+                    setCustomerCodeSearchDraft(code);
                     setCustomerAccount(null);
                     setOdooCustomers([]);
                     setCompletedOdooSearch(null);
@@ -764,12 +777,11 @@ const CustomerSection = ({
                 : "輸入 Customer ID 搜尋客戶"}
               value={isCustomerCodeEntry
                 ? customerCode
-                : activeDropdown === "customerCode"
-                  ? search
-                  : selectedCustomer?.customerCode || ""}
+                : customerCodeSearchDraft}
               onChange={(event) => {
+                const nextCustomerCode = event.target.value;
+                setCustomerCodeSearchDraft(nextCustomerCode);
                 if (isCustomerCodeEntry) {
-                  const nextCustomerCode = event.target.value;
                   onCustomerCodeChange(nextCustomerCode);
                   setSearch(nextCustomerCode);
                   setActiveDropdown("customerCode");
@@ -779,9 +791,11 @@ const CustomerSection = ({
                 setActiveDropdown("customerCode");
               }}
               onFocus={() => {
-                setSearch(isCustomerCodeEntry
+                const nextCustomerCode = isCustomerCodeEntry
                   ? customerCode
-                  : selectedCustomer?.customerCode || "");
+                  : selectedCustomer?.customerCode || customerCodeSearchDraft;
+                setCustomerCodeSearchDraft(nextCustomerCode);
+                setSearch(nextCustomerCode);
                 setActiveDropdown("customerCode");
               }}
               className="pl-9 font-mono text-base"

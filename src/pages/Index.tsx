@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef, type CSSProperties } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { AlertTriangle, Calculator, ClipboardList, HandCoins, LogOut, RotateCcw, UserRound } from "lucide-react";
@@ -115,7 +115,7 @@ import {
 } from "@/lib/checkout-validation";
 import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pricing";
 import { parseDeliveryAddress, type DeliveryAddressSelection } from "@/lib/hk-address";
-import { checkoutBarLeftOffset, mobileCheckoutBarClassName } from "@/lib/pos-layout";
+import { mobileCheckoutBarClassName } from "@/lib/pos-layout";
 import {
   loadCachedPaymentOptions,
   resolvePaymentReference,
@@ -235,7 +235,6 @@ const Index = () => {
     identityKey: "",
   });
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
-  const [customerHistoryOpen, setCustomerHistoryOpen] = useState(true);
   const [confirmedNewCustomerName, setConfirmedNewCustomerName] = useState<string | null>(null);
   const [confirmedNewCustomerPhone, setConfirmedNewCustomerPhone] = useState<string | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
@@ -2073,7 +2072,6 @@ const Index = () => {
           <CustomerHistoryDock
             key={selectedCustomer.id}
             customer={selectedCustomer}
-            onOpenChange={setCustomerHistoryOpen}
             onUseAddress={applyHistoryAddressSelection}
             addressTargetLabel={historyAddressTargetLabel}
           />
@@ -2587,9 +2585,6 @@ const Index = () => {
       {hasSalesperson && <div
         aria-label="流動版確認訂單列"
         className={mobileCheckoutBarClassName}
-        style={{
-          "--checkout-bar-left": checkoutBarLeftOffset(Boolean(selectedCustomer), customerHistoryOpen),
-        } as CSSProperties}
       >
         <div className="mx-auto flex max-w-3xl min-w-0 items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-4">
           <div className="min-w-0 text-right">

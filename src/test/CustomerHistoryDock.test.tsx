@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import CustomerHistoryDock from "@/components/pos/CustomerHistoryDock";
 import type { DemoCustomer } from "@/data/demo-customers";
@@ -25,8 +25,26 @@ const customer: DemoCustomer = {
   history: [],
 };
 
+const mockDesktopDock = (matches: boolean) => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+};
+
 describe("CustomerHistoryDock", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("closes the panel without losing the selected customer and reopens it from the left rail", () => {
+    mockDesktopDock(true);
     const onOpenChange = vi.fn();
     render(
       <CustomerHistoryDock
@@ -51,6 +69,7 @@ describe("CustomerHistoryDock", () => {
   });
 
   it("opens automatically for a different selected customer", () => {
+    mockDesktopDock(true);
     const { rerender } = render(<CustomerHistoryDock customer={customer} />);
     fireEvent.click(screen.getByRole("button", { name: "關閉客戶記錄" }));
 
@@ -63,15 +82,16 @@ describe("CustomerHistoryDock", () => {
     expect(screen.getByRole("region", { name: "May 客戶記錄面板" })).toBeVisible();
   });
 
-  it("keeps the collapsed dock in the 361px mobile flex layout without covering checkout", () => {
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 361 });
+  it("starts collapsed as a floating control on iPad without shrinking the order form", () => {
+    mockDesktopDock(false);
     render(<CustomerHistoryDock customer={customer} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "關閉客戶記錄" }));
-
     const dock = screen.getByRole("complementary", { name: "已摺疊的客戶記錄" });
-    expect(dock).toHaveClass("sticky", "w-14", "shrink-0");
-    expect(dock).not.toHaveClass("fixed", "inset-y-0", "z-50");
-    expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+    expect(dock).toHaveClass("fixed", "bottom-24", "left-3", "xl:sticky");
+    expect(dock).not.toHaveClass("w-14", "shrink-0");
+    expect(screen.queryByRole("region", { name: "Jay 客戶記錄面板" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "打開 Jay 客戶記錄" }));
+    expect(screen.getByRole("region", { name: "Jay 客戶記錄面板" })).toBeVisible();
   });
 });

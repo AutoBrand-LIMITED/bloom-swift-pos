@@ -345,7 +345,7 @@ describe("CustomerSection gift sender", () => {
     expect(screen.getByTestId("customer-resolution-panel")).toHaveTextContent(
       "搜尋結果唔係同一位聯絡人",
     );
-    fireEvent.pointerDown(screen.getByText(/輸入最少 2 個 Customer ID/));
+    fireEvent.click(screen.getByText(/輸入最少 2 個 Customer ID/));
     expect(screen.queryByText(/系統未有符合此電話及聯絡人名稱/)).not.toBeInTheDocument();
     const confirmButton = screen.getByRole("button", { name: "確認新增聯絡人" });
     expect(confirmButton).toHaveClass("min-h-11");
@@ -513,10 +513,72 @@ describe("CustomerSection gift sender", () => {
 
     expect(await screen.findByText("Oh Contact")).toBeVisible();
 
-    fireEvent.pointerDown(screen.getByText(/輸入最少 2 個 Customer ID/));
+    fireEvent.click(screen.getByText(/輸入最少 2 個 Customer ID/));
 
     expect(screen.queryByText("Oh Contact")).not.toBeInTheDocument();
     expect(selectCustomer).not.toHaveBeenCalled();
+  });
+
+  it("keeps the Customer ID draft while an iPad scroll starts outside the lookup", async () => {
+    searchOdooCustomerAccount.mockImplementation(() => new Promise(() => undefined));
+    searchOdooCustomers.mockImplementation(() => new Promise(() => undefined));
+    render(<CustomerLookupHarness />);
+
+    const input = screen.getByLabelText("Customer ID／客戶編號");
+    const outsideHelp = screen.getByText(/輸入最少 2 個 Customer ID/);
+    fireEvent.change(input, { target: { value: "CROWNEP" } });
+
+    expect(await screen.findByText("正在搜尋 Odoo 客戶及收件人...")).toBeVisible();
+    fireEvent.pointerDown(outsideHelp, { pointerType: "touch", clientY: 400 });
+    fireEvent.pointerMove(outsideHelp, { pointerType: "touch", clientY: 250 });
+    fireEvent.pointerCancel(outsideHelp, { pointerType: "touch" });
+
+    expect(input).toHaveValue("CROWNEP");
+    expect(screen.getByText("正在搜尋 Odoo 客戶及收件人...")).toBeVisible();
+
+    fireEvent.click(outsideHelp);
+    expect(screen.queryByText("正在搜尋 Odoo 客戶及收件人...")).not.toBeInTheDocument();
+    expect(input).toHaveValue("CROWNEP");
+  });
+
+  it("shows an edited Customer ID draft even when another customer is already selected", () => {
+    function SelectedCustomerHarness() {
+      return (
+        <CustomerSection
+          phone="67610707"
+          customerName="Jay"
+          customerCode="TESTING"
+          senderName="Jay"
+          customerType="personal"
+          companyName=""
+          {...emptyBusinessProps}
+          onPhoneChange={noop}
+          onNameChange={noop}
+          onCustomerCodeChange={noop}
+          onSenderNameChange={noop}
+          onCustomerTypeChange={noop}
+          onCompanyNameChange={noop}
+          onCustomerSelect={noop}
+          onCustomerAndRecipientSelect={noop}
+          selectedCustomer={{
+            id: "odoo-42",
+            odooPartnerId: 42,
+            name: "Jay",
+            phone: "67610707",
+            customerCode: "TESTING",
+            history: [],
+          }}
+        />
+      );
+    }
+
+    render(<SelectedCustomerHarness />);
+    const input = screen.getByLabelText("Customer ID／客戶編號");
+    expect(input).toHaveValue("TESTING");
+
+    fireEvent.change(input, { target: { value: "CROWNEP" } });
+
+    expect(input).toHaveValue("CROWNEP");
   });
 
   it("allows a different contact name to reuse an existing phone without selecting the old contact", async () => {
@@ -551,7 +613,7 @@ describe("CustomerSection gift sender", () => {
     });
 
     expect(await screen.findByText("Odoo timeout")).toBeInTheDocument();
-    fireEvent.pointerDown(screen.getByText(/輸入最少 2 個 Customer ID/));
+    fireEvent.click(screen.getByText(/輸入最少 2 個 Customer ID/));
     expect(screen.getByTestId("customer-resolution-panel")).toHaveTextContent(
       "未能完成當前客戶確認",
     );
