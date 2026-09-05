@@ -29,7 +29,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import {
   applyOdooOrderProductCorrection,
@@ -411,7 +410,7 @@ const OrderProductCorrectionDialog = ({
     <Dialog open={open} onOpenChange={(nextOpen) => {
       if (!submitting) onOpenChange(nextOpen);
     }}>
-      <DialogContent className="flex max-h-[92dvh] max-w-5xl flex-col overflow-hidden p-0">
+      <DialogContent className="flex h-[92dvh] max-h-[92dvh] max-w-5xl flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b px-5 pb-4 pt-5">
           <DialogTitle>修改訂單商品 · {order?.odooOrderName || order?.id || ""}</DialogTitle>
           <DialogDescription>
@@ -419,7 +418,11 @@ const OrderProductCorrectionDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="min-h-0 flex-1">
+        <div
+          role="region"
+          aria-label="商品修改內容"
+          className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+        >
           <div className="space-y-5 p-5">
             <section className="space-y-3 rounded-xl border bg-card p-4" aria-label="即時商品變動摘要">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -781,7 +784,7 @@ const OrderProductCorrectionDialog = ({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="shrink-0 border-t px-5 py-4 sm:items-center">
           <div className="mr-auto flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">

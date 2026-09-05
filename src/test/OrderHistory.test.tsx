@@ -271,6 +271,13 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(within(screen.getByRole("region", { name: "產品與價錢" }))
       .getByRole("button", { name: "修改商品／計算差額" }));
     expect(await screen.findByRole("heading", { name: "修改訂單商品 · S00017" })).toBeVisible();
+    expect(screen.getByRole("dialog")).toHaveClass("h-[92dvh]", "overflow-hidden");
+    expect(screen.getByRole("region", { name: "商品修改內容" })).toHaveClass(
+      "min-h-0",
+      "flex-1",
+      "touch-pan-y",
+      "overflow-y-auto",
+    );
     fireEvent.click(screen.getByRole("button", { name: "增加 花束 數量" }));
     expect(screen.getByText("多咗 HK$680.00，需要向客戶補收")).toBeVisible();
 
