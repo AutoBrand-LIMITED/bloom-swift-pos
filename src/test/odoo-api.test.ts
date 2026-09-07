@@ -815,6 +815,53 @@ describe("odoo-api note contracts", () => {
     );
   });
 
+  it("updates one selected Odoo contact by Partner ID", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      id: 42,
+      name: "Alice Updated",
+      email: "alice@example.com",
+      phone: null,
+      mobile: null,
+      history_count: null,
+      total_spent: null,
+      history: [],
+      tags: [],
+      customerType: "personal",
+      companyName: null,
+      billingAddress: "Central",
+      writeDate: "2026-09-08 10:01:00",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { updateOdooCustomerProfile } = await import("@/lib/odoo-api");
+
+    await expect(updateOdooCustomerProfile(42, {
+      name: "Alice Updated",
+      phone: "",
+      email: "alice@example.com",
+      billingAddress: "Central",
+      expectedWriteDate: "2026-09-08 10:00:00",
+    })).resolves.toMatchObject({
+      odooPartnerId: 42,
+      name: "Alice Updated",
+      phone: "",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/customers/42",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          name: "Alice Updated",
+          phone: "",
+          email: "alice@example.com",
+          billingAddress: "Central",
+          expectedWriteDate: "2026-09-08 10:00:00",
+        }),
+      }),
+    );
+  });
+
   it("raises a typed conflict error with the latest Odoo partner record", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const current = {

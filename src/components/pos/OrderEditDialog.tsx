@@ -265,8 +265,8 @@ const OrderEditDialog = ({
         setError("客戶名稱及送花人名稱不能留空。");
         return;
       }
-      if (!isValidPhoneNumber(form.phone)) {
-        setError("請輸入有效嘅下單人電話。");
+      if (form.phone.trim() && !isValidPhoneNumber(form.phone)) {
+        setError("請輸入有效嘅下單人電話，或者留空。");
         return;
       }
       if (!isValidEmailAddress(form.customerEmail)) {
@@ -528,7 +528,7 @@ const OrderEditDialog = ({
                 <h3 className="text-sm font-semibold">客戶資料</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="下單人／客戶名稱 *" value={form.customerName} onChange={(value) => setField("customerName", value)} />
-                  <Field label="下單人電話 *" value={form.phone} onChange={(value) => setField("phone", value)} />
+                  <Field label="下單人電話（選填）" value={form.phone} onChange={(value) => setField("phone", value)} />
                   <Field label="送花人名稱 *" value={form.senderName} onChange={(value) => setField("senderName", value)} />
                   <Field label="客戶電郵" value={form.customerEmail} onChange={(value) => setField("customerEmail", value)} type="email" />
                 </div>

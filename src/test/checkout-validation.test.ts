@@ -105,7 +105,6 @@ describe("checkout required-field validation", () => {
 
     expect(Object.keys(errors)).toEqual([
       "customerName",
-      "phone",
       "senderName",
       "recipientName",
       "recipientPhone",
@@ -233,6 +232,34 @@ describe("checkout required-field validation", () => {
       requiresCustomerResolution: true,
       confirmedNewCustomerName: validCheckout.customerName,
       confirmedNewCustomerPhone: "91234567",
+    })).toEqual({});
+  });
+
+  it("allows a no-phone contact only after explicit new-contact confirmation", () => {
+    expect(validateCheckout({
+      ...validCheckout,
+      phone: "",
+      requiresCustomerResolution: true,
+    }).phone).toBe("請選擇現有客戶，或確認新增冇電話聯絡人");
+
+    expect(validateCheckout({
+      ...validCheckout,
+      phone: "",
+      requiresCustomerResolution: true,
+      confirmedNewCustomerName: validCheckout.customerName,
+      confirmedNewCustomerPhone: "",
+    })).toEqual({});
+  });
+
+  it("keeps an explicitly selected Partner ID resolved while its editable fields change", () => {
+    expect(validateCheckout({
+      ...validCheckout,
+      phone: "",
+      customerName: "Updated Contact",
+      requiresCustomerResolution: true,
+      selectedCustomerId: 42,
+      selectedCustomerName: "Old Contact",
+      selectedCustomerPhone: "91234567",
     })).toEqual({});
   });
 

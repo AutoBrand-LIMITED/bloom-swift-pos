@@ -35,6 +35,7 @@ interface CheckoutValidationInput {
   billingAddress: string;
   allowLegacyMissingCompanyFields?: boolean;
   phone: string;
+  selectedCustomerId?: number;
   selectedCustomerName?: string;
   selectedCustomerPhone?: string;
   confirmedNewCustomerName?: string | null;
@@ -105,9 +106,7 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
   if (!isValidEmailAddress(input.customerEmail)) {
     errors.customerEmail = "請輸入有效電郵地址";
   }
-  if (!input.phone.trim()) {
-    errors.phone = "請輸入下單人電話";
-  } else if (!isValidPhoneNumber(input.phone)) {
+  if (input.phone.trim() && !isValidPhoneNumber(input.phone)) {
     errors.phone = "請輸入有效電話號碼";
   } else if (input.requiresCustomerResolution && !hasResolvedCustomer(input)) {
     const resolutionIsCurrent = input.customerResolution?.identityKey
@@ -120,7 +119,9 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
     } else if (resolutionIsCurrent && input.customerResolution?.phase === "error") {
       errors.phone = "客戶搜尋暫時失敗，請按重試完成確認後再下單";
     } else {
-      errors.phone = "請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人";
+      errors.phone = input.phone.trim()
+        ? "請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人"
+        : "請選擇現有客戶，或確認新增冇電話聯絡人";
     }
   }
   if (!input.senderName.trim()) errors.senderName = "請輸入送花人名稱";
@@ -162,6 +163,7 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
 
 function hasResolvedCustomer(input: CheckoutValidationInput): boolean {
   if (input.restoredPendingSubmission) return true;
+  if (input.selectedCustomerId) return true;
 
   const currentPhone = normalizePhoneNumber(input.phone);
   const currentName = normalizeCustomerIdentityName(input.customerName);
@@ -170,11 +172,13 @@ function hasResolvedCustomer(input: CheckoutValidationInput): boolean {
   const confirmedPhone = normalizePhoneNumber(input.confirmedNewCustomerPhone || "");
   const confirmedName = normalizeCustomerIdentityName(input.confirmedNewCustomerName || "");
 
-  return Boolean(
-    currentPhone && currentName
-      && (
-        (selectedPhone === currentPhone && selectedName === currentName)
-        || (confirmedPhone === currentPhone && confirmedName === currentName)
-      )
-  );
+  const hasExplicitNewCustomerConfirmation = input.confirmedNewCustomerPhone !== null
+    && input.confirmedNewCustomerPhone !== undefined
+    && confirmedPhone === currentPhone
+    && confirmedName === currentName;
+
+  return Boolean(currentName && (
+    (selectedPhone === currentPhone && selectedName === currentName)
+    || hasExplicitNewCustomerConfirmation
+  ));
 }

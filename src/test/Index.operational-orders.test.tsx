@@ -162,7 +162,7 @@ describe("Index operational-order hydration", () => {
 
     expect((await screen.findAllByText("Cross-tablet customer"))[0]).toBeVisible();
     fireEvent.click(screen.getByRole("button", {
-      name: "查看訂單 8c768e88-7de0-46e2-bc25-aea63e68df91",
+      name: "查看訂單 S00091",
     }));
     expect(screen.getByRole("button", { name: /重試訂單 .* Odoo 同步/ })).toBeVisible();
     expect(screen.queryByText(/已嘗試/)).not.toBeInTheDocument();

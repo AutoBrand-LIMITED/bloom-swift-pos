@@ -22,10 +22,12 @@ interface RegionalPhoneInputProps {
   compact?: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
   ariaLabel: string;
+  disabled?: boolean;
 }
 
 export default function RegionalPhoneInput({
   id, value, onChange, onFocus, invalid = false, inputClassName, compact = false, inputRef, ariaLabel,
+  disabled = false,
 }: RegionalPhoneInputProps) {
   const initialRegion = explicitPhoneRegion(value) || "HK";
   const [region, setRegion] = useState<PhoneRegion>(initialRegion);
@@ -88,6 +90,7 @@ export default function RegionalPhoneInput({
       <select
         aria-label="國家或地區區號"
         value={region}
+        disabled={disabled}
         onFocus={() => setShowAllRegions(true)}
         onBlur={() => setShowAllRegions(false)}
         onChange={(event) => updateRegion(event.target.value as PhoneRegion)}
@@ -108,6 +111,7 @@ export default function RegionalPhoneInput({
         id={id}
         aria-label={ariaLabel}
         aria-invalid={invalid}
+        disabled={disabled}
         inputMode="tel"
         autoComplete="tel-national"
         placeholder="輸入電話號碼"

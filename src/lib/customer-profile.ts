@@ -17,8 +17,8 @@ export interface CustomerResolutionState {
 export function customerResolutionIdentityKey(phone: string, name: string): string {
   const normalizedPhone = canonicalPhoneValue(phone);
   const normalizedName = name.trim().replace(/\s+/g, " ").toLocaleLowerCase();
-  return normalizedPhone && normalizedName
-    ? `${normalizedPhone}|${normalizedName}`
+  return normalizedName
+    ? `${normalizedPhone || "no-phone"}|${normalizedName}`
     : "";
 }
 

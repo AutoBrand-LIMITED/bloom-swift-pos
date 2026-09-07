@@ -333,6 +333,14 @@ export interface PartnerNoteUpdate {
   expectedWriteDate: string;
 }
 
+export interface CustomerProfileUpdate {
+  name: string;
+  phone: string;
+  email: string;
+  billingAddress: string;
+  expectedWriteDate: string;
+}
+
 export interface OrderNoteRecord {
   orderId: number;
   senderNote: string;
@@ -1441,6 +1449,39 @@ export async function getOdooCustomer(
   });
   if (!res.ok) {
     return throwApiError<DemoCustomer>(res, `Odoo customer lookup failed: ${res.status}`);
+  }
+  return mapOdooPartner((await res.json()) as OdooPartner);
+}
+
+export async function updateOdooCustomerProfile(
+  partnerId: number,
+  payload: CustomerProfileUpdate,
+  signal?: AbortSignal,
+): Promise<DemoCustomer> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(`${BACKEND_URL}/customers/${partnerId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!res.ok) {
+    try {
+      return await throwApiError<OdooPartner>(
+        res,
+        `Odoo customer update failed: ${res.status}`,
+      );
+    } catch (error) {
+      if (error instanceof OdooConflictError && error.latest) {
+        throw new OdooConflictError<DemoCustomer>(
+          error.message,
+          mapOdooPartner(error.latest as OdooPartner),
+        );
+      }
+      throw error;
+    }
   }
   return mapOdooPartner((await res.json()) as OdooPartner);
 }

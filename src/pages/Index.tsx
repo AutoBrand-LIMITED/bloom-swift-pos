@@ -92,6 +92,7 @@ import {
   hasOdooBackend,
   OdooConflictError,
   submitOdooOrder,
+  updateOdooCustomerProfile,
   updateOdooPartnerNotes,
   type AccountingPaymentOption,
   type DeliverySlot,
@@ -238,6 +239,9 @@ const Index = () => {
     identityKey: "",
   });
   const [selectedCustomer, setSelectedCustomer] = useState<DemoCustomer | null>(null);
+  const [editingSelectedCustomer, setEditingSelectedCustomer] = useState(false);
+  const [savingCustomerProfile, setSavingCustomerProfile] = useState(false);
+  const [customerProfileError, setCustomerProfileError] = useState<string | null>(null);
   const [confirmedNewCustomerName, setConfirmedNewCustomerName] = useState<string | null>(null);
   const [confirmedNewCustomerPhone, setConfirmedNewCustomerPhone] = useState<string | null>(null);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
@@ -658,26 +662,28 @@ const Index = () => {
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
   const customerResolutionComplete = !hasOdooBackend
     || Boolean(pendingSubmission)
+    || Boolean(selectedCustomer?.odooPartnerId)
     || (
       normalizePhoneNumber(selectedCustomer?.phone || "") === normalizePhoneNumber(phone)
       && normalizeCustomerIdentityName(selectedCustomer?.name || "")
         === normalizeCustomerIdentityName(customerName)
     )
     || (
-      normalizePhoneNumber(confirmedNewCustomerPhone || "") === normalizePhoneNumber(phone)
+      confirmedNewCustomerPhone !== null
+      && normalizePhoneNumber(confirmedNewCustomerPhone) === normalizePhoneNumber(phone)
       && normalizeCustomerIdentityName(confirmedNewCustomerName || "")
         === normalizeCustomerIdentityName(customerName)
     );
   const selectedSenderPartnerId = (
     selectedCustomer?.odooPartnerId
-    && normalizePhoneNumber(selectedCustomer.phone) === normalizePhoneNumber(phone)
+    && !editingSelectedCustomer
     && normalizeCustomerIdentityName(selectedCustomer.name)
       === normalizeCustomerIdentityName(senderName || customerName)
   ) ? selectedCustomer.odooPartnerId : undefined;
   const customerSectionComplete = Boolean(
     customerName.trim()
       && senderName.trim()
-      && isValidPhoneNumber(phone)
+      && (!phone.trim() || isValidPhoneNumber(phone))
       && isValidEmailAddress(customerEmail)
       && customerResolutionComplete
       && (customerType !== "company" || (companyName.trim() && billingAddress.trim())),
@@ -850,6 +856,8 @@ const Index = () => {
   const detachSelectedCustomerProfile = useCallback(() => {
     const emptyProfile = detachedCustomerProfile();
     setSelectedCustomer(null);
+    setEditingSelectedCustomer(false);
+    setCustomerProfileError(null);
     setCustomerCode("");
     setCustomerEmail(emptyProfile.customerEmail);
     setCustomerType(emptyProfile.customerType);
@@ -878,6 +886,8 @@ const Index = () => {
       ? customer.customerGroupId
       : undefined;
     setSelectedCustomer(customer);
+    setEditingSelectedCustomer(false);
+    setCustomerProfileError(null);
     setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
     setCustomerName(customer.name);
@@ -923,6 +933,8 @@ const Index = () => {
   const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
     const emptyProfile = detachedCustomerProfile();
     setSelectedCustomer(null);
+    setEditingSelectedCustomer(false);
+    setCustomerProfileError(null);
     setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
     setCustomerCode(accountCode);
@@ -941,6 +953,72 @@ const Index = () => {
     resetRecipientPersistence();
     clearCheckoutErrors("customerName", "phone", "companyName", "customerEmail", "billingAddress");
   }, [clearCheckoutErrors, resetRecipientPersistence]);
+
+  const restoreSelectedCustomerProfile = useCallback((customer: DemoCustomer) => {
+    setCustomerName(customer.name);
+    setPhone(customer.phone || "");
+    setCustomerEmail(customer.email || "");
+    setCustomerType(customer.customerType || "personal");
+    setCompanyName(customer.companyName || "");
+    setBillingAddress(customer.billingAddress || "");
+    setCustomerGroupExpectedWriteDate(customer.writeDate);
+    clearCheckoutErrors("customerName", "phone", "companyName", "customerEmail", "billingAddress");
+  }, [clearCheckoutErrors]);
+
+  const saveSelectedCustomerProfile = useCallback(async () => {
+    if (!selectedCustomer?.odooPartnerId || !selectedCustomer.writeDate) {
+      setCustomerProfileError("呢位聯絡人未有完整 Odoo 版本資料，請重新選擇後再試。");
+      return;
+    }
+    if (!customerName.trim()) {
+      setCustomerProfileError("聯絡人名稱不能留空。");
+      return;
+    }
+    if (phone.trim() && !isValidPhoneNumber(phone)) {
+      setCustomerProfileError("請輸入有效電話號碼，或者留空。");
+      return;
+    }
+    if (!isValidEmailAddress(customerEmail)) {
+      setCustomerProfileError("請輸入有效電郵地址，或者留空。");
+      return;
+    }
+
+    setSavingCustomerProfile(true);
+    setCustomerProfileError(null);
+    try {
+      const updated = await updateOdooCustomerProfile(selectedCustomer.odooPartnerId, {
+        name: customerName.trim(),
+        phone: phone.trim(),
+        email: customerEmail.trim(),
+        billingAddress: billingAddress.trim(),
+        expectedWriteDate: selectedCustomer.writeDate,
+      });
+      setSelectedCustomer(updated);
+      restoreSelectedCustomerProfile(updated);
+      setEditingSelectedCustomer(false);
+      setCustomerRefreshKey((key) => key + 1);
+      toast.success(`已更新 Odoo Contact #${updated.odooPartnerId}`);
+    } catch (error) {
+      if (error instanceof OdooConflictError && error.latest) {
+        const latest = error.latest as DemoCustomer;
+        setSelectedCustomer(latest);
+        restoreSelectedCustomerProfile(latest);
+        setEditingSelectedCustomer(false);
+        setCustomerProfileError("Odoo 資料已被其他人更新；已重新載入最新版本，請核對後再編輯。");
+        return;
+      }
+      setCustomerProfileError(error instanceof Error ? error.message : "未能更新 Odoo 聯絡人。");
+    } finally {
+      setSavingCustomerProfile(false);
+    }
+  }, [
+    billingAddress,
+    customerEmail,
+    customerName,
+    phone,
+    restoreSelectedCustomerProfile,
+    selectedCustomer,
+  ]);
 
   const applyRecipientSelection = useCallback((selection: RecipientSelectionDetails) => {
     const occasionState = recipientOccasionsStateFromSelection(selection);
@@ -1122,6 +1200,9 @@ const Index = () => {
     setTerms("");
     setCheckoutErrors({});
     setSelectedCustomer(null);
+    setEditingSelectedCustomer(false);
+    setSavingCustomerProfile(false);
+    setCustomerProfileError(null);
     setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
     setItems([]);
@@ -1556,6 +1637,11 @@ const Index = () => {
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    if (editingSelectedCustomer) {
+      toast.error("請先儲存或取消聯絡人編輯，再提交訂單。");
+      scrollToWorkflowSection("customer");
+      return;
+    }
     if (!hasOdooBackend && !allowLocalOnlyOrders) {
       showOrderSubmissionFailure();
       return;
@@ -1628,6 +1714,7 @@ const Index = () => {
           )
       ),
       phone,
+      selectedCustomerId: selectedCustomer?.odooPartnerId,
       selectedCustomerName: selectedCustomer?.name,
       selectedCustomerPhone: selectedCustomer?.phone,
       confirmedNewCustomerName,
@@ -2207,25 +2294,19 @@ const Index = () => {
             clearCheckoutErrors("phone");
             const normalizedPhone = normalizePhoneNumber(v);
             if (
-              confirmedNewCustomerPhone
+              confirmedNewCustomerPhone !== null
               && confirmedNewCustomerPhone !== normalizedPhone
             ) {
               setCustomerCode("");
             }
             setConfirmedNewCustomerPhone((current) => (
-              current && current !== normalizedPhone ? null : current
+              current !== null && current !== normalizedPhone ? null : current
             ));
             if (
-              confirmedNewCustomerPhone
+              confirmedNewCustomerPhone !== null
               && confirmedNewCustomerPhone !== normalizedPhone
             ) {
               setConfirmedNewCustomerName(null);
-            }
-            if (
-              selectedCustomer
-              && normalizedPhone !== normalizePhoneNumber(selectedCustomer.phone)
-            ) {
-              detachSelectedCustomerProfile();
             }
           }}
           onNameChange={(value) => {
@@ -2238,9 +2319,6 @@ const Index = () => {
             ) {
               setConfirmedNewCustomerName(null);
               setConfirmedNewCustomerPhone(null);
-            }
-            if (selectedCustomer && value !== selectedCustomer.name) {
-              detachSelectedCustomerProfile();
             }
           }}
           onCustomerCodeChange={setCustomerCode}
@@ -2281,6 +2359,20 @@ const Index = () => {
           customerEmailError={checkoutErrors.customerEmail}
           billingAddressError={checkoutErrors.billingAddress}
           selectedCustomer={selectedCustomer}
+          editingSelectedCustomer={editingSelectedCustomer}
+          customerProfileSaving={savingCustomerProfile}
+          customerProfileError={customerProfileError}
+          onStartCustomerEdit={() => {
+            setEditingSelectedCustomer(true);
+            setCustomerProfileError(null);
+          }}
+          onSaveCustomerEdit={() => { void saveSelectedCustomerProfile(); }}
+          onCancelCustomerEdit={() => {
+            if (selectedCustomer) restoreSelectedCustomerProfile(selectedCustomer);
+            setEditingSelectedCustomer(false);
+            setCustomerProfileError(null);
+          }}
+          onClearCustomerSelection={detachSelectedCustomerProfile}
           confirmedNewCustomerName={confirmedNewCustomerName}
           confirmedNewCustomerPhone={confirmedNewCustomerPhone}
           onConfirmNewCustomer={(normalizedPhone, confirmedName) => {

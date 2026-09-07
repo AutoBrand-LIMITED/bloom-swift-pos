@@ -10,9 +10,12 @@ import {
   LoaderCircle,
   Mail,
   MapPin,
+  Pencil,
   RefreshCw,
+  Save,
   User,
   UserRoundCheck,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DemoCustomer } from "@/data/demo-customers";
@@ -88,6 +91,13 @@ interface CustomerSectionProps {
   confirmedNewCustomerPhone?: string | null;
   onConfirmNewCustomer?: (normalizedPhone: string, normalizedName: string) => void;
   onResolutionStateChange?: (state: CustomerResolutionState) => void;
+  editingSelectedCustomer?: boolean;
+  customerProfileSaving?: boolean;
+  customerProfileError?: string | null;
+  onStartCustomerEdit?: () => void;
+  onSaveCustomerEdit?: () => void;
+  onCancelCustomerEdit?: () => void;
+  onClearCustomerSelection?: () => void;
   refreshKey?: number;
 }
 
@@ -101,7 +111,9 @@ const CustomerSection = ({
   phoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
   confirmedNewCustomerName, confirmedNewCustomerPhone, onConfirmNewCustomer,
-  onResolutionStateChange,
+  onResolutionStateChange, editingSelectedCustomer = false, customerProfileSaving = false,
+  customerProfileError, onStartCustomerEdit, onSaveCustomerEdit, onCancelCustomerEdit,
+  onClearCustomerSelection,
 }: CustomerSectionProps) => {
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
   const [search, setSearch] = useState("");
@@ -129,6 +141,12 @@ const CustomerSection = ({
     || customerGroupsLoading
     || Boolean(customerGroupsError)
     || customerGroups.length === 0;
+  const selectedOdooPartnerId = selectedCustomer?.odooPartnerId;
+  const selectedProfileLocked = Boolean(selectedOdooPartnerId && !editingSelectedCustomer);
+
+  useEffect(() => {
+    if (selectedOdooPartnerId) setActiveDropdown(null);
+  }, [editingSelectedCustomer, selectedOdooPartnerId]);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -347,15 +365,21 @@ const CustomerSection = ({
       && customerAccount.contactCount > 0,
   );
   const isNewCustomerConfirmed = Boolean(
-    normalizedCurrentPhone
-      && normalizedCurrentCustomerName
+    normalizedCurrentCustomerName
+      && confirmedNewCustomerPhone !== null
+      && confirmedNewCustomerPhone !== undefined
       && confirmedNewCustomerPhone === normalizedCurrentPhone
       && normalizeCustomerIdentityName(confirmedNewCustomerName || "") === normalizedCurrentCustomerName,
   );
   const selectedCustomerConfirmed = Boolean(
     selectedCustomer
-      && normalizePhoneNumber(selectedCustomer.phone) === normalizedCurrentPhone
-      && normalizeCustomerIdentityName(selectedCustomer.name) === normalizedCurrentCustomerName,
+      && (
+        selectedCustomer.odooPartnerId
+        || (
+          normalizePhoneNumber(selectedCustomer.phone) === normalizedCurrentPhone
+          && normalizeCustomerIdentityName(selectedCustomer.name) === normalizedCurrentCustomerName
+        )
+      ),
   );
   const currentIdentityKey = customerResolutionIdentityKey(phone, customerName);
   const queryForSource = (source: CustomerLookupSource) => {
@@ -393,7 +417,7 @@ const CustomerSection = ({
   let customerResolutionPhase: CustomerResolutionState["phase"] = "idle";
   if (!hasOdooBackend || selectedCustomerConfirmed || isNewCustomerConfirmed) {
     customerResolutionPhase = "confirmed";
-  } else if (currentIdentityKey && isValidPhoneNumber(phone)) {
+  } else if (currentIdentityKey && (!phone.trim() || isValidPhoneNumber(phone))) {
     if (activeLookupMatchesCurrentIdentity && activeDebouncedKey !== currentSearchKey) {
       customerResolutionPhase = "debouncing";
     } else if (activeLookupMatchesCurrentIdentity && odooLoading) {
@@ -510,7 +534,9 @@ const CustomerSection = ({
   const confirmNewCustomerAction = canConfirmNewCustomer && (
     <div className="space-y-2 border-t border-border bg-muted/20 p-3">
       <p className="text-xs leading-relaxed text-foreground">
-        搜尋結果唔係同一位聯絡人？可保留電話 {phone.trim()}，以「{customerName.trim()}」新增聯絡人。
+        {phone.trim()
+          ? `搜尋結果唔係同一位聯絡人？可保留電話 ${phone.trim()}，以「${customerName.trim()}」新增聯絡人。`
+          : `搜尋結果唔係同一位聯絡人？可以「${customerName.trim()}」建立冇電話聯絡人。`}
       </p>
       <Button
         type="button"
@@ -523,7 +549,7 @@ const CustomerSection = ({
           setSearch("");
         }}
       >
-        確認新增聯絡人
+        {phone.trim() ? "確認新增聯絡人" : "確認新增冇電話聯絡人"}
       </Button>
     </div>
   );
@@ -696,6 +722,8 @@ const CustomerSection = ({
         </h2>
         <div className="flex rounded-lg overflow-hidden border border-border">
           <button
+            type="button"
+            disabled={Boolean(selectedOdooPartnerId)}
             onClick={() => onCustomerTypeChange("personal")}
             className={`px-3 py-1 text-xs font-medium transition-colors ${
               customerType === "personal"
@@ -706,6 +734,8 @@ const CustomerSection = ({
             個人
           </button>
           <button
+            type="button"
+            disabled={Boolean(selectedOdooPartnerId)}
             onClick={() => onCustomerTypeChange("company")}
             className={`px-3 py-1 text-xs font-medium transition-colors ${
               customerType === "company"
@@ -718,6 +748,75 @@ const CustomerSection = ({
         </div>
       </div>
 
+      {selectedOdooPartnerId && (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50/70 p-3" data-testid="selected-customer-identity">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-emerald-900">已鎖定現有聯絡人</p>
+              <p className="mt-1 font-mono text-xs text-emerald-800">Odoo Contact #{selectedOdooPartnerId}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {editingSelectedCustomer ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="min-h-11 gap-2 touch-manipulation"
+                    disabled={customerProfileSaving}
+                    onClick={onSaveCustomerEdit}
+                    aria-label="儲存聯絡人"
+                  >
+                    {customerProfileSaving
+                      ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      : <Save className="h-4 w-4" aria-hidden="true" />}
+                    儲存
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="min-h-11 gap-2 touch-manipulation"
+                    disabled={customerProfileSaving}
+                    onClick={onCancelCustomerEdit}
+                    aria-label="取消編輯聯絡人"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" /> 取消
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="min-h-11 gap-2 touch-manipulation"
+                    onClick={onStartCustomerEdit}
+                    aria-label="編輯聯絡人"
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" /> 編輯聯絡人
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-11 touch-manipulation"
+                    onClick={onClearCustomerSelection}
+                  >
+                    選擇其他聯絡人
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-emerald-800">
+            姓名或電話更新只會修改呢個 Partner ID；購買紀錄唔會因電話改變而分拆。
+          </p>
+          {customerProfileError && (
+            <p role="alert" className="mt-2 text-xs text-destructive">{customerProfileError}</p>
+          )}
+        </div>
+      )}
+
       {/* Company billing identity */}
       {customerType === "company" && (
         <div className="grid grid-cols-1 gap-3 animate-in fade-in slide-in-from-top-2 duration-200 sm:grid-cols-2">
@@ -729,6 +828,7 @@ const CustomerSection = ({
               id="company-name"
               placeholder="輸入公司名稱"
               value={companyName}
+              disabled={Boolean(selectedOdooPartnerId)}
               onChange={(e) => onCompanyNameChange(e.target.value)}
               className={`text-base ${companyNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
               maxLength={200}
@@ -747,6 +847,7 @@ const CustomerSection = ({
               id="billing-address"
               placeholder="輸入公司帳單地址"
               value={billingAddress}
+              disabled={selectedProfileLocked}
               onChange={(event) => onBillingAddressChange(event.target.value)}
               className={`min-h-11 text-base ${billingAddressError ? "border-destructive ring-1 ring-destructive" : ""}`}
               maxLength={2000}
@@ -823,7 +924,7 @@ const CustomerSection = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5 relative">
             <Label htmlFor="phone" className="text-xs font-medium">
-              下單人電話 <span className="text-destructive">*</span>
+              下單人電話（選填）
             </Label>
             <div data-customer-lookup-interactive>
               <RegionalPhoneInput
@@ -831,12 +932,15 @@ const CustomerSection = ({
                 id="phone"
                 ariaLabel="下單人電話"
                 value={phone}
+                disabled={selectedProfileLocked || customerProfileSaving}
                 onChange={(nextPhone) => {
                   onPhoneChange(nextPhone);
+                  if (editingSelectedCustomer) return;
                   setSearch(nextPhone);
                   setActiveDropdown("phone");
                 }}
                 onFocus={() => {
+                  if (editingSelectedCustomer) return;
                   if (phone.trim()) {
                     setSearch(phone);
                     setActiveDropdown("phone");
@@ -866,16 +970,23 @@ const CustomerSection = ({
                 id="customer-name"
                 placeholder="選擇或輸入客戶名稱"
                 value={activeDropdown === "name" ? search : customerName}
+                disabled={selectedProfileLocked || customerProfileSaving}
                 onChange={(e) => {
+                  if (editingSelectedCustomer) {
+                    onNameChange(e.target.value);
+                    return;
+                  }
                   setSearch(e.target.value);
                   onNameChange(e.target.value);
                   setActiveDropdown("name");
                 }}
                 onFocus={() => {
+                  if (editingSelectedCustomer) return;
                   setSearch(customerName);
                   setActiveDropdown("name");
                 }}
                 onClick={() => {
+                  if (editingSelectedCustomer) return;
                   setActiveDropdown("name");
                 }}
                 className={`pr-10 text-base ${customerNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
@@ -886,6 +997,7 @@ const CustomerSection = ({
               <button
                 type="button"
                 aria-label="開啟客戶選單"
+                disabled={selectedProfileLocked || editingSelectedCustomer || customerProfileSaving}
                 className="absolute right-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -977,13 +1089,16 @@ const CustomerSection = ({
           inputMode="email"
           placeholder="例如：accounts@example.com"
           value={customerEmail}
+          disabled={selectedProfileLocked || customerProfileSaving}
           onChange={(event) => {
             const nextEmail = event.target.value;
             onCustomerEmailChange(nextEmail);
+            if (editingSelectedCustomer) return;
             setSearch(nextEmail);
             setActiveDropdown("email");
           }}
           onFocus={() => {
+            if (editingSelectedCustomer) return;
             setSearch(customerEmail);
             setActiveDropdown("email");
           }}

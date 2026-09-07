@@ -360,6 +360,20 @@ describe("CustomerSection gift sender", () => {
     expect(screen.queryByText(/系統未有符合此電話及聯絡人名稱/)).not.toBeInTheDocument();
   });
 
+  it("requires an explicit confirmation before creating a contact without a phone", async () => {
+    searchOdooCustomers.mockResolvedValue([]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText(/下單人／聯絡人/), {
+      target: { value: "No Phone Contact" },
+    });
+
+    const confirm = await screen.findByRole("button", { name: "確認新增冇電話聯絡人" });
+    fireEvent.click(confirm);
+
+    expect(screen.getByText(/已確認當前電話及聯絡人/)).toBeVisible();
+  });
+
   it("preserves an international country code when searching Odoo customers", async () => {
     searchOdooCustomers.mockResolvedValue([]);
     render(<CustomerLookupHarness />);
@@ -495,6 +509,92 @@ describe("CustomerSection gift sender", () => {
     expect(await screen.findByText(/提交訂單時會補填到已選客戶/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "確認新增聯絡人" })).not.toBeInTheDocument();
     expect(onConfirmNewCustomer).not.toHaveBeenCalled();
+  });
+
+  it("locks a selected Partner ID until the employee explicitly enters edit mode", () => {
+    const onStartCustomerEdit = vi.fn();
+    const onSaveCustomerEdit = vi.fn();
+    const onCancelCustomerEdit = vi.fn();
+    const onClearCustomerSelection = vi.fn();
+    const selectedCustomer: DemoCustomer = {
+      id: "odoo-42",
+      odooPartnerId: 42,
+      name: "Jay",
+      phone: "67610707",
+      email: "jay@example.com",
+      history: [],
+      writeDate: "2026-09-08 10:00:00",
+    };
+
+    const { rerender } = render(
+      <CustomerSection
+        phone="67610707"
+        customerName="Jay"
+        customerCode=""
+        senderName="Jay"
+        customerType="personal"
+        companyName=""
+        customerEmail="jay@example.com"
+        billingAddress=""
+        onPhoneChange={noop}
+        onNameChange={noop}
+        onCustomerCodeChange={noop}
+        onSenderNameChange={noop}
+        onCustomerTypeChange={noop}
+        onCompanyNameChange={noop}
+        onCustomerEmailChange={noop}
+        onBillingAddressChange={noop}
+        onCustomerSelect={noop}
+        onCustomerAndRecipientSelect={noop}
+        selectedCustomer={selectedCustomer}
+        editingSelectedCustomer={false}
+        onStartCustomerEdit={onStartCustomerEdit}
+        onSaveCustomerEdit={onSaveCustomerEdit}
+        onCancelCustomerEdit={onCancelCustomerEdit}
+        onClearCustomerSelection={onClearCustomerSelection}
+      />,
+    );
+
+    expect(screen.getByText("Odoo Contact #42")).toBeVisible();
+    expect(screen.getByLabelText(/下單人電話/)).toBeDisabled();
+    expect(screen.getByLabelText(/下單人／聯絡人/)).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "編輯聯絡人" }));
+    expect(onStartCustomerEdit).toHaveBeenCalledOnce();
+
+    rerender(
+      <CustomerSection
+        phone="67610707"
+        customerName="Jay"
+        customerCode=""
+        senderName="Jay"
+        customerType="personal"
+        companyName=""
+        customerEmail="jay@example.com"
+        billingAddress=""
+        onPhoneChange={noop}
+        onNameChange={noop}
+        onCustomerCodeChange={noop}
+        onSenderNameChange={noop}
+        onCustomerTypeChange={noop}
+        onCompanyNameChange={noop}
+        onCustomerEmailChange={noop}
+        onBillingAddressChange={noop}
+        onCustomerSelect={noop}
+        onCustomerAndRecipientSelect={noop}
+        selectedCustomer={selectedCustomer}
+        editingSelectedCustomer
+        onStartCustomerEdit={onStartCustomerEdit}
+        onSaveCustomerEdit={onSaveCustomerEdit}
+        onCancelCustomerEdit={onCancelCustomerEdit}
+        onClearCustomerSelection={onClearCustomerSelection}
+      />,
+    );
+
+    expect(screen.getByLabelText(/下單人電話/)).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "儲存聯絡人" }));
+    expect(onSaveCustomerEdit).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "取消編輯聯絡人" }));
+    expect(onCancelCustomerEdit).toHaveBeenCalledOnce();
   });
 
   it("closes customer suggestions when any non-dropdown form area is pressed", async () => {
