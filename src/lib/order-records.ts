@@ -146,6 +146,13 @@ export const mergeOrderRecords = (
   const unresolvedOperationalOrders = operationalOrders
     .filter((record) => record.syncState !== "synced")
     .map((record) => record.order);
+  const unresolvedOdooIdentityByLocalId = new Map<string, Order>();
+  for (const operationalOrder of unresolvedOperationalOrders) {
+    const remoteMatch = remoteOrders.find((remoteOrder) => (
+      ordersMatch(remoteOrder, operationalOrder)
+    ));
+    if (remoteMatch) unresolvedOdooIdentityByLocalId.set(operationalOrder.id, remoteMatch);
+  }
   const remoteByOdooId = new Set<number>();
   const remoteByOdooName = new Set<string>();
   const remoteByLocalId = new Set<string>();
@@ -177,7 +184,14 @@ export const mergeOrderRecords = (
   const operationalByOdooName = new Set<string>();
   const operational: OrderRecordView[] = [];
   for (const record of operationalOrders) {
-    const order = record.order;
+    const unresolvedOdooIdentity = unresolvedOdooIdentityByLocalId.get(record.order.id);
+    const order = unresolvedOdooIdentity
+      ? {
+          ...record.order,
+          odooOrderId: record.order.odooOrderId ?? unresolvedOdooIdentity.odooOrderId,
+          odooOrderName: record.order.odooOrderName ?? unresolvedOdooIdentity.odooOrderName,
+        }
+      : record.order;
     const remoteMatch = remoteByLocalId.has(order.id)
       || Boolean(order.odooOrderId && remoteByOdooId.has(order.odooOrderId))
       || Boolean(order.odooOrderName && remoteByOdooName.has(order.odooOrderName));

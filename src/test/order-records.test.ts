@@ -114,7 +114,7 @@ describe("order record sources", () => {
     const operational: OperationalOrderRecord = {
       operationalOrderId: "same-operational",
       operatorEmployeeId: 17,
-      order: { ...remoteDraft },
+      order: order("same-operational"),
       syncState: "needs_review",
       reviewError: "訂單需要管理員核對。",
       lastError: null,
@@ -126,8 +126,11 @@ describe("order record sources", () => {
     expect(mergeOrderRecords([remoteDraft], [], null, [operational])).toEqual([
       expect.objectContaining({
         id: "same-operational",
+        odooOrderId: 91,
+        odooOrderName: "S00091",
         source: "operational",
         syncState: "needs_review",
+        operationalReviewError: "訂單需要管理員核對。",
       }),
     ]);
   });
