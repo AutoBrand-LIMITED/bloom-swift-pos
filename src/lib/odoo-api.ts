@@ -972,7 +972,11 @@ export async function getOperationalOrderStatus(
   }
   const res = await authenticatedFetch(
     `${BACKEND_URL}/orders/operational/${encodeURIComponent(operationalOrderId)}`,
-    { headers: { "Content-Type": "application/json" }, signal },
+    {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      signal,
+    },
   );
   if (!res.ok) {
     return throwApiError(res, `Operational order status failed: ${res.status}`);
@@ -993,6 +997,7 @@ export async function getOperationalOrders(
     };
   }
   const res = await authenticatedFetch(`${BACKEND_URL}/orders/operational`, {
+    cache: "no-store",
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -1740,6 +1745,7 @@ export async function getOdooOrderRecords(
   if (date) params.set("date", date);
   const queryString = params.toString();
   const res = await authenticatedFetch(`${BACKEND_URL}/orders${queryString ? `?${queryString}` : ""}`, {
+    cache: "no-store",
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -1764,6 +1770,7 @@ export async function searchOdooOrderRecords(
   const params = new URLSearchParams({ q: trimmed });
   if (date) params.set("date", date);
   const res = await authenticatedFetch(`${BACKEND_URL}/orders?${params.toString()}`, {
+    cache: "no-store",
     headers: { "Content-Type": "application/json" },
     signal,
   });

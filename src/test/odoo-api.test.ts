@@ -94,7 +94,10 @@ describe("odoo-api note contracts", () => {
     await expect(getOperationalOrderStatus(status.operationalOrderId)).resolves.toEqual(status);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/orders/operational/order%20%2F%2042",
-      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+      expect.objectContaining({
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }),
     );
   });
 
@@ -128,7 +131,10 @@ describe("odoo-api note contracts", () => {
     await expect(getOperationalOrders()).resolves.toEqual(collection);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/orders/operational",
-      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+      expect.objectContaining({
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }),
     );
   });
 
@@ -1217,7 +1223,10 @@ describe("odoo-api note contracts", () => {
     await expect(getOdooOrderRecords("2026-07-19")).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/orders?date=2026-07-19",
-      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+      expect.objectContaining({
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }),
     );
   });
 
@@ -1235,7 +1244,10 @@ describe("odoo-api note contracts", () => {
     await expect(getOdooOrderRecords()).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/orders",
-      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+      expect.objectContaining({
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }),
     );
   });
 
@@ -1257,7 +1269,10 @@ describe("odoo-api note contracts", () => {
     )).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/orders?q=accounts%2Bhk%40example.com&date=2026-07-19",
-      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+      expect.objectContaining({
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }),
     );
   });
 
@@ -1275,7 +1290,10 @@ describe("odoo-api note contracts", () => {
     await expect(searchOdooOrderRecords("Wong")).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/orders?q=Wong",
-      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+      expect.objectContaining({
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }),
     );
   });
 
