@@ -91,6 +91,9 @@ describe("Index correlated order search", () => {
       date: "2026-08-26",
       generatedAt: "2026-08-26T09:00:00+08:00",
       truncated: false,
+      page: 1,
+      limit: 50,
+      hasMore: false,
       orders: [],
     });
     odooMocks.getOdooProductCategories.mockResolvedValue([]);
@@ -106,6 +109,7 @@ describe("Index correlated order search", () => {
     await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
       undefined,
       expect.any(AbortSignal),
+      { page: 1, limit: 50, status: "all" },
     ));
     expect(screen.getByText(/顯示最新訂單，按落單時間由新至舊排列/)).toBeVisible();
 
@@ -113,6 +117,7 @@ describe("Index correlated order search", () => {
     await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
       "2026-08-25",
       expect.any(AbortSignal),
+      { page: 1, limit: 50, status: "all" },
     ));
     expect(screen.getByText(/顯示 2026-08-25 的落單記錄/)).toBeVisible();
 
@@ -120,7 +125,57 @@ describe("Index correlated order search", () => {
     await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenLastCalledWith(
       undefined,
       expect.any(AbortSignal),
+      { page: 1, limit: 50, status: "all" },
     ));
+  });
+
+  it("loads the second 50-order page only after the user requests it", async () => {
+    const secondPage = deferredResponse();
+    odooMocks.getOdooOrderRecords.mockImplementation((
+      _date: string | undefined,
+      _signal: AbortSignal,
+      options: { page?: number } = {},
+    ) => {
+      if (options.page === 2) return secondPage.promise;
+      return Promise.resolve({
+        generatedAt: "2026-09-07T09:00:00+08:00",
+        truncated: true,
+        page: 1,
+        limit: 50,
+        hasMore: true,
+        orders: [orderFixture(50, "Page One")],
+      });
+    });
+
+    render(<MemoryRouter><Index /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: /訂單記錄/ }));
+
+    expect((await screen.findAllByText("Page One"))[0]).toBeVisible();
+    expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "下一頁" }));
+
+    await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
+      undefined,
+      expect.any(AbortSignal),
+      { page: 2, limit: 50, status: "all" },
+    ));
+    expect(screen.getAllByText("正在載入第 2 頁訂單...").length).toBeGreaterThan(0);
+
+    await act(async () => {
+      secondPage.resolve({
+        generatedAt: "2026-09-07T09:01:00+08:00",
+        truncated: false,
+        page: 2,
+        limit: 50,
+        hasMore: false,
+        orders: [orderFixture(49, "Page Two")],
+      });
+    });
+
+    expect((await screen.findAllByText("Page Two"))[0]).toBeVisible();
+    expect(screen.queryByText("Page One")).not.toBeInTheDocument();
+    expect(screen.getByText("第 2 頁 · 每頁最多 50 張訂單")).toBeVisible();
+    expect(screen.getByRole("button", { name: "下一頁" })).toBeDisabled();
   });
 
   it("correlates combined search by query and date and ignores the stale date response", async () => {
@@ -148,6 +203,7 @@ describe("Index correlated order search", () => {
         "Alpha",
         expect.any(AbortSignal),
         undefined,
+        { page: 1, limit: 50, status: "all" },
       ),
       { timeout: 1_000 },
     );
@@ -162,6 +218,7 @@ describe("Index correlated order search", () => {
         "Alpha",
         expect.any(AbortSignal),
         "2026-08-25",
+        { page: 1, limit: 50, status: "all" },
       ),
       { timeout: 1_000 },
     );
@@ -170,6 +227,9 @@ describe("Index correlated order search", () => {
       second.resolve({
         generatedAt: "2026-08-26T09:01:00+08:00",
         truncated: false,
+        page: 1,
+        limit: 50,
+        hasMore: false,
         orders: [orderFixture(22, "New Match")],
       });
     });
@@ -180,6 +240,9 @@ describe("Index correlated order search", () => {
       first.resolve({
         generatedAt: "2026-08-26T09:02:00+08:00",
         truncated: false,
+        page: 1,
+        limit: 50,
+        hasMore: false,
         orders: [orderFixture(21, "Old Match")],
       });
       await Promise.resolve();
@@ -192,6 +255,7 @@ describe("Index correlated order search", () => {
     await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
       "2026-08-25",
       expect.any(AbortSignal),
+      { page: 1, limit: 50, status: "all" },
     ));
   });
 
@@ -210,6 +274,7 @@ describe("Index correlated order search", () => {
     await waitFor(() => expect(odooMocks.getOdooOrderRecords).toHaveBeenCalledWith(
       undefined,
       expect.any(AbortSignal),
+      { page: 1, limit: 50, status: "all" },
     ));
 
     expect(screen.getAllByText("Local Today")[0]).toBeVisible();

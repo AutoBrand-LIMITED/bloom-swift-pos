@@ -133,10 +133,10 @@ describe("OrderHistory delivery summary", () => {
 
     render(<OrderHistory orders={orders} open onClose={vi.fn()} />);
 
-    expect(screen.getByText("訂單記錄 (20)")).toBeVisible();
+    expect(screen.getByText("訂單記錄 (本頁 20)")).toBeVisible();
     expect(screen.getByRole("main", { name: "訂單列表" })).toHaveClass("w-full");
     expect(screen.getByTestId("order-history-scroll-area")).toHaveClass("min-h-0", "flex-1");
-    expect(screen.getByRole("tab", { name: "全部訂單 20" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "全部訂單" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("訂單")).toBeVisible();
     expect(screen.getByText("落單時間")).toBeVisible();
     expect(screen.getByText("客戶")).toBeVisible();
@@ -177,9 +177,9 @@ describe("OrderHistory delivery summary", () => {
     expect(within(refundedRow).getByText("已退款")).toBeVisible();
     expect(within(refundedRow).queryByText("已付款")).not.toBeInTheDocument();
 
-    expect(screen.getByRole("tab", { name: "已付款 0" })).toBeVisible();
-    expect(screen.getByRole("tab", { name: "已取消 1" })).toBeVisible();
-    expect(screen.getByRole("tab", { name: "已退款 1" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "已付款" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "已取消" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "已退款" })).toBeVisible();
 
     fireEvent.click(cancelledRow);
     const detail = screen.getByTestId("order-history-detail-pane");
@@ -1441,7 +1441,7 @@ describe("OrderHistory delivery summary", () => {
       />,
     );
 
-    expect(screen.getByText("訂單記錄 (2)")).toBeVisible();
+    expect(screen.getByText("訂單記錄 (本頁 2)")).toBeVisible();
     expect(screen.queryByText(/Odoo 同步/)).not.toBeInTheDocument();
     expect(screen.queryByText(/已安全保存/)).not.toBeInTheDocument();
     expect(screen.queryByText(/已嘗試/)).not.toBeInTheDocument();
@@ -1454,8 +1454,9 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText("需主管處理")).toBeVisible();
   });
 
-  it("filters payment status without exposing a routine sync-status filter", () => {
+  it("filters the selected payment status and requests server-side status changes", () => {
     const onSearchQueryChange = vi.fn();
+    const onStatusFilterChange = vi.fn();
     const orders = [
       orderFixture({ id: "paid", odooOrderName: "S-PAID", paymentStatus: "paid" }),
       orderFixture({
@@ -1473,17 +1474,42 @@ describe("OrderHistory delivery summary", () => {
         onClose={vi.fn()}
         searchQuery="Wong"
         searchPhase="success"
+        statusFilter="unpaid"
+        onStatusFilterChange={onStatusFilterChange}
         onSearchQueryChange={onSearchQueryChange}
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "未付款 1" }));
     expect(screen.queryByRole("button", { name: "查看訂單 S-PAID" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查看訂單 pending" })).toBeInTheDocument();
-    expect(screen.getByText("訂單記錄 (1/2)")).toBeVisible();
+    expect(screen.getByText("訂單記錄 (本頁 1)")).toBeVisible();
+    fireEvent.click(screen.getByRole("tab", { name: "已付款" }));
+    expect(onStatusFilterChange).toHaveBeenCalledWith("paid");
     expect(screen.queryByLabelText("同步狀態篩選")).not.toBeInTheDocument();
     expect(screen.queryByText("全部同步狀態")).not.toBeInTheDocument();
     expect(onSearchQueryChange).not.toHaveBeenCalled();
+  });
+
+  it("loads order history one 50-order page at a time", () => {
+    const onPageChange = vi.fn();
+    render(
+      <OrderHistory
+        orders={[orderFixture()]}
+        open
+        onClose={vi.fn()}
+        page={2}
+        pageSize={50}
+        hasMore
+        onPageChange={onPageChange}
+      />,
+    );
+
+    expect(screen.getByText("第 2 頁 · 每頁最多 50 張訂單")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "上一頁" }));
+    fireEvent.click(screen.getByRole("button", { name: "下一頁" }));
+    expect(onPageChange).toHaveBeenNthCalledWith(1, 1);
+    expect(onPageChange).toHaveBeenNthCalledWith(2, 3);
+    expect(screen.queryByText(/目前只顯示最新 100 張訂單/)).not.toBeInTheDocument();
   });
 
   it("opens a full-page detail and provides a 44px back control", () => {

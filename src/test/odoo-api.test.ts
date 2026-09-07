@@ -1222,7 +1222,7 @@ describe("odoo-api note contracts", () => {
 
     await expect(getOdooOrderRecords("2026-07-19")).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://backend.test/orders?date=2026-07-19",
+      "https://backend.test/orders?date=2026-07-19&page=1&limit=50&status=all",
       expect.objectContaining({
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
@@ -1243,7 +1243,7 @@ describe("odoo-api note contracts", () => {
 
     await expect(getOdooOrderRecords()).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://backend.test/orders",
+      "https://backend.test/orders?page=1&limit=50&status=all",
       expect.objectContaining({
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
@@ -1268,7 +1268,7 @@ describe("odoo-api note contracts", () => {
       "2026-07-19",
     )).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://backend.test/orders?q=accounts%2Bhk%40example.com&date=2026-07-19",
+      "https://backend.test/orders?q=accounts%2Bhk%40example.com&date=2026-07-19&page=1&limit=50&status=all",
       expect.objectContaining({
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
@@ -1289,7 +1289,7 @@ describe("odoo-api note contracts", () => {
 
     await expect(searchOdooOrderRecords("Wong")).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://backend.test/orders?q=Wong",
+      "https://backend.test/orders?q=Wong&page=1&limit=50&status=all",
       expect.objectContaining({
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
@@ -1306,8 +1306,36 @@ describe("odoo-api note contracts", () => {
     await expect(searchOdooOrderRecords("A")).resolves.toEqual({
       generatedAt: "",
       truncated: false,
+      page: 1,
+      limit: 50,
+      hasMore: false,
       orders: [],
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("requests only the selected order page and status", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const response = {
+      generatedAt: "2026-09-07T00:00:00+08:00",
+      truncated: true,
+      page: 2,
+      limit: 50,
+      hasMore: true,
+      orders: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOdooOrderRecords } = await import("@/lib/odoo-api");
+
+    await expect(getOdooOrderRecords(undefined, undefined, {
+      page: 2,
+      limit: 50,
+      status: "paid",
+    })).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders?page=2&limit=50&status=paid",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 });

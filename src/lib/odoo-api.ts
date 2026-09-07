@@ -723,7 +723,24 @@ export interface OdooOrderRecordsResponse {
   date?: string;
   generatedAt: string;
   truncated: boolean;
+  page: number;
+  limit: number;
+  hasMore: boolean;
   orders: Order[];
+}
+
+export type OdooOrderStatusFilter =
+  | "all"
+  | "unpaid"
+  | "deposit"
+  | "paid"
+  | "cancelled"
+  | "refunded";
+
+export interface OdooOrderRecordsQuery {
+  page?: number;
+  limit?: number;
+  status?: OdooOrderStatusFilter;
 }
 
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
@@ -1736,13 +1753,25 @@ export async function getReceivableDetail(
 export async function getOdooOrderRecords(
   date?: string,
   signal?: AbortSignal,
+  { page = 1, limit = 50, status = "all" }: OdooOrderRecordsQuery = {},
 ): Promise<OdooOrderRecordsResponse> {
   if (!BACKEND_URL) {
-    return { ...(date ? { date } : {}), generatedAt: "", truncated: false, orders: [] };
+    return {
+      ...(date ? { date } : {}),
+      generatedAt: "",
+      truncated: false,
+      page,
+      limit,
+      hasMore: false,
+      orders: [],
+    };
   }
 
   const params = new URLSearchParams();
   if (date) params.set("date", date);
+  params.set("page", String(page));
+  params.set("limit", String(limit));
+  params.set("status", status);
   const queryString = params.toString();
   const res = await authenticatedFetch(`${BACKEND_URL}/orders${queryString ? `?${queryString}` : ""}`, {
     cache: "no-store",
@@ -1761,14 +1790,26 @@ export async function searchOdooOrderRecords(
   query: string,
   signal?: AbortSignal,
   date?: string,
+  { page = 1, limit = 50, status = "all" }: OdooOrderRecordsQuery = {},
 ): Promise<OdooOrderRecordsResponse> {
   const trimmed = query.trim();
   if (!BACKEND_URL || trimmed.length < 2) {
-    return { ...(date ? { date } : {}), generatedAt: "", truncated: false, orders: [] };
+    return {
+      ...(date ? { date } : {}),
+      generatedAt: "",
+      truncated: false,
+      page,
+      limit,
+      hasMore: false,
+      orders: [],
+    };
   }
 
   const params = new URLSearchParams({ q: trimmed });
   if (date) params.set("date", date);
+  params.set("page", String(page));
+  params.set("limit", String(limit));
+  params.set("status", status);
   const res = await authenticatedFetch(`${BACKEND_URL}/orders?${params.toString()}`, {
     cache: "no-store",
     headers: { "Content-Type": "application/json" },

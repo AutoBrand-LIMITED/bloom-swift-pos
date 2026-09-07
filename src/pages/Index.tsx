@@ -97,6 +97,7 @@ import {
   type DeliverySlot,
   type PartnerNoteRecord,
   type RecipientSuggestion,
+  type OdooOrderStatusFilter,
 } from "@/lib/odoo-api";
 import {
   DEMO_DELIVERY_SLOTS,
@@ -178,6 +179,8 @@ const orderCreatedOnHongKongDate = (
   return Number.isFinite(createdAt.getTime())
     && hongKongBusinessDate(createdAt) === businessDate;
 };
+
+const ORDER_HISTORY_PAGE_SIZE = 50;
 
 const Index = () => {
   const navigate = useNavigate();
@@ -341,8 +344,12 @@ const Index = () => {
   const [remoteOrders, setRemoteOrders] = useState<Order[]>([]);
   const [remoteOrdersQuery, setRemoteOrdersQuery] = useState("");
   const [remoteOrdersDate, setRemoteOrdersDate] = useState("");
+  const [remoteOrdersPage, setRemoteOrdersPage] = useState(1);
+  const [remoteOrdersStatus, setRemoteOrdersStatus] = useState<OdooOrderStatusFilter>("all");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [orderHistoryDate, setOrderHistoryDate] = useState("");
+  const [orderHistoryPage, setOrderHistoryPage] = useState(1);
+  const [orderHistoryStatus, setOrderHistoryStatus] = useState<OdooOrderStatusFilter>("all");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [debouncedOrderSearchQuery, setDebouncedOrderSearchQuery] = useState("");
   const [orderSearchPhase, setOrderSearchPhase] = useState<
@@ -351,10 +358,12 @@ const Index = () => {
   const orderSearchRequestRef = useRef(0);
   const orderSearchQueryRef = useRef("");
   const orderSearchDateRef = useRef(orderHistoryDate);
+  const orderSearchPageRef = useRef(orderHistoryPage);
+  const orderSearchStatusRef = useRef(orderHistoryStatus);
   const [orderRecordsLoading, setOrderRecordsLoading] = useState(false);
   const [orderRecordsLoaded, setOrderRecordsLoaded] = useState(!hasOdooBackend);
   const [orderRecordsError, setOrderRecordsError] = useState<string | null>(null);
-  const [orderRecordsTruncated, setOrderRecordsTruncated] = useState(false);
+  const [orderRecordsHasMore, setOrderRecordsHasMore] = useState(false);
   const [orderRecordsRefreshKey, setOrderRecordsRefreshKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const workflowHeaderRef = useRef<HTMLElement | null>(null);
@@ -368,14 +377,17 @@ const Index = () => {
 
   const normalizedOrderSearchQuery = orderSearchQuery.trim();
   const orderSearchActive = normalizedOrderSearchQuery.length >= 2;
+  orderSearchPageRef.current = orderHistoryPage;
+  orderSearchStatusRef.current = orderHistoryStatus;
   const visibleOrderRecords = useMemo(() => {
     if (normalizedOrderSearchQuery && !orderSearchActive) return [];
-    const matchingLocalOrders = localOrders
+    const includeLocalOrders = orderHistoryPage === 1;
+    const matchingLocalOrders = includeLocalOrders ? localOrders
       .filter((order) => orderCreatedOnHongKongDate(order, orderHistoryDate))
       .filter((order) => (
         !orderSearchActive || orderMatchesSearch(order, normalizedOrderSearchQuery)
-      ));
-    const matchingPendingOrder = employeePendingSubmission?.order
+      )) : [];
+    const matchingPendingOrder = includeLocalOrders && employeePendingSubmission?.order
       && orderCreatedOnHongKongDate(employeePendingSubmission.order, orderHistoryDate)
       && (!orderSearchActive
         || orderMatchesSearch(employeePendingSubmission.order, normalizedOrderSearchQuery))
@@ -383,13 +395,15 @@ const Index = () => {
       : undefined;
     const matchingRemoteOrders = remoteOrdersQuery === normalizedOrderSearchQuery
       && remoteOrdersDate === orderHistoryDate
+      && remoteOrdersPage === orderHistoryPage
+      && remoteOrdersStatus === orderHistoryStatus
       ? remoteOrders
       : [];
-    const matchingOperationalOrders = operationalOrders
+    const matchingOperationalOrders = includeLocalOrders ? operationalOrders
       .filter((record) => orderCreatedOnHongKongDate(record.order, orderHistoryDate))
       .filter((record) => (
         !orderSearchActive || orderMatchesSearch(record.order, normalizedOrderSearchQuery)
-      ));
+      )) : [];
     return mergeOrderRecords(
       matchingRemoteOrders,
       matchingLocalOrders,
@@ -402,10 +416,14 @@ const Index = () => {
     normalizedOrderSearchQuery,
     orderSearchActive,
     orderHistoryDate,
+    orderHistoryPage,
+    orderHistoryStatus,
     operationalOrders,
     remoteOrders,
     remoteOrdersDate,
+    remoteOrdersPage,
     remoteOrdersQuery,
+    remoteOrdersStatus,
   ]);
 
   const handleOperationalOrderRetry = useCallback(async (operationalOrderId: string) => {
@@ -518,7 +536,7 @@ const Index = () => {
       setOrderRecordsLoading(false);
       setOrderRecordsLoaded(true);
       setOrderRecordsError(null);
-      setOrderRecordsTruncated(false);
+      setOrderRecordsHasMore(false);
       return;
     }
     const controller = new AbortController();
@@ -526,13 +544,24 @@ const Index = () => {
     orderSearchRequestRef.current = requestId;
     const requestQuery = debouncedOrderSearchQuery;
     const requestDate = orderHistoryDate;
+    const requestPage = orderHistoryPage;
+    const requestStatus = orderHistoryStatus;
     setOrderRecordsLoading(true);
     setOrderRecordsError(null);
     if (requestQuery.length >= 2) setOrderSearchPhase("searching");
 
     const request = debouncedOrderSearchQuery.length >= 2
-      ? searchOdooOrderRecords(debouncedOrderSearchQuery, controller.signal, requestDate || undefined)
-      : getOdooOrderRecords(requestDate || undefined, controller.signal);
+      ? searchOdooOrderRecords(
+          debouncedOrderSearchQuery,
+          controller.signal,
+          requestDate || undefined,
+          { page: requestPage, limit: ORDER_HISTORY_PAGE_SIZE, status: requestStatus },
+        )
+      : getOdooOrderRecords(
+          requestDate || undefined,
+          controller.signal,
+          { page: requestPage, limit: ORDER_HISTORY_PAGE_SIZE, status: requestStatus },
+        );
 
     request
       .then((response) => {
@@ -541,9 +570,13 @@ const Index = () => {
           || orderSearchRequestRef.current !== requestId
           || orderSearchQueryRef.current !== requestQuery
           || orderSearchDateRef.current !== requestDate
+          || orderSearchPageRef.current !== requestPage
+          || orderSearchStatusRef.current !== requestStatus
         ) return;
         setRemoteOrdersQuery(requestQuery);
         setRemoteOrdersDate(requestDate);
+        setRemoteOrdersPage(requestPage);
+        setRemoteOrdersStatus(requestStatus);
         setRemoteOrders(response.orders);
         if (employee?.id !== undefined) {
           setOperationalOrders((current) => {
@@ -578,7 +611,7 @@ const Index = () => {
           saveUnsyncedOrders(remaining);
           return remaining;
         });
-        setOrderRecordsTruncated(response.truncated);
+        setOrderRecordsHasMore(response.hasMore ?? response.truncated);
         setOrderRecordsLoaded(true);
         if (requestQuery.length >= 2) setOrderSearchPhase("success");
       })
@@ -588,6 +621,8 @@ const Index = () => {
           || orderSearchRequestRef.current !== requestId
           || orderSearchQueryRef.current !== requestQuery
           || orderSearchDateRef.current !== requestDate
+          || orderSearchPageRef.current !== requestPage
+          || orderSearchStatusRef.current !== requestStatus
         ) return;
         setOrderRecordsError(error instanceof Error ? error.message : "未能載入 Odoo 訂單記錄");
         if (requestQuery.length >= 2) setOrderSearchPhase("error");
@@ -598,6 +633,8 @@ const Index = () => {
           && orderSearchRequestRef.current === requestId
           && orderSearchQueryRef.current === requestQuery
           && orderSearchDateRef.current === requestDate
+          && orderSearchPageRef.current === requestPage
+          && orderSearchStatusRef.current === requestStatus
         ) setOrderRecordsLoading(false);
       });
 
@@ -608,6 +645,8 @@ const Index = () => {
     employee?.role,
     historyOpen,
     orderHistoryDate,
+    orderHistoryPage,
+    orderHistoryStatus,
     orderRecordsRefreshKey,
   ]);
 
@@ -2610,14 +2649,34 @@ const Index = () => {
         selectedDate={orderHistoryDate}
         onSelectedDateChange={(value) => {
           setOrderHistoryDate(value);
+          setOrderHistoryPage(1);
           setOrderRecordsError(null);
-          setOrderRecordsTruncated(false);
+          setOrderRecordsHasMore(false);
         }}
         searchQuery={orderSearchQuery}
         onSearchQueryChange={(value) => {
           setOrderSearchQuery(value);
+          setOrderHistoryPage(1);
           setOrderRecordsError(null);
-          setOrderRecordsTruncated(false);
+          setOrderRecordsHasMore(false);
+        }}
+        page={orderHistoryPage}
+        pageSize={ORDER_HISTORY_PAGE_SIZE}
+        hasMore={remoteOrdersQuery === normalizedOrderSearchQuery
+          && remoteOrdersDate === orderHistoryDate
+          && remoteOrdersPage === orderHistoryPage
+          && remoteOrdersStatus === orderHistoryStatus
+          && orderRecordsHasMore}
+        statusFilter={orderHistoryStatus}
+        onPageChange={(page) => {
+          setOrderHistoryPage(page);
+          setOrderRecordsError(null);
+        }}
+        onStatusFilterChange={(status) => {
+          setOrderHistoryStatus(status);
+          setOrderHistoryPage(1);
+          setOrderRecordsHasMore(false);
+          setOrderRecordsError(null);
         }}
         loading={orderRecordsLoading}
         loaded={orderRecordsLoaded}
@@ -2627,8 +2686,9 @@ const Index = () => {
           && Boolean(orderRecordsError)
           && remoteOrders.length > 0
           && remoteOrdersDate === orderHistoryDate
-          && remoteOrdersQuery === normalizedOrderSearchQuery}
-        truncated={orderRecordsTruncated}
+          && remoteOrdersQuery === normalizedOrderSearchQuery
+          && remoteOrdersPage === orderHistoryPage
+          && remoteOrdersStatus === orderHistoryStatus}
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onStartReplacement={handleStartReplacement}

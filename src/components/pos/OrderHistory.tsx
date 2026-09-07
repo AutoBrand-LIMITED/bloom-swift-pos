@@ -5,6 +5,8 @@ import {
   Banknote,
   Ban,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Clock3,
   LoaderCircle,
@@ -47,6 +49,7 @@ import {
 import {
   cancelOdooOrder,
   getOdooOrderEditHistory,
+  type OdooOrderStatusFilter,
   type OdooOrderEditHistory,
 } from "@/lib/odoo-api";
 import type { OrderRecordView } from "@/lib/order-records";
@@ -68,7 +71,12 @@ interface OrderHistoryProps {
   searchPhase?: "idle" | "too_short" | "debouncing" | "searching" | "success" | "error";
   error?: string | null;
   stale?: boolean;
-  truncated?: boolean;
+  page?: number;
+  pageSize?: number;
+  hasMore?: boolean;
+  statusFilter?: OdooOrderStatusFilter;
+  onPageChange?: (page: number) => void;
+  onStatusFilterChange?: (status: OdooOrderStatusFilter) => void;
   onRetry?: () => void;
   onOrderUpdated?: () => void;
   onStartReplacement?: (
@@ -82,7 +90,7 @@ interface OrderHistoryProps {
 }
 
 type OrderStatus = PaymentStatus | "cancelled" | "refunded";
-type OrderStatusFilter = "all" | OrderStatus;
+export type OrderStatusFilter = OdooOrderStatusFilter;
 
 const statusBadge: Record<OrderStatus, { label: string; variant: "destructive" | "default" | "secondary" }> = {
   unpaid: { label: "未付款", variant: "destructive" },
@@ -834,7 +842,12 @@ const OrderHistory = ({
   searchPhase = "idle",
   error,
   stale = false,
-  truncated = false,
+  page = 1,
+  pageSize = 50,
+  hasMore = false,
+  statusFilter = "all",
+  onPageChange,
+  onStatusFilterChange,
   onRetry,
   onOrderUpdated,
   onStartReplacement,
@@ -849,7 +862,6 @@ const OrderHistory = ({
   } | null>(null);
   const [productEditingOrder, setProductEditingOrder] = useState<OrderRecordView | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>("all");
   const [history, setHistory] = useState<OdooOrderEditHistory | null>(null);
   const [historyStatus, setHistoryStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -864,8 +876,8 @@ const OrderHistory = ({
   const [cancellationError, setCancellationError] = useState<string | null>(null);
 
   const filteredOrders = useMemo(() => orders.filter((order) => (
-    orderStatusFilter === "all" || effectiveOrderStatus(order) === orderStatusFilter
-  )), [orders, orderStatusFilter]);
+    statusFilter === "all" || effectiveOrderStatus(order) === statusFilter
+  )), [orders, statusFilter]);
   const selectedOrder = selectedOrderId
     ? orders.find((order) => order.id === selectedOrderId) || null
     : null;
@@ -931,15 +943,14 @@ const OrderHistory = ({
   const searchSettled = searchActive && searchPhase === "success";
   const showOrderCount = !searchActive || searchSettled;
   const selectedDateLabel = selectedDate || "全部日期";
-  const filtersActive = orderStatusFilter !== "all";
-  const countLabel = filtersActive ? `${filteredOrders.length}/${orders.length}` : String(orders.length);
-  const orderStatusTabs: Array<{ value: OrderStatusFilter; label: string; count: number }> = [
-    { value: "all", label: "全部訂單", count: orders.length },
-    { value: "unpaid", label: "未付款", count: orders.filter((order) => effectiveOrderStatus(order) === "unpaid").length },
-    { value: "deposit", label: "已付訂金", count: orders.filter((order) => effectiveOrderStatus(order) === "deposit").length },
-    { value: "paid", label: "已付款", count: orders.filter((order) => effectiveOrderStatus(order) === "paid").length },
-    { value: "cancelled", label: "已取消", count: orders.filter((order) => effectiveOrderStatus(order) === "cancelled").length },
-    { value: "refunded", label: "已退款", count: orders.filter((order) => effectiveOrderStatus(order) === "refunded").length },
+  const countLabel = `本頁 ${filteredOrders.length}`;
+  const orderStatusTabs: Array<{ value: OrderStatusFilter; label: string }> = [
+    { value: "all", label: "全部訂單" },
+    { value: "unpaid", label: "未付款" },
+    { value: "deposit", label: "已付訂金" },
+    { value: "paid", label: "已付款" },
+    { value: "cancelled", label: "已取消" },
+    { value: "refunded", label: "已退款" },
   ];
 
   const openOrder = (order: OrderRecordView) => {
@@ -1015,7 +1026,11 @@ const OrderHistory = ({
     }
   };
 
-  const listContent = searchActive && !searchSettled ? (
+  const listContent = loading && orders.length === 0 ? (
+    <p aria-live="polite" className="flex items-center justify-center gap-2 p-8 text-center text-muted-foreground">
+      <LoaderCircle className="h-4 w-4 animate-spin" /> 正在載入第 {page} 頁訂單...
+    </p>
+  ) : searchActive && !searchSettled ? (
     searchPhase === "error" ? null : (
       <p aria-live="polite" className="p-8 text-center text-muted-foreground">
         {searchPhase === "debouncing"
@@ -1178,15 +1193,15 @@ const OrderHistory = ({
                       key={tab.value}
                       type="button"
                       role="tab"
-                      aria-selected={orderStatusFilter === tab.value}
+                      aria-selected={statusFilter === tab.value}
                       className={`min-h-11 shrink-0 touch-manipulation border-b-2 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                        orderStatusFilter === tab.value
+                        statusFilter === tab.value
                           ? "border-primary text-foreground"
                           : "border-transparent text-muted-foreground active:bg-muted/70"
                       }`}
-                      onClick={() => setOrderStatusFilter(tab.value)}
+                      onClick={() => onStatusFilterChange?.(tab.value)}
                     >
-                      {tab.label} <span className="ml-1 text-xs">{tab.count}</span>
+                      {tab.label}
                     </button>
                   ))}
                 </div>
@@ -1276,7 +1291,7 @@ const OrderHistory = ({
                   </p>
                 </section>
 
-          {(loading || error || truncated) && (
+          {(loading || error) && (
                   <section className="space-y-2 rounded-xl border border-border bg-card p-3 shadow-sm" aria-label="訂單資料狀態">
               {loading && (
                 <p aria-live="polite" className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -1287,7 +1302,7 @@ const OrderHistory = ({
                       : "正在 Odoo 跨日期搜尋訂單"
                     : selectedDate
                       ? `正在從 Odoo 載入 ${selectedDateLabel} 的落單記錄`
-                      : "正在從 Odoo 載入最新訂單"}
+                      : `正在從 Odoo 載入第 ${page} 頁訂單`}
                 </p>
               )}
               {error && (
@@ -1307,19 +1322,40 @@ const OrderHistory = ({
                   )}
                 </div>
               )}
-              {truncated && (
-                <p className="text-xs text-amber-700">
-                  {searchActive
-                    ? "搜尋結果超過顯示上限，請輸入更完整資料收窄結果。"
-                    : selectedDate
-                      ? "當日訂單超過顯示上限，完整記錄請到 Odoo 查看。"
-                      : "目前只顯示最新 100 張訂單；可用搜尋或日期篩選收窄結果。"}
-                </p>
-              )}
                   </section>
           )}
 
                 {listContent}
+                {(page > 1 || hasMore) && (
+                  <nav
+                    className="flex flex-col items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm sm:flex-row"
+                    aria-label="訂單分頁"
+                  >
+                    <p className="text-sm text-muted-foreground">
+                      第 {page} 頁 · 每頁最多 {pageSize} 張訂單
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-11 gap-1 touch-manipulation"
+                        disabled={page <= 1 || loading}
+                        onClick={() => onPageChange?.(Math.max(1, page - 1))}
+                      >
+                        <ChevronLeft className="h-4 w-4" /> 上一頁
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-11 gap-1 touch-manipulation"
+                        disabled={!hasMore || loading}
+                        onClick={() => onPageChange?.(page + 1)}
+                      >
+                        下一頁 <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </nav>
+                )}
               </div>
           </ScrollArea>
           </main>
