@@ -20,6 +20,7 @@ export interface DemoCustomer {
   customerGroup?: string;
   commentText?: string;
   tags?: CustomerTag[];
+  createDate?: string;
   writeDate?: string;
   recipientMatch?: RecipientSearchMatch;
 }

@@ -35,6 +35,18 @@ const sameContact = (left: DemoCustomer, right: DemoCustomer) => (
     : left.id === right.id
 );
 
+const contactKey = (contact: DemoCustomer) => String(contact.odooPartnerId ?? contact.id);
+
+const parseOdooDate = (value?: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(trimmed)
+    ? `${trimmed.replace(" ", "T")}Z`
+    : trimmed;
+  const timestamp = Date.parse(normalized);
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
 const CustomerContactChooserDialog = ({
   open,
   customer,
@@ -102,6 +114,27 @@ const CustomerContactChooserDialog = ({
   }, [lookup.contacts, query]);
 
   const alternativeCount = lookup.contacts.filter((contact) => !sameContact(contact, customer)).length;
+  const latestContactKey = useMemo(() => {
+    const datedContacts = lookup.contacts.flatMap((contact) => {
+      const timestamp = parseOdooDate(contact.createDate);
+      return timestamp === null ? [] : [{ contact, timestamp }];
+    });
+    if (datedContacts.length < 2 || datedContacts.length !== lookup.contacts.length) return null;
+
+    const latest = datedContacts.reduce((currentLatest, candidate) => {
+      if (candidate.timestamp !== currentLatest.timestamp) {
+        return candidate.timestamp > currentLatest.timestamp ? candidate : currentLatest;
+      }
+      return contactKey(candidate.contact).localeCompare(
+        contactKey(currentLatest.contact),
+        undefined,
+        { numeric: true },
+      ) > 0
+        ? candidate
+        : currentLatest;
+    });
+    return contactKey(latest.contact);
+  }, [lookup.contacts]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -160,6 +193,7 @@ const CustomerContactChooserDialog = ({
               <div className="divide-y divide-border">
                 {visibleContacts.map((contact) => {
                   const current = sameContact(contact, customer);
+                  const latest = latestContactKey === contactKey(contact);
                   return (
                     <button
                       key={contact.odooPartnerId ?? contact.id}
@@ -173,7 +207,14 @@ const CustomerContactChooserDialog = ({
                       }}
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block break-words text-sm font-semibold">{contact.name}</span>
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="break-words text-sm font-semibold">{contact.name}</span>
+                          {latest && (
+                            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+                              最新
+                            </span>
+                          )}
+                        </span>
                         <span className="mt-0.5 block break-all font-mono text-xs text-muted-foreground">
                           {contact.phone || "沒有電話"}
                         </span>

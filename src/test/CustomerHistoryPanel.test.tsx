@@ -165,6 +165,7 @@ describe("CustomerHistoryPanel resizable history", () => {
         { id: 1, name: "VIP", managed: true },
         { id: 2, name: "Special Handling", managed: true },
       ],
+      createDate: "2024-05-12 03:15:00",
       writeDate: "2026-09-08 10:00:00",
     };
     const alternativeCustomer: DemoCustomer = {
@@ -174,6 +175,7 @@ describe("CustomerHistoryPanel resizable history", () => {
       name: "May Chan",
       phone: "61234567",
       email: "may@example.com",
+      createDate: "2026-09-08 03:15:00",
     };
     odooApiMocks.getOdooCustomerHistory.mockResolvedValue({
       history: profileCustomer.history,
@@ -261,10 +263,20 @@ describe("CustomerHistoryPanel resizable history", () => {
 
     expect(await screen.findByRole("dialog", { name: "選擇其他聯絡人" })).toBeVisible();
     expect(document.querySelector('aside[aria-label="客戶記錄面板"]')).toBeInTheDocument();
-    expect(screen.getByRole("button", {
+    const currentContactButton = screen.getByRole("button", {
       name: "Alexandra Very Long Customer Name 目前聯絡人",
-    })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "選擇聯絡人 May Chan" })).toBeVisible();
+    });
+    const latestContactButton = screen.getByRole("button", { name: "選擇聯絡人 May Chan" });
+    expect(currentContactButton).toBeDisabled();
+    expect(currentContactButton).not.toHaveTextContent("最新");
+    expect(latestContactButton).toBeVisible();
+    expect(latestContactButton).toHaveTextContent("最新");
+    expect(screen.getAllByText("最新")).toHaveLength(1);
+    expect(screen.queryByText("2024-05-12")).not.toBeInTheDocument();
+    expect(screen.queryByText("2026-09-08")).not.toBeInTheDocument();
+    expect(screen.queryByText("較早")).not.toBeInTheDocument();
+    expect(screen.queryByText("較新")).not.toBeInTheDocument();
+    expect(screen.queryByText("建立時間")).not.toBeInTheDocument();
     expect(onContactSelect).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "取消" }));

@@ -51,6 +51,7 @@ interface OdooPartner {
   history: OdooPurchaseRecord[];
   commentText?: string;
   tags?: CustomerTag[];
+  createDate?: string | null;
   writeDate?: string | null;
 }
 
@@ -1440,6 +1441,7 @@ function mapOdooPartner(p: OdooPartner): DemoCustomer {
     totalSpent: p.total_spent ?? undefined,
     commentText: p.commentText || "",
     tags,
+    createDate: p.createDate || undefined,
     writeDate: p.writeDate || undefined,
     recipientMatch: p.recipientMatch
       ? {

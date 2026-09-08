@@ -776,6 +776,7 @@ describe("odoo-api note contracts", () => {
         email: "alice@example.com",
         phone: "91234567",
         mobile: null,
+        createDate: "2026-08-12 03:15:00",
         customerCode: "WONDER",
         history_count: null,
         total_spent: null,
@@ -796,7 +797,11 @@ describe("odoo-api note contracts", () => {
       customerCode: "WONDER",
       contactCount: 1435,
       truncated: true,
-      contacts: [{ odooPartnerId: 42, customerCode: "WONDER" }],
+      contacts: [{
+        odooPartnerId: 42,
+        customerCode: "WONDER",
+        createDate: "2026-08-12 03:15:00",
+      }],
     });
   });
 
