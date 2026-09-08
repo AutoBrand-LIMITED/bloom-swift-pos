@@ -157,6 +157,7 @@ describe("CustomerHistoryPanel resizable history", () => {
       customerCode: "ACCT-42",
       name: "Alexandra Very Long Customer Name",
       phone: "67610707",
+      alternatePhone: "92345678",
       email: "alex@example.com",
       billingAddress: "香港中環花園道 1 號",
       commentText: "呢段係一個好長嘅客戶長期備註，用嚟確認三點設定按鈕唔會遮住任何重要文字。",
@@ -190,6 +191,7 @@ describe("CustomerHistoryPanel resizable history", () => {
       const [open, setOpen] = useState(false);
       const [name, setName] = useState(profileCustomer.name);
       const [phone, setPhone] = useState(profileCustomer.phone);
+      const [alternatePhone, setAlternatePhone] = useState(profileCustomer.alternatePhone || "");
       const [email, setEmail] = useState(profileCustomer.email || "");
       const [billingAddress, setBillingAddress] = useState(profileCustomer.billingAddress || "");
 
@@ -203,11 +205,13 @@ describe("CustomerHistoryPanel resizable history", () => {
             partnerId: 42,
             name,
             phone,
+            alternatePhone,
             email,
             billingAddress,
             onOpenChange: setOpen,
             onNameChange: setName,
             onPhoneChange: setPhone,
+            onAlternatePhoneChange: setAlternatePhone,
             onEmailChange: setEmail,
             onBillingAddressChange: setBillingAddress,
             onSave,
@@ -232,6 +236,10 @@ describe("CustomerHistoryPanel resizable history", () => {
     expect(screen.getByRole("dialog", { name: "編輯聯絡人" })).toBeVisible();
     expect(screen.getByLabelText("聯絡人名稱")).toHaveValue(profileCustomer.name);
     expect(screen.getByLabelText("編輯聯絡人電話")).toHaveValue("67610707");
+    expect(screen.queryByLabelText("編輯聯絡人後備電話")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "顯示後備電話" }));
+    expect(screen.getByLabelText("編輯聯絡人後備電話")).toBeVisible();
+    expect(screen.getByLabelText("編輯聯絡人後備電話")).toHaveValue("92345678");
     expect(screen.getByLabelText("電郵（選填）")).toHaveValue("alex@example.com");
     expect(screen.getByLabelText("帳單地址（選填）")).toHaveValue("香港中環花園道 1 號");
 

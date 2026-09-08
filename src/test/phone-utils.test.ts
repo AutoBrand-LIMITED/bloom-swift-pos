@@ -7,6 +7,7 @@ import {
   phoneMatchesQuery,
   phoneSearchQueryKey,
   samePhoneNumber,
+  splitPhoneValues,
 } from "@/lib/phone-utils";
 
 describe("international phone handling", () => {
@@ -41,5 +42,21 @@ describe("international phone handling", () => {
   it("rejects incomplete and impossible numbers", () => {
     expect(isValidSupportedPhone("+65 8123")).toBe(false);
     expect(isValidSupportedPhone("+1 123")).toBe(false);
+  });
+
+  it("splits legacy comma-separated contacts without merging their digits", () => {
+    expect(splitPhoneValues("90274536,96639019 MS CHARIS YU")).toEqual({
+      phone: "90274536",
+      alternatePhone: "96639019",
+      usedLegacySplit: true,
+    });
+  });
+
+  it("keeps Odoo phone and mobile as separate contact numbers", () => {
+    expect(splitPhoneValues("91234567", "92345678")).toEqual({
+      phone: "91234567",
+      alternatePhone: "92345678",
+      usedLegacySplit: false,
+    });
   });
 });

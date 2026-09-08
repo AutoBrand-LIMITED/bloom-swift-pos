@@ -19,6 +19,12 @@ export interface ParsedPhoneValue {
   localNumber: string;
 }
 
+export interface SplitPhoneValues {
+  phone: string;
+  alternatePhone: string;
+  usedLegacySplit: boolean;
+}
+
 const DEFAULT_PHONE_REGION: PhoneRegion = "HK";
 export const COMMON_PHONE_REGIONS: readonly PhoneRegion[] = [
   "HK", "MO", "CN", "SG", "CA", "US", "GB", "AU", "NZ", "MY", "TW",
@@ -47,6 +53,38 @@ function digitsOnly(value: string): string {
 function normalizedInternationalPrefix(value: string): string {
   const trimmed = value.trim();
   return trimmed.startsWith("00") ? `+${trimmed.slice(2)}` : trimmed;
+}
+
+function legacyPhoneCandidate(value: string): string {
+  const match = value.trim().match(/^(?:\+|00)?\d[\d\s().-]*\d/);
+  return match?.[0]?.trim() || "";
+}
+
+/**
+ * Keep Odoo's primary and mobile numbers separate. Older customer records may
+ * contain two comma-separated numbers in `phone`; split those without joining
+ * every digit into one invalid number.
+ */
+export function splitPhoneValues(phoneValue: string | null | undefined, mobileValue?: string | null): SplitPhoneValues {
+  const rawPhone = phoneValue?.trim() || "";
+  const rawMobile = mobileValue?.trim() || "";
+  const legacyParts = rawPhone
+    .split(/[,，;；/／]+/)
+    .map(legacyPhoneCandidate)
+    .filter((candidate) => candidate && isValidSupportedPhone(candidate));
+  const usedLegacySplit = legacyParts.length >= 2;
+  const phone = usedLegacySplit ? legacyParts[0] : rawPhone;
+
+  if (!phone) {
+    return { phone: rawMobile, alternatePhone: "", usedLegacySplit: false };
+  }
+
+  const alternatePhone = rawMobile && !samePhoneNumber(phone, rawMobile)
+    ? rawMobile
+    : usedLegacySplit && !samePhoneNumber(phone, legacyParts[1])
+      ? legacyParts[1]
+      : "";
+  return { phone, alternatePhone, usedLegacySplit };
 }
 
 function countryName(region: PhoneRegion): string {

@@ -77,6 +77,7 @@ export const orderMatchesSearch = (order: Order, query: string): boolean => {
     order.customerName,
     order.senderName,
     order.phone,
+    order.alternatePhone,
     order.customerEmail,
     order.billingAddress,
     order.deliveryAddress,
@@ -100,6 +101,7 @@ export const orderMatchesSearch = (order: Order, query: string): boolean => {
   if (queryDigits.length < 4) return false;
   return [
     order.phone,
+    order.alternatePhone,
     order.recipientPhone,
     ...(order.deliverySplits || []).map((split) => split.recipientPhone),
   ].some((value) => (

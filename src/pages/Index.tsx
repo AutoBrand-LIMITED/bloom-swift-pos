@@ -158,6 +158,7 @@ type RecipientSelectionDetails = Pick<
 const CUSTOMER_CHECKOUT_FIELDS: CheckoutField[] = [
   "customerName",
   "phone",
+  "alternatePhone",
   "senderName",
   "companyName",
   "customerEmail",
@@ -219,6 +220,7 @@ const Index = () => {
   );
   // Customer
   const [phone, setPhone] = useState("");
+  const [alternatePhone, setAlternatePhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerCode, setCustomerCode] = useState("");
   const [senderName, setSenderName] = useState("");
@@ -690,6 +692,7 @@ const Index = () => {
     customerName.trim()
       && senderName.trim()
       && (!phone.trim() || isValidPhoneNumber(phone))
+      && (!alternatePhone.trim() || isValidPhoneNumber(alternatePhone))
       && isValidEmailAddress(customerEmail)
       && customerResolutionComplete
       && (customerType !== "company" || (companyName.trim() && billingAddress.trim())),
@@ -881,6 +884,7 @@ const Index = () => {
     setCustomerName(customer.name);
     setCustomerCode(customer.customerCode || "");
     setPhone(customer.phone);
+    setAlternatePhone(customer.alternatePhone || "");
     setCustomerEmail(customer.email || "");
     setCustomerType(customer.customerType || "personal");
     setCompanyName(customer.companyName || "");
@@ -895,6 +899,7 @@ const Index = () => {
     clearCheckoutErrors(
       "customerName",
       "phone",
+      "alternatePhone",
       "companyName",
       "customerEmail",
       "billingAddress",
@@ -927,6 +932,7 @@ const Index = () => {
     setConfirmedNewCustomerPhone(null);
     setCustomerCode(accountCode);
     setPhone("");
+    setAlternatePhone("");
     setCustomerName("");
     setSenderName("");
     setCustomerEmail(emptyProfile.customerEmail);
@@ -939,18 +945,19 @@ const Index = () => {
     setCustomerGroupExpectedWriteDate(undefined);
     setSenderContactDraft("");
     resetRecipientPersistence();
-    clearCheckoutErrors("customerName", "phone", "companyName", "customerEmail", "billingAddress");
+    clearCheckoutErrors("customerName", "phone", "alternatePhone", "companyName", "customerEmail", "billingAddress");
   }, [clearCheckoutErrors, resetRecipientPersistence]);
 
   const restoreSelectedCustomerProfile = useCallback((customer: DemoCustomer) => {
     setCustomerName(customer.name);
     setPhone(customer.phone || "");
+    setAlternatePhone(customer.alternatePhone || "");
     setCustomerEmail(customer.email || "");
     setCustomerType(customer.customerType || "personal");
     setCompanyName(customer.companyName || "");
     setBillingAddress(customer.billingAddress || "");
     setCustomerGroupExpectedWriteDate(customer.writeDate);
-    clearCheckoutErrors("customerName", "phone", "companyName", "customerEmail", "billingAddress");
+    clearCheckoutErrors("customerName", "phone", "alternatePhone", "companyName", "customerEmail", "billingAddress");
   }, [clearCheckoutErrors]);
 
   const saveSelectedCustomerProfile = useCallback(async () => {
@@ -966,6 +973,10 @@ const Index = () => {
       setCustomerProfileError("請輸入有效電話號碼，或者留空。");
       return;
     }
+    if (alternatePhone.trim() && !isValidPhoneNumber(alternatePhone)) {
+      setCustomerProfileError("請輸入有效後備電話號碼，或者留空。");
+      return;
+    }
     if (!isValidEmailAddress(customerEmail)) {
       setCustomerProfileError("請輸入有效電郵地址，或者留空。");
       return;
@@ -977,6 +988,7 @@ const Index = () => {
       const updated = await updateOdooCustomerProfile(selectedCustomer.odooPartnerId, {
         name: customerName.trim(),
         phone: phone.trim(),
+        alternatePhone: alternatePhone.trim(),
         email: customerEmail.trim(),
         billingAddress: billingAddress.trim(),
         expectedWriteDate: selectedCustomer.writeDate,
@@ -1001,6 +1013,7 @@ const Index = () => {
     }
   }, [
     billingAddress,
+    alternatePhone,
     customerEmail,
     customerName,
     phone,
@@ -1170,6 +1183,7 @@ const Index = () => {
       (candidate) => candidate.odooEmployeeId === employee?.id,
     );
     setPhone("");
+    setAlternatePhone("");
     setCustomerName("");
     setCustomerCode("");
     setSenderName("");
@@ -1448,6 +1462,7 @@ const Index = () => {
     if (!restoredEmployeePendingSubmission) return;
     const { order, options } = restoredEmployeePendingSubmission;
     setPhone(order.phone);
+    setAlternatePhone(order.alternatePhone || "");
     setCustomerName(order.customerName);
     setCustomerCode(order.customerCode || "");
     setSenderName(order.senderName ?? order.customerName ?? "");
@@ -1468,6 +1483,7 @@ const Index = () => {
       id: `odoo-${options.customerId}`,
       name: order.customerName,
       phone: order.phone,
+      alternatePhone: order.alternatePhone,
       customerCode: order.customerCode,
       history: [],
       odooPartnerId: options.customerId,
@@ -1761,6 +1777,7 @@ const Index = () => {
       terms: terms.trim(),
       senderName: senderName.trim(),
       phone: phone.trim(),
+      alternatePhone: alternatePhone.trim(),
       items,
       deliveryFee,
       urgentFee,
@@ -1896,6 +1913,7 @@ const Index = () => {
           )
       ),
       phone,
+      alternatePhone,
       selectedCustomerId: selectedCustomer?.odooPartnerId,
       selectedCustomerName: selectedCustomer?.name,
       selectedCustomerPhone: selectedCustomer?.phone,
@@ -2081,6 +2099,7 @@ const Index = () => {
       ...(includePendingField("terms") ? { terms: terms.trim() } : {}),
       ...(preserveLegacySenderPayload ? {} : { senderName: senderName.trim() }),
       phone: phone.trim(),
+      alternatePhone: alternatePhone.trim(),
       items,
       deliveryFee,
       urgentFee,
@@ -2389,6 +2408,7 @@ const Index = () => {
               partnerId: selectedCustomer.odooPartnerId,
               name: customerName,
               phone,
+              alternatePhone,
               email: customerEmail,
               billingAddress,
               onOpenChange: (open) => {
@@ -2409,6 +2429,10 @@ const Index = () => {
               onPhoneChange: (value) => {
                 setPhone(value);
                 clearCheckoutErrors("phone");
+              },
+              onAlternatePhoneChange: (value) => {
+                setAlternatePhone(value);
+                clearCheckoutErrors("alternatePhone");
               },
               onEmailChange: (value) => {
                 setCustomerEmail(value);
@@ -2496,7 +2520,9 @@ const Index = () => {
           className="scroll-mt-40 space-y-4"
         >
         <CustomerSection
+          key={checkoutId}
           phone={phone}
+          alternatePhone={alternatePhone}
           customerName={customerName}
           customerCode={customerCode}
           senderName={senderName}
@@ -2529,6 +2555,10 @@ const Index = () => {
             ) {
               setConfirmedNewCustomerName(null);
             }
+          }}
+          onAlternatePhoneChange={(value) => {
+            setAlternatePhone(value);
+            clearCheckoutErrors("alternatePhone");
           }}
           onNameChange={(value) => {
             setCustomerName(value);
@@ -2574,6 +2604,7 @@ const Index = () => {
           onStartNewCustomerUnderAccount={startNewCustomerUnderAccount}
           onCustomerAndRecipientSelect={applyCustomerAndRecipient}
           phoneError={checkoutErrors.phone}
+          alternatePhoneError={checkoutErrors.alternatePhone}
           customerNameError={checkoutErrors.customerName}
           senderNameError={checkoutErrors.senderName}
           companyNameError={checkoutErrors.companyName}

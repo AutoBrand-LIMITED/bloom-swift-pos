@@ -10,7 +10,9 @@ import {
   LoaderCircle,
   Mail,
   MapPin,
+  Plus,
   RefreshCw,
+  Trash2,
   User,
   UserRoundCheck,
 } from "lucide-react";
@@ -49,6 +51,7 @@ const CUSTOMER_CODE_PREFIX_MIN_LENGTH = 2;
 
 interface CustomerSectionProps {
   phone: string;
+  alternatePhone?: string;
   customerName: string;
   customerCode: string;
   senderName: string;
@@ -63,6 +66,7 @@ interface CustomerSectionProps {
   customerGroupsError?: string | null;
   customerGroupLocked?: boolean;
   onPhoneChange: (v: string) => void;
+  onAlternatePhoneChange?: (v: string) => void;
   onNameChange: (v: string) => void;
   onCustomerCodeChange: (v: string) => void;
   onSenderNameChange: (v: string) => void;
@@ -78,6 +82,7 @@ interface CustomerSectionProps {
     recipient: NonNullable<DemoCustomer["recipientMatch"]>,
   ) => void;
   phoneError?: string;
+  alternatePhoneError?: string;
   customerNameError?: string;
   senderNameError?: string;
   companyNameError?: string;
@@ -92,17 +97,18 @@ interface CustomerSectionProps {
 }
 
 const CustomerSection = ({
-  phone, customerName, customerCode, senderName, customerType, companyName, customerEmail, billingAddress,
+  phone, alternatePhone = "", customerName, customerCode, senderName, customerType, companyName, customerEmail, billingAddress,
   customerGroup = "", customerGroupId, customerGroups = [], customerGroupsLoading = false,
   customerGroupsError, customerGroupLocked = false,
-  onPhoneChange, onNameChange, onCustomerCodeChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
+  onPhoneChange, onAlternatePhoneChange = () => undefined, onNameChange, onCustomerCodeChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
   onCustomerEmailChange, onBillingAddressChange, onCustomerGroupChange,
   onCustomerSelect, onCustomerAndRecipientSelect, onStartNewCustomerUnderAccount,
-  phoneError, customerNameError, senderNameError,
+  phoneError, alternatePhoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
   confirmedNewCustomerName, confirmedNewCustomerPhone, onConfirmNewCustomer,
   onResolutionStateChange,
 }: CustomerSectionProps) => {
+  const [alternatePhoneExpanded, setAlternatePhoneExpanded] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
   const [search, setSearch] = useState("");
   const [customerCodeSearchDraft, setCustomerCodeSearchDraft] = useState("");
@@ -123,6 +129,7 @@ const CustomerSection = ({
   const nameInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
+  const previousSelectedCustomerIdRef = useRef(selectedCustomer?.id);
   const selectedCustomerGroup = customerGroups.find((group) => group.id === customerGroupId);
   const customerGroupIsLegacySnapshot = customerGroupId === undefined && Boolean(customerGroup.trim());
   const customerGroupDisabled = customerGroupLocked
@@ -131,6 +138,12 @@ const CustomerSection = ({
     || customerGroups.length === 0;
   const selectedOdooPartnerId = selectedCustomer?.odooPartnerId;
   const selectedProfileLocked = Boolean(selectedOdooPartnerId);
+
+  useEffect(() => {
+    if (previousSelectedCustomerIdRef.current === selectedCustomer?.id) return;
+    previousSelectedCustomerIdRef.current = selectedCustomer?.id;
+    setAlternatePhoneExpanded(false);
+  }, [selectedCustomer?.id]);
 
   useEffect(() => {
     if (selectedOdooPartnerId) setActiveDropdown(null);
@@ -171,7 +184,11 @@ const CustomerSection = ({
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       Boolean(c.email?.toLowerCase().includes(search.toLowerCase())) ||
       c.phone.includes(search) ||
-      Boolean(normalizedSearchPhone && phoneMatchesQuery(c.phone, search))
+      Boolean(c.alternatePhone?.includes(search)) ||
+      Boolean(normalizedSearchPhone && (
+        phoneMatchesQuery(c.phone, search)
+        || phoneMatchesQuery(c.alternatePhone || "", search)
+      ))
     );
   });
 
@@ -291,7 +308,15 @@ const CustomerSection = ({
     }
 
     if (activeDropdown === "phone" && normalizedSearchPhone) {
-      options.sort((left, right) => phoneSearchRank(left.phone, search) - phoneSearchRank(right.phone, search));
+      options.sort((left, right) => (
+        Math.min(
+          phoneSearchRank(left.phone, search),
+          phoneSearchRank(left.alternatePhone || "", search),
+        ) - Math.min(
+          phoneSearchRank(right.phone, search),
+          phoneSearchRank(right.alternatePhone || "", search),
+        )
+      ));
     }
     return options;
   }, [activeDropdown, completedCurrentSearch, filtered, normalizedSearchPhone, odooCustomers, search]);
@@ -490,6 +515,11 @@ const CustomerSection = ({
         <span className="text-xs text-muted-foreground ml-2 font-mono break-all">
           {c.phone || "沒有電話"}
         </span>
+        {c.alternatePhone && (
+          <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
+            後備電話：{c.alternatePhone}
+          </p>
+        )}
         {c.email && (
           <p className="mt-1 break-all text-[11px] text-muted-foreground">{c.email}</p>
         )}
@@ -937,6 +967,57 @@ const CustomerSection = ({
             )}
           </div>
         </div>
+
+        {alternatePhoneExpanded ? (
+          <div className="rounded-lg border border-border bg-muted/15 p-3">
+            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="alternate-phone" className="text-xs font-medium">
+                後備電話（選填）
+              </Label>
+              {!selectedProfileLocked && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="min-h-9 gap-1.5 px-2 text-xs text-muted-foreground touch-manipulation"
+                  onClick={() => {
+                    onAlternatePhoneChange("");
+                    setAlternatePhoneExpanded(false);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  移除後備電話
+                </Button>
+              )}
+            </div>
+            <RegionalPhoneInput
+              id="alternate-phone"
+              ariaLabel="後備電話"
+              value={alternatePhone}
+              disabled={selectedProfileLocked}
+              onChange={onAlternatePhoneChange}
+              invalid={Boolean(alternatePhoneError)}
+            />
+            {alternatePhoneError && (
+              <p id="alternate-phone-error" role="alert" className="mt-1.5 text-xs text-destructive">
+                {alternatePhoneError}
+              </p>
+            )}
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+              主要電話未能聯絡時使用；會獨立儲存到 Odoo Contact 嘅 Mobile 欄位。
+            </p>
+          </div>
+        ) : (!selectedProfileLocked || Boolean(alternatePhone.trim())) ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 w-full justify-start gap-2 border-dashed text-sm touch-manipulation sm:w-auto"
+            onClick={() => setAlternatePhoneExpanded(true)}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {alternatePhone.trim() ? "顯示後備電話" : "加入後備電話"}
+          </Button>
+        ) : null}
 
         {customerResolutionPhase !== "idle" && (
           <div

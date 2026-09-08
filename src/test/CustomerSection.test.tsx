@@ -31,17 +31,20 @@ const emptyBusinessProps = {
 };
 
 function Harness({
+  initialAlternatePhone = "",
   initialCustomerGroup = "",
   initialCustomerGroupId,
   customerGroups = [{ id: 12, name: "Corporate" }, { id: 13, name: "VIP Wholesale" }],
   customerGroupsError = null,
 }: {
+  initialAlternatePhone?: string;
   initialCustomerGroup?: string;
   initialCustomerGroupId?: number;
   customerGroups?: Array<{ id: number; name: string }>;
   customerGroupsError?: string | null;
 } = {}) {
   const [senderName, setSenderName] = useState("");
+  const [alternatePhone, setAlternatePhone] = useState(initialAlternatePhone);
   const [customerCode, setCustomerCode] = useState("");
   const [customerGroup, setCustomerGroup] = useState(initialCustomerGroup);
   const [customerGroupId, setCustomerGroupId] = useState<number | undefined>(initialCustomerGroupId);
@@ -49,6 +52,7 @@ function Harness({
   return (
     <CustomerSection
       phone="9123 4567"
+      alternatePhone={alternatePhone}
       customerName="Secretary Chan"
       customerCode={customerCode}
       senderName={senderName}
@@ -60,6 +64,7 @@ function Harness({
       customerGroupsError={customerGroupsError}
       {...emptyBusinessProps}
       onPhoneChange={noop}
+      onAlternatePhoneChange={setAlternatePhone}
       onNameChange={noop}
       onCustomerCodeChange={setCustomerCode}
       onSenderNameChange={setSenderName}
@@ -222,6 +227,25 @@ describe("CustomerSection gift sender", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
     expect(senderInput).toHaveValue("Secretary Chan");
+  });
+
+  it("keeps the optional backup phone hidden until staff asks for it", () => {
+    render(<Harness />);
+
+    expect(screen.queryByLabelText("後備電話")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "加入後備電話" }));
+    expect(screen.getByLabelText("後備電話")).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText("後備電話"), { target: { value: "92345678" } });
+    expect(screen.getByLabelText("後備電話")).toHaveValue("92345678");
+  });
+
+  it("keeps an existing backup phone collapsed until staff asks to view it", () => {
+    render(<Harness initialAlternatePhone="92345678" />);
+
+    expect(screen.queryByLabelText("後備電話")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "顯示後備電話" }));
+    expect(screen.getByLabelText("後備電話")).toHaveValue("92345678");
   });
 
   it("selects Customer Group from existing Odoo Contact Tags inside Customer Details", () => {

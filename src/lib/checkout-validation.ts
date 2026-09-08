@@ -13,6 +13,7 @@ import {
 export type CheckoutField =
   | "customerName"
   | "phone"
+  | "alternatePhone"
   | "senderName"
   | "companyName"
   | "customerEmail"
@@ -35,6 +36,7 @@ interface CheckoutValidationInput {
   billingAddress: string;
   allowLegacyMissingCompanyFields?: boolean;
   phone: string;
+  alternatePhone?: string;
   selectedCustomerId?: number;
   selectedCustomerName?: string;
   selectedCustomerPhone?: string;
@@ -123,6 +125,9 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
         ? "請選擇符合電話及聯絡人名稱嘅現有客戶，或確認新增聯絡人"
         : "請選擇現有客戶，或確認新增冇電話聯絡人";
     }
+  }
+  if (input.alternatePhone?.trim() && !isValidPhoneNumber(input.alternatePhone)) {
+    errors.alternatePhone = "請輸入有效後備電話號碼";
   }
   if (!input.senderName.trim()) errors.senderName = "請輸入送花人名稱";
   if ((input.fulfillmentType || "delivery") === "delivery") {

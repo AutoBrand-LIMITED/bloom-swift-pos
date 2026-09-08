@@ -12,6 +12,7 @@ import type {
 import { authenticatedFetch } from "@/lib/pos-auth";
 import { normalizePurchasePaymentStatus } from "@/lib/customer-utils";
 import { hasRecipientBirthdayField } from "@/lib/recipient-birthday";
+import { splitPhoneValues } from "@/lib/phone-utils";
 import {
   hasRecipientOccasionsField,
   ownsRecipientOccasionsVersionField,
@@ -24,7 +25,7 @@ interface OdooPartner {
   name: string;
   email: string | null;
   phone: string | null;
-  mobile: string | null;
+  mobile?: string | null;
   customerCode: string | null;
   customerType?: "personal" | "company";
   companyName?: string | null;
@@ -336,6 +337,7 @@ export interface PartnerNoteUpdate {
 export interface CustomerProfileUpdate {
   name: string;
   phone: string;
+  alternatePhone: string;
   email: string;
   billingAddress: string;
   expectedWriteDate: string;
@@ -1411,12 +1413,14 @@ function mapOdooPartner(p: OdooPartner): DemoCustomer {
       ? tags.find((tag) => tag.id === customerGroupId)?.name
       : tags.map((tag) => tag.name.trim()).filter(Boolean).join(", "))
     || undefined;
+  const phones = splitPhoneValues(p.phone, p.mobile);
 
   return {
     id: `odoo-${p.id}`,
     odooPartnerId: p.id,
     name: p.name,
-    phone: p.phone || p.mobile || "",
+    phone: phones.phone,
+    alternatePhone: phones.alternatePhone || undefined,
     email: p.email || undefined,
     customerType: p.customerType || "personal",
     companyName: p.companyName || undefined,

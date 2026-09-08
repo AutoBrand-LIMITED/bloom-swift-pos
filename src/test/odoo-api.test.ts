@@ -835,7 +835,7 @@ describe("odoo-api note contracts", () => {
       name: "Alice",
       email: "alice@example.com",
       phone: "91234567",
-      mobile: null,
+      mobile: "92345678",
       history_count: null,
       total_spent: null,
       history: [],
@@ -851,6 +851,7 @@ describe("odoo-api note contracts", () => {
       odooPartnerId: 42,
       name: "Alice",
       phone: "91234567",
+      alternatePhone: "92345678",
       email: "alice@example.com",
     });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -883,6 +884,7 @@ describe("odoo-api note contracts", () => {
     await expect(updateOdooCustomerProfile(42, {
       name: "Alice Updated",
       phone: "",
+      alternatePhone: "",
       email: "alice@example.com",
       billingAddress: "Central",
       expectedWriteDate: "2026-09-08 10:00:00",
@@ -898,6 +900,7 @@ describe("odoo-api note contracts", () => {
         body: JSON.stringify({
           name: "Alice Updated",
           phone: "",
+          alternatePhone: "",
           email: "alice@example.com",
           billingAddress: "Central",
           expectedWriteDate: "2026-09-08 10:00:00",
@@ -959,6 +962,7 @@ describe("odoo-api note contracts", () => {
       customerCode: " NEW-001 ",
       senderName: "Director Lee",
       phone: "9123 4567",
+      alternatePhone: "9234 5678",
       customerType: "company",
       companyName: "Chan Tai Limited",
       customerEmail: "accounts@example.com",
@@ -1025,6 +1029,7 @@ describe("odoo-api note contracts", () => {
     const payload = JSON.parse(String(init.body));
     expect(payload).toMatchObject({
       senderName: "Director Lee",
+      alternatePhone: "9234 5678",
       senderNote: "Sender note",
       deliveryNote: "Delivery note",
       internalNote: "Internal note",

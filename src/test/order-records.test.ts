@@ -200,6 +200,7 @@ describe("order record sources", () => {
   it("matches local orders by email, sender, delivery address, recipient, and formatted phone", () => {
     const record = order("searchable", {
       senderName: "Director Lee",
+      alternatePhone: "+852 9876 5432",
       customerEmail: "accounts@example.com",
       billingAddress: "1 Flower Market Road",
       deliveryAddress: "香港中環皇后大道 66 號",
@@ -214,6 +215,7 @@ describe("order record sources", () => {
     expect(orderMatchesSearch(record, "Recipient Limited")).toBe(true);
     expect(orderMatchesSearch(record, "陳小姐")).toBe(true);
     expect(orderMatchesSearch(record, "61234567")).toBe(true);
+    expect(orderMatchesSearch(record, "98765432")).toBe(true);
     expect(orderMatchesSearch(record, "not present")).toBe(false);
   });
 

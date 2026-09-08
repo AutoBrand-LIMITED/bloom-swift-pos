@@ -4,6 +4,7 @@ export interface DemoCustomer {
   id: string;
   name: string;
   phone: string;
+  alternatePhone?: string;
   history: PurchaseRecord[];
   historyCount?: number;
   totalSpent?: number;

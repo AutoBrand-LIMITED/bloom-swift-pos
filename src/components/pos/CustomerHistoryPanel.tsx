@@ -274,6 +274,11 @@ const CustomerHistoryPanel = ({
                     <p className="break-all font-mono text-xs text-muted-foreground">
                       {displayCustomer.phone || "沒有電話"}
                     </p>
+                    {displayCustomer.alternatePhone && (
+                      <p className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">
+                        後備：{displayCustomer.alternatePhone}
+                      </p>
+                    )}
                   </div>
                   {displayCustomer.odooPartnerId && contactEditor && (
                     <DropdownMenu>
