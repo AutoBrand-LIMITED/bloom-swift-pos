@@ -7,10 +7,14 @@ import type { DemoCustomer } from "@/data/demo-customers";
 
 const odooApiMocks = vi.hoisted(() => ({
   getOdooCustomerHistory: vi.fn(),
+  searchOdooCustomerAccount: vi.fn(),
+  searchOdooCustomers: vi.fn(),
 }));
 
 vi.mock("@/lib/odoo-api", () => ({
   getOdooCustomerHistory: odooApiMocks.getOdooCustomerHistory,
+  searchOdooCustomerAccount: odooApiMocks.searchOdooCustomerAccount,
+  searchOdooCustomers: odooApiMocks.searchOdooCustomers,
   hasOdooBackend: true,
 }));
 
@@ -67,6 +71,8 @@ const customer: DemoCustomer = {
 describe("CustomerHistoryPanel resizable history", () => {
   beforeEach(() => {
     odooApiMocks.getOdooCustomerHistory.mockReset();
+    odooApiMocks.searchOdooCustomerAccount.mockReset();
+    odooApiMocks.searchOdooCustomers.mockReset();
   });
 
   it("keeps addresses and history in vertically resizable panes", () => {
@@ -143,11 +149,12 @@ describe("CustomerHistoryPanel resizable history", () => {
 
   it("keeps the three-dot contact settings separate from labels and long-term notes", async () => {
     const onSave = vi.fn();
-    const onChooseOtherContact = vi.fn();
+    const onContactSelect = vi.fn();
     const profileCustomer: DemoCustomer = {
       ...customer,
       id: "odoo-42",
       odooPartnerId: 42,
+      customerCode: "ACCT-42",
       name: "Alexandra Very Long Customer Name",
       phone: "67610707",
       email: "alex@example.com",
@@ -159,10 +166,24 @@ describe("CustomerHistoryPanel resizable history", () => {
       ],
       writeDate: "2026-09-08 10:00:00",
     };
+    const alternativeCustomer: DemoCustomer = {
+      ...profileCustomer,
+      id: "odoo-43",
+      odooPartnerId: 43,
+      name: "May Chan",
+      phone: "61234567",
+      email: "may@example.com",
+    };
     odooApiMocks.getOdooCustomerHistory.mockResolvedValue({
       history: profileCustomer.history,
       historyCount: profileCustomer.historyCount ?? profileCustomer.history.length,
       totalSpent: 1560,
+    });
+    odooApiMocks.searchOdooCustomerAccount.mockResolvedValue({
+      customerCode: "ACCT-42",
+      contactCount: 2,
+      contacts: [profileCustomer, alternativeCustomer],
+      truncated: false,
     });
 
     const Harness = () => {
@@ -176,7 +197,7 @@ describe("CustomerHistoryPanel resizable history", () => {
         <CustomerHistoryPanel
           customer={profileCustomer}
           onClose={vi.fn()}
-          onChooseOtherContact={onChooseOtherContact}
+          onContactSelect={onContactSelect}
           contactEditor={{
             open,
             partnerId: 42,
@@ -225,7 +246,30 @@ describe("CustomerHistoryPanel resizable history", () => {
       name: "Alexandra Very Long Customer Name 聯絡人設定",
     }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "選擇其他聯絡人" }));
-    expect(onChooseOtherContact).toHaveBeenCalledOnce();
+
+    expect(await screen.findByRole("dialog", { name: "選擇其他聯絡人" })).toBeVisible();
+    expect(document.querySelector('aside[aria-label="客戶記錄面板"]')).toBeInTheDocument();
+    expect(screen.getByRole("button", {
+      name: "Alexandra Very Long Customer Name 目前聯絡人",
+    })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "選擇聯絡人 May Chan" })).toBeVisible();
+    expect(onContactSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.queryByRole("dialog", { name: "選擇其他聯絡人" })).not.toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "客戶記錄面板" })).toBeVisible();
+    expect(onContactSelect).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(screen.getByRole("button", {
+      name: "Alexandra Very Long Customer Name 聯絡人設定",
+    }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "選擇其他聯絡人" }));
+    fireEvent.click(await screen.findByRole("button", { name: "選擇聯絡人 May Chan" }));
+    expect(onContactSelect).toHaveBeenCalledWith(alternativeCustomer);
+    expect(odooApiMocks.searchOdooCustomerAccount).toHaveBeenCalledWith(
+      "ACCT-42",
+      expect.any(AbortSignal),
+    );
   });
 
   it("keeps different recipients at the same address as separate choices", () => {

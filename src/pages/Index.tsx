@@ -853,24 +853,6 @@ const Index = () => {
     setRecipientContactDraft("");
   }, [clearRecipientPersistenceBinding]);
 
-  const detachSelectedCustomerProfile = useCallback(() => {
-    const emptyProfile = detachedCustomerProfile();
-    setSelectedCustomer(null);
-    setEditingSelectedCustomer(false);
-    setCustomerProfileError(null);
-    setCustomerCode("");
-    setCustomerEmail(emptyProfile.customerEmail);
-    setCustomerType(emptyProfile.customerType);
-    setCompanyName(emptyProfile.companyName);
-    setBillingAddress(emptyProfile.billingAddress);
-    setTerms("");
-    setCustomerGroup("");
-    setCustomerGroupId(undefined);
-    setCustomerGroupExpectedWriteDate(undefined);
-    setSenderContactDraft("");
-    resetRecipientPersistence();
-  }, [resetRecipientPersistence]);
-
   const clearCheckoutErrors = useCallback((...fields: CheckoutField[]) => {
     setCheckoutErrors((current) => {
       if (!fields.some((field) => current[field])) return current;
@@ -2196,7 +2178,6 @@ const Index = () => {
         {/* Left: Customer history panel */}
         {hasSalesperson && selectedCustomer && (
           <CustomerHistoryDock
-            key={selectedCustomer.id}
             customer={selectedCustomer}
             onUseAddress={applyHistoryAddressSelection}
             addressTargetLabel={historyAddressTargetLabel}
@@ -2238,7 +2219,7 @@ const Index = () => {
               },
               onSave: () => { void saveSelectedCustomerProfile(); },
             } : undefined}
-            onChooseOtherContact={detachSelectedCustomerProfile}
+            onContactSelect={applyCustomerSelection}
           />
         )}
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PanelLeftOpen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ interface CustomerHistoryDockProps {
   onUseAddress?: (selection: DeliveryAddressSelection) => void;
   addressTargetLabel?: string;
   contactEditor?: CustomerContactEditorProps;
-  onChooseOtherContact?: () => void;
+  onContactSelect?: (customer: DemoCustomer) => void;
 }
 
 const CustomerHistoryDock = ({
@@ -30,10 +30,11 @@ const CustomerHistoryDock = ({
   onUseAddress,
   addressTargetLabel,
   contactEditor,
-  onChooseOtherContact,
+  onContactSelect,
 }: CustomerHistoryDockProps) => {
   const [inlineHistory, setInlineHistory] = useState(usesInlineHistory);
   const [open, setOpen] = useState(usesInlineHistory);
+  const previousCustomerIdRef = useRef(customer.id);
 
   useEffect(() => {
     const media = window.matchMedia(INLINE_HISTORY_QUERY);
@@ -45,7 +46,14 @@ const CustomerHistoryDock = ({
   useEffect(() => {
     setOpen(inlineHistory);
     onOpenChange?.(inlineHistory);
-  }, [customer.id, inlineHistory, onOpenChange]);
+  }, [inlineHistory, onOpenChange]);
+
+  useEffect(() => {
+    if (previousCustomerIdRef.current === customer.id) return;
+    previousCustomerIdRef.current = customer.id;
+    setOpen(true);
+    onOpenChange?.(true);
+  }, [customer.id, onOpenChange]);
 
   const setDockOpen = (nextOpen: boolean) => {
     setOpen(nextOpen);
@@ -61,7 +69,7 @@ const CustomerHistoryDock = ({
         addressTargetLabel={addressTargetLabel}
         inline={inlineHistory}
         contactEditor={contactEditor}
-        onChooseOtherContact={onChooseOtherContact}
+        onContactSelect={onContactSelect}
       />
     );
   }

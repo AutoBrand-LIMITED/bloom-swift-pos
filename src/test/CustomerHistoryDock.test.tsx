@@ -109,4 +109,22 @@ describe("CustomerHistoryDock", () => {
       "false",
     );
   });
+
+  it("keeps the iPad history panel open after choosing another contact", () => {
+    mockDesktopDock(false);
+    const { rerender } = render(<CustomerHistoryDock customer={customer} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "打開 Jay 客戶記錄" }));
+    rerender(
+      <CustomerHistoryDock
+        customer={{ ...customer, id: "customer-2", name: "May" }}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "May 客戶記錄面板" })).toHaveAttribute(
+      "data-inline",
+      "false",
+    );
+    expect(screen.queryByRole("button", { name: "打開 May 客戶記錄" })).not.toBeInTheDocument();
+  });
 });

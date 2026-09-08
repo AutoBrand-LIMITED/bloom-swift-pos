@@ -7,6 +7,7 @@ import { getOdooCustomerHistory, hasOdooBackend } from "@/lib/odoo-api";
 import CustomerContactEditDialog, {
   type CustomerContactEditorProps,
 } from "@/components/pos/CustomerContactEditDialog";
+import CustomerContactChooserDialog from "@/components/pos/CustomerContactChooserDialog";
 import CustomerFlags from "@/components/pos/CustomerFlags";
 import {
   DropdownMenu,
@@ -30,7 +31,7 @@ interface CustomerHistoryPanelProps {
   addressTargetLabel?: string;
   inline?: boolean;
   contactEditor?: CustomerContactEditorProps;
-  onChooseOtherContact?: () => void;
+  onContactSelect?: (customer: DemoCustomer) => void;
 }
 
 const formatDateTime = (value?: string) => {
@@ -100,7 +101,7 @@ const CustomerHistoryPanel = ({
   addressTargetLabel = "收貨點 1",
   inline = false,
   contactEditor,
-  onChooseOtherContact,
+  onContactSelect,
 }: CustomerHistoryPanelProps) => {
   const [odooHistoryState, setOdooHistoryState] = useState<{
     customerId: string;
@@ -112,6 +113,7 @@ const CustomerHistoryPanel = ({
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [showAllAddresses, setShowAllAddresses] = useState(false);
+  const [contactChooserOpen, setContactChooserOpen] = useState(false);
 
   useEffect(() => {
     setHistoryExpanded(false);
@@ -297,10 +299,10 @@ const CustomerHistoryPanel = ({
                           <Pencil className="h-4 w-4" aria-hidden="true" />
                           編輯聯絡人
                         </DropdownMenuItem>
-                        {onChooseOtherContact && (
+                        {onContactSelect && (
                           <DropdownMenuItem
                             className="min-h-11 gap-2 touch-manipulation"
-                            onSelect={onChooseOtherContact}
+                            onSelect={() => setContactChooserOpen(true)}
                           >
                             <UserRoundPlus className="h-4 w-4" aria-hidden="true" />
                             選擇其他聯絡人
@@ -690,6 +692,14 @@ const CustomerHistoryPanel = ({
       </div>
 
       {contactEditor && <CustomerContactEditDialog editor={contactEditor} />}
+      {onContactSelect && (
+        <CustomerContactChooserDialog
+          open={contactChooserOpen}
+          customer={displayCustomer}
+          onOpenChange={setContactChooserOpen}
+          onSelect={onContactSelect}
+        />
+      )}
     </aside>
   );
 };
