@@ -536,6 +536,7 @@ describe("CustomerSection gift sender", () => {
   });
 
   it("keeps a selected Partner ID locked and directs editing to customer history", () => {
+    const startCustomerSearch = vi.fn();
     const selectedCustomer: DemoCustomer = {
       id: "odoo-42",
       odooPartnerId: 42,
@@ -565,6 +566,7 @@ describe("CustomerSection gift sender", () => {
         onCustomerEmailChange={noop}
         onBillingAddressChange={noop}
         onCustomerSelect={noop}
+        onStartCustomerSearch={startCustomerSearch}
         onCustomerAndRecipientSelect={noop}
         selectedCustomer={selectedCustomer}
       />,
@@ -574,7 +576,9 @@ describe("CustomerSection gift sender", () => {
     expect(screen.getByLabelText(/下單人電話/)).toBeDisabled();
     expect(screen.getByLabelText(/下單人／聯絡人/)).toBeDisabled();
     expect(screen.getByLabelText(/客戶電郵/)).toBeDisabled();
-    expect(screen.getByText(/左側「客戶記錄」嘅三點選單/)).toBeVisible();
+    expect(screen.getByText(/左側三點選單編輯/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "重新搜尋客戶" }));
+    expect(startCustomerSearch).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button", { name: "編輯聯絡人" })).not.toBeInTheDocument();
   });
 

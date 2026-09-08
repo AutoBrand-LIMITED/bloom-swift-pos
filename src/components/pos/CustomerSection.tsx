@@ -76,6 +76,7 @@ interface CustomerSectionProps {
   onBillingAddressChange: (v: string) => void;
   onCustomerGroupChange?: (label: string, groupId?: number) => void;
   onCustomerSelect: (c: DemoCustomer) => void;
+  onStartCustomerSearch?: () => void;
   onStartNewCustomerUnderAccount?: (customerCode: string) => void;
   onCustomerAndRecipientSelect: (
     customer: DemoCustomer,
@@ -102,7 +103,8 @@ const CustomerSection = ({
   customerGroupsError, customerGroupLocked = false,
   onPhoneChange, onAlternatePhoneChange = () => undefined, onNameChange, onCustomerCodeChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
   onCustomerEmailChange, onBillingAddressChange, onCustomerGroupChange,
-  onCustomerSelect, onCustomerAndRecipientSelect, onStartNewCustomerUnderAccount,
+  onCustomerSelect, onCustomerAndRecipientSelect, onStartCustomerSearch,
+  onStartNewCustomerUnderAccount,
   phoneError, alternatePhoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
   confirmedNewCustomerName, confirmedNewCustomerPhone, onConfirmNewCustomer,
@@ -480,6 +482,17 @@ const CustomerSection = ({
     setRetryKey((key) => key + 1);
   };
 
+  const handleStartCustomerSearch = () => {
+    setActiveDropdown(null);
+    setSearch("");
+    setCustomerCodeSearchDraft("");
+    setOdooCustomers([]);
+    setCustomerAccount(null);
+    setOdooError(null);
+    setCompletedOdooSearch(null);
+    onStartCustomerSearch?.();
+  };
+
   const handleSelect = (c: DemoCustomer) => {
     const customer = { ...c };
     delete customer.recipientMatch;
@@ -768,10 +781,24 @@ const CustomerSection = ({
 
       {selectedOdooPartnerId && (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50/70 px-3 py-2" data-testid="selected-customer-identity">
-          <p className="text-[11px] leading-relaxed text-emerald-900">
-            已選 <span className="font-mono font-semibold">Odoo Contact #{selectedOdooPartnerId}</span>；
-            可從左側「客戶記錄」嘅三點選單編輯或更換聯絡人。
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-emerald-900">
+              已選 <span className="font-mono font-semibold">Odoo Contact #{selectedOdooPartnerId}</span>；
+              聯絡人資料已鎖定避免誤改，亦可從左側三點選單編輯。
+            </p>
+            {onStartCustomerSearch && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-11 shrink-0 gap-1.5 border-emerald-300 bg-white/80 text-emerald-800 touch-manipulation"
+                onClick={handleStartCustomerSearch}
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                重新搜尋客戶
+              </Button>
+            )}
+          </div>
         </div>
       )}
 

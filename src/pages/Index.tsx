@@ -923,7 +923,7 @@ const Index = () => {
     setCustomerGroupExpectedWriteDate(selectedCustomer.writeDate);
   }, [customerGroups, customerGroupsError, customerGroupsLoading, selectedCustomer]);
 
-  const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
+  const resetCustomerForSearch = useCallback((accountCode = "") => {
     const emptyProfile = detachedCustomerProfile();
     setSelectedCustomer(null);
     setEditingSelectedCustomer(false);
@@ -947,6 +947,10 @@ const Index = () => {
     resetRecipientPersistence();
     clearCheckoutErrors("customerName", "phone", "alternatePhone", "companyName", "customerEmail", "billingAddress");
   }, [clearCheckoutErrors, resetRecipientPersistence]);
+
+  const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
+    resetCustomerForSearch(accountCode);
+  }, [resetCustomerForSearch]);
 
   const restoreSelectedCustomerProfile = useCallback((customer: DemoCustomer) => {
     setCustomerName(customer.name);
@@ -2601,6 +2605,7 @@ const Index = () => {
             setCustomerGroupId(groupId);
           }}
           onCustomerSelect={applyCustomerSelection}
+          onStartCustomerSearch={() => resetCustomerForSearch()}
           onStartNewCustomerUnderAccount={startNewCustomerUnderAccount}
           onCustomerAndRecipientSelect={applyCustomerAndRecipient}
           phoneError={checkoutErrors.phone}
