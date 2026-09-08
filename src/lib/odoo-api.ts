@@ -536,7 +536,6 @@ export interface OdooProduct {
 }
 
 export interface OdooProductWritePayload {
-  name: string;
   price: number;
   productCode?: string | null;
   categoryId?: number | null;
@@ -545,6 +544,10 @@ export interface OdooProductWritePayload {
   displaySequence: number;
   availableFrom?: string | null;
   availableUntil?: string | null;
+}
+
+export interface OdooProductCreatePayload extends OdooProductWritePayload {
+  name: string;
 }
 
 export interface OdooProductCategory {
@@ -898,7 +901,7 @@ export async function reorderOdooProducts(
   return (await res.json()) as { updated: number };
 }
 
-export async function createOdooProduct(payload: OdooProductWritePayload): Promise<OdooProduct> {
+export async function createOdooProduct(payload: OdooProductCreatePayload): Promise<OdooProduct> {
   if (!BACKEND_URL) {
     throw new Error("Odoo backend is not configured");
   }

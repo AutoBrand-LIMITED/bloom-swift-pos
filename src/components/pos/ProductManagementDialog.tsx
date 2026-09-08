@@ -242,7 +242,6 @@ const ProductManagementDialog = ({
   };
 
   const payloadFromForm = (): OdooProductWritePayload => ({
-    name: form.name.trim(),
     price: Number(form.price) || 0,
     productCode: form.productCode.trim() || null,
     categoryId: form.categoryId === "none" ? null : Number(form.categoryId),
@@ -255,7 +254,8 @@ const ProductManagementDialog = ({
 
   const saveProduct = async () => {
     const payload = payloadFromForm();
-    if (!payload.name) {
+    const productName = form.name.trim();
+    if (!form.id && !productName) {
       setError("商品名稱必須填寫。");
       return;
     }
@@ -270,7 +270,7 @@ const ProductManagementDialog = ({
     try {
       const saved = form.id
         ? await updateOdooProduct(form.id, payload)
-        : await createOdooProduct(payload);
+        : await createOdooProduct({ ...payload, name: productName });
       setProducts((current) => {
         const exists = current.some((product) => product.id === saved.id);
         return exists
@@ -1052,10 +1052,20 @@ const ProductManagementDialog = ({
                     <Input
                       id="product-manager-name"
                       value={form.name}
-                      onChange={(event) => setFormField("name", event.target.value)}
+                      onChange={form.id
+                        ? undefined
+                        : (event) => setFormField("name", event.target.value)}
                       placeholder="例如：玫瑰花束"
                       maxLength={140}
+                      disabled={Boolean(form.id)}
+                      aria-describedby={form.id ? "product-manager-name-help" : undefined}
+                      className={cn(form.id && "bg-muted text-muted-foreground disabled:opacity-100")}
                     />
+                    {form.id && (
+                      <p id="product-manager-name-help" className="text-xs text-muted-foreground">
+                        既有商品名稱由 Odoo 統一管理，不可於 POS 修改。
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">

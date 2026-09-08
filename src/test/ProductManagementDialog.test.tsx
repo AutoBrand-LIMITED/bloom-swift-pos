@@ -201,7 +201,23 @@ describe("ProductManagementDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "商品設定 testing" }));
 
     expect(screen.getByLabelText("商品名稱")).toHaveValue("testing");
+    expect(screen.getByLabelText("商品名稱")).toBeDisabled();
+    expect(screen.getByText("既有商品名稱由 Odoo 統一管理，不可於 POS 修改。")).toBeInTheDocument();
     expect(screen.queryByLabelText("POS 排序")).not.toBeInTheDocument();
+  });
+
+  it("never sends an existing product name through the update API", async () => {
+    renderDialog();
+
+    await screen.findByText("testing");
+    fireEvent.click(screen.getByRole("button", { name: "商品設定 testing" }));
+    fireEvent.change(screen.getByLabelText("售價 ($)"), { target: { value: "1200" } });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => expect(apiMocks.updateProduct).toHaveBeenCalledTimes(1));
+    const [, payload] = apiMocks.updateProduct.mock.calls[0];
+    expect(payload).not.toHaveProperty("name");
+    expect(payload).toMatchObject({ price: 1200 });
   });
 
   it("keeps a new-product form blank when the product list finishes loading", async () => {
@@ -211,6 +227,7 @@ describe("ProductManagementDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "新增商品" }));
     const nameInput = screen.getByLabelText("商品名稱");
     expect(nameInput).toHaveValue("");
+    expect(nameInput).toBeEnabled();
 
     fireEvent.change(nameInput, { target: { value: "Browser UX Probe" } });
     await act(async () => {
