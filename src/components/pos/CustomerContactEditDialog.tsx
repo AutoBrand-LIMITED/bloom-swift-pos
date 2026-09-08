@@ -1,8 +1,9 @@
-import { LoaderCircle, Mail, MapPin, Plus, Save, Trash2, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronDown, LoaderCircle, Mail, MapPin, Save, Trash2, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import RegionalPhoneInput from "@/components/pos/RegionalPhoneInput";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -39,10 +40,12 @@ interface CustomerContactEditDialogProps {
 }
 
 const CustomerContactEditDialog = ({ editor }: CustomerContactEditDialogProps) => {
-  const [alternatePhoneExpanded, setAlternatePhoneExpanded] = useState(false);
+  const [alternatePhoneExpanded, setAlternatePhoneExpanded] = useState(Boolean(editor.alternatePhone.trim()));
+  const alternatePhoneRef = useRef(editor.alternatePhone);
+  alternatePhoneRef.current = editor.alternatePhone;
 
   useEffect(() => {
-    if (editor.open) setAlternatePhoneExpanded(false);
+    if (editor.open) setAlternatePhoneExpanded(Boolean(alternatePhoneRef.current.trim()));
   }, [editor.open, editor.partnerId]);
 
   return (
@@ -85,48 +88,61 @@ const CustomerContactEditDialog = ({ editor }: CustomerContactEditDialogProps) =
           />
         </div>
 
-        {alternatePhoneExpanded ? (
-          <div className="space-y-1.5 rounded-lg border border-border bg-muted/15 p-3 sm:col-span-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <Label htmlFor="contact-editor-alternate-phone">後備電話（選填）</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="min-h-9 gap-1.5 px-2 text-xs text-muted-foreground touch-manipulation"
-                disabled={editor.saving}
-                onClick={() => {
-                  editor.onAlternatePhoneChange("");
-                  setAlternatePhoneExpanded(false);
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                移除後備電話
-              </Button>
-            </div>
-            <RegionalPhoneInput
-              id="contact-editor-alternate-phone"
-              ariaLabel="編輯聯絡人後備電話"
-              value={editor.alternatePhone}
+        <Collapsible
+          open={alternatePhoneExpanded}
+          onOpenChange={setAlternatePhoneExpanded}
+          className="overflow-hidden rounded-lg border border-border bg-muted/15 sm:col-span-2"
+        >
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
               disabled={editor.saving}
-              onChange={editor.onAlternatePhoneChange}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              會同主要電話一齊保存喺同一個 Odoo Contact。
-            </p>
-          </div>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-11 justify-start gap-2 border-dashed touch-manipulation sm:col-span-2"
-            disabled={editor.saving}
-            onClick={() => setAlternatePhoneExpanded(true)}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {editor.alternatePhone.trim() ? "顯示後備電話" : "加入後備電話"}
-          </Button>
-        )}
+              className="flex min-h-12 w-full touch-manipulation items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="text-sm font-medium">後備電話（選填）</span>
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                {editor.alternatePhone.trim() ? "已填寫" : "未填寫"}
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${alternatePhoneExpanded ? "rotate-180" : ""}`}
+                  aria-hidden="true"
+                />
+              </span>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-1.5 border-t border-border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Label htmlFor="contact-editor-alternate-phone">電話號碼</Label>
+                {editor.alternatePhone.trim() && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-9 gap-1.5 px-2 text-xs text-muted-foreground touch-manipulation"
+                    disabled={editor.saving}
+                    onClick={() => {
+                      editor.onAlternatePhoneChange("");
+                      setAlternatePhoneExpanded(false);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    移除後備電話
+                  </Button>
+                )}
+              </div>
+              <RegionalPhoneInput
+                id="contact-editor-alternate-phone"
+                ariaLabel="編輯聯絡人後備電話"
+                value={editor.alternatePhone}
+                disabled={editor.saving}
+                onChange={editor.onAlternatePhoneChange}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                會同主要電話一齊保存喺同一個 Odoo Contact。
+              </p>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="contact-editor-email" className="flex items-center gap-1.5">

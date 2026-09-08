@@ -43,7 +43,7 @@ function Harness({
   customerGroups?: Array<{ id: number; name: string }>;
   customerGroupsError?: string | null;
 } = {}) {
-  const [senderName, setSenderName] = useState("");
+  const [senderName, setSenderName] = useState("Secretary Chan");
   const [alternatePhone, setAlternatePhone] = useState(initialAlternatePhone);
   const [customerCode, setCustomerCode] = useState("");
   const [customerGroup, setCustomerGroup] = useState(initialCustomerGroup);
@@ -168,40 +168,6 @@ function ExistingCustomerWithoutCodeHarness() {
   );
 }
 
-function SelectedOdooCustomerSenderHarness({ customerName = "" }: { customerName?: string }) {
-  const [senderName, setSenderName] = useState("");
-  const [selectedCustomer] = useState<DemoCustomer>({
-    id: "odoo-42",
-    odooPartnerId: 42,
-    name: "Jay Contact",
-    phone: "67610707",
-    customerType: "company",
-    companyName: "Autobrand LIMITED",
-    history: [],
-  });
-
-  return (
-    <CustomerSection
-      phone="67610707"
-      customerName={customerName}
-      customerCode="testcompany"
-      senderName={senderName}
-      customerType="company"
-      companyName="Autobrand LIMITED"
-      {...emptyBusinessProps}
-      onPhoneChange={noop}
-      onNameChange={noop}
-      onCustomerCodeChange={noop}
-      onSenderNameChange={setSenderName}
-      onCustomerTypeChange={noop}
-      onCompanyNameChange={noop}
-      onCustomerSelect={noop}
-      onCustomerAndRecipientSelect={noop}
-      selectedCustomer={selectedCustomer}
-    />
-  );
-}
-
 describe("CustomerSection gift sender", () => {
   beforeEach(() => {
     searchOdooCustomerAccount.mockReset();
@@ -217,35 +183,48 @@ describe("CustomerSection gift sender", () => {
     selectCustomerAndRecipient.mockReset();
   });
 
-  it("keeps the ordering customer and gift sender as separate inputs", () => {
+  it("defaults the gift sender to the ordering contact and allows direct edits", () => {
     render(<Harness />);
 
     const senderInput = screen.getByLabelText(/送花人名稱/);
+    expect(senderInput).toHaveValue("Secretary Chan");
+    expect(screen.queryByRole("button", { name: "同客戶相同" })).not.toBeInTheDocument();
+
     fireEvent.change(senderInput, { target: { value: "Director Lee" } });
     expect(senderInput).toHaveValue("Director Lee");
     expect(screen.getByLabelText(/下單人／聯絡人/)).toHaveValue("Secretary Chan");
-
-    fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
-    expect(senderInput).toHaveValue("Secretary Chan");
   });
 
-  it("keeps the optional backup phone hidden until staff asks for it", () => {
+  it("keeps an empty backup phone collapsed until its row is expanded", () => {
     render(<Harness />);
 
+    const alternatePhoneRow = screen.getByRole("button", { name: /後備電話（選填） 未填寫/ });
+    expect(alternatePhoneRow).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByLabelText("後備電話")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "加入後備電話" }));
+    fireEvent.click(alternatePhoneRow);
     expect(screen.getByLabelText("後備電話")).toBeVisible();
 
     fireEvent.change(screen.getByLabelText("後備電話"), { target: { value: "92345678" } });
     expect(screen.getByLabelText("後備電話")).toHaveValue("92345678");
+
+    fireEvent.change(screen.getByLabelText("後備電話"), { target: { value: "" } });
+    expect(screen.getByLabelText("後備電話")).toBeVisible();
+    fireEvent.change(screen.getByLabelText("後備電話"), { target: { value: "92345678" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /後備電話（選填） 已填寫/ }));
+    expect(screen.queryByLabelText("後備電話")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /後備電話（選填） 已填寫/ }));
+    expect(screen.getByLabelText("後備電話")).toHaveValue("92345678");
   });
 
-  it("keeps an existing backup phone collapsed until staff asks to view it", () => {
+  it("opens an existing backup phone by default and lets staff collapse it", () => {
     render(<Harness initialAlternatePhone="92345678" />);
 
-    expect(screen.queryByLabelText("後備電話")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "顯示後備電話" }));
     expect(screen.getByLabelText("後備電話")).toHaveValue("92345678");
+    const alternatePhoneRow = screen.getByRole("button", { name: /後備電話（選填） 已填寫/ });
+    expect(alternatePhoneRow).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(alternatePhoneRow);
+    expect(screen.queryByLabelText("後備電話")).not.toBeInTheDocument();
   });
 
   it("selects Customer Group from existing Odoo Contact Tags inside Customer Details", () => {
@@ -280,51 +259,6 @@ describe("CustomerSection gift sender", () => {
     expect(screen.getByRole("combobox", { name: "客戶群組（選填）" })).toBeDisabled();
     expect(screen.getByText(/未能同步 Odoo Contact Tags；不會提供未驗證選項/)).toBeVisible();
     expect(screen.queryByRole("option", { name: /Corporate|VIP Wholesale/ })).not.toBeInTheDocument();
-  });
-
-  it("uses the ordering contact instead of the company name for a company customer", () => {
-    const onSenderNameChange = vi.fn();
-
-    render(
-      <CustomerSection
-        phone="67610808"
-        customerName="Jay"
-        customerCode="testcompany"
-        senderName="Autobrand LIMITED"
-        customerType="company"
-        companyName="Autobrand LIMITED"
-        {...emptyBusinessProps}
-        onPhoneChange={noop}
-        onNameChange={noop}
-        onCustomerCodeChange={noop}
-        onSenderNameChange={onSenderNameChange}
-        onCustomerTypeChange={noop}
-        onCompanyNameChange={noop}
-        onCustomerSelect={noop}
-        onCustomerAndRecipientSelect={noop}
-        selectedCustomer={null}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
-    expect(onSenderNameChange).toHaveBeenCalledWith("Jay");
-  });
-
-  it("falls back to the selected Odoo contact when the controlled name has not settled yet", () => {
-    render(<SelectedOdooCustomerSenderHarness />);
-
-    fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
-
-    expect(screen.getByLabelText(/送花人名稱/)).toHaveValue("Jay Contact");
-    expect(screen.getByLabelText(/送花人名稱/)).not.toHaveValue("Autobrand LIMITED");
-  });
-
-  it("keeps the displayed controlled contact authoritative over selected-customer fallback", () => {
-    render(<SelectedOdooCustomerSenderHarness customerName="Edited Contact" />);
-
-    fireEvent.click(screen.getByRole("button", { name: "同客戶相同" }));
-
-    expect(screen.getByLabelText(/送花人名稱/)).toHaveValue("Edited Contact");
   });
 
   it("marks required customer fields invalid and exposes inline alerts", () => {

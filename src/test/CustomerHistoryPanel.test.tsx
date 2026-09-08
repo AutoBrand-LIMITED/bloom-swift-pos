@@ -236,9 +236,13 @@ describe("CustomerHistoryPanel resizable history", () => {
     expect(screen.getByRole("dialog", { name: "編輯聯絡人" })).toBeVisible();
     expect(screen.getByLabelText("聯絡人名稱")).toHaveValue(profileCustomer.name);
     expect(screen.getByLabelText("編輯聯絡人電話")).toHaveValue("67610707");
-    expect(screen.queryByLabelText("編輯聯絡人後備電話")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "顯示後備電話" }));
     expect(screen.getByLabelText("編輯聯絡人後備電話")).toBeVisible();
+    expect(screen.getByLabelText("編輯聯絡人後備電話")).toHaveValue("92345678");
+    const alternatePhoneRow = screen.getByRole("button", { name: /後備電話（選填） 已填寫/ });
+    expect(alternatePhoneRow).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(alternatePhoneRow);
+    expect(screen.queryByLabelText("編輯聯絡人後備電話")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /後備電話（選填） 已填寫/ }));
     expect(screen.getByLabelText("編輯聯絡人後備電話")).toHaveValue("92345678");
     expect(screen.getByLabelText("電郵（選填）")).toHaveValue("alex@example.com");
     expect(screen.getByLabelText("帳單地址（選填）")).toHaveValue("香港中環花園道 1 號");

@@ -885,6 +885,7 @@ const Index = () => {
     setCustomerCode(customer.customerCode || "");
     setPhone(customer.phone);
     setAlternatePhone(customer.alternatePhone || "");
+    setSenderName(customer.name);
     setCustomerEmail(customer.email || "");
     setCustomerType(customer.customerType || "personal");
     setCompanyName(customer.companyName || "");
@@ -900,6 +901,7 @@ const Index = () => {
       "customerName",
       "phone",
       "alternatePhone",
+      "senderName",
       "companyName",
       "customerEmail",
       "billingAddress",
@@ -945,7 +947,7 @@ const Index = () => {
     setCustomerGroupExpectedWriteDate(undefined);
     setSenderContactDraft("");
     resetRecipientPersistence();
-    clearCheckoutErrors("customerName", "phone", "alternatePhone", "companyName", "customerEmail", "billingAddress");
+    clearCheckoutErrors("customerName", "phone", "alternatePhone", "senderName", "companyName", "customerEmail", "billingAddress");
   }, [clearCheckoutErrors, resetRecipientPersistence]);
 
   const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
@@ -953,6 +955,12 @@ const Index = () => {
   }, [resetCustomerForSearch]);
 
   const restoreSelectedCustomerProfile = useCallback((customer: DemoCustomer) => {
+    setSenderName((current) => (
+      !current.trim()
+      || normalizeCustomerIdentityName(current) === normalizeCustomerIdentityName(customerName)
+        ? customer.name
+        : current
+    ));
     setCustomerName(customer.name);
     setPhone(customer.phone || "");
     setAlternatePhone(customer.alternatePhone || "");
@@ -961,8 +969,8 @@ const Index = () => {
     setCompanyName(customer.companyName || "");
     setBillingAddress(customer.billingAddress || "");
     setCustomerGroupExpectedWriteDate(customer.writeDate);
-    clearCheckoutErrors("customerName", "phone", "alternatePhone", "companyName", "customerEmail", "billingAddress");
-  }, [clearCheckoutErrors]);
+    clearCheckoutErrors("customerName", "phone", "alternatePhone", "senderName", "companyName", "customerEmail", "billingAddress");
+  }, [clearCheckoutErrors, customerName]);
 
   const saveSelectedCustomerProfile = useCallback(async () => {
     if (!selectedCustomer?.odooPartnerId || !selectedCustomer.writeDate) {
@@ -2427,8 +2435,14 @@ const Index = () => {
                 setCustomerProfileError(null);
               },
               onNameChange: (value) => {
+                setSenderName((current) => (
+                  !current.trim()
+                  || normalizeCustomerIdentityName(current) === normalizeCustomerIdentityName(customerName)
+                    ? value
+                    : current
+                ));
                 setCustomerName(value);
-                clearCheckoutErrors("customerName");
+                clearCheckoutErrors("customerName", "senderName");
               },
               onPhoneChange: (value) => {
                 setPhone(value);
@@ -2565,8 +2579,14 @@ const Index = () => {
             clearCheckoutErrors("alternatePhone");
           }}
           onNameChange={(value) => {
+            setSenderName((current) => (
+              !current.trim()
+              || normalizeCustomerIdentityName(current) === normalizeCustomerIdentityName(customerName)
+                ? value
+                : current
+            ));
             setCustomerName(value);
-            clearCheckoutErrors("customerName");
+            clearCheckoutErrors("customerName", "senderName");
             if (
               confirmedNewCustomerName
               && normalizeCustomerIdentityName(value)

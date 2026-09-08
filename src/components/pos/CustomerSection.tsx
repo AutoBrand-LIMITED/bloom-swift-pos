@@ -10,13 +10,13 @@ import {
   LoaderCircle,
   Mail,
   MapPin,
-  Plus,
   RefreshCw,
   Trash2,
   User,
   UserRoundCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { DemoCustomer } from "@/data/demo-customers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CustomerFlags from "@/components/pos/CustomerFlags";
@@ -110,7 +110,7 @@ const CustomerSection = ({
   confirmedNewCustomerName, confirmedNewCustomerPhone, onConfirmNewCustomer,
   onResolutionStateChange,
 }: CustomerSectionProps) => {
-  const [alternatePhoneExpanded, setAlternatePhoneExpanded] = useState(false);
+  const [alternatePhoneExpanded, setAlternatePhoneExpanded] = useState(Boolean(alternatePhone.trim()));
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
   const [search, setSearch] = useState("");
   const [customerCodeSearchDraft, setCustomerCodeSearchDraft] = useState("");
@@ -132,6 +132,7 @@ const CustomerSection = ({
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
   const previousSelectedCustomerIdRef = useRef(selectedCustomer?.id);
+  const previousAlternatePhoneRef = useRef(alternatePhone);
   const selectedCustomerGroup = customerGroups.find((group) => group.id === customerGroupId);
   const customerGroupIsLegacySnapshot = customerGroupId === undefined && Boolean(customerGroup.trim());
   const customerGroupDisabled = customerGroupLocked
@@ -142,10 +143,15 @@ const CustomerSection = ({
   const selectedProfileLocked = Boolean(selectedOdooPartnerId);
 
   useEffect(() => {
-    if (previousSelectedCustomerIdRef.current === selectedCustomer?.id) return;
+    const selectedCustomerChanged = previousSelectedCustomerIdRef.current !== selectedCustomer?.id;
+    const alternatePhoneAdded = !previousAlternatePhoneRef.current.trim() && Boolean(alternatePhone.trim());
     previousSelectedCustomerIdRef.current = selectedCustomer?.id;
-    setAlternatePhoneExpanded(false);
-  }, [selectedCustomer?.id]);
+    previousAlternatePhoneRef.current = alternatePhone;
+
+    if (selectedCustomerChanged || alternatePhoneAdded) {
+      setAlternatePhoneExpanded(Boolean(alternatePhone.trim()));
+    }
+  }, [alternatePhone, selectedCustomer?.id]);
 
   useEffect(() => {
     if (selectedOdooPartnerId) setActiveDropdown(null);
@@ -358,8 +364,6 @@ const CustomerSection = ({
           : "未搵到客戶"
         : "正在準備搜尋...";
 
-  // 「同客戶相同」係指實際下單人／聯絡人；公司名稱只屬於帳戶資料。
-  const orderingCustomerName = customerName.trim() || selectedCustomer?.name.trim() || "";
   const normalizedCurrentPhone = normalizePhoneNumber(phone);
   const currentPhoneSearchKey = phoneSearchQueryKey(phone);
   const normalizedCurrentCustomerName = normalizeCustomerIdentityName(customerName);
@@ -995,56 +999,69 @@ const CustomerSection = ({
           </div>
         </div>
 
-        {alternatePhoneExpanded ? (
-          <div className="rounded-lg border border-border bg-muted/15 p-3">
-            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-              <Label htmlFor="alternate-phone" className="text-xs font-medium">
-                後備電話（選填）
-              </Label>
-              {!selectedProfileLocked && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="min-h-9 gap-1.5 px-2 text-xs text-muted-foreground touch-manipulation"
-                  onClick={() => {
-                    onAlternatePhoneChange("");
-                    setAlternatePhoneExpanded(false);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  移除後備電話
-                </Button>
-              )}
-            </div>
-            <RegionalPhoneInput
-              id="alternate-phone"
-              ariaLabel="後備電話"
-              value={alternatePhone}
-              disabled={selectedProfileLocked}
-              onChange={onAlternatePhoneChange}
-              invalid={Boolean(alternatePhoneError)}
-            />
-            {alternatePhoneError && (
-              <p id="alternate-phone-error" role="alert" className="mt-1.5 text-xs text-destructive">
-                {alternatePhoneError}
-              </p>
-            )}
-            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              主要電話未能聯絡時使用；會同主要電話一齊保存喺同一個 Odoo Contact。
-            </p>
-          </div>
-        ) : (!selectedProfileLocked || Boolean(alternatePhone.trim())) ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-11 w-full justify-start gap-2 border-dashed text-sm touch-manipulation sm:w-auto"
-            onClick={() => setAlternatePhoneExpanded(true)}
+        {(!selectedProfileLocked || Boolean(alternatePhone.trim())) && (
+          <Collapsible
+            open={alternatePhoneExpanded}
+            onOpenChange={setAlternatePhoneExpanded}
+            className="overflow-hidden rounded-lg border border-border bg-muted/15 sm:col-span-2"
           >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {alternatePhone.trim() ? "顯示後備電話" : "加入後備電話"}
-          </Button>
-        ) : null}
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex min-h-12 w-full touch-manipulation items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+              >
+                <span className="text-sm font-medium">後備電話（選填）</span>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {alternatePhone.trim() ? "已填寫" : "未填寫"}
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${alternatePhoneExpanded ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  />
+                </span>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t border-border p-3">
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <Label htmlFor="alternate-phone" className="text-xs font-medium">
+                    電話號碼
+                  </Label>
+                  {!selectedProfileLocked && alternatePhone.trim() && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="min-h-9 gap-1.5 px-2 text-xs text-muted-foreground touch-manipulation"
+                      onClick={() => {
+                        onAlternatePhoneChange("");
+                        setAlternatePhoneExpanded(false);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      移除後備電話
+                    </Button>
+                  )}
+                </div>
+                <RegionalPhoneInput
+                  id="alternate-phone"
+                  ariaLabel="後備電話"
+                  value={alternatePhone}
+                  disabled={selectedProfileLocked}
+                  onChange={onAlternatePhoneChange}
+                  invalid={Boolean(alternatePhoneError)}
+                />
+                {alternatePhoneError && (
+                  <p id="alternate-phone-error" role="alert" className="mt-1.5 text-xs text-destructive">
+                    {alternatePhoneError}
+                  </p>
+                )}
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  主要電話未能聯絡時使用；會同主要電話一齊保存喺同一個 Odoo Contact。
+                </p>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         {customerResolutionPhase !== "idle" && (
           <div
@@ -1196,25 +1213,13 @@ const CustomerSection = ({
       </div>
 
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor="sender-name" className="text-xs font-medium flex items-center gap-1.5">
-            <UserRoundCheck className="h-3.5 w-3.5" />
-            送花人名稱 <span className="text-destructive">*</span>
-          </Label>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-xs"
-            disabled={!orderingCustomerName}
-            onClick={() => onSenderNameChange(orderingCustomerName)}
-          >
-            同客戶相同
-          </Button>
-        </div>
+        <Label htmlFor="sender-name" className="text-xs font-medium flex items-center gap-1.5">
+          <UserRoundCheck className="h-3.5 w-3.5" />
+          送花人名稱 <span className="text-destructive">*</span>
+        </Label>
         <Input
           id="sender-name"
-          placeholder="輸入真正送花者姓名或公司"
+          placeholder="預設與下單人／聯絡人相同；如不同可直接修改"
           value={senderName}
           onChange={(event) => onSenderNameChange(event.target.value)}
           className={`text-base ${senderNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
