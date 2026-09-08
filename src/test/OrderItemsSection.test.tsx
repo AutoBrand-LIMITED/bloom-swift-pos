@@ -26,12 +26,13 @@ describe("OrderItemsSection legacy line snapshots", () => {
     />,
   );
 
-  it("keeps packing and remarks editable on each order line", () => {
+  it("removes packing and keeps a free-text note on each order line", () => {
     const items: OrderItem[] = [{
       id: "line-1",
       name: "花束",
       price: 680,
       quantity: 1,
+      packing: "舊有禮盒記錄",
     }];
     const onItemsChange = vi.fn();
 
@@ -50,14 +51,17 @@ describe("OrderItemsSection legacy line snapshots", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("花束 包裝"), { target: { value: "禮盒" } });
-    expect(onItemsChange).toHaveBeenLastCalledWith([
-      expect.objectContaining({ id: "line-1", packing: "禮盒" }),
-    ]);
+    expect(screen.queryByLabelText("花束 包裝")).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("花束 項目備註"), { target: { value: "白色絲帶" } });
+    const remarks = screen.getByLabelText("花束 項目備註");
+    expect(remarks.tagName).toBe("TEXTAREA");
+    fireEvent.change(remarks, { target: { value: "白色絲帶\n星期五前完成" } });
     expect(onItemsChange).toHaveBeenLastCalledWith([
-      expect.objectContaining({ id: "line-1", remarks: "白色絲帶" }),
+      expect.objectContaining({
+        id: "line-1",
+        packing: "舊有禮盒記錄",
+        remarks: "白色絲帶\n星期五前完成",
+      }),
     ]);
   });
 

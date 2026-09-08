@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -539,29 +540,16 @@ const OrderItemsSection = ({
                   <span className="font-mono font-semibold">小計 ${formatMoney(orderItemTotal(item))}</span>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">包裝</Label>
-                    <Input
-                      aria-label={`${item.name} 包裝`}
-                      value={item.packing || ""}
-                      onChange={(event) => updateItem(item.id, "packing", event.target.value)}
-                      className="min-h-11 bg-card text-sm"
-                      placeholder="例如：禮盒、花紙"
-                      maxLength={500}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">項目備註</Label>
-                    <Input
-                      aria-label={`${item.name} 項目備註`}
-                      value={item.remarks || ""}
-                      onChange={(event) => updateItem(item.id, "remarks", event.target.value)}
-                      className="min-h-11 bg-card text-sm"
-                      placeholder="只適用於此項目"
-                      maxLength={1000}
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">項目備註</Label>
+                  <Textarea
+                    aria-label={`${item.name} 項目備註`}
+                    value={item.remarks || ""}
+                    onChange={(event) => updateItem(item.id, "remarks", event.target.value)}
+                    className="min-h-20 resize-y bg-card text-sm"
+                    placeholder="可自由填寫只適用於此項目嘅備註"
+                    maxLength={1000}
+                  />
                 </div>
 
                 {adjusted && (
