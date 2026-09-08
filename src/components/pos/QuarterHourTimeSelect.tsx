@@ -6,10 +6,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DELIVERY_HOUR_OPTIONS,
   isQuarterHourDeliveryRange,
   parseQuarterHourDeliveryRange,
-  QUARTER_HOUR_MINUTE_OPTIONS,
+  QUARTER_HOUR_DELIVERY_TIME_OPTIONS,
 } from "@/lib/delivery-time-options";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -35,28 +34,34 @@ const QuarterHourTimeSelect = ({
 }: QuarterHourTimeSelectProps) => {
   const legacyValue = value.trim() && !isQuarterHourDeliveryRange(value) ? value : null;
   const parsedValue = parseQuarterHourDeliveryRange(value);
-  const [startHour, setStartHour] = useState(parsedValue?.startHour || "");
-  const [startMinute, setStartMinute] = useState(parsedValue?.startMinute || "00");
-  const [endHour, setEndHour] = useState(parsedValue?.endHour || "");
-  const [endMinute, setEndMinute] = useState(parsedValue?.endMinute || "00");
+  const [startTime, setStartTime] = useState(
+    parsedValue ? `${parsedValue.startHour}:${parsedValue.startMinute}` : "",
+  );
+  const [endTime, setEndTime] = useState(
+    parsedValue ? `${parsedValue.endHour}:${parsedValue.endMinute}` : "",
+  );
 
-  const emitRange = (
-    nextStartHour: string,
-    nextStartMinute: string,
-    nextEndHour: string,
-    nextEndMinute: string,
-  ) => {
-    if (nextStartHour && nextEndHour) {
-      onChange(`${nextStartHour}:${nextStartMinute}-${nextEndHour}:${nextEndMinute}`);
+  const emitRange = (nextStartTime: string, nextEndTime: string) => {
+    if (nextStartTime && nextEndTime) {
+      onChange(`${nextStartTime}-${nextEndTime}`);
     }
+  };
+
+  const defaultEndTime = (nextStartTime: string) => {
+    const startIndex = QUARTER_HOUR_DELIVERY_TIME_OPTIONS.findIndex(
+      (option) => option.value === nextStartTime,
+    );
+    if (startIndex < 0) return "";
+    return QUARTER_HOUR_DELIVERY_TIME_OPTIONS[Math.min(
+      startIndex + 4,
+      QUARTER_HOUR_DELIVERY_TIME_OPTIONS.length - 1,
+    )]?.value || "";
   };
 
   useEffect(() => {
     const parsed = parseQuarterHourDeliveryRange(value);
-    setStartHour(parsed?.startHour || "");
-    setStartMinute(parsed?.startMinute || "00");
-    setEndHour(parsed?.endHour || "");
-    setEndMinute(parsed?.endMinute || "00");
+    setStartTime(parsed ? `${parsed.startHour}:${parsed.startMinute}` : "");
+    setEndTime(parsed ? `${parsed.endHour}:${parsed.endMinute}` : "");
   }, [value]);
 
   return (
@@ -71,31 +76,31 @@ const QuarterHourTimeSelect = ({
           原有時間：{legacyValue}。選擇新時間後會改用一段 15 分鐘間隔嘅時間。
         </p>
       )}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-end">
         <div className="space-y-1">
-          <span className="text-xs text-muted-foreground">開始小時</span>
+          <span className="text-xs font-medium text-muted-foreground">From（由）</span>
           <Select
-            value={startHour}
-            onValueChange={(hour) => {
-              setStartHour(hour);
-              let nextEndHour = endHour;
-              if (!nextEndHour) {
-                nextEndHour = String(Math.min(23, Number(hour) + 1)).padStart(2, "0");
-                setEndHour(nextEndHour);
+            value={startTime}
+            onValueChange={(nextStartTime) => {
+              setStartTime(nextStartTime);
+              let nextEndTime = endTime;
+              if (!nextEndTime || nextEndTime <= nextStartTime) {
+                nextEndTime = defaultEndTime(nextStartTime);
+                setEndTime(nextEndTime);
               }
-              emitRange(hour, startMinute, nextEndHour, endMinute);
+              emitRange(nextStartTime, nextEndTime);
             }}
           >
             <SelectTrigger
-              id={`${id}-start-hour`}
-              aria-label={`${label} 開始小時`}
+              id={`${id}-from`}
+              aria-label={`${label} From（由）`}
               aria-invalid={ariaInvalid}
-              className="min-h-11"
+              className="min-h-11 w-full touch-manipulation"
             >
-              <SelectValue placeholder="選擇小時" />
+              <SelectValue placeholder="選擇開始時間" />
             </SelectTrigger>
             <SelectContent>
-              {DELIVERY_HOUR_OPTIONS.map((option) => (
+              {QUARTER_HOUR_DELIVERY_TIME_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -103,75 +108,26 @@ const QuarterHourTimeSelect = ({
             </SelectContent>
           </Select>
         </div>
+        <span className="hidden min-h-11 items-center text-lg text-muted-foreground sm:flex" aria-hidden="true">→</span>
         <div className="space-y-1">
-          <span className="text-xs text-muted-foreground">開始分鐘</span>
+          <span className="text-xs font-medium text-muted-foreground">To（至）</span>
           <Select
-            value={startMinute}
-            onValueChange={(minute) => {
-              setStartMinute(minute);
-              emitRange(startHour, minute, endHour, endMinute);
+            value={endTime}
+            onValueChange={(nextEndTime) => {
+              setEndTime(nextEndTime);
+              emitRange(startTime, nextEndTime);
             }}
           >
             <SelectTrigger
-              id={`${id}-start-minute`}
-              aria-label={`${label} 開始分鐘`}
+              id={`${id}-to`}
+              aria-label={`${label} To（至）`}
               aria-invalid={ariaInvalid}
-              className="min-h-11"
+              className="min-h-11 w-full touch-manipulation"
             >
-              <SelectValue />
+              <SelectValue placeholder="選擇結束時間" />
             </SelectTrigger>
             <SelectContent>
-              {QUARTER_HOUR_MINUTE_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <span className="text-xs text-muted-foreground">結束小時</span>
-          <Select
-            value={endHour}
-            onValueChange={(hour) => {
-              setEndHour(hour);
-              emitRange(startHour, startMinute, hour, endMinute);
-            }}
-          >
-            <SelectTrigger
-              id={`${id}-end-hour`}
-              aria-label={`${label} 結束小時`}
-              aria-invalid={ariaInvalid}
-              className="min-h-11"
-            >
-              <SelectValue placeholder="選擇小時" />
-            </SelectTrigger>
-            <SelectContent>
-              {DELIVERY_HOUR_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <span className="text-xs text-muted-foreground">結束分鐘</span>
-          <Select
-            value={endMinute}
-            onValueChange={(minute) => {
-              setEndMinute(minute);
-              emitRange(startHour, startMinute, endHour, minute);
-            }}
-          >
-            <SelectTrigger
-              id={`${id}-end-minute`}
-              aria-label={`${label} 結束分鐘`}
-              aria-invalid={ariaInvalid}
-              className="min-h-11"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {QUARTER_HOUR_MINUTE_OPTIONS.map((option) => (
+              {QUARTER_HOUR_DELIVERY_TIME_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
               ))}
             </SelectContent>

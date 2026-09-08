@@ -434,19 +434,17 @@ describe("DeliverySection delivery time controls", () => {
       deliveryTimeError: "請輸入指定送貨時間",
     });
 
-    const hourSelector = screen.getByRole("combobox", { name: "指定送貨時間 開始小時" });
-    const minuteSelector = screen.getByRole("combobox", { name: "指定送貨時間 開始分鐘" });
-    expect(hourSelector).toHaveAttribute("aria-invalid", "true");
-    expect(minuteSelector).toHaveAttribute("aria-invalid", "true");
+    const fromSelector = screen.getByRole("combobox", { name: "指定送貨時間 From（由）" });
+    const toSelector = screen.getByRole("combobox", { name: "指定送貨時間 To（至）" });
+    expect(fromSelector).toHaveAttribute("aria-invalid", "true");
+    expect(toSelector).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("指定時間可能另收附加費")).toBeVisible();
     expect(screen.getByRole("alert", { name: "" })).toHaveTextContent("請輸入指定送貨時間");
 
-    fireEvent.click(hourSelector);
-    fireEvent.click(screen.getByRole("option", { name: "上午 10 時" }));
-    fireEvent.click(minuteSelector);
-    expect(screen.queryByRole("option", { name: "02 分" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("option", { name: "15 分" }));
-    expect(props.onTimeChange).toHaveBeenCalledWith("10:15-11:00");
+    fireEvent.click(fromSelector);
+    expect(screen.queryByRole("option", { name: "上午 10:02" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "上午 10:15" }));
+    expect(props.onTimeChange).toHaveBeenCalledWith("10:15-11:15");
   });
 
   it("renders loading, error/retry, and empty backend states without hiding specified time", () => {

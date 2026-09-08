@@ -20,6 +20,22 @@ describe("QuarterHourTimeSelect", () => {
     });
   });
 
+  it("shows the complete From and To times in two clear fields", () => {
+    render(
+      <QuarterHourTimeSelect
+        id="visible-range"
+        label="指定送貨時間"
+        value="09:15-10:00"
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "指定送貨時間 From（由）" }))
+      .toHaveTextContent("上午 09:15");
+    expect(screen.getByRole("combobox", { name: "指定送貨時間 To（至）" }))
+      .toHaveTextContent("上午 10:00");
+  });
+
   it("preserves a legacy free-text time until a standard time range is selected", () => {
     const onChange = vi.fn();
     render(
@@ -33,14 +49,16 @@ describe("QuarterHourTimeSelect", () => {
 
     expect(screen.getByText(/原有時間：下午 3 時前/)).toBeVisible();
 
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 開始分鐘" }));
-    fireEvent.click(screen.getByRole("option", { name: "30 分" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 開始小時" }));
-    fireEvent.click(screen.getByRole("option", { name: "下午 03 時" }));
-    expect(onChange).toHaveBeenCalledWith("15:30-16:00");
+    expect(screen.getByText("From（由）")).toBeVisible();
+    expect(screen.getByText("To（至）")).toBeVisible();
+    expect(screen.getAllByRole("combobox")).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 結束分鐘" }));
-    fireEvent.click(screen.getByRole("option", { name: "30 分" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 From（由）" }));
+    fireEvent.click(screen.getByRole("option", { name: "下午 03:30" }));
     expect(onChange).toHaveBeenCalledWith("15:30-16:30");
+
+    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 To（至）" }));
+    fireEvent.click(screen.getByRole("option", { name: "下午 05:00" }));
+    expect(onChange).toHaveBeenCalledWith("15:30-17:00");
   });
 });
