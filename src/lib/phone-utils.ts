@@ -61,9 +61,10 @@ function legacyPhoneCandidate(value: string): string {
 }
 
 /**
- * Keep Odoo's primary and mobile numbers separate. Older customer records may
+ * Present primary and backup numbers separately. Older customer records may
  * contain two comma-separated numbers in `phone`; split those without joining
- * every digit into one invalid number.
+ * every digit into one invalid number. Some Odoo databases may also expose a
+ * separate mobile value.
  */
 export function splitPhoneValues(phoneValue: string | null | undefined, mobileValue?: string | null): SplitPhoneValues {
   const rawPhone = phoneValue?.trim() || "";

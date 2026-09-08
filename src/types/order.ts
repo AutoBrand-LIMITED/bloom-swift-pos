@@ -123,7 +123,7 @@ export interface Order {
   /** Gift sender shown on the florist order; may differ from the ordering customer. */
   senderName?: string;
   phone: string;
-  /** Optional backup contact number stored on the Odoo Contact mobile field. */
+  /** Optional backup contact number stored with the same Odoo Contact. */
   alternatePhone?: string;
   items: OrderItem[];
   deliveryFee: number;

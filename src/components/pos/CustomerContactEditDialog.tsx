@@ -112,7 +112,7 @@ const CustomerContactEditDialog = ({ editor }: CustomerContactEditDialogProps) =
               onChange={editor.onAlternatePhoneChange}
             />
             <p className="text-[11px] text-muted-foreground">
-              會獨立儲存到同一個 Odoo Contact 嘅 Mobile 欄位。
+              會同主要電話一齊保存喺同一個 Odoo Contact。
             </p>
           </div>
         ) : (

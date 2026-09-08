@@ -1004,7 +1004,7 @@ const CustomerSection = ({
               </p>
             )}
             <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              主要電話未能聯絡時使用；會獨立儲存到 Odoo Contact 嘅 Mobile 欄位。
+              主要電話未能聯絡時使用；會同主要電話一齊保存喺同一個 Odoo Contact。
             </p>
           </div>
         ) : (!selectedProfileLocked || Boolean(alternatePhone.trim())) ? (
