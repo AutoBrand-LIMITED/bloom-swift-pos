@@ -44,6 +44,52 @@ describe("QuarterHourTimeSelect", () => {
       .toHaveValue("00");
   });
 
+  it("lets staff choose hour and minute from dropdowns as well as type them", () => {
+    const onChange = vi.fn();
+    render(
+      <QuarterHourTimeSelect
+        id="editable-range"
+        label="指定送貨時間"
+        value=""
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "選擇指定送貨時間 From（由） 小時" }));
+    fireEvent.click(screen.getByRole("button", { name: "指定送貨時間 From（由） 小時 10" }));
+    fireEvent.click(screen.getByRole("button", { name: "選擇指定送貨時間 From（由） 分鐘" }));
+    fireEvent.click(screen.getByRole("button", { name: "指定送貨時間 From（由） 分鐘 15" }));
+
+    expect(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 小時" }))
+      .toHaveValue("10");
+    expect(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 分鐘" }))
+      .toHaveValue("15");
+    expect(onChange).toHaveBeenLastCalledWith("10:15-11:15");
+
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 To（至） 小時" }), {
+      target: { value: "1" },
+    });
+    expect(screen.getByRole("textbox", { name: "指定送貨時間 To（至） 小時" }))
+      .toHaveValue("1");
+  });
+
+  it("does not show an error while an endpoint is only partly entered", () => {
+    render(
+      <QuarterHourTimeSelect
+        id="partial-range"
+        label="指定送貨時間"
+        value=""
+        onChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 分鐘" }), {
+      target: { value: "00" },
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("preserves a legacy free-text time until a standard time range is selected", () => {
     const onChange = vi.fn();
     render(

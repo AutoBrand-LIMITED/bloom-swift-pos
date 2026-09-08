@@ -1,10 +1,12 @@
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   isQuarterHourDeliveryRange,
   parseQuarterHourDeliveryRange,
   QUARTER_HOUR_DELIVERY_TIME_OPTIONS,
 } from "@/lib/delivery-time-options";
 import { cn } from "@/lib/utils";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface QuarterHourTimeSelectProps {
@@ -28,6 +30,8 @@ interface TimeParts {
 const EMPTY_TIME_PARTS = (): TimeParts => ({ period: "am", hour: "", minute: "" });
 const VALID_MINUTES = new Set([0, 15, 30, 45]);
 const padTwoDigits = (value: number) => String(value).padStart(2, "0");
+const HOUR_OPTIONS = Array.from({ length: 12 }, (_, index) => padTwoDigits(index + 1));
+const MINUTE_OPTIONS = ["00", "15", "30", "45"];
 
 const from24HourTime = (hour: string, minute: string): TimeParts => {
   const hourNumber = Number(hour);
@@ -66,6 +70,87 @@ interface TimeEndpointProps {
   invalid: boolean;
   describedBy?: string;
 }
+
+interface EditableTimePartProps {
+  id: string;
+  accessibleLabel: string;
+  label: string;
+  kind: "hour" | "minute";
+  value: string;
+  onChange: (value: string) => void;
+  invalid: boolean;
+  describedBy?: string;
+}
+
+const EditableTimePart = ({
+  id,
+  accessibleLabel,
+  label,
+  kind,
+  value,
+  onChange,
+  invalid,
+  describedBy,
+}: EditableTimePartProps) => {
+  const [open, setOpen] = useState(false);
+  const options = kind === "hour" ? HOUR_OPTIONS : MINUTE_OPTIONS;
+
+  return (
+    <div className="min-w-[5.5rem] flex-1 space-y-1">
+      <label htmlFor={id} className="block text-[11px] text-muted-foreground">{label}</label>
+      <div className="relative">
+        <Input
+          id={id}
+          aria-label={accessibleLabel}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder={kind === "hour" ? "HH" : "00"}
+          value={value}
+          onChange={(event) => onChange(onlyTwoDigits(event.target.value))}
+          onBlur={() => onChange(normaliseInput(value, kind))}
+          className="min-h-11 pr-11 text-center font-mono text-base tabular-nums touch-manipulation"
+        />
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={`選擇${accessibleLabel}`}
+              aria-expanded={open}
+              className="absolute inset-y-0 right-0 flex min-h-11 min-w-11 items-center justify-center rounded-r-md text-muted-foreground touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            className={cn("w-40 p-2", kind === "hour" ? "grid grid-cols-3 gap-1" : "grid grid-cols-2 gap-1")}
+            onOpenAutoFocus={(event) => event.preventDefault()}
+          >
+            {options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-label={`${accessibleLabel} ${option}`}
+                className={cn(
+                  "min-h-11 rounded-md px-2 font-mono text-sm tabular-nums touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  value === option ? "bg-primary text-primary-foreground" : "active:bg-muted",
+                )}
+                onClick={() => {
+                  onChange(option);
+                  setOpen(false);
+                }}
+              >
+                {option}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+  );
+};
 
 const TimeEndpoint = ({
   id,
@@ -110,43 +195,31 @@ const TimeEndpoint = ({
           })}
         </div>
 
-        <label className="min-w-[4.75rem] flex-1 space-y-1">
-          <span className="block text-[11px] text-muted-foreground">小時</span>
-          <Input
-            id={`${id}-hour`}
-            aria-label={`${accessibleLabel} 小時`}
-            aria-invalid={invalid}
-            aria-describedby={describedBy}
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="HH"
-            value={value.hour}
-            onChange={(event) => updatePart("hour", onlyTwoDigits(event.target.value))}
-            onBlur={() => updatePart("hour", normaliseInput(value.hour, "hour"))}
-            className="min-h-11 text-center font-mono text-base tabular-nums touch-manipulation"
-          />
-        </label>
+        <EditableTimePart
+          id={`${id}-hour`}
+          accessibleLabel={`${accessibleLabel} 小時`}
+          label="小時"
+          kind="hour"
+          value={value.hour}
+          onChange={(nextValue) => updatePart("hour", nextValue)}
+          invalid={invalid}
+          describedBy={describedBy}
+        />
 
         <span className="flex min-h-11 items-center pb-0.5 text-lg font-semibold text-muted-foreground" aria-hidden="true">
           :
         </span>
 
-        <label className="min-w-[4.75rem] flex-1 space-y-1">
-          <span className="block text-[11px] text-muted-foreground">分鐘</span>
-          <Input
-            id={`${id}-minute`}
-            aria-label={`${accessibleLabel} 分鐘`}
-            aria-invalid={invalid}
-            aria-describedby={describedBy}
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="00"
-            value={value.minute}
-            onChange={(event) => updatePart("minute", onlyTwoDigits(event.target.value))}
-            onBlur={() => updatePart("minute", normaliseInput(value.minute, "minute"))}
-            className="min-h-11 text-center font-mono text-base tabular-nums touch-manipulation"
-          />
-        </label>
+        <EditableTimePart
+          id={`${id}-minute`}
+          accessibleLabel={`${accessibleLabel} 分鐘`}
+          label="分鐘"
+          kind="minute"
+          value={value.minute}
+          onChange={(nextValue) => updatePart("minute", nextValue)}
+          invalid={invalid}
+          describedBy={describedBy}
+        />
       </div>
     </div>
   );
@@ -227,10 +300,10 @@ const QuarterHourTimeSelect = ({
 
   const startTime = to24HourTime(startParts);
   const endTime = to24HourTime(endParts);
-  const startStarted = Boolean(startParts.hour || startParts.minute);
-  const endStarted = Boolean(endParts.hour || endParts.minute);
-  const invalidStart = startStarted && !startTime;
-  const invalidEnd = endStarted && !endTime;
+  const startComplete = Boolean(startParts.hour && startParts.minute);
+  const endComplete = Boolean(endParts.hour && endParts.minute);
+  const invalidStart = startComplete && !startTime;
+  const invalidEnd = endComplete && !endTime;
   const invalidOrder = Boolean(startTime && endTime && endTime <= startTime);
   const localError = invalidStart
     ? "From（由）：小時請輸入 1 至 12；分鐘只可輸入 00、15、30 或 45。"

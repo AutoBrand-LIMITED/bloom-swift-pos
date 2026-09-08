@@ -243,6 +243,24 @@ describe("ProductManagementDialog", () => {
     expect(apiMocks.searchProducts).toHaveBeenCalledTimes(1);
   });
 
+  it("blocks a duplicate Product Code before creating a product", async () => {
+    apiMocks.searchProducts.mockResolvedValue([
+      { ...testingProduct, productCode: "CONG1" },
+    ]);
+    renderDialog();
+
+    await screen.findByText("testing");
+    fireEvent.click(screen.getByRole("button", { name: "新增商品" }));
+    fireEvent.change(screen.getByLabelText("商品名稱"), { target: { value: "Duplicate vase" } });
+    fireEvent.change(screen.getByLabelText("Product Code"), { target: { value: " cong1 " } });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Product Code「cong1」已經由另一件商品使用",
+    );
+    expect(apiMocks.createProduct).not.toHaveBeenCalled();
+  });
+
   it("filters products by category before sorting", async () => {
     renderDialog();
 

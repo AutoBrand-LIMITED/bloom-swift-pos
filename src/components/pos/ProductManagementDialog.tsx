@@ -138,6 +138,12 @@ const formFromProduct = (product: OdooProduct): ProductFormState => ({
   availableUntil: product.availableUntil || "",
 });
 
+const normalizeProductCode = (value: string | null | undefined) => value?.trim().toLocaleUpperCase() || "";
+
+const duplicateProductCodeMessage = (productCode: string) => (
+  `Product Code「${productCode}」已經由另一件商品使用，請輸入另一個編號。`
+);
+
 const ProductManagementDialog = ({
   open,
   onOpenChange,
@@ -255,8 +261,19 @@ const ProductManagementDialog = ({
   const saveProduct = async () => {
     const payload = payloadFromForm();
     const productName = form.name.trim();
+    const normalizedProductCode = normalizeProductCode(payload.productCode);
     if (!form.id && !productName) {
       setError("商品名稱必須填寫。");
+      return;
+    }
+    const duplicateProduct = normalizedProductCode
+      ? products.find((product) => (
+        product.id !== form.id
+        && normalizeProductCode(product.productCode) === normalizedProductCode
+      ))
+      : undefined;
+    if (duplicateProduct) {
+      setError(duplicateProductCodeMessage(payload.productCode?.trim() || normalizedProductCode));
       return;
     }
     if (payload.availableFrom && payload.availableUntil && payload.availableFrom > payload.availableUntil) {
@@ -1152,7 +1169,7 @@ const ProductManagementDialog = ({
                 </div>
 
                 {error && (
-                  <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <div role="alert" className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                     {error}
                   </div>
                 )}
