@@ -515,23 +515,23 @@ describe("print document privacy", () => {
     expect(html).not.toContain("$1,200");
   });
 
-  it("keeps non-divisible discounts explicit without inventing a rounded effective unit price", () => {
+  it("normalizes legacy non-five-percent discounts before printing", () => {
     const html = generatePickingList(orderFixture({
       items: [{
         id: "line-1",
         name: "Rounding case",
-        price: 19.99,
+        price: 20,
         quantity: 3,
         discountPercent: 17,
       }],
-      subtotal: 49.78,
-      finalPrice: 49.78,
+      subtotal: 51,
+      finalPrice: 51,
     }));
 
-    expect(html).toContain("$19.99");
-    expect(html).toContain("$49.78");
-    expect(html).toContain("折扣 17% / DISCOUNT");
-    expect(html).not.toContain("$16.59");
+    expect(html).toContain("$20");
+    expect(html).toContain("$51");
+    expect(html).toContain("折扣 15% / DISCOUNT");
+    expect(html).not.toContain("17% / DISCOUNT");
   });
 
   it("keeps every item in a long picking list and allows the document to paginate", () => {

@@ -120,7 +120,7 @@ describe("checkout required-field validation", () => {
       ...validCheckout,
       deliveryTimeMode: "specified",
       deliverySlotId: undefined,
-      deliveryTime: "上午 10 時前",
+      deliveryTime: "10:00-12:00",
     })).toEqual({});
   });
 

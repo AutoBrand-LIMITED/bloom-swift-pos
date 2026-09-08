@@ -6,7 +6,10 @@ export interface OrderItem {
   quantity: number;
   /** Odoo list price captured when the product was added to the order. */
   catalogPrice?: number;
+  /** Discount modes are exclusive: percentage uses 5% steps; fixed uses whole HKD. */
+  discountType?: "percent" | "fixed";
   discountPercent?: number;
+  discountAmount?: number;
   priceOverrideReason?: string;
   productId?: number;
   productCode?: string | null;
@@ -164,6 +167,8 @@ export interface Order {
   senderNote: string;
   deliveryNote: string;
   internalNote: string;
+  /** Intentional Odoo draft saved before delivery details are complete. */
+  completionStatus?: "complete" | "incomplete";
   customerNoteMutation?: PartnerNoteMutation;
   recipientNoteMutation?: PartnerNoteMutation;
   recipientPartnerId?: number;

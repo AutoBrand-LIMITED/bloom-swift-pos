@@ -92,6 +92,7 @@ import {
   hasOdooBackend,
   OdooConflictError,
   submitOdooOrder,
+  saveIncompleteOdooOrder,
   updateOdooCustomerProfile,
   updateOdooPartnerNotes,
   type AccountingPaymentOption,
@@ -118,6 +119,7 @@ import {
 import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pricing";
 import { parseDeliveryAddress, type DeliveryAddressSelection } from "@/lib/hk-address";
 import { mobileCheckoutBarClassName } from "@/lib/pos-layout";
+import { formatMoney } from "@/lib/money";
 import {
   loadCachedPaymentOptions,
   resolvePaymentReference,
@@ -324,6 +326,9 @@ const Index = () => {
   const [checkoutId, setCheckoutId] = useState(
     () => restoredEmployeePendingSubmission?.order.id || crypto.randomUUID(),
   );
+  const [checkoutCreatedAt, setCheckoutCreatedAt] = useState(
+    () => restoredEmployeePendingSubmission?.order.createdAt || new Date().toISOString(),
+  );
   const [replacementOrderId, setReplacementOrderId] = useState<number | undefined>(
     restoredEmployeePendingSubmission?.order.replacementOrderId,
   );
@@ -370,6 +375,7 @@ const Index = () => {
   const [orderRecordsHasMore, setOrderRecordsHasMore] = useState(false);
   const [orderRecordsRefreshKey, setOrderRecordsRefreshKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingIncomplete, setIsSavingIncomplete] = useState(false);
   const workflowHeaderRef = useRef<HTMLElement | null>(null);
   const workflowSectionRefs = useRef<Record<WorkflowSectionId, HTMLElement | null>>({
     customer: null,
@@ -1231,6 +1237,7 @@ const Index = () => {
     setPaymentReceivedAt("");
     setPaymentIdempotencyKey(crypto.randomUUID());
     setCheckoutId(crypto.randomUUID());
+    setCheckoutCreatedAt(new Date().toISOString());
     setReplacementOrderId(undefined);
     setCustomerCreditSourceOrderId(undefined);
     setPriceOverridden(false);
@@ -1330,6 +1337,66 @@ const Index = () => {
         ? `已複製 ${order.odooOrderName || "原單"}；新單會自動套用 Customer Credit。`
         : `已複製 ${order.odooOrderName || "原單"} 成替代單。`,
     );
+  }, [applyCustomerSelection, pendingSubmission, resetOrderForm]);
+
+  const handleResumeIncomplete = useCallback(async (order: Order) => {
+    if (order.completionStatus !== "incomplete" || !order.customerId) return;
+    if (pendingSubmission) {
+      toast.error("請先處理目前待確認訂單，再繼續未完成訂單。");
+      return;
+    }
+    let latestCustomer: DemoCustomer;
+    try {
+      latestCustomer = await getOdooCustomer(order.customerId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "未能讀取未完成訂單客戶。");
+      return;
+    }
+    resetOrderForm();
+    applyCustomerSelection(latestCustomer);
+    setSenderName(order.senderName || order.customerName);
+    setSenderDoNumber(order.senderDoNumber || "");
+    setRecipientDoNumber(order.recipientDoNumber || "");
+    setSourceReference(order.sourceReference || "");
+    setDepartment(order.department || "");
+    setSalesTeamId(order.salesTeamId);
+    setItems(order.items.map((item) => ({ ...item })));
+    setDeliveryFee(order.deliveryFee);
+    setUrgentFee(order.urgentFee);
+    setSenderNote(order.senderNote || "");
+    setDeliveryNote(order.deliveryNote || "");
+    setInternalNote(order.internalNote || "");
+    setFulfillmentType(order.fulfillmentType || "delivery");
+    setDeliveryDate(order.deliveryDate || "");
+    setDeliveryTimeMode(order.deliveryTimeMode);
+    setDeliverySlotId(order.deliverySlotId);
+    setDeliveryTime(order.deliveryTime || "");
+    const parsedAddress = parseDeliveryAddress(order.deliveryGoogleAddress || order.deliveryAddress || "");
+    setDeliveryRegion(parsedAddress.region);
+    setDeliveryDistrict(parsedAddress.district);
+    setDeliveryArea(parsedAddress.area);
+    setDeliveryDetail(parsedAddress.detail);
+    setDeliveryBuilding(order.deliveryBuilding || "");
+    setDeliveryFloor(order.deliveryFloor || "");
+    setDeliveryUnit(order.deliveryUnit || "");
+    setRecipientType(order.recipientType || "personal");
+    setRecipientCompanyName(order.recipientCompanyName || "");
+    setRecipientName(order.recipientName || "");
+    setRecipientPhone(order.recipientPhone || "");
+    setRecipientPartnerId(order.recipientPartnerId);
+    setRecipientOccasions(order.recipientOccasions || []);
+    setRecipientOccasionsKnown(order.recipientOccasions !== undefined);
+    setRecipientOccasionsVersion(order.recipientOccasionsVersion);
+    setDeliveryPerson(order.deliveryPerson || "");
+    setGiftCardEnabled(order.giftCardEnabled);
+    setGiftCardMessage(order.giftCardMessage || "");
+    setPaymentStatus("unpaid");
+    setCheckoutId(order.id);
+    setCheckoutCreatedAt(order.createdAt);
+    setSalesId(order.salesId);
+    setSalespersonEmployeeId(order.salespersonEmployeeId);
+    setHistoryOpen(false);
+    toast.success(`已載入 ${order.odooOrderName || "未完成訂單"}，填妥資料後可正式提交。`);
   }, [applyCustomerSelection, pendingSubmission, resetOrderForm]);
 
   const handleClearForm = useCallback(() => {
@@ -1614,6 +1681,139 @@ const Index = () => {
       }
     } finally {
       setSavingRecipientContact(false);
+    }
+  };
+
+  const handleSaveIncomplete = async () => {
+    if (isSubmitting || isSavingIncomplete) return;
+    if (!hasOdooBackend) {
+      toast.error("未完成訂單需要連接 Odoo 先可以儲存。");
+      return;
+    }
+    if (editingSelectedCustomer) {
+      toast.error("請先儲存或取消聯絡人編輯。");
+      scrollToWorkflowSection("customer");
+      return;
+    }
+    if (!salesId.trim() || !operatorEmployeeId || !salespersonEmployeeId) {
+      toast.error("請先確認登入操作員及負責員工。");
+      return;
+    }
+    if (!selectedCustomer?.odooPartnerId) {
+      toast.error("請先選擇一位已同步到 Odoo 嘅客戶。");
+      scrollToWorkflowSection("customer");
+      return;
+    }
+    if (items.length === 0) {
+      toast.error("請至少加入一件商品先儲存未完成訂單。");
+      scrollToWorkflowSection("items");
+      return;
+    }
+    const itemMissingAdjustmentReason = items.find(orderLineAdjustmentNeedsReason);
+    if (itemMissingAdjustmentReason) {
+      toast.error(`「${itemMissingAdjustmentReason.name}」已改價或折扣，請填寫原因`);
+      scrollToWorkflowSection("items");
+      return;
+    }
+    if (priceOverridden) {
+      toast.error("Odoo 訂單價格必須跟商品目錄；請先重設最終價格。");
+      return;
+    }
+    const totalError = validatePositiveOrderTotal(finalPrice);
+    if (totalError) {
+      toast.error(totalError);
+      return;
+    }
+    const deliveryGoogleAddress = [
+      deliveryRegion,
+      deliveryDistrict,
+      deliveryArea,
+      deliveryDetail.trim(),
+    ].filter(Boolean).join(" ");
+    const deliveryAddress = fulfillmentType === "pickup"
+      ? PICKUP_LOCATION_ADDRESS
+      : [
+          deliveryGoogleAddress,
+          deliveryBuilding.trim(),
+          deliveryFloor.trim() ? `${deliveryFloor.trim()}樓` : "",
+          deliveryUnit.trim() ? `${deliveryUnit.trim()}室` : "",
+        ].filter(Boolean).join("，");
+    const incompleteOrder: Order = {
+      id: checkoutId,
+      salesId,
+      operatorEmployeeId,
+      salespersonEmployeeId,
+      salesTeamId,
+      customerGroupId,
+      customerGroupExpectedWriteDate,
+      customerId: selectedCustomer.odooPartnerId,
+      customerName: customerName.trim(),
+      customerCode: customerCode.trim(),
+      customerType,
+      companyName: companyName.trim(),
+      customerEmail: customerEmail.trim(),
+      billingAddress: billingAddress.trim(),
+      customerGroup: customerGroup.trim(),
+      senderDoNumber: senderDoNumber.trim(),
+      recipientDoNumber: recipientDoNumber.trim(),
+      sourceReference: sourceReference.trim(),
+      department: department.trim(),
+      terms: terms.trim(),
+      senderName: senderName.trim(),
+      phone: phone.trim(),
+      items,
+      deliveryFee,
+      urgentFee,
+      subtotal,
+      finalPrice,
+      priceOverridden: false,
+      paymentStatus: "unpaid",
+      depositAmount: 0,
+      paymentMethod: "",
+      paymentReference: "",
+      paymentReceivedAt: "",
+      paymentIdempotencyKey: "",
+      fulfillmentType,
+      deliveryDate,
+      deliveryTimeMode,
+      deliverySlotId,
+      deliveryTime,
+      deliveryAddress,
+      deliveryGoogleAddress,
+      deliveryBuilding: deliveryBuilding.trim(),
+      deliveryFloor: deliveryFloor.trim(),
+      deliveryUnit: deliveryUnit.trim(),
+      deliverySplits: [],
+      recipientType,
+      recipientCompanyName: recipientCompanyName.trim(),
+      recipientName: recipientName.trim(),
+      recipientPhone: recipientPhone.trim(),
+      ...(recipientOccasionsKnown ? { recipientOccasions } : {}),
+      recipientOccasionsVersion,
+      recipientPartnerId,
+      deliveryPerson: deliveryPerson.trim(),
+      giftCardEnabled,
+      giftCardMessage: giftCardEnabled ? giftCardMessage.trim() : "",
+      senderNote: senderNote.trim(),
+      deliveryNote: deliveryNote.trim(),
+      internalNote: internalNote.trim(),
+      completionStatus: "incomplete",
+      createdAt: checkoutCreatedAt,
+    };
+    setIsSavingIncomplete(true);
+    try {
+      const saved = await saveIncompleteOdooOrder(incompleteOrder, {
+        customerId: selectedCustomer.odooPartnerId,
+        customerType,
+        companyName: companyName.trim(),
+      });
+      toast.success(`未完成訂單 ${saved.name || ""} 已儲存到 Odoo 草稿。`);
+      setOrderRecordsRefreshKey((key) => key + 1);
+      resetOrderForm();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "未能儲存未完成訂單。");
+    } finally {
+      setIsSavingIncomplete(false);
     }
   };
 
@@ -1931,12 +2131,13 @@ const Index = () => {
       senderNote: senderNote.trim(),
       deliveryNote: deliveryNote.trim(),
       internalNote: internalNote.trim(),
+      completionStatus: "complete",
       ...(customerNoteMutation ? { customerNoteMutation } : {}),
       ...(recipientNoteMutation ? { recipientNoteMutation } : {}),
       recipientPartnerId,
       ...(replacementOrderId !== undefined ? { replacementOrderId } : {}),
       ...(customerCreditSourceOrderId !== undefined ? { customerCreditSourceOrderId } : {}),
-      createdAt: pendingSubmission?.order.createdAt || new Date().toISOString(),
+      createdAt: pendingSubmission?.order.createdAt || checkoutCreatedAt,
     };
     const currentOptions = pendingSubmission
       ? pendingSubmission.options
@@ -2710,7 +2911,9 @@ const Index = () => {
               completedCount={completedRequiredSectionCount}
               requiredSectionCount={4}
               isSubmitting={isSubmitting}
+              isSavingIncomplete={isSavingIncomplete}
               onSubmit={handleSubmit}
+              onSaveIncomplete={handleSaveIncomplete}
               onNavigate={scrollToWorkflowSection}
             />
           </div>
@@ -2726,11 +2929,20 @@ const Index = () => {
         <div className="mx-auto flex max-w-3xl min-w-0 items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-4">
           <div className="min-w-0 text-right">
             <p className="text-xs text-muted-foreground">總計</p>
-            <p className="truncate font-mono text-xl font-bold tracking-tight sm:text-2xl">${finalPrice.toLocaleString()}</p>
+            <p className="truncate font-mono text-xl font-bold tracking-tight sm:text-2xl">${formatMoney(finalPrice)}</p>
           </div>
           <Button
+            variant="outline"
+            onClick={handleSaveIncomplete}
+            disabled={isSubmitting || isSavingIncomplete}
+            size="lg"
+            className="shrink-0 px-3 text-sm font-semibold"
+          >
+            {isSavingIncomplete ? "儲存中" : "未完成"}
+          </Button>
+          <Button
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isSavingIncomplete}
             size="lg"
             className="shrink-0 px-4 text-base font-semibold shadow-lg sm:px-8"
           >
@@ -2790,6 +3002,7 @@ const Index = () => {
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onStartReplacement={handleStartReplacement}
+        onResumeIncomplete={handleResumeIncomplete}
         canRetryOperationalOrders={employee?.role === "manager"}
         onRetryOperationalOrder={handleOperationalOrderRetry}
         currentEmployeeId={employee?.id}

@@ -24,6 +24,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import OrderDestinationEditCard from "@/components/pos/OrderDestinationEditCard";
 import QuarterHourTimeSelect from "@/components/pos/QuarterHourTimeSelect";
+import { formatMoney, normalizeWholeMoney } from "@/lib/money";
 import RecipientOccasionEditor from "@/components/pos/RecipientOccasionEditor";
 import {
   isValidDeliveryDate,
@@ -173,7 +174,7 @@ const OrderEditDialog = ({
     setForm(formFromOrder(order));
     setError(null);
     const outstanding = order.balanceAmount ?? Math.max(0, order.finalPrice - order.depositAmount);
-    setPaymentAmount(outstanding > 0 ? outstanding.toFixed(2) : "");
+    setPaymentAmount(outstanding > 0 ? String(Math.round(outstanding)) : "");
     setPaymentMethod("");
     setPaymentReference("");
     const now = new Date();
@@ -457,7 +458,7 @@ const OrderEditDialog = ({
       return;
     }
     if (amount > outstanding + 0.005) {
-      setError(`收款金額不可高於尚欠金額 HK$${outstanding.toFixed(2)}。`);
+      setError(`收款金額不可高於尚欠金額 HK$${formatMoney(outstanding)}。`);
       return;
     }
     if (!paymentMethod || !paymentReference.trim() || !paymentReceivedAt) {
@@ -745,11 +746,18 @@ const OrderEditDialog = ({
                   <div>
                     <h3 className="text-sm font-semibold">補記付款</h3>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      尚欠 HK${(order.balanceAmount ?? Math.max(0, order.finalPrice - order.depositAmount)).toFixed(2)}。付款會直接入 Odoo Accounting，並保留收款紀錄。
+                      尚欠 HK${formatMoney(order.balanceAmount ?? Math.max(0, order.finalPrice - order.depositAmount))}。付款會直接入 Odoo Accounting，並保留收款紀錄。
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="本次收款金額 *" value={paymentAmount} onChange={setPaymentAmount} type="number" />
+                    <Field
+                      label="本次收款金額 *"
+                      value={paymentAmount}
+                      onChange={(value) => setPaymentAmount(
+                        value ? String(normalizeWholeMoney(Number(value))) : "",
+                      )}
+                      type="number"
+                    />
                     <div className="space-y-1.5">
                       <Label>付款方式 *</Label>
                       <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={paymentOptionsLoading}>

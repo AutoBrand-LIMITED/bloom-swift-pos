@@ -245,7 +245,7 @@ describe("ReceivablesDashboard", () => {
     expect(screen.getByText("9876 5432")).toBeVisible();
     expect(screen.getByText("AC03 — May")).toBeVisible();
     expect(screen.getByText("S00100")).toBeVisible();
-    expect(screen.getByText("HK$400.00")).toBeVisible();
+    expect(screen.getByText("HK$400")).toBeVisible();
     expect(getReceivables).toHaveBeenCalledWith(expect.objectContaining({
       status: "all",
       page: 1,

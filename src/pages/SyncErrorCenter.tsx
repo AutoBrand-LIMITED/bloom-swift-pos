@@ -87,6 +87,8 @@ const formatMoney = (minor: number): string => new Intl.NumberFormat("zh-HK", {
   style: "currency",
   currency: "HKD",
   currencyDisplay: "narrowSymbol",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
 }).format(minor / 100);
 
 const waitingDuration = (value: string | null): string => {

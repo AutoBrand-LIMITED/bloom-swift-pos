@@ -55,6 +55,50 @@ describe("odoo-api note contracts", () => {
     } as Order)).resolves.toEqual(pendingResponse);
   });
 
+  it("saves an incomplete order through the draft endpoint without payment data", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const savedResponse = {
+      id: 42,
+      name: "S00042",
+      amountTotal: 680,
+      partnerId: 25131,
+      syncState: "synced",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(savedResponse));
+    vi.stubGlobal("fetch", fetchMock);
+    const { saveIncompleteOdooOrder } = await import("@/lib/odoo-api");
+
+    await expect(saveIncompleteOdooOrder({
+      id: "11111111-1111-4111-8111-111111111111",
+      completionStatus: "incomplete",
+      paymentStatus: "paid",
+      depositAmount: 680,
+      paymentMethod: "cash",
+      paymentReference: "must-be-cleared",
+      paymentReceivedAt: "2026-09-08T10:00:00+08:00",
+      paymentIdempotencyKey: "must-be-cleared",
+      notes: "legacy note is removed",
+    } as Order, { customerId: 25131 })).resolves.toEqual(savedResponse);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders/incomplete",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(request.body));
+    expect(body).toMatchObject({
+      completionStatus: "incomplete",
+      paymentStatus: "unpaid",
+      depositAmount: 0,
+      paymentMethod: "",
+      paymentReference: "",
+      paymentReceivedAt: "",
+      paymentIdempotencyKey: "",
+      customerId: 25131,
+    });
+    expect(body).not.toHaveProperty("notes");
+  });
+
   it("returns a durable review record from HTTP 409 instead of losing its identity", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const reviewResponse = {
@@ -1382,6 +1426,26 @@ describe("odoo-api note contracts", () => {
     })).resolves.toEqual(response);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/orders?page=2&limit=50&status=paid",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("requests the intentional incomplete-order tab separately", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      generatedAt: "2026-09-08T00:00:00+08:00",
+      page: 1,
+      limit: 50,
+      hasMore: false,
+      orders: [],
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOdooOrderRecords } = await import("@/lib/odoo-api");
+
+    await getOdooOrderRecords(undefined, undefined, { status: "incomplete" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/orders?page=1&limit=50&status=incomplete",
       expect.objectContaining({ cache: "no-store" }),
     );
   });

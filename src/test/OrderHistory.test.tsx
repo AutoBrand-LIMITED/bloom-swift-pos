@@ -279,7 +279,7 @@ describe("OrderHistory delivery summary", () => {
       "overflow-y-auto",
     );
     fireEvent.click(screen.getByRole("button", { name: "增加 花束 數量" }));
-    expect(screen.getByText("多咗 HK$680.00，需要向客戶補收")).toBeVisible();
+    expect(screen.getByText("多咗 HK$680，需要向客戶補收")).toBeVisible();
 
     await waitFor(() => expect(previewOdooOrderProductCorrection).toHaveBeenCalledWith(
       17,
@@ -289,7 +289,7 @@ describe("OrderHistory delivery summary", () => {
       }),
       expect.any(AbortSignal),
     ));
-    expect(await screen.findByText("HK$1,360.00")).toBeVisible();
+    expect(await screen.findByText("HK$1,360")).toBeVisible();
     fireEvent.change(screen.getByLabelText("修改原因 *"), {
       target: { value: "客人追加一份花束" },
     });
@@ -386,7 +386,7 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText("更換商品")).toBeVisible();
     expect(screen.getByText("花束 × 1")).toBeVisible();
     expect(screen.getByText("百合花束 × 1")).toBeVisible();
-    expect(screen.getByText("多咗 HK$120.00，需要向客戶補收")).toBeVisible();
+    expect(screen.getByText("多咗 HK$120，需要向客戶補收")).toBeVisible();
     await waitFor(() => {
       const payload = previewOdooOrderProductCorrection.mock.calls.at(-1)?.[1];
       expect(payload).toBeDefined();
@@ -457,7 +457,7 @@ describe("OrderHistory delivery summary", () => {
     fireEvent.click(await screen.findByRole("button", { name: "刪除 朱古力" }));
 
     expect(screen.getByText("刪除商品")).toBeVisible();
-    expect(screen.getByText("少咗 HK$123.00，需要退款或保留 Customer Credit")).toBeVisible();
+    expect(screen.getByText("少咗 HK$123，需要退款或保留 Customer Credit")).toBeVisible();
     await waitFor(() => expect(previewOdooOrderProductCorrection).toHaveBeenCalledWith(
       17,
       expect.objectContaining({
@@ -1290,9 +1290,9 @@ describe("OrderHistory delivery summary", () => {
     openOrderEditSection("修改收貨點與商品分配");
     fireEvent.click(screen.getByRole("combobox", { name: "送貨時間模式 *" }));
     fireEvent.click(screen.getByRole("option", { name: "指定時間" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 * 小時" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 * 開始小時" }));
     fireEvent.click(screen.getByRole("option", { name: "下午 03 時" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 * 分鐘" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 * 開始分鐘" }));
     fireEvent.click(screen.getByRole("option", { name: "15 分" }));
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
@@ -1304,7 +1304,7 @@ describe("OrderHistory delivery summary", () => {
           data: expect.objectContaining({
             deliveryTimeMode: "specified",
             deliverySlotId: undefined,
-            deliveryTime: "15:15",
+            deliveryTime: "15:15-16:00",
           }),
         },
       );

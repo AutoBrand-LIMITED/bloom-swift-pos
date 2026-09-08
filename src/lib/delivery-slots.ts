@@ -1,5 +1,6 @@
 import type { DeliverySlot } from "@/lib/odoo-api";
 import type { DeliveryTimeMode } from "@/types/order";
+import { isQuarterHourDeliveryRange } from "@/lib/delivery-time-options";
 
 export const DEMO_DELIVERY_SLOTS: DeliverySlot[] = [
   {
@@ -60,6 +61,7 @@ export function validateDeliveryTimeSelection({
     const specifiedTime = deliveryTime.trim();
     if (!specifiedTime) return "請輸入指定送貨時間";
     if (specifiedTime.length > 120) return "指定送貨時間不可多於 120 個字";
+    if (!isQuarterHourDeliveryRange(specifiedTime)) return "請選擇有效嘅開始及結束時間";
     return null;
   }
 

@@ -26,6 +26,8 @@ const baseProps = {
   completedCount: 3,
   requiredSectionCount: 4,
   isSubmitting: false,
+  isSavingIncomplete: false,
+  onSaveIncomplete: vi.fn(),
 };
 
 describe("OrderSummaryPanel", () => {
@@ -64,5 +66,23 @@ describe("OrderSummaryPanel", () => {
 
     expect(onNavigate).toHaveBeenCalledWith("items");
     expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves an intentionally incomplete order separately from final checkout", () => {
+    const onSaveIncomplete = vi.fn();
+    const onSubmit = vi.fn();
+    render(
+      <OrderSummaryPanel
+        {...baseProps}
+        onSaveIncomplete={onSaveIncomplete}
+        onSubmit={onSubmit}
+        onNavigate={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "儲存未完成訂單" }));
+
+    expect(onSaveIncomplete).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

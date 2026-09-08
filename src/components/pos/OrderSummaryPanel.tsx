@@ -2,6 +2,7 @@ import { CalendarDays, ChevronRight, Package, Phone, Truck, UserRound } from "lu
 
 import { Button } from "@/components/ui/button";
 import { orderItemTotal } from "@/lib/order-pricing";
+import { formatMoney } from "@/lib/money";
 import type { OrderItem, PaymentStatus } from "@/types/order";
 import type { WorkflowSectionId } from "@/components/pos/PosWorkflowTabs";
 
@@ -20,14 +21,11 @@ interface OrderSummaryPanelProps {
   completedCount: number;
   requiredSectionCount: number;
   isSubmitting: boolean;
+  isSavingIncomplete: boolean;
   onSubmit: () => void;
+  onSaveIncomplete: () => void;
   onNavigate: (section: WorkflowSectionId) => void;
 }
-
-const money = new Intl.NumberFormat("zh-HK", {
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
 
 const paymentLabels: Record<PaymentStatus, string> = {
   unpaid: "未付款",
@@ -69,7 +67,9 @@ const OrderSummaryPanel = ({
   completedCount,
   requiredSectionCount,
   isSubmitting,
+  isSavingIncomplete,
   onSubmit,
+  onSaveIncomplete,
   onNavigate,
 }: OrderSummaryPanelProps) => {
   const completionPercent = Math.round((completedCount / requiredSectionCount) * 100);
@@ -123,7 +123,7 @@ const OrderSummaryPanel = ({
                   <p className="truncate font-medium">{item.name}</p>
                   <p className="text-xs text-muted-foreground">數量 {item.quantity}</p>
                 </div>
-                <span className="shrink-0 font-mono">${money.format(orderItemTotal(item))}</span>
+                <span className="shrink-0 font-mono">${formatMoney(orderItemTotal(item))}</span>
               </div>
             ))}
           </div>
@@ -132,8 +132,8 @@ const OrderSummaryPanel = ({
         )}
         {(deliveryFee > 0 || urgentFee > 0) && (
           <div className="mt-3 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
-            {deliveryFee > 0 && <p className="flex justify-between"><span>送貨費</span><span>${money.format(deliveryFee)}</span></p>}
-            {urgentFee > 0 && <p className="flex justify-between"><span>急單費</span><span>${money.format(urgentFee)}</span></p>}
+            {deliveryFee > 0 && <p className="flex justify-between"><span>送貨費</span><span>${formatMoney(deliveryFee)}</span></p>}
+            {urgentFee > 0 && <p className="flex justify-between"><span>急單費</span><span>${formatMoney(urgentFee)}</span></p>}
           </div>
         )}
       </div>
@@ -160,14 +160,24 @@ const OrderSummaryPanel = ({
             <p className="text-xs text-muted-foreground">{paymentLabels[paymentStatus]}</p>
             <p className="mt-1 text-xs font-medium text-muted-foreground">訂單總計</p>
           </div>
-          <p className="font-mono text-3xl font-bold tracking-tight">${money.format(finalPrice)}</p>
+          <p className="font-mono text-3xl font-bold tracking-tight">${formatMoney(finalPrice)}</p>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          onClick={onSaveIncomplete}
+          disabled={isSubmitting || isSavingIncomplete}
+          className="mt-4 min-h-12 w-full touch-manipulation text-base font-semibold"
+        >
+          {isSavingIncomplete ? "儲存中" : "儲存未完成訂單"}
+        </Button>
         <Button
           type="button"
           size="lg"
           onClick={onSubmit}
-          disabled={isSubmitting}
-          className="mt-4 min-h-12 w-full touch-manipulation text-base font-semibold shadow-md"
+          disabled={isSubmitting || isSavingIncomplete}
+          className="mt-2 min-h-12 w-full touch-manipulation text-base font-semibold shadow-md"
         >
           {isSubmitting ? "下單中" : "確認訂單"}
         </Button>

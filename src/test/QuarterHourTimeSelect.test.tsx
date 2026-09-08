@@ -20,7 +20,7 @@ describe("QuarterHourTimeSelect", () => {
     });
   });
 
-  it("preserves a legacy free-text time until a standard time is selected", () => {
+  it("preserves a legacy free-text time until a standard time range is selected", () => {
     const onChange = vi.fn();
     render(
       <QuarterHourTimeSelect
@@ -33,10 +33,14 @@ describe("QuarterHourTimeSelect", () => {
 
     expect(screen.getByText(/原有時間：下午 3 時前/)).toBeVisible();
 
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 分鐘" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 開始分鐘" }));
     fireEvent.click(screen.getByRole("option", { name: "30 分" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 小時" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 開始小時" }));
     fireEvent.click(screen.getByRole("option", { name: "下午 03 時" }));
-    expect(onChange).toHaveBeenCalledWith("15:30");
+    expect(onChange).toHaveBeenCalledWith("15:30-16:00");
+
+    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 結束分鐘" }));
+    fireEvent.click(screen.getByRole("option", { name: "30 分" }));
+    expect(onChange).toHaveBeenCalledWith("15:30-16:30");
   });
 });

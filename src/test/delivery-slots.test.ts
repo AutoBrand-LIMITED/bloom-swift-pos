@@ -46,7 +46,7 @@ describe("delivery slot helpers", () => {
     })).toContain("內容已更新");
   });
 
-  it("requires specified text and a delivery date", () => {
+  it("requires a valid specified time range and a delivery date", () => {
     expect(validateDeliveryTimeSelection({
       deliveryDate: "2026-07-17",
       deliveryTime: "  ",
@@ -55,8 +55,15 @@ describe("delivery slot helpers", () => {
       slots: [],
     })).toBe("請輸入指定送貨時間");
     expect(validateDeliveryTimeSelection({
+      deliveryDate: "2026-07-17",
+      deliveryTime: "10:00-09:00",
+      deliveryTimeMode: "specified",
+      deliverySlotId: undefined,
+      slots: [],
+    })).toBe("請選擇有效嘅開始及結束時間");
+    expect(validateDeliveryTimeSelection({
       deliveryDate: "",
-      deliveryTime: "上午 10 時前",
+      deliveryTime: "09:00-10:00",
       deliveryTimeMode: "specified",
       deliverySlotId: undefined,
       slots: [],

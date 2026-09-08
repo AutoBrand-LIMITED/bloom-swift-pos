@@ -44,3 +44,31 @@ export const parseQuarterHourDeliveryTime = (value: string) => {
   const [hour, minute] = value.split(":");
   return { hour, minute };
 };
+
+export interface QuarterHourDeliveryRange {
+  startHour: string;
+  startMinute: string;
+  endHour: string;
+  endMinute: string;
+}
+
+export const parseQuarterHourDeliveryRange = (value: string): QuarterHourDeliveryRange | null => {
+  const [start = "", end = "", ...rest] = value.trim().split("-");
+  if (rest.length || !isQuarterHourDeliveryTime(start) || !isQuarterHourDeliveryTime(end)) return null;
+  const startParts = parseQuarterHourDeliveryTime(start)!;
+  const endParts = parseQuarterHourDeliveryTime(end)!;
+  return {
+    startHour: startParts.hour,
+    startMinute: startParts.minute,
+    endHour: endParts.hour,
+    endMinute: endParts.minute,
+  };
+};
+
+export const isQuarterHourDeliveryRange = (value: string) => {
+  const parsed = parseQuarterHourDeliveryRange(value);
+  if (!parsed) return false;
+  const start = Number(parsed.startHour) * 60 + Number(parsed.startMinute);
+  const end = Number(parsed.endHour) * 60 + Number(parsed.endMinute);
+  return end > start;
+};

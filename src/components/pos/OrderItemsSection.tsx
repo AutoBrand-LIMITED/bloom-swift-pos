@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Plus,
   Trash2,
@@ -35,8 +36,10 @@ import type { OrderItem } from "@/types/order";
 import {
   hasOrderLinePriceAdjustment,
   normalizeDiscountPercent,
+  normalizeFixedDiscount,
   orderItemTotal,
 } from "@/lib/order-pricing";
+import { formatMoney, normalizeWholeMoney } from "@/lib/money";
 
 interface OrderItemsSectionProps {
   items: OrderItem[];
@@ -148,7 +151,9 @@ const OrderItemsSection = ({
         price: product.price || 0,
         quantity: 1,
         catalogPrice: product.price || 0,
+        discountType: "percent",
         discountPercent: 0,
+        discountAmount: 0,
         priceOverrideReason: "",
         productId: product.id,
         productCode: product.productCode,
@@ -160,7 +165,7 @@ const OrderItemsSection = ({
 
   const addItem = () => {
     if (!newName.trim()) return;
-    const price = parseFloat(newPrice) || 0;
+    const price = normalizeWholeMoney(parseFloat(newPrice) || 0);
     onItemsChange([
       ...items,
       { id: crypto.randomUUID(), name: newName.trim(), price, quantity: 1 },
@@ -175,6 +180,15 @@ const OrderItemsSection = ({
 
   const updateItem = (id: string, field: keyof OrderItem, value: string | number) => {
     onItemsChange(items.map((i) => (i.id === id ? { ...i, [field]: value } : i)));
+  };
+
+  const updateDiscountType = (id: string, discountType: "percent" | "fixed") => {
+    onItemsChange(items.map((item) => item.id === id ? {
+      ...item,
+      discountType,
+      discountPercent: 0,
+      discountAmount: 0,
+    } : item));
   };
 
   return (
@@ -222,7 +236,7 @@ const OrderItemsSection = ({
           <Wallet className="h-4 w-4 text-primary" />
           <span className="text-xs font-medium">客人預算</span>
           <span className="ml-auto font-mono text-xs text-muted-foreground">
-            {budget > 0 ? `$${budget.toLocaleString()}` : "未設定"}
+            {budget > 0 ? `$${formatMoney(budget)}` : "未設定"}
           </span>
           {budgetExpanded ? (
             <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -241,7 +255,7 @@ const OrderItemsSection = ({
                 id="customer-budget"
                 type="number"
                 value={budget || ""}
-                onChange={(e) => onBudgetChange(parseFloat(e.target.value) || 0)}
+                onChange={(e) => onBudgetChange(normalizeWholeMoney(parseFloat(e.target.value) || 0))}
                 placeholder="輸入預算"
                 className="h-9 w-32 bg-card text-right font-mono text-sm"
                 min={0}
@@ -250,11 +264,11 @@ const OrderItemsSection = ({
             {budget > 0 && (
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">已用 ${subtotal.toLocaleString()}</span>
+                  <span className="text-muted-foreground">已用 ${formatMoney(subtotal)}</span>
                   <span className={`font-mono font-medium ${budget - subtotal < 0 ? "text-destructive" : "text-primary"}`}>
                     {budget - subtotal >= 0
-                      ? `剩餘 $${(budget - subtotal).toLocaleString()}`
-                      : `超出 $${(subtotal - budget).toLocaleString()}`}
+                      ? `剩餘 $${formatMoney(budget - subtotal)}`
+                      : `超出 $${formatMoney(subtotal - budget)}`}
                   </span>
                 </div>
                 <Progress
@@ -383,7 +397,7 @@ const OrderItemsSection = ({
                 <span className="line-clamp-2 text-sm font-medium leading-snug">{product.name}</span>
                 <span className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span className="min-w-0 truncate">{product.productCode || product.categoryName || "Odoo"}</span>
-                  <span className="font-mono text-foreground">${product.price.toLocaleString()}</span>
+                  <span className="font-mono text-foreground">${formatMoney(product.price)}</span>
                 </span>
               </button>
             ))}
@@ -413,15 +427,15 @@ const OrderItemsSection = ({
             const adjusted = hasOrderLinePriceAdjustment(item);
             return (
               <div key={item.id} className="space-y-2 rounded-lg bg-secondary/50 p-3">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_120px_92px_72px_40px] sm:items-end">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_112px_104px_112px_72px_40px] sm:items-end">
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">商品名稱</Label>
                     <Input
                       value={item.name}
-                      onChange={(event) => updateItem(item.id, "name", event.target.value)}
-                      className="h-9 bg-card text-sm"
-                      placeholder="項目名稱"
-                      maxLength={100}
+                      readOnly
+                      disabled
+                      aria-label={`${item.name} 商品名稱（不可修改）`}
+                      className="h-9 bg-muted/60 text-sm opacity-100"
                     />
                   </div>
                   <div className="space-y-1">
@@ -430,29 +444,69 @@ const OrderItemsSection = ({
                       aria-label={`${item.name} 成交單價`}
                       type="number"
                       value={item.price || ""}
-                      onChange={(event) => updateItem(item.id, "price", parseFloat(event.target.value) || 0)}
-                      className="h-9 bg-card text-right font-mono text-sm"
-                      min={0}
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">折扣 (%)</Label>
-                    <Input
-                      aria-label={`${item.name} 折扣`}
-                      type="number"
-                      value={item.discountPercent || ""}
                       onChange={(event) => updateItem(
                         item.id,
-                        "discountPercent",
-                        normalizeDiscountPercent(parseFloat(event.target.value) || 0),
+                        "price",
+                        normalizeWholeMoney(parseFloat(event.target.value) || 0),
                       )}
                       className="h-9 bg-card text-right font-mono text-sm"
                       min={0}
-                      max={100}
-                      step="0.01"
-                      placeholder="0"
+                      step="1"
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">折扣方式</Label>
+                    <Select
+                      value={item.discountType || "percent"}
+                      onValueChange={(value: "percent" | "fixed") => updateDiscountType(item.id, value)}
+                    >
+                      <SelectTrigger aria-label={`${item.name} 折扣方式`} className="h-9 bg-card text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="percent">百分比</SelectItem>
+                        <SelectItem value="fixed">固定金額</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">
+                      {item.discountType === "fixed" ? "折扣金額 ($)" : "折扣 (%)"}
+                    </Label>
+                    {item.discountType === "fixed" ? (
+                      <Input
+                        aria-label={`${item.name} 固定金額折扣`}
+                        type="number"
+                        value={item.discountAmount || ""}
+                        onChange={(event) => updateItem(
+                          item.id,
+                          "discountAmount",
+                          normalizeFixedDiscount(
+                            parseFloat(event.target.value) || 0,
+                            item.price * item.quantity,
+                          ),
+                        )}
+                        className="h-9 bg-card text-right font-mono text-sm"
+                        min={0}
+                        max={item.price * item.quantity}
+                        step="1"
+                        placeholder="0"
+                      />
+                    ) : (
+                      <Select
+                        value={String(normalizeDiscountPercent(item.discountPercent))}
+                        onValueChange={(value) => updateItem(item.id, "discountPercent", Number(value))}
+                      >
+                        <SelectTrigger aria-label={`${item.name} 百分比折扣`} className="h-9 bg-card font-mono text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 21 }, (_, index) => index * 5).map((value) => (
+                            <SelectItem key={value} value={String(value)}>{value}%</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">數量</Label>
@@ -479,10 +533,10 @@ const OrderItemsSection = ({
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-muted-foreground">
                     {item.catalogPrice !== undefined
-                      ? `Odoo 原價 $${item.catalogPrice.toLocaleString()}`
+                      ? `Odoo 原價 $${formatMoney(item.catalogPrice)}`
                       : "手動項目"}
                   </span>
-                  <span className="font-mono font-semibold">小計 ${orderItemTotal(item).toLocaleString()}</span>
+                  <span className="font-mono font-semibold">小計 ${formatMoney(orderItemTotal(item))}</span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -557,6 +611,7 @@ const OrderItemsSection = ({
             onKeyDown={(e) => e.key === "Enter" && addItem()}
             className="text-sm font-mono"
             min={0}
+            step="1"
           />
         </div>
         <Button onClick={addItem} size="default" variant="outline" className="gap-1.5">
@@ -573,10 +628,11 @@ const OrderItemsSection = ({
           <Input
             type="number"
             value={deliveryFee || ""}
-            onChange={(e) => onDeliveryFeeChange(parseFloat(e.target.value) || 0)}
+            onChange={(e) => onDeliveryFeeChange(normalizeWholeMoney(parseFloat(e.target.value) || 0))}
             placeholder="0"
             className="text-sm font-mono"
             min={0}
+            step="1"
           />
         </div>
         <div className="space-y-1">
@@ -586,10 +642,11 @@ const OrderItemsSection = ({
           <Input
             type="number"
             value={urgentFee || ""}
-            onChange={(e) => onUrgentFeeChange(parseFloat(e.target.value) || 0)}
+            onChange={(e) => onUrgentFeeChange(normalizeWholeMoney(parseFloat(e.target.value) || 0))}
             placeholder="0"
             className="text-sm font-mono"
             min={0}
+            step="1"
           />
         </div>
       </div>

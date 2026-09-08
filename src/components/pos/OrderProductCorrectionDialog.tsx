@@ -40,6 +40,7 @@ import {
 } from "@/lib/odoo-api";
 import type { OrderRecordView } from "@/lib/order-records";
 import { orderItemTotal } from "@/lib/order-pricing";
+import { formatMoney } from "@/lib/money";
 import type { OrderItem } from "@/types/order";
 
 interface OrderProductCorrectionDialogProps {
@@ -49,10 +50,7 @@ interface OrderProductCorrectionDialogProps {
   onSaved: () => void;
 }
 
-const money = (minor: number) => `${minor < 0 ? "-" : ""}HK$${(Math.abs(minor) / 100).toLocaleString("en-HK", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})}`;
+const money = (minor: number) => `${minor < 0 ? "-" : ""}HK$${formatMoney(Math.abs(minor) / 100)}`;
 
 const signedMoney = (minor: number) => `${minor > 0 ? "+" : ""}${money(minor)}`;
 
@@ -310,7 +308,9 @@ const OrderProductCorrectionDialog = ({
         name: product.name,
         price: product.price,
         catalogPrice: product.price,
+        discountType: "percent",
         discountPercent: 0,
+        discountAmount: 0,
         priceOverrideReason: "",
         productId: product.id,
         productCode: product.productCode,
@@ -351,7 +351,9 @@ const OrderProductCorrectionDialog = ({
         price: product.price,
         quantity: 1,
         catalogPrice: product.price,
+        discountType: "percent",
         discountPercent: 0,
+        discountAmount: 0,
         priceOverrideReason: "",
         productId: product.id,
         productCode: product.productCode,
@@ -583,7 +585,7 @@ const OrderProductCorrectionDialog = ({
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">成交單價</Label>
-                      <p className="mt-2 font-mono">HK${item.price.toFixed(2)}</p>
+                      <p className="mt-2 font-mono">HK${formatMoney(item.price)}</p>
                     </div>
                     <div>
                       <Label htmlFor={`correction-quantity-${item.id}`} className="text-xs text-muted-foreground">數量</Label>
@@ -657,7 +659,7 @@ const OrderProductCorrectionDialog = ({
                   </div>
                   <div className="mt-3 flex justify-between border-t pt-2 text-xs">
                     <span className="text-muted-foreground">主要收貨點：{Math.max(0, item.quantity - allocatedQuantity(splits, item.id))}</span>
-                    <span className="font-mono font-semibold">小計 HK${orderItemTotal(item).toFixed(2)}</span>
+                    <span className="font-mono font-semibold">小計 HK${formatMoney(orderItemTotal(item))}</span>
                   </div>
                 </div>
               ))}
@@ -709,7 +711,7 @@ const OrderProductCorrectionDialog = ({
                       <span className="line-clamp-2 text-sm font-medium">{product.name}</span>
                       <span className="mt-1 flex justify-between gap-2 text-xs text-muted-foreground">
                         <span>{product.productCode || product.categoryName || "Odoo"}</span>
-                        <span className="font-mono text-foreground">HK${product.price.toFixed(2)}</span>
+                        <span className="font-mono text-foreground">HK${formatMoney(product.price)}</span>
                       </span>
                     </button>
                   ))}

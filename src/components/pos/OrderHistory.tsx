@@ -56,6 +56,7 @@ import type { OrderRecordView } from "@/lib/order-records";
 import type { PosEmployeeRole } from "@/lib/pos-auth";
 import { formatRecipientOccasions } from "@/lib/recipient-occasions";
 import { orderItemTotal } from "@/lib/order-pricing";
+import { formatHkd } from "@/lib/money";
 import type { DeliverySplit, OrderCancellationResolution, PaymentStatus } from "@/types/order";
 
 interface OrderHistoryProps {
@@ -83,16 +84,18 @@ interface OrderHistoryProps {
     order: OrderRecordView,
     resolution: OrderCancellationResolution,
   ) => void;
+  onResumeIncomplete?: (order: OrderRecordView) => void;
   canRetryOperationalOrders?: boolean;
   onRetryOperationalOrder?: (operationalOrderId: string) => Promise<void>;
   currentEmployeeId?: number;
   currentEmployeeRole?: PosEmployeeRole;
 }
 
-type OrderStatus = PaymentStatus | "cancelled" | "refunded";
+type OrderStatus = PaymentStatus | "incomplete" | "cancelled" | "refunded";
 export type OrderStatusFilter = OdooOrderStatusFilter;
 
 const statusBadge: Record<OrderStatus, { label: string; variant: "destructive" | "default" | "secondary" }> = {
+  incomplete: { label: "未完成訂單", variant: "secondary" },
   unpaid: { label: "未付款", variant: "destructive" },
   paid: { label: "已付款", variant: "default" },
   deposit: { label: "已付訂金", variant: "secondary" },
@@ -101,6 +104,7 @@ const statusBadge: Record<OrderStatus, { label: string; variant: "destructive" |
 };
 
 const effectiveOrderStatus = (order: OrderRecordView): OrderStatus => {
+  if (order.completionStatus === "incomplete") return "incomplete";
   if (order.orderState !== "cancel") return order.paymentStatus;
   return order.cancellationStatus === "refunded" ? "refunded" : "cancelled";
 };
@@ -129,10 +133,7 @@ const syncAttentionBadge = (order: OrderRecordView): { label: string; className:
   return null;
 };
 
-const formatMoney = (amount: number | undefined) => `HK$${(amount ?? 0).toLocaleString("zh-HK", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})}`;
+const formatMoney = (amount: number | undefined) => formatHkd(amount ?? 0);
 
 const formatDateTime = (value?: string) => {
   if (!value) return "—";
@@ -460,6 +461,7 @@ const OrderDetail = ({
   canEditOrder,
   canCancelOrder,
   onCancelOrder,
+  onResumeIncomplete,
 }: {
   order: OrderRecordView;
   history: OdooOrderEditHistory | null;
@@ -475,6 +477,7 @@ const OrderDetail = ({
   canEditOrder: boolean;
   canCancelOrder: boolean;
   onCancelOrder: () => void;
+  onResumeIncomplete?: () => void;
 }) => {
   const displayStatus = statusBadge[effectiveOrderStatus(order)];
   const syncAttention = syncAttentionBadge(order);
@@ -495,7 +498,7 @@ const OrderDetail = ({
     }))
     .filter((allocation) => allocation.quantity > 0);
   const productsSubtotal = order.items.reduce((total, item) => total + orderItemTotal(item), 0);
-  const operationalEditable = order.source === "odoo"
+  const operationalEditable = order.completionStatus !== "incomplete" && order.source === "odoo"
     && order.orderState !== "cancel"
     && Boolean(order.odooOrderId && order.writeDate);
   const deliveryEditable = operationalEditable && Boolean(order.deliveryTimeMode);
@@ -542,6 +545,11 @@ const OrderDetail = ({
         <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:max-w-[70%] sm:items-end">
           <p className="font-mono text-2xl font-bold">{formatMoney(order.finalPrice)}</p>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end [&_button]:min-h-11 [&_button]:touch-manipulation">
+            {order.completionStatus === "incomplete" && onResumeIncomplete && (
+              <Button type="button" onClick={onResumeIncomplete} className="gap-2">
+                繼續完成訂單
+              </Button>
+            )}
             {availableEditSections.length > 0 && (
               <OrderEditMenu
                 onEdit={onEdit}
@@ -751,7 +759,11 @@ const OrderDetail = ({
                     )}
                   </td>
                   <td className="py-3 pr-3 font-mono">{item.quantity}</td>
-                  <td className="py-3 pr-3 font-mono">{item.discountPercent || 0}%</td>
+                  <td className="py-3 pr-3 font-mono">
+                    {item.discountType === "fixed"
+                      ? `$${formatMoney(item.discountAmount || 0)}`
+                      : `${item.discountPercent || 0}%`}
+                  </td>
                   <td className="py-3 text-right font-mono font-medium">{formatMoney(orderItemTotal(item))}</td>
                 </tr>
               ))}
@@ -851,6 +863,7 @@ const OrderHistory = ({
   onRetry,
   onOrderUpdated,
   onStartReplacement,
+  onResumeIncomplete,
   canRetryOperationalOrders = false,
   onRetryOperationalOrder,
   currentEmployeeId,
@@ -946,6 +959,7 @@ const OrderHistory = ({
   const countLabel = `本頁 ${filteredOrders.length}`;
   const orderStatusTabs: Array<{ value: OrderStatusFilter; label: string }> = [
     { value: "all", label: "全部訂單" },
+    { value: "incomplete", label: "未完成訂單" },
     { value: "unpaid", label: "未付款" },
     { value: "deposit", label: "已付訂金" },
     { value: "paid", label: "已付款" },
@@ -1382,6 +1396,9 @@ const OrderHistory = ({
                   canEditOrder={canEditSelectedOrder}
                   canCancelOrder={canCancelSelectedOrder}
                   onCancelOrder={() => openCancellation(selectedOrder)}
+                  onResumeIncomplete={onResumeIncomplete && canEditSelectedOrder
+                    ? () => onResumeIncomplete(selectedOrder)
+                    : undefined}
                 />
           </main>
         )}

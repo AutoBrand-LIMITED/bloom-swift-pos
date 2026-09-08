@@ -54,11 +54,13 @@ const formatMoney = (amount: number, currency: string): string => {
       style: "currency",
       currency,
       currencyDisplay: "symbol",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   } catch {
     return `${currency} ${amount.toLocaleString("zh-HK", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     })}`;
   }
 };

@@ -6,6 +6,7 @@ import {
   roundMoney,
 } from "@/lib/order-pricing";
 import { renderSafeMarkdown } from "@/lib/safe-markdown";
+import { formatMoney } from "@/lib/money";
 
 const paymentLabel: Record<string, string> = {
   unpaid: "未付款",
@@ -228,10 +229,13 @@ function itemsTable(order: Order, showPrice: boolean): string {
   const rows = order.items
     .map((item) => {
       const discountPercent = normalizeDiscountPercent(item.discountPercent);
-      const adjustment = showPrice && discountPercent > 0
-        ? `<div class="item-adjustment">折扣 ${escapeHtml(discountPercent)}% / DISCOUNT</div>`
+      const fixedDiscount = item.discountType === "fixed" ? Math.max(0, Math.round(item.discountAmount || 0)) : 0;
+      const adjustment = showPrice && fixedDiscount > 0
+        ? `<div class="item-adjustment">固定折扣 $${escapeHtml(fixedDiscount)} / FIXED DISCOUNT</div>`
+        : showPrice && discountPercent > 0
+          ? `<div class="item-adjustment">折扣 ${escapeHtml(discountPercent)}% / DISCOUNT</div>`
         : "";
-      const unitPriceNote = discountPercent > 0
+      const unitPriceNote = fixedDiscount > 0 || discountPercent > 0
         ? '<div class="item-adjustment">折扣前 / BEFORE DISCOUNT</div>'
         : "";
 
@@ -239,24 +243,24 @@ function itemsTable(order: Order, showPrice: boolean): string {
     <tr>
       <td>${escapeHtml(item.name)}${adjustment}</td>
       <td class="num">${escapeHtml(item.quantity)}</td>
-      ${showPrice ? `<td class="num">$${escapeHtml(item.price.toLocaleString())}${unitPriceNote}</td>` : ""}
-      ${showPrice ? `<td class="num">$${escapeHtml(orderItemTotal(item).toLocaleString())}</td>` : ""}
+      ${showPrice ? `<td class="num">$${escapeHtml(formatMoney(item.price))}${unitPriceNote}</td>` : ""}
+      ${showPrice ? `<td class="num">$${escapeHtml(formatMoney(orderItemTotal(item)))}</td>` : ""}
     </tr>`;
     })
     .join("");
 
   const extras: string[] = [];
   if (showPrice && order.deliveryFee > 0) {
-    extras.push(`<tr><td colspan="3">送貨費</td><td class="num">$${order.deliveryFee.toLocaleString()}</td></tr>`);
+    extras.push(`<tr><td colspan="3">送貨費</td><td class="num">$${formatMoney(order.deliveryFee)}</td></tr>`);
   }
   if (showPrice && order.urgentFee > 0) {
-    extras.push(`<tr><td colspan="3">急單費</td><td class="num">$${order.urgentFee.toLocaleString()}</td></tr>`);
+    extras.push(`<tr><td colspan="3">急單費</td><td class="num">$${formatMoney(order.urgentFee)}</td></tr>`);
   }
   const orderAdjustment = roundMoney(
     order.finalPrice - orderItemsTotal(order.items) - order.deliveryFee - order.urgentFee,
   );
   if (showPrice && orderAdjustment !== 0) {
-    extras.push(`<tr><td colspan="3">訂單金額調整</td><td class="num">$${orderAdjustment.toLocaleString()}</td></tr>`);
+    extras.push(`<tr><td colspan="3">訂單金額調整</td><td class="num">$${formatMoney(orderAdjustment)}</td></tr>`);
   }
 
   return `
@@ -276,7 +280,7 @@ function itemsTable(order: Order, showPrice: boolean): string {
           showPrice
             ? `<tr class="total-row">
                 <td colspan="3">總計 / TOTAL</td>
-                <td class="num">$${order.finalPrice.toLocaleString()}</td>
+                <td class="num">$${formatMoney(order.finalPrice)}</td>
               </tr>`
             : ""
         }
@@ -324,7 +328,7 @@ export function generateReceipt(order: Order): string {
         <div><span class="field-label">付款狀態 / PAYMENT STATUS：</span><span class="payment-status">${escapeHtml(status)}</span></div>
         ${
           order.paymentStatus === "deposit"
-            ? `<div class="payment-detail"><span>訂金 $${order.depositAmount.toLocaleString()}</span><span>尚欠 $${(order.finalPrice - order.depositAmount).toLocaleString()}</span></div>`
+            ? `<div class="payment-detail"><span>訂金 $${formatMoney(order.depositAmount)}</span><span>尚欠 $${formatMoney(order.finalPrice - order.depositAmount)}</span></div>`
             : ""
         }
       </section>
@@ -648,7 +652,8 @@ export function generatePickingList(order: Order): string {
       + Math.ceil((destinationOrder.recipientCompanyName?.length || 0) / 50)
       + Math.ceil(destinationOrder.recipientName.length / 50);
     const hasDiscountRows = destinationOrder.items.some(
-      (item) => normalizeDiscountPercent(item.discountPercent) > 0,
+      (item) => normalizeDiscountPercent(item.discountPercent) > 0
+        || (item.discountType === "fixed" && (item.discountAmount || 0) > 0),
     );
     const feeRowCount = Number(destinationOrder.deliveryFee > 0)
       + Number(destinationOrder.urgentFee > 0);

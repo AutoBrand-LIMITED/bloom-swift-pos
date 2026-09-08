@@ -38,6 +38,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { formatMoney } from "@/lib/money";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -818,7 +819,7 @@ const ProductManagementDialog = ({
                               </span>
                             </div>
                             <div className="hidden shrink-0 text-right md:block">
-                              <span className="block font-mono text-sm font-semibold">${product.price.toLocaleString()}</span>
+                              <span className="block font-mono text-sm font-semibold">${formatMoney(product.price)}</span>
                               <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
                                 {product.availableInPos ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                                 {product.availableInPos ? "顯示" : "隱藏"}
@@ -982,7 +983,7 @@ const ProductManagementDialog = ({
                         )}
                       </div>
                       <span className="shrink-0 font-mono text-lg font-semibold text-foreground">
-                        ${product.price.toLocaleString()}
+                        ${formatMoney(product.price)}
                       </span>
                     </div>
                   </article>

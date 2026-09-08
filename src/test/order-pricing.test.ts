@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   hasOrderLinePriceAdjustment,
+  normalizeDiscountPercent,
+  normalizeFixedDiscount,
   orderItemTotal,
   orderItemsTotal,
   orderLineAdjustmentNeedsReason,
@@ -39,5 +41,17 @@ describe("order line pricing", () => {
   it("does not treat the normal catalog price as an override", () => {
     expect(hasOrderLinePriceAdjustment(item())).toBe(false);
     expect(orderItemTotal(item())).toBe(200);
+  });
+
+  it("uses whole five-percent steps and supports a mutually exclusive fixed discount", () => {
+    expect(normalizeDiscountPercent(2.5)).toBe(5);
+    expect(normalizeDiscountPercent(17)).toBe(15);
+    expect(normalizeFixedDiscount(10.6, 200)).toBe(11);
+    expect(orderItemTotal(item({
+      discountType: "fixed",
+      discountPercent: 0,
+      discountAmount: 25,
+      priceOverrideReason: "Manager discount",
+    }))).toBe(175);
   });
 });

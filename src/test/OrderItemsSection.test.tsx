@@ -11,6 +11,21 @@ vi.mock("@/lib/odoo-api", () => ({
 }));
 
 describe("OrderItemsSection legacy line snapshots", () => {
+  const renderItems = (items: OrderItem[], onItemsChange = vi.fn()) => render(
+    <OrderItemsSection
+      items={items}
+      onItemsChange={onItemsChange}
+      deliveryFee={0}
+      urgentFee={0}
+      onDeliveryFeeChange={vi.fn()}
+      onUrgentFeeChange={vi.fn()}
+      onCustomOrderSummary={vi.fn()}
+      budget={0}
+      onBudgetChange={vi.fn()}
+      subtotal={items.reduce((total, item) => total + item.price * item.quantity, 0)}
+    />,
+  );
+
   it("keeps packing and remarks editable on each order line", () => {
     const items: OrderItem[] = [{
       id: "line-1",
@@ -79,5 +94,33 @@ describe("OrderItemsSection legacy line snapshots", () => {
       target: { value: "1200" },
     });
     expect(onBudgetChange).toHaveBeenCalledWith(1200);
+  });
+
+  it("locks an existing product name and offers only five-percent discount steps", () => {
+    renderItems([{ id: "line-1", name: "花束", price: 680, quantity: 1 }]);
+
+    expect(screen.getByLabelText("花束 商品名稱（不可修改）")).toBeDisabled();
+    fireEvent.click(screen.getByRole("combobox", { name: "花束 百分比折扣" }));
+    expect(screen.getByRole("option", { name: "5%" })).toBeVisible();
+    expect(screen.queryByRole("option", { name: "0.5%" })).not.toBeInTheDocument();
+  });
+
+  it("switches to a whole-dollar fixed discount and clears the percentage", () => {
+    const onItemsChange = vi.fn();
+    renderItems([{
+      id: "line-1",
+      name: "花束",
+      price: 680,
+      quantity: 1,
+      discountType: "percent",
+      discountPercent: 10,
+    }], onItemsChange);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "花束 折扣方式" }));
+    fireEvent.click(screen.getByRole("option", { name: "固定金額" }));
+
+    expect(onItemsChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ discountType: "fixed", discountPercent: 0, discountAmount: 0 }),
+    ]);
   });
 });

@@ -739,6 +739,7 @@ export interface OdooOrderRecordsResponse {
 
 export type OdooOrderStatusFilter =
   | "all"
+  | "incomplete"
   | "unpaid"
   | "deposit"
   | "paid"
@@ -985,6 +986,35 @@ export async function submitOdooOrder(
     return throwApiError(res, `Odoo order sync failed: ${res.status}`);
   }
 
+  return (await res.json()) as OdooOrderResponse;
+}
+
+export async function saveIncompleteOdooOrder(
+  order: Order,
+  options: { customerId?: number; customerType?: "personal" | "company"; companyName?: string } = {},
+  signal?: AbortSignal,
+): Promise<OdooOrderResponse> {
+  if (!BACKEND_URL) throw new Error("Odoo backend is not configured");
+  const { notes: _legacyNotes, ...orderPayload } = order;
+  const res = await authenticatedFetch(`${BACKEND_URL}/orders/incomplete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...orderPayload,
+      completionStatus: "incomplete",
+      paymentStatus: "unpaid",
+      depositAmount: 0,
+      paymentMethod: "",
+      paymentReference: "",
+      paymentReceivedAt: "",
+      paymentIdempotencyKey: "",
+      customerId: options.customerId,
+      customerType: options.customerType ?? order.customerType,
+      companyName: options.companyName ?? order.companyName,
+    }),
+    signal,
+  });
+  if (!res.ok) return throwApiError(res, `Odoo incomplete order save failed: ${res.status}`);
   return (await res.json()) as OdooOrderResponse;
 }
 

@@ -77,7 +77,7 @@ describe("DayEndSettlement order table", () => {
     expect(within(table).getByText("S17803")).toBeVisible();
     expect(within(table).getByText("2026-08-26 09:39")).toBeVisible();
     expect(within(table).getByText("UAT-LATE-PAYMENT")).toBeVisible();
-    expect(within(table).getByText("HK$600.00")).toBeVisible();
+    expect(within(table).getByText("HK$600")).toBeVisible();
   });
 
   it("uses A plus B payment buckets and labels order value without claiming revenue", async () => {
@@ -125,8 +125,8 @@ describe("DayEndSettlement order table", () => {
     expect(screen.getByText("已匹配訂單：")).toBeVisible();
     expect(screen.getByText("PBNK1/2026/00018")).toBeVisible();
     expect(screen.getByText("Bank-in / FPS")).toBeVisible();
-    expect(screen.getAllByText("HK$600.00").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("HK$1,000.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("HK$600").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("HK$1,000").length).toBeGreaterThanOrEqual(1);
   });
 
   it("hides every official metric and table when Odoo is unavailable", async () => {

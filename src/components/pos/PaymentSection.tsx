@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CreditCard, AlertTriangle } from "lucide-react";
 import type { PaymentStatus } from "@/types/order";
 import type { AccountingPaymentOption } from "@/lib/odoo-api";
+import { formatMoney, normalizeWholeMoney } from "@/lib/money";
 
 interface PaymentSectionProps {
   subtotal: number;
@@ -53,7 +54,7 @@ const PaymentSection = ({
     <div className="space-y-2">
       <div className="flex justify-between text-sm">
         <span className="text-muted-foreground">小計</span>
-        <span className="font-mono">${subtotal.toLocaleString()}</span>
+        <span className="font-mono">${formatMoney(subtotal)}</span>
       </div>
       <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
         <Label className="text-sm font-semibold">最終價格</Label>
@@ -63,9 +64,10 @@ const PaymentSection = ({
             aria-label="最終價格"
             type="number"
             value={finalPrice || ""}
-            onChange={(e) => onFinalPriceChange(parseFloat(e.target.value) || 0)}
+            onChange={(e) => onFinalPriceChange(normalizeWholeMoney(parseFloat(e.target.value) || 0))}
             className="w-28 text-right font-mono text-lg font-bold h-10"
             min={0}
+            step="1"
             readOnly={!allowPriceOverride}
             aria-readonly={!allowPriceOverride}
           />
@@ -162,14 +164,15 @@ const PaymentSection = ({
           aria-label="訂金金額"
           type="number"
           value={depositAmount || ""}
-          onChange={(e) => onDepositAmountChange(parseFloat(e.target.value) || 0)}
+          onChange={(e) => onDepositAmountChange(normalizeWholeMoney(parseFloat(e.target.value) || 0))}
           placeholder="輸入已付訂金"
           className="font-mono"
           min={0}
+          step="1"
         />
         {depositAmount > 0 && (
           <p className="text-xs text-muted-foreground">
-            尚欠 <span className="font-mono font-medium text-destructive">${(finalPrice - depositAmount).toLocaleString()}</span>
+            尚欠 <span className="font-mono font-medium text-destructive">${formatMoney(finalPrice - depositAmount)}</span>
           </p>
         )}
       </div>

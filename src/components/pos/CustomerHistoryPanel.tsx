@@ -23,6 +23,7 @@ import {
   recipientOccasionsVersionFromSelection,
   recipientOccasionsStateFromSelection,
 } from "@/lib/recipient-occasions";
+import { formatMoney as formatWholeMoney } from "@/lib/money";
 
 interface CustomerHistoryPanelProps {
   customer: DemoCustomer | null;
@@ -39,8 +40,7 @@ const formatDateTime = (value?: string) => {
   return value.replace("T", " ").slice(0, 16);
 };
 
-const formatMoney = (value: number) =>
-  `$${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
+const formatMoney = (value: number) => `$${formatWholeMoney(value)}`;
 
 const formatQuantity = (value: number) =>
   value.toLocaleString(undefined, { maximumFractionDigits: 2 });
