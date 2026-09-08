@@ -869,7 +869,7 @@ const DeliverySection = ({
                     onChange={onTimeChange}
                     ariaInvalid={Boolean(deliveryTimeError)}
                     ariaDescribedBy={deliveryTimeError ? "delivery-time-error" : undefined}
-                    className="min-h-11 max-w-xs text-sm"
+                    className="min-h-11 max-w-3xl text-sm"
                   />
                   <p className="flex items-start gap-1 text-xs text-muted-foreground">
                     <CircleDollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0" />

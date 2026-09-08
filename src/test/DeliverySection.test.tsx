@@ -434,16 +434,18 @@ describe("DeliverySection delivery time controls", () => {
       deliveryTimeError: "請輸入指定送貨時間",
     });
 
-    const fromSelector = screen.getByRole("combobox", { name: "指定送貨時間 From（由）" });
-    const toSelector = screen.getByRole("combobox", { name: "指定送貨時間 To（至）" });
-    expect(fromSelector).toHaveAttribute("aria-invalid", "true");
-    expect(toSelector).toHaveAttribute("aria-invalid", "true");
+    const fromHour = screen.getByRole("textbox", { name: "指定送貨時間 From（由） 小時" });
+    const fromMinute = screen.getByRole("textbox", { name: "指定送貨時間 From（由） 分鐘" });
+    const toHour = screen.getByRole("textbox", { name: "指定送貨時間 To（至） 小時" });
+    expect(fromHour).toHaveAttribute("aria-invalid", "true");
+    expect(toHour).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("指定時間可能另收附加費")).toBeVisible();
     expect(screen.getByRole("alert", { name: "" })).toHaveTextContent("請輸入指定送貨時間");
 
-    fireEvent.click(fromSelector);
-    expect(screen.queryByRole("option", { name: "上午 10:02" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("option", { name: "上午 10:15" }));
+    fireEvent.change(fromHour, { target: { value: "10" } });
+    fireEvent.change(fromMinute, { target: { value: "02" } });
+    expect(screen.getByText(/分鐘只可輸入 00、15、30 或 45/)).toBeVisible();
+    fireEvent.change(fromMinute, { target: { value: "15" } });
     expect(props.onTimeChange).toHaveBeenCalledWith("10:15-11:15");
   });
 

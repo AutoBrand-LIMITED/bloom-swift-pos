@@ -20,7 +20,7 @@ describe("QuarterHourTimeSelect", () => {
     });
   });
 
-  it("shows the complete From and To times in two clear fields", () => {
+  it("shows AM/PM, hour, and minute as separate controls", () => {
     render(
       <QuarterHourTimeSelect
         id="visible-range"
@@ -30,10 +30,18 @@ describe("QuarterHourTimeSelect", () => {
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: "指定送貨時間 From（由）" }))
-      .toHaveTextContent("上午 09:15");
-    expect(screen.getByRole("combobox", { name: "指定送貨時間 To（至）" }))
-      .toHaveTextContent("上午 10:00");
+    expect(screen.getByRole("button", { name: "指定送貨時間 From（由） 上午" }))
+      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 小時" }))
+      .toHaveValue("09");
+    expect(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 分鐘" }))
+      .toHaveValue("15");
+    expect(screen.getByRole("button", { name: "指定送貨時間 To（至） 上午" }))
+      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("textbox", { name: "指定送貨時間 To（至） 小時" }))
+      .toHaveValue("10");
+    expect(screen.getByRole("textbox", { name: "指定送貨時間 To（至） 分鐘" }))
+      .toHaveValue("00");
   });
 
   it("preserves a legacy free-text time until a standard time range is selected", () => {
@@ -51,14 +59,50 @@ describe("QuarterHourTimeSelect", () => {
 
     expect(screen.getByText("From（由）")).toBeVisible();
     expect(screen.getByText("To（至）")).toBeVisible();
-    expect(screen.getAllByRole("combobox")).toHaveLength(2);
+    expect(screen.getAllByRole("textbox")).toHaveLength(4);
 
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 From（由）" }));
-    fireEvent.click(screen.getByRole("option", { name: "下午 03:30" }));
+    fireEvent.click(screen.getByRole("button", { name: "指定送貨時間 From（由） 下午" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 小時" }), {
+      target: { value: "3" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 分鐘" }), {
+      target: { value: "30" },
+    });
     expect(onChange).toHaveBeenCalledWith("15:30-16:30");
 
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 To（至）" }));
-    fireEvent.click(screen.getByRole("option", { name: "下午 05:00" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 To（至） 小時" }), {
+      target: { value: "5" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 To（至） 分鐘" }), {
+      target: { value: "00" },
+    });
     expect(onChange).toHaveBeenCalledWith("15:30-17:00");
+  });
+
+  it("rejects non-quarter-hour minutes and accepts manual correction", () => {
+    const onChange = vi.fn();
+    render(
+      <QuarterHourTimeSelect
+        id="manual-time"
+        label="指定送貨時間"
+        value=""
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 小時" }), {
+      target: { value: "10" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 分鐘" }), {
+      target: { value: "02" },
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("分鐘只可輸入 00、15、30 或 45");
+    expect(onChange).toHaveBeenLastCalledWith("");
+
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 From（由） 分鐘" }), {
+      target: { value: "15" },
+    });
+    expect(onChange).toHaveBeenLastCalledWith("10:15-11:15");
   });
 });

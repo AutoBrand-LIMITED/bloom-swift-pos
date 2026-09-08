@@ -1290,10 +1290,19 @@ describe("OrderHistory delivery summary", () => {
     openOrderEditSection("修改收貨點與商品分配");
     fireEvent.click(screen.getByRole("combobox", { name: "送貨時間模式 *" }));
     fireEvent.click(screen.getByRole("option", { name: "指定時間" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 * From（由）" }));
-    fireEvent.click(screen.getByRole("option", { name: "下午 03:15" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "指定送貨時間 * To（至）" }));
-    fireEvent.click(screen.getByRole("option", { name: "下午 04:00" }));
+    fireEvent.click(screen.getByRole("button", { name: "指定送貨時間 * From（由） 下午" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 * From（由） 小時" }), {
+      target: { value: "3" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 * From（由） 分鐘" }), {
+      target: { value: "15" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 * To（至） 小時" }), {
+      target: { value: "4" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "指定送貨時間 * To（至） 分鐘" }), {
+      target: { value: "00" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
 
     await waitFor(() => {
