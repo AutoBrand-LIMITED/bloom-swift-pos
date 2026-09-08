@@ -35,10 +35,10 @@ import {
 } from "@/lib/odoo-api";
 import type { OrderItem } from "@/types/order";
 import {
-  hasOrderLinePriceAdjustment,
   normalizeDiscountPercent,
   normalizeFixedDiscount,
   orderItemTotal,
+  orderLineAdjustmentRequiresReason,
 } from "@/lib/order-pricing";
 import { formatMoney, normalizeWholeMoney } from "@/lib/money";
 
@@ -101,6 +101,22 @@ const OrderItemsSection = ({
     return () => controller.abort();
   }, [loadCatalog]);
 
+  useEffect(() => {
+    if (catalogProducts.length === 0) return;
+    const fixedPriceByProductId = new Map(
+      catalogProducts.map((product) => [product.id, product.fixedPrice !== false]),
+    );
+    let changed = false;
+    const synchronizedItems = items.map((item) => {
+      if (!item.productId || !fixedPriceByProductId.has(item.productId)) return item;
+      const fixedPrice = fixedPriceByProductId.get(item.productId)!;
+      if (item.fixedPrice === fixedPrice) return item;
+      changed = true;
+      return { ...item, fixedPrice };
+    });
+    if (changed) onItemsChange(synchronizedItems);
+  }, [catalogProducts, items, onItemsChange]);
+
   const filteredCatalogProducts = useMemo(() => {
     const query = catalogQuery.trim().toLowerCase();
     return catalogProducts.filter((product) => {
@@ -152,6 +168,7 @@ const OrderItemsSection = ({
         price: product.price || 0,
         quantity: 1,
         catalogPrice: product.price || 0,
+        fixedPrice: product.fixedPrice !== false,
         discountType: "percent",
         discountPercent: 0,
         discountAmount: 0,
@@ -425,7 +442,7 @@ const OrderItemsSection = ({
       {items.length > 0 && (
         <div className="space-y-2">
           {items.map((item) => {
-            const adjusted = hasOrderLinePriceAdjustment(item);
+            const requiresAdjustmentReason = orderLineAdjustmentRequiresReason(item);
             return (
               <div key={item.id} className="space-y-2 rounded-lg bg-secondary/50 p-3">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_112px_104px_112px_72px_40px] sm:items-end">
@@ -534,7 +551,11 @@ const OrderItemsSection = ({
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-muted-foreground">
                     {item.catalogPrice !== undefined
-                      ? `Odoo 原價 $${formatMoney(item.catalogPrice)}`
+                      ? `Odoo 原價 $${formatMoney(item.catalogPrice)} · ${
+                        item.fixedPrice === false
+                          ? "浮動價格，可直接改價"
+                          : "固定價格，改價須填原因"
+                      }`
                       : "手動項目"}
                   </span>
                   <span className="font-mono font-semibold">小計 ${formatMoney(orderItemTotal(item))}</span>
@@ -552,7 +573,7 @@ const OrderItemsSection = ({
                   />
                 </div>
 
-                {adjusted && (
+                {requiresAdjustmentReason && (
                   <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-amber-700">
                       改價／折扣原因 <span className="text-destructive">*</span>

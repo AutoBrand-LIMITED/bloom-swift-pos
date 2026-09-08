@@ -39,6 +39,17 @@ export function hasOrderLinePriceAdjustment(item: OrderItem): boolean {
   return hasDiscount || hasCatalogPriceOverride;
 }
 
+export function orderLineAdjustmentRequiresReason(item: OrderItem): boolean {
+  const hasDiscount = item.discountType === "fixed"
+    ? normalizeFixedDiscount(item.discountAmount) > 0
+    : normalizeDiscountPercent(item.discountPercent) > 0;
+  const hasReasonRequiredPriceOverride = item.fixedPrice !== false
+    && item.productId !== undefined
+    && item.catalogPrice !== undefined
+    && roundMoney(item.price) !== roundMoney(item.catalogPrice);
+  return hasDiscount || hasReasonRequiredPriceOverride;
+}
+
 export function orderLineAdjustmentNeedsReason(item: OrderItem): boolean {
-  return hasOrderLinePriceAdjustment(item) && !item.priceOverrideReason?.trim();
+  return orderLineAdjustmentRequiresReason(item) && !item.priceOverrideReason?.trim();
 }

@@ -75,6 +75,7 @@ interface ProductFormState {
   categoryId: string;
   barcode: string;
   availableInPos: boolean;
+  fixedPrice: boolean;
   displaySequence: string;
   availableFrom: string;
   availableUntil: string;
@@ -120,6 +121,7 @@ const EMPTY_FORM: ProductFormState = {
   categoryId: "none",
   barcode: "",
   availableInPos: true,
+  fixedPrice: true,
   displaySequence: "100",
   availableFrom: "",
   availableUntil: "",
@@ -133,6 +135,7 @@ const formFromProduct = (product: OdooProduct): ProductFormState => ({
   categoryId: product.categoryId ? String(product.categoryId) : "none",
   barcode: product.barcode || "",
   availableInPos: product.availableInPos,
+  fixedPrice: product.fixedPrice !== false,
   displaySequence: String(product.displaySequence ?? 100),
   availableFrom: product.availableFrom || "",
   availableUntil: product.availableUntil || "",
@@ -253,6 +256,7 @@ const ProductManagementDialog = ({
     categoryId: form.categoryId === "none" ? null : Number(form.categoryId),
     barcode: form.barcode.trim() || null,
     availableInPos: form.availableInPos,
+    fixedPrice: form.fixedPrice,
     displaySequence: Number(form.displaySequence) || 0,
     availableFrom: form.availableFrom || null,
     availableUntil: form.availableUntil || null,
@@ -993,6 +997,9 @@ const ProductManagementDialog = ({
                           {product.availableInPos ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                           {product.availableInPos ? "顯示於 POS" : "已隱藏"}
                         </span>
+                        <span className="mt-1 block">
+                          {product.fixedPrice === false ? "浮動價格" : "固定價格"}
+                        </span>
                         {(product.availableFrom || product.availableUntil) && (
                           <span className="mt-1 block truncate">
                             {product.availableFrom || "不限"} 至 {product.availableUntil || "不限"}
@@ -1166,6 +1173,24 @@ const ProductManagementDialog = ({
                     </div>
                     <Switch checked={form.availableInPos} onCheckedChange={(checked) => setFormField("availableInPos", checked)} />
                   </div>
+
+                  <label
+                    htmlFor="product-manager-fixed-price"
+                    className="flex min-h-14 cursor-pointer items-center justify-between gap-4 rounded-xl border border-border px-3 py-3 sm:col-span-2"
+                  >
+                    <span>
+                      <span className="block text-sm font-medium">固定價格</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        開啟後仍可改成交單價，但必須填原因；關閉後可直接改價。折扣一律仍須填原因。
+                      </span>
+                    </span>
+                    <Switch
+                      id="product-manager-fixed-price"
+                      aria-label="固定價格"
+                      checked={form.fixedPrice}
+                      onCheckedChange={(checked) => setFormField("fixedPrice", checked)}
+                    />
+                  </label>
                 </div>
 
                 {error && (

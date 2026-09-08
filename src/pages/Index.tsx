@@ -1739,7 +1739,7 @@ const Index = () => {
     }
     const itemMissingAdjustmentReason = items.find(orderLineAdjustmentNeedsReason);
     if (itemMissingAdjustmentReason) {
-      toast.error(`「${itemMissingAdjustmentReason.name}」已改價或折扣，請填寫原因`);
+      toast.error(`「${itemMissingAdjustmentReason.name}」係固定價格商品而且已改價，或者有折扣，請填寫原因`);
       scrollToWorkflowSection("items");
       return;
     }
@@ -2008,7 +2008,7 @@ const Index = () => {
 
     const itemMissingAdjustmentReason = items.find(orderLineAdjustmentNeedsReason);
     if (itemMissingAdjustmentReason) {
-      toast.error(`「${itemMissingAdjustmentReason.name}」已改價或折扣，請填寫原因`);
+      toast.error(`「${itemMissingAdjustmentReason.name}」係固定價格商品而且已改價，或者有折扣，請填寫原因`);
       scrollToWorkflowSection("items");
       return;
     }

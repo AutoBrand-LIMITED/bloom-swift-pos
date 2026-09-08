@@ -6,6 +6,8 @@ export interface OrderItem {
   quantity: number;
   /** Odoo list price captured when the product was added to the order. */
   catalogPrice?: number;
+  /** Fixed-price catalog lines require a reason when their unit price changes. */
+  fixedPrice?: boolean;
   /** Discount modes are exclusive: percentage uses 5% steps; fixed uses whole HKD. */
   discountType?: "percent" | "fixed";
   discountPercent?: number;

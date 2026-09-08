@@ -127,4 +127,31 @@ describe("OrderItemsSection legacy line snapshots", () => {
       expect.objectContaining({ discountType: "fixed", discountPercent: 0, discountAmount: 0 }),
     ]);
   });
+
+  it("requires a reason for fixed-price changes but not floating-price changes", () => {
+    renderItems([
+      {
+        id: "fixed-line",
+        name: "Fixed bouquet",
+        price: 780,
+        quantity: 1,
+        productId: 1,
+        catalogPrice: 680,
+        fixedPrice: true,
+      },
+      {
+        id: "floating-line",
+        name: "Daily bouquet",
+        price: 780,
+        quantity: 1,
+        productId: 2,
+        catalogPrice: 680,
+        fixedPrice: false,
+      },
+    ]);
+
+    expect(screen.getByLabelText("Fixed bouquet 改價原因")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Daily bouquet 改價原因")).not.toBeInTheDocument();
+    expect(screen.getByText(/浮動價格，可直接改價/)).toBeVisible();
+  });
 });

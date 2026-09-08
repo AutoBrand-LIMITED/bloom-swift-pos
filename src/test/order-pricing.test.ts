@@ -6,6 +6,7 @@ import {
   normalizeFixedDiscount,
   orderItemTotal,
   orderItemsTotal,
+  orderLineAdjustmentRequiresReason,
   orderLineAdjustmentNeedsReason,
 } from "@/lib/order-pricing";
 import type { OrderItem } from "@/types/order";
@@ -17,6 +18,7 @@ const item = (overrides: Partial<OrderItem> = {}): OrderItem => ({
   quantity: 2,
   productId: 4338,
   catalogPrice: 100,
+  fixedPrice: true,
   discountPercent: 0,
   priceOverrideReason: "",
   ...overrides,
@@ -31,11 +33,24 @@ describe("order line pricing", () => {
     ])).toBe(212);
   });
 
-  it("requires a reason for either a catalog price override or a discount", () => {
+  it("requires a reason for a fixed catalog price override or any discount", () => {
     expect(hasOrderLinePriceAdjustment(item({ price: 90 }))).toBe(true);
+    expect(orderLineAdjustmentRequiresReason(item({ price: 90 }))).toBe(true);
     expect(orderLineAdjustmentNeedsReason(item({ price: 90 }))).toBe(true);
     expect(orderLineAdjustmentNeedsReason(item({ discountPercent: 5 }))).toBe(true);
     expect(orderLineAdjustmentNeedsReason(item({ price: 90, priceOverrideReason: "VIP" }))).toBe(false);
+  });
+
+  it("allows a floating-price product to change price without a reason", () => {
+    const floatingPriceItem = item({ fixedPrice: false, price: 90 });
+    expect(hasOrderLinePriceAdjustment(floatingPriceItem)).toBe(true);
+    expect(orderLineAdjustmentRequiresReason(floatingPriceItem)).toBe(false);
+    expect(orderLineAdjustmentNeedsReason(floatingPriceItem)).toBe(false);
+    expect(orderLineAdjustmentNeedsReason(item({
+      fixedPrice: false,
+      price: 90,
+      discountPercent: 5,
+    }))).toBe(true);
   });
 
   it("does not treat the normal catalog price as an override", () => {

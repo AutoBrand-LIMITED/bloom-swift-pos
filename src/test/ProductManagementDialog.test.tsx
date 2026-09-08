@@ -50,6 +50,7 @@ const testingProduct = {
   templateId: 4338,
   barcode: "1234",
   availableInPos: true,
+  fixedPrice: true,
   displaySequence: 100,
   availableFrom: "2026-02-01",
   availableUntil: "2026-02-28",
@@ -218,6 +219,19 @@ describe("ProductManagementDialog", () => {
     const [, payload] = apiMocks.updateProduct.mock.calls[0];
     expect(payload).not.toHaveProperty("name");
     expect(payload).toMatchObject({ price: 1200 });
+  });
+
+  it("stores the fixed-price setting with the product", async () => {
+    renderDialog();
+
+    await screen.findByText("testing");
+    fireEvent.click(screen.getByRole("button", { name: "商品設定 testing" }));
+    expect(screen.getByRole("switch", { name: "固定價格" })).toBeChecked();
+    fireEvent.click(screen.getByRole("switch", { name: "固定價格" }));
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+
+    await waitFor(() => expect(apiMocks.updateProduct).toHaveBeenCalledTimes(1));
+    expect(apiMocks.updateProduct.mock.calls[0][1]).toMatchObject({ fixedPrice: false });
   });
 
   it("keeps a new-product form blank when the product list finishes loading", async () => {
