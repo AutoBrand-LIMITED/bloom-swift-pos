@@ -10,12 +10,9 @@ import {
   LoaderCircle,
   Mail,
   MapPin,
-  Pencil,
   RefreshCw,
-  Save,
   User,
   UserRoundCheck,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DemoCustomer } from "@/data/demo-customers";
@@ -91,13 +88,6 @@ interface CustomerSectionProps {
   confirmedNewCustomerPhone?: string | null;
   onConfirmNewCustomer?: (normalizedPhone: string, normalizedName: string) => void;
   onResolutionStateChange?: (state: CustomerResolutionState) => void;
-  editingSelectedCustomer?: boolean;
-  customerProfileSaving?: boolean;
-  customerProfileError?: string | null;
-  onStartCustomerEdit?: () => void;
-  onSaveCustomerEdit?: () => void;
-  onCancelCustomerEdit?: () => void;
-  onClearCustomerSelection?: () => void;
   refreshKey?: number;
 }
 
@@ -111,9 +101,7 @@ const CustomerSection = ({
   phoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
   confirmedNewCustomerName, confirmedNewCustomerPhone, onConfirmNewCustomer,
-  onResolutionStateChange, editingSelectedCustomer = false, customerProfileSaving = false,
-  customerProfileError, onStartCustomerEdit, onSaveCustomerEdit, onCancelCustomerEdit,
-  onClearCustomerSelection,
+  onResolutionStateChange,
 }: CustomerSectionProps) => {
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
   const [search, setSearch] = useState("");
@@ -142,11 +130,11 @@ const CustomerSection = ({
     || Boolean(customerGroupsError)
     || customerGroups.length === 0;
   const selectedOdooPartnerId = selectedCustomer?.odooPartnerId;
-  const selectedProfileLocked = Boolean(selectedOdooPartnerId && !editingSelectedCustomer);
+  const selectedProfileLocked = Boolean(selectedOdooPartnerId);
 
   useEffect(() => {
     if (selectedOdooPartnerId) setActiveDropdown(null);
-  }, [editingSelectedCustomer, selectedOdooPartnerId]);
+  }, [selectedOdooPartnerId]);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -749,71 +737,11 @@ const CustomerSection = ({
       </div>
 
       {selectedOdooPartnerId && (
-        <div className="rounded-lg border border-emerald-300 bg-emerald-50/70 p-3" data-testid="selected-customer-identity">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-emerald-900">已鎖定現有聯絡人</p>
-              <p className="mt-1 font-mono text-xs text-emerald-800">Odoo Contact #{selectedOdooPartnerId}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {editingSelectedCustomer ? (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="min-h-11 gap-2 touch-manipulation"
-                    disabled={customerProfileSaving}
-                    onClick={onSaveCustomerEdit}
-                    aria-label="儲存聯絡人"
-                  >
-                    {customerProfileSaving
-                      ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-                      : <Save className="h-4 w-4" aria-hidden="true" />}
-                    儲存
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="min-h-11 gap-2 touch-manipulation"
-                    disabled={customerProfileSaving}
-                    onClick={onCancelCustomerEdit}
-                    aria-label="取消編輯聯絡人"
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" /> 取消
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="min-h-11 gap-2 touch-manipulation"
-                    onClick={onStartCustomerEdit}
-                    aria-label="編輯聯絡人"
-                  >
-                    <Pencil className="h-4 w-4" aria-hidden="true" /> 編輯聯絡人
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="min-h-11 touch-manipulation"
-                    onClick={onClearCustomerSelection}
-                  >
-                    選擇其他聯絡人
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-emerald-800">
-            姓名或電話更新只會修改呢個 Partner ID；購買紀錄唔會因電話改變而分拆。
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50/70 px-3 py-2" data-testid="selected-customer-identity">
+          <p className="text-[11px] leading-relaxed text-emerald-900">
+            已選 <span className="font-mono font-semibold">Odoo Contact #{selectedOdooPartnerId}</span>；
+            可從左側「客戶記錄」嘅三點選單編輯或更換聯絡人。
           </p>
-          {customerProfileError && (
-            <p role="alert" className="mt-2 text-xs text-destructive">{customerProfileError}</p>
-          )}
         </div>
       )}
 
@@ -932,15 +860,13 @@ const CustomerSection = ({
                 id="phone"
                 ariaLabel="下單人電話"
                 value={phone}
-                disabled={selectedProfileLocked || customerProfileSaving}
+                disabled={selectedProfileLocked}
                 onChange={(nextPhone) => {
                   onPhoneChange(nextPhone);
-                  if (editingSelectedCustomer) return;
                   setSearch(nextPhone);
                   setActiveDropdown("phone");
                 }}
                 onFocus={() => {
-                  if (editingSelectedCustomer) return;
                   if (phone.trim()) {
                     setSearch(phone);
                     setActiveDropdown("phone");
@@ -970,23 +896,17 @@ const CustomerSection = ({
                 id="customer-name"
                 placeholder="選擇或輸入客戶名稱"
                 value={activeDropdown === "name" ? search : customerName}
-                disabled={selectedProfileLocked || customerProfileSaving}
+                disabled={selectedProfileLocked}
                 onChange={(e) => {
-                  if (editingSelectedCustomer) {
-                    onNameChange(e.target.value);
-                    return;
-                  }
                   setSearch(e.target.value);
                   onNameChange(e.target.value);
                   setActiveDropdown("name");
                 }}
                 onFocus={() => {
-                  if (editingSelectedCustomer) return;
                   setSearch(customerName);
                   setActiveDropdown("name");
                 }}
                 onClick={() => {
-                  if (editingSelectedCustomer) return;
                   setActiveDropdown("name");
                 }}
                 className={`pr-10 text-base ${customerNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
@@ -997,7 +917,7 @@ const CustomerSection = ({
               <button
                 type="button"
                 aria-label="開啟客戶選單"
-                disabled={selectedProfileLocked || editingSelectedCustomer || customerProfileSaving}
+                disabled={selectedProfileLocked}
                 className="absolute right-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -1089,16 +1009,14 @@ const CustomerSection = ({
           inputMode="email"
           placeholder="例如：accounts@example.com"
           value={customerEmail}
-          disabled={selectedProfileLocked || customerProfileSaving}
+          disabled={selectedProfileLocked}
           onChange={(event) => {
             const nextEmail = event.target.value;
             onCustomerEmailChange(nextEmail);
-            if (editingSelectedCustomer) return;
             setSearch(nextEmail);
             setActiveDropdown("email");
           }}
           onFocus={() => {
-            if (editingSelectedCustomer) return;
             setSearch(customerEmail);
             setActiveDropdown("email");
           }}

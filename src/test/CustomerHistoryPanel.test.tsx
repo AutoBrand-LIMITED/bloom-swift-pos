@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
@@ -138,6 +139,93 @@ describe("CustomerHistoryPanel resizable history", () => {
       "border-r",
     );
     expect(panel).not.toHaveClass("fixed", "left-0", "order-last", "border-l", "shadow-2xl");
+  });
+
+  it("keeps the three-dot contact settings separate from labels and long-term notes", async () => {
+    const onSave = vi.fn();
+    const onChooseOtherContact = vi.fn();
+    const profileCustomer: DemoCustomer = {
+      ...customer,
+      id: "odoo-42",
+      odooPartnerId: 42,
+      name: "Alexandra Very Long Customer Name",
+      phone: "67610707",
+      email: "alex@example.com",
+      billingAddress: "香港中環花園道 1 號",
+      commentText: "呢段係一個好長嘅客戶長期備註，用嚟確認三點設定按鈕唔會遮住任何重要文字。",
+      tags: [
+        { id: 1, name: "VIP", managed: true },
+        { id: 2, name: "Special Handling", managed: true },
+      ],
+      writeDate: "2026-09-08 10:00:00",
+    };
+    odooApiMocks.getOdooCustomerHistory.mockResolvedValue({
+      history: profileCustomer.history,
+      historyCount: profileCustomer.historyCount ?? profileCustomer.history.length,
+      totalSpent: 1560,
+    });
+
+    const Harness = () => {
+      const [open, setOpen] = useState(false);
+      const [name, setName] = useState(profileCustomer.name);
+      const [phone, setPhone] = useState(profileCustomer.phone);
+      const [email, setEmail] = useState(profileCustomer.email || "");
+      const [billingAddress, setBillingAddress] = useState(profileCustomer.billingAddress || "");
+
+      return (
+        <CustomerHistoryPanel
+          customer={profileCustomer}
+          onClose={vi.fn()}
+          onChooseOtherContact={onChooseOtherContact}
+          contactEditor={{
+            open,
+            partnerId: 42,
+            name,
+            phone,
+            email,
+            billingAddress,
+            onOpenChange: setOpen,
+            onNameChange: setName,
+            onPhoneChange: setPhone,
+            onEmailChange: setEmail,
+            onBillingAddressChange: setBillingAddress,
+            onSave,
+          }}
+        />
+      );
+    };
+
+    render(<Harness />);
+
+    const settings = screen.getByRole("button", {
+      name: "Alexandra Very Long Customer Name 聯絡人設定",
+    });
+    expect(settings).toHaveClass("shrink-0");
+    expect(screen.getByLabelText("客戶標記")).toHaveTextContent("VIP");
+    expect(screen.getByLabelText("客戶標記")).toHaveTextContent("特別處理");
+    expect(screen.getByText(/呢段係一個好長嘅客戶長期備註/)).toBeVisible();
+
+    fireEvent.keyDown(settings, { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "編輯聯絡人" }));
+
+    expect(screen.getByRole("dialog", { name: "編輯聯絡人" })).toBeVisible();
+    expect(screen.getByLabelText("聯絡人名稱")).toHaveValue(profileCustomer.name);
+    expect(screen.getByLabelText("編輯聯絡人電話")).toHaveValue("67610707");
+    expect(screen.getByLabelText("電郵（選填）")).toHaveValue("alex@example.com");
+    expect(screen.getByLabelText("帳單地址（選填）")).toHaveValue("香港中環花園道 1 號");
+
+    fireEvent.change(screen.getByLabelText("聯絡人名稱"), {
+      target: { value: "Alexandra Updated" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "儲存到 Odoo" }));
+    expect(onSave).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    fireEvent.keyDown(screen.getByRole("button", {
+      name: "Alexandra Very Long Customer Name 聯絡人設定",
+    }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "選擇其他聯絡人" }));
+    expect(onChooseOtherContact).toHaveBeenCalledOnce();
   });
 
   it("keeps different recipients at the same address as separate choices", () => {

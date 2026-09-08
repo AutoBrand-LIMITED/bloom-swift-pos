@@ -1003,8 +1003,8 @@ const Index = () => {
         const latest = error.latest as DemoCustomer;
         setSelectedCustomer(latest);
         restoreSelectedCustomerProfile(latest);
-        setEditingSelectedCustomer(false);
-        setCustomerProfileError("Odoo 資料已被其他人更新；已重新載入最新版本，請核對後再編輯。");
+        setEditingSelectedCustomer(true);
+        setCustomerProfileError("Odoo 資料已被其他人更新；已重新載入最新版本，請核對後再儲存。");
         return;
       }
       setCustomerProfileError(error instanceof Error ? error.message : "未能更新 Odoo 聯絡人。");
@@ -2200,6 +2200,45 @@ const Index = () => {
             customer={selectedCustomer}
             onUseAddress={applyHistoryAddressSelection}
             addressTargetLabel={historyAddressTargetLabel}
+            contactEditor={selectedCustomer.odooPartnerId ? {
+              open: editingSelectedCustomer,
+              saving: savingCustomerProfile,
+              error: customerProfileError,
+              partnerId: selectedCustomer.odooPartnerId,
+              name: customerName,
+              phone,
+              email: customerEmail,
+              billingAddress,
+              onOpenChange: (open) => {
+                if (open) {
+                  setEditingSelectedCustomer(true);
+                  setCustomerProfileError(null);
+                  return;
+                }
+                if (savingCustomerProfile) return;
+                restoreSelectedCustomerProfile(selectedCustomer);
+                setEditingSelectedCustomer(false);
+                setCustomerProfileError(null);
+              },
+              onNameChange: (value) => {
+                setCustomerName(value);
+                clearCheckoutErrors("customerName");
+              },
+              onPhoneChange: (value) => {
+                setPhone(value);
+                clearCheckoutErrors("phone");
+              },
+              onEmailChange: (value) => {
+                setCustomerEmail(value);
+                clearCheckoutErrors("customerEmail");
+              },
+              onBillingAddressChange: (value) => {
+                setBillingAddress(value);
+                clearCheckoutErrors("billingAddress");
+              },
+              onSave: () => { void saveSelectedCustomerProfile(); },
+            } : undefined}
+            onChooseOtherContact={detachSelectedCustomerProfile}
           />
         )}
 
@@ -2359,20 +2398,6 @@ const Index = () => {
           customerEmailError={checkoutErrors.customerEmail}
           billingAddressError={checkoutErrors.billingAddress}
           selectedCustomer={selectedCustomer}
-          editingSelectedCustomer={editingSelectedCustomer}
-          customerProfileSaving={savingCustomerProfile}
-          customerProfileError={customerProfileError}
-          onStartCustomerEdit={() => {
-            setEditingSelectedCustomer(true);
-            setCustomerProfileError(null);
-          }}
-          onSaveCustomerEdit={() => { void saveSelectedCustomerProfile(); }}
-          onCancelCustomerEdit={() => {
-            if (selectedCustomer) restoreSelectedCustomerProfile(selectedCustomer);
-            setEditingSelectedCustomer(false);
-            setCustomerProfileError(null);
-          }}
-          onClearCustomerSelection={detachSelectedCustomerProfile}
           confirmedNewCustomerName={confirmedNewCustomerName}
           confirmedNewCustomerPhone={confirmedNewCustomerPhone}
           onConfirmNewCustomer={(normalizedPhone, confirmedName) => {

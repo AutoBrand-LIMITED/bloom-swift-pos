@@ -3,6 +3,7 @@ import { PanelLeftOpen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
+import type { CustomerContactEditorProps } from "@/components/pos/CustomerContactEditDialog";
 import type { DemoCustomer } from "@/data/demo-customers";
 import type { DeliveryAddressSelection } from "@/lib/hk-address";
 
@@ -19,6 +20,8 @@ interface CustomerHistoryDockProps {
   onOpenChange?: (open: boolean) => void;
   onUseAddress?: (selection: DeliveryAddressSelection) => void;
   addressTargetLabel?: string;
+  contactEditor?: CustomerContactEditorProps;
+  onChooseOtherContact?: () => void;
 }
 
 const CustomerHistoryDock = ({
@@ -26,6 +29,8 @@ const CustomerHistoryDock = ({
   onOpenChange,
   onUseAddress,
   addressTargetLabel,
+  contactEditor,
+  onChooseOtherContact,
 }: CustomerHistoryDockProps) => {
   const [inlineHistory, setInlineHistory] = useState(usesInlineHistory);
   const [open, setOpen] = useState(usesInlineHistory);
@@ -55,6 +60,8 @@ const CustomerHistoryDock = ({
         onUseAddress={onUseAddress}
         addressTargetLabel={addressTargetLabel}
         inline={inlineHistory}
+        contactEditor={contactEditor}
+        onChooseOtherContact={onChooseOtherContact}
       />
     );
   }

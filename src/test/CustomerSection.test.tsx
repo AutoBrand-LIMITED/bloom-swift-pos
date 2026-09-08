@@ -511,11 +511,7 @@ describe("CustomerSection gift sender", () => {
     expect(onConfirmNewCustomer).not.toHaveBeenCalled();
   });
 
-  it("locks a selected Partner ID until the employee explicitly enters edit mode", () => {
-    const onStartCustomerEdit = vi.fn();
-    const onSaveCustomerEdit = vi.fn();
-    const onCancelCustomerEdit = vi.fn();
-    const onClearCustomerSelection = vi.fn();
+  it("keeps a selected Partner ID locked and directs editing to customer history", () => {
     const selectedCustomer: DemoCustomer = {
       id: "odoo-42",
       odooPartnerId: 42,
@@ -526,7 +522,7 @@ describe("CustomerSection gift sender", () => {
       writeDate: "2026-09-08 10:00:00",
     };
 
-    const { rerender } = render(
+    render(
       <CustomerSection
         phone="67610707"
         customerName="Jay"
@@ -547,54 +543,15 @@ describe("CustomerSection gift sender", () => {
         onCustomerSelect={noop}
         onCustomerAndRecipientSelect={noop}
         selectedCustomer={selectedCustomer}
-        editingSelectedCustomer={false}
-        onStartCustomerEdit={onStartCustomerEdit}
-        onSaveCustomerEdit={onSaveCustomerEdit}
-        onCancelCustomerEdit={onCancelCustomerEdit}
-        onClearCustomerSelection={onClearCustomerSelection}
       />,
     );
 
     expect(screen.getByText("Odoo Contact #42")).toBeVisible();
     expect(screen.getByLabelText(/下單人電話/)).toBeDisabled();
     expect(screen.getByLabelText(/下單人／聯絡人/)).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "編輯聯絡人" }));
-    expect(onStartCustomerEdit).toHaveBeenCalledOnce();
-
-    rerender(
-      <CustomerSection
-        phone="67610707"
-        customerName="Jay"
-        customerCode=""
-        senderName="Jay"
-        customerType="personal"
-        companyName=""
-        customerEmail="jay@example.com"
-        billingAddress=""
-        onPhoneChange={noop}
-        onNameChange={noop}
-        onCustomerCodeChange={noop}
-        onSenderNameChange={noop}
-        onCustomerTypeChange={noop}
-        onCompanyNameChange={noop}
-        onCustomerEmailChange={noop}
-        onBillingAddressChange={noop}
-        onCustomerSelect={noop}
-        onCustomerAndRecipientSelect={noop}
-        selectedCustomer={selectedCustomer}
-        editingSelectedCustomer
-        onStartCustomerEdit={onStartCustomerEdit}
-        onSaveCustomerEdit={onSaveCustomerEdit}
-        onCancelCustomerEdit={onCancelCustomerEdit}
-        onClearCustomerSelection={onClearCustomerSelection}
-      />,
-    );
-
-    expect(screen.getByLabelText(/下單人電話/)).not.toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "儲存聯絡人" }));
-    expect(onSaveCustomerEdit).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole("button", { name: "取消編輯聯絡人" }));
-    expect(onCancelCustomerEdit).toHaveBeenCalledOnce();
+    expect(screen.getByLabelText(/客戶電郵/)).toBeDisabled();
+    expect(screen.getByText(/左側「客戶記錄」嘅三點選單/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "編輯聯絡人" })).not.toBeInTheDocument();
   });
 
   it("closes customer suggestions when any non-dropdown form area is pressed", async () => {

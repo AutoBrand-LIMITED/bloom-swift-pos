@@ -1,10 +1,21 @@
-import { AlertCircle, ChevronDown, ChevronUp, Clock, History, MapPin, Package, Phone, RefreshCw, Truck, User, X } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, Clock, History, MapPin, MoreVertical, Package, Pencil, Phone, RefreshCw, Truck, User, UserRoundPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useEffect, useMemo, useState } from "react";
 import type { DemoCustomer } from "@/data/demo-customers";
 import { getOdooCustomerHistory, hasOdooBackend } from "@/lib/odoo-api";
+import CustomerContactEditDialog, {
+  type CustomerContactEditorProps,
+} from "@/components/pos/CustomerContactEditDialog";
 import CustomerFlags from "@/components/pos/CustomerFlags";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { DeliveryAddressSelection } from "@/lib/hk-address";
 import {
   hasRecipientOccasionsField,
@@ -18,6 +29,8 @@ interface CustomerHistoryPanelProps {
   onUseAddress?: (selection: DeliveryAddressSelection) => void;
   addressTargetLabel?: string;
   inline?: boolean;
+  contactEditor?: CustomerContactEditorProps;
+  onChooseOtherContact?: () => void;
 }
 
 const formatDateTime = (value?: string) => {
@@ -86,6 +99,8 @@ const CustomerHistoryPanel = ({
   onUseAddress,
   addressTargetLabel = "收貨點 1",
   inline = false,
+  contactEditor,
+  onChooseOtherContact,
 }: CustomerHistoryPanelProps) => {
   const [odooHistoryState, setOdooHistoryState] = useState<{
     customerId: string;
@@ -247,21 +262,59 @@ const CustomerHistoryPanel = ({
           <ResizablePanel defaultSize={pastAddresses.length > 0 ? 55 : 35} minSize={22} maxSize={78}>
             <div className="h-full overflow-y-auto overscroll-contain">
               {/* Customer summary */}
-              <div className="p-3 border-b border-border space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+              <div className="space-y-2 border-b border-border p-3">
+                <div className="flex items-start gap-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                     {displayCustomer.name.charAt(0)}
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold">{displayCustomer.name}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{displayCustomer.phone}</p>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <p className="break-words text-sm font-semibold">{displayCustomer.name}</p>
+                    <p className="break-all font-mono text-xs text-muted-foreground">
+                      {displayCustomer.phone || "沒有電話"}
+                    </p>
                   </div>
+                  {displayCustomer.odooPartnerId && contactEditor && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-11 w-11 shrink-0 touch-manipulation"
+                          aria-label={`${displayCustomer.name} 聯絡人設定`}
+                          title="聯絡人設定"
+                        >
+                          <MoreVertical className="h-5 w-5" aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuLabel>聯絡人設定</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="min-h-11 gap-2 touch-manipulation"
+                          onSelect={() => contactEditor.onOpenChange(true)}
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                          編輯聯絡人
+                        </DropdownMenuItem>
+                        {onChooseOtherContact && (
+                          <DropdownMenuItem
+                            className="min-h-11 gap-2 touch-manipulation"
+                            onSelect={onChooseOtherContact}
+                          >
+                            <UserRoundPlus className="h-4 w-4" aria-hidden="true" />
+                            選擇其他聯絡人
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
-                <CustomerFlags tags={displayCustomer.tags} />
+                <CustomerFlags tags={displayCustomer.tags} className="pr-1" />
                 {displayCustomer.commentText?.trim() && (
-                  <div className="border-l-2 border-primary/40 pl-2">
+                  <div className="min-w-0 border-l-2 border-primary/40 pl-2 pr-1">
                     <p className="text-[10px] font-semibold text-muted-foreground">長期備註</p>
-                    <p className="line-clamp-3 whitespace-pre-wrap text-xs leading-relaxed">
+                    <p className="line-clamp-3 break-words whitespace-pre-wrap text-xs leading-relaxed">
                       {displayCustomer.commentText}
                     </p>
                   </div>
@@ -635,6 +688,8 @@ const CustomerHistoryPanel = ({
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      {contactEditor && <CustomerContactEditDialog editor={contactEditor} />}
     </aside>
   );
 };
