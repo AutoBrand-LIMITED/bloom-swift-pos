@@ -122,6 +122,7 @@ import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pri
 import { parseDeliveryAddress, type DeliveryAddressSelection } from "@/lib/hk-address";
 import { mobileCheckoutBarClassName } from "@/lib/pos-layout";
 import { formatMoney } from "@/lib/money";
+import { cloneOrderContent } from "@/lib/order-copy";
 import {
   loadCachedPaymentOptions,
   resolvePaymentReference,
@@ -1283,17 +1284,22 @@ const Index = () => {
     setSalespersonEmployeeId(employee?.id);
   }, [employee, staff]);
 
-  const handleStartReplacement = useCallback(async (
+  const copyOrderIntoNewCheckout = useCallback(async (
     order: Order,
-    resolution: OrderCancellationResolution,
+    options: {
+      replacementOrderId?: number;
+      customerCreditSourceOrderId?: number;
+      pendingMessage: string;
+      customerLoadErrorPrefix: string;
+    },
   ) => {
-    if (!order.odooOrderId || !order.customerId) {
-      toast.error("原單缺少 Odoo 客戶或訂單編號，未能安全建立替代單。");
-      return;
+    if (!order.customerId) {
+      toast.error("原單缺少 Odoo 客戶編號，未能安全複製。");
+      return false;
     }
     if (pendingSubmission) {
-      toast.error("請先處理目前待確認訂單，再建立替代單。");
-      return;
+      toast.error(options.pendingMessage);
+      return false;
     }
 
     let latestCustomer: DemoCustomer;
@@ -1302,12 +1308,13 @@ const Index = () => {
     } catch (error) {
       toast.error(
         error instanceof Error
-          ? `原單已取消，但未能讀取客戶最新資料：${error.message}`
-          : "原單已取消，但未能讀取客戶最新資料。",
+          ? `${options.customerLoadErrorPrefix}：${error.message}`
+          : options.customerLoadErrorPrefix,
       );
-      return;
+      return false;
     }
 
+    const clonedContent = cloneOrderContent(order);
     resetOrderForm();
     applyCustomerSelection(latestCustomer);
     setSenderName(order.senderName || order.customerName);
@@ -1316,19 +1323,20 @@ const Index = () => {
     setSourceReference(order.sourceReference || "");
     setDepartment(order.department || "");
     setSalesTeamId(order.salesTeamId);
-    setItems(order.items.map((item) => ({ ...item })));
+    if (order.terms) setTerms(order.terms);
+    setItems(clonedContent.items);
     setDeliveryFee(order.deliveryFee);
     setUrgentFee(order.urgentFee);
     setSenderNote(order.senderNote || "");
     setDeliveryNote(order.deliveryNote || "");
     setInternalNote(order.internalNote || "");
     setFulfillmentType(order.fulfillmentType || "delivery");
-    setDeliveryDate(order.deliveryDate);
+    setDeliveryDate(order.deliveryDate || "");
     setDeliveryTimeMode(order.deliveryTimeMode);
     setDeliverySlotId(order.deliverySlotId);
-    setDeliveryTime(order.deliveryTime);
+    setDeliveryTime(order.deliveryTime || "");
     const parsedAddress = parseDeliveryAddress(
-      order.deliveryGoogleAddress || order.deliveryAddress,
+      order.deliveryGoogleAddress || order.deliveryAddress || "",
     );
     setDeliveryRegion(parsedAddress.region);
     setDeliveryDistrict(parsedAddress.district);
@@ -1337,21 +1345,19 @@ const Index = () => {
     setDeliveryBuilding(order.deliveryBuilding || "");
     setDeliveryFloor(order.deliveryFloor || "");
     setDeliveryUnit(order.deliveryUnit || "");
-    setDeliverySplits((order.deliverySplits || []).map((split) => ({
-      ...split,
-      itemAllocations: split.itemAllocations.map((allocation) => ({ ...allocation })),
-    })));
+    setDeliverySplits(clonedContent.deliverySplits);
     setRecipientType(order.recipientType || "personal");
     setRecipientCompanyName(order.recipientCompanyName || "");
-    setRecipientName(order.recipientName);
-    setRecipientPhone(order.recipientPhone);
+    setRecipientName(order.recipientName || "");
+    setRecipientPhone(order.recipientPhone || "");
     setRecipientPartnerId(order.recipientPartnerId);
     setRecipientOccasions(order.recipientOccasions || []);
     setRecipientOccasionsKnown(order.recipientOccasions !== undefined);
     setRecipientOccasionsVersion(order.recipientOccasionsVersion);
-    setDeliveryPerson(order.deliveryPerson);
+    setDeliveryPerson(order.deliveryPerson || "");
+    setFailedDeliveryAction("none");
     setGiftCardEnabled(order.giftCardEnabled);
-    setGiftCardMessage(order.giftCardMessage);
+    setGiftCardMessage(order.giftCardMessage || "");
     setPaymentStatus("unpaid");
     setDepositAmount(0);
     setPaymentMethod("");
@@ -1359,21 +1365,47 @@ const Index = () => {
     setPaymentReceivedAt("");
     setPaymentIdempotencyKey(crypto.randomUUID());
     setCheckoutId(crypto.randomUUID());
-    setReplacementOrderId(order.odooOrderId);
-    setCustomerCreditSourceOrderId(
-      resolution === "credit" ? order.odooOrderId : undefined,
-    );
+    setCheckoutCreatedAt(new Date().toISOString());
+    setReplacementOrderId(options.replacementOrderId);
+    setCustomerCreditSourceOrderId(options.customerCreditSourceOrderId);
     setPriceOverridden(order.priceOverridden);
     setManualPrice(order.priceOverridden ? order.finalPrice : null);
     setSalesId(order.salesId);
     setSalespersonEmployeeId(order.salespersonEmployeeId);
     setHistoryOpen(false);
+    return true;
+  }, [applyCustomerSelection, pendingSubmission, resetOrderForm]);
+
+  const handleStartReplacement = useCallback(async (
+    order: Order,
+    resolution: OrderCancellationResolution,
+  ) => {
+    if (!order.odooOrderId) {
+      toast.error("原單缺少 Odoo 客戶或訂單編號，未能安全建立替代單。");
+      return;
+    }
+    const copied = await copyOrderIntoNewCheckout(order, {
+      replacementOrderId: order.odooOrderId,
+      customerCreditSourceOrderId: resolution === "credit" ? order.odooOrderId : undefined,
+      pendingMessage: "請先處理目前待確認訂單，再建立替代單。",
+      customerLoadErrorPrefix: "原單已取消，但未能讀取客戶最新資料",
+    });
+    if (!copied) return;
     toast.success(
       resolution === "credit"
         ? `已複製 ${order.odooOrderName || "原單"}；新單會自動套用 Customer Credit。`
         : `已複製 ${order.odooOrderName || "原單"} 成替代單。`,
     );
-  }, [applyCustomerSelection, pendingSubmission, resetOrderForm]);
+  }, [copyOrderIntoNewCheckout]);
+
+  const handleDuplicateOrder = useCallback(async (order: Order) => {
+    const copied = await copyOrderIntoNewCheckout(order, {
+      pendingMessage: "請先處理目前待確認訂單，再複製另一張訂單。",
+      customerLoadErrorPrefix: "未能讀取客戶最新資料",
+    });
+    if (!copied) return;
+    toast.success(`已複製 ${order.odooOrderName || "原單"}；付款資料已清空，請確認後再落單。`);
+  }, [copyOrderIntoNewCheckout]);
 
   const handleResumeIncomplete = useCallback(async (order: Order) => {
     if (order.completionStatus !== "incomplete" || !order.customerId) return;
@@ -3069,6 +3101,7 @@ const Index = () => {
         onRetry={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onOrderUpdated={() => setOrderRecordsRefreshKey((key) => key + 1)}
         onStartReplacement={handleStartReplacement}
+        onDuplicateOrder={handleDuplicateOrder}
         onResumeIncomplete={handleResumeIncomplete}
         canRetryOperationalOrders={employee?.role === "manager"}
         onRetryOperationalOrder={handleOperationalOrderRetry}

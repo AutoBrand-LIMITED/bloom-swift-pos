@@ -13,6 +13,7 @@ const odooMocks = vi.hoisted(() => ({
   getOdooEmployees: vi.fn(),
   getOdooSalesTeams: vi.fn(),
   getOdooCustomerGroups: vi.fn(),
+  getOdooCustomer: vi.fn(),
   getOdooOrderRecords: vi.fn(),
   getOdooProductCategories: vi.fn(),
   getOdooProducts: vi.fn(),
@@ -87,6 +88,14 @@ describe("Index correlated order search", () => {
     odooMocks.getOdooEmployees.mockResolvedValue([]);
     odooMocks.getOdooSalesTeams.mockResolvedValue([]);
     odooMocks.getOdooCustomerGroups.mockResolvedValue([]);
+    odooMocks.getOdooCustomer.mockResolvedValue({
+      id: "odoo-42",
+      odooPartnerId: 42,
+      name: "Repeat Customer",
+      phone: "91234567",
+      customerCode: "REPEAT-42",
+      history: [],
+    });
     odooMocks.getOdooOrderRecords.mockResolvedValue({
       date: "2026-08-26",
       generatedAt: "2026-08-26T09:00:00+08:00",
@@ -287,5 +296,42 @@ describe("Index correlated order search", () => {
     expect((await screen.findAllByText("Local Previous"))[0]).toBeVisible();
     expect(screen.queryByText("Local Today")).not.toBeInTheDocument();
     expect(screen.queryByText("Malformed Local")).not.toBeInTheDocument();
+  });
+
+  it("loads a copied order into a fresh unpaid checkout", async () => {
+    const sourceOrder = orderFixture(42, "Repeat Customer", {
+      customerId: 42,
+      senderName: "Gift Sender",
+      items: [{ id: "source-line", name: "Copy Bouquet", price: 680, quantity: 2 }],
+      deliveryFee: 120,
+      subtotal: 1480,
+      finalPrice: 1480,
+      paymentStatus: "paid",
+      paymentMethod: "cash_other",
+      paymentReference: "ORIGINAL-PAYMENT",
+      recipientName: "Copy Recipient",
+      recipientPhone: "61234567",
+    });
+    odooMocks.getOdooOrderRecords.mockResolvedValue({
+      generatedAt: "2026-09-10T09:00:00+08:00",
+      truncated: false,
+      page: 1,
+      limit: 50,
+      hasMore: false,
+      orders: [sourceOrder],
+    });
+
+    render(<MemoryRouter><Index /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: /訂單記錄/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "查看訂單 S00042" }));
+    fireEvent.click(screen.getByRole("button", { name: "複製成新訂單" }));
+
+    await waitFor(() => expect(odooMocks.getOdooCustomer).toHaveBeenCalledWith(42));
+    expect(await screen.findByLabelText("Customer ID／客戶編號")).toHaveValue("REPEAT-42");
+    expect(screen.getByLabelText("Copy Bouquet 商品名稱（不可修改）")).toHaveValue("Copy Bouquet");
+    expect(screen.getByRole("combobox", { name: "送貨費" })).toHaveTextContent("香港島第 3 區");
+    expect(screen.getByPlaceholderText("收貨人姓名")).toHaveValue("Copy Recipient");
+    expect(screen.getByRole("button", { name: "未付款" })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("ORIGINAL-PAYMENT")).not.toBeInTheDocument();
   });
 });

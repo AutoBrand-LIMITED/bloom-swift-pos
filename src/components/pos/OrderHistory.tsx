@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ClipboardList,
   Clock3,
+  Copy,
   LoaderCircle,
   MoreHorizontal,
   PackageOpen,
@@ -84,6 +85,7 @@ interface OrderHistoryProps {
     order: OrderRecordView,
     resolution: OrderCancellationResolution,
   ) => void;
+  onDuplicateOrder?: (order: OrderRecordView) => void;
   onResumeIncomplete?: (order: OrderRecordView) => void;
   canRetryOperationalOrders?: boolean;
   onRetryOperationalOrder?: (operationalOrderId: string) => Promise<void>;
@@ -461,6 +463,7 @@ const OrderDetail = ({
   canEditOrder,
   canCancelOrder,
   onCancelOrder,
+  onDuplicateOrder,
   onResumeIncomplete,
 }: {
   order: OrderRecordView;
@@ -477,6 +480,7 @@ const OrderDetail = ({
   canEditOrder: boolean;
   canCancelOrder: boolean;
   onCancelOrder: () => void;
+  onDuplicateOrder?: () => void;
   onResumeIncomplete?: () => void;
 }) => {
   const displayStatus = statusBadge[effectiveOrderStatus(order)];
@@ -558,6 +562,16 @@ const OrderDetail = ({
                 productsAvailable={operationalEditable}
                 disabled={!canEditOrder}
               />
+            )}
+            {order.completionStatus !== "incomplete" && onDuplicateOrder && (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 gap-2 touch-manipulation"
+                onClick={onDuplicateOrder}
+              >
+                <Copy className="h-4 w-4" /> 複製成新訂單
+              </Button>
             )}
             <PrintButtons order={order} size="default" />
             {canCancelOrder && (
@@ -863,6 +877,7 @@ const OrderHistory = ({
   onRetry,
   onOrderUpdated,
   onStartReplacement,
+  onDuplicateOrder,
   onResumeIncomplete,
   canRetryOperationalOrders = false,
   onRetryOperationalOrder,
@@ -1396,6 +1411,9 @@ const OrderHistory = ({
                   canEditOrder={canEditSelectedOrder}
                   canCancelOrder={canCancelSelectedOrder}
                   onCancelOrder={() => openCancellation(selectedOrder)}
+                  onDuplicateOrder={onDuplicateOrder
+                    ? () => onDuplicateOrder(selectedOrder)
+                    : undefined}
                   onResumeIncomplete={onResumeIncomplete && canEditSelectedOrder
                     ? () => onResumeIncomplete(selectedOrder)
                     : undefined}

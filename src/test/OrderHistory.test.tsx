@@ -574,6 +574,26 @@ describe("OrderHistory delivery summary", () => {
     expect(onStartReplacement).toHaveBeenCalledWith(paidOrder, "credit");
   });
 
+  it("lets staff copy a completed order into a new checkout without cancelling it", () => {
+    const onDuplicateOrder = vi.fn();
+    const originalOrder = orderFixture({ customerId: 42 });
+
+    render(
+      <OrderHistory
+        orders={[originalOrder]}
+        open
+        onClose={vi.fn()}
+        onDuplicateOrder={onDuplicateOrder}
+      />,
+    );
+
+    openOrderDetails();
+    fireEvent.click(screen.getByRole("button", { name: "複製成新訂單" }));
+
+    expect(onDuplicateOrder).toHaveBeenCalledWith(originalOrder);
+    expect(cancelOdooOrder).not.toHaveBeenCalled();
+  });
+
   it("opens only the requested section from its three-dot action menu", () => {
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
     openOrderDetails();
