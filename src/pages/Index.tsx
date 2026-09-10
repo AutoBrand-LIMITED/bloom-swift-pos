@@ -62,6 +62,8 @@ import {
   companyFieldsForCustomerType,
   type CustomerResolutionState,
   detachedCustomerProfile,
+  WALK_IN_CUSTOMER_CODE,
+  WALK_IN_CUSTOMER_NAME,
 } from "@/lib/customer-profile";
 import {
   discardPendingSubmissionAfterOdooReview,
@@ -952,6 +954,14 @@ const Index = () => {
 
   const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
     resetCustomerForSearch(accountCode);
+  }, [resetCustomerForSearch]);
+
+  const useWalkInCustomer = useCallback(() => {
+    resetCustomerForSearch(WALK_IN_CUSTOMER_CODE);
+    setCustomerName(WALK_IN_CUSTOMER_NAME);
+    setSenderName(WALK_IN_CUSTOMER_NAME);
+    setConfirmedNewCustomerName(WALK_IN_CUSTOMER_NAME);
+    setConfirmedNewCustomerPhone("");
   }, [resetCustomerForSearch]);
 
   const restoreSelectedCustomerProfile = useCallback((customer: DemoCustomer) => {
@@ -2625,6 +2635,7 @@ const Index = () => {
             setCustomerGroupId(groupId);
           }}
           onCustomerSelect={applyCustomerSelection}
+          onUseWalkInCustomer={useWalkInCustomer}
           onStartCustomerSearch={() => resetCustomerForSearch()}
           onStartNewCustomerUnderAccount={startNewCustomerUnderAccount}
           onCustomerAndRecipientSelect={applyCustomerAndRecipient}

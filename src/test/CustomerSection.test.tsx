@@ -23,6 +23,7 @@ vi.mock("@/lib/odoo-api", () => ({
 const noop = vi.fn();
 const selectCustomer = vi.fn();
 const selectCustomerAndRecipient = vi.fn();
+const useWalkInCustomer = vi.fn();
 const emptyBusinessProps = {
   customerEmail: "",
   billingAddress: "",
@@ -75,6 +76,7 @@ function Harness({
         setCustomerGroupId(groupId);
       }}
       onCustomerSelect={selectCustomer}
+      onUseWalkInCustomer={useWalkInCustomer}
       onStartNewCustomerUnderAccount={setCustomerCode}
       onCustomerAndRecipientSelect={selectCustomerAndRecipient}
       selectedCustomer={null}
@@ -181,6 +183,7 @@ describe("CustomerSection gift sender", () => {
     searchOdooCustomers.mockResolvedValue([]);
     selectCustomer.mockReset();
     selectCustomerAndRecipient.mockReset();
+    useWalkInCustomer.mockReset();
   });
 
   it("defaults the gift sender to the ordering contact and allows direct edits", () => {
@@ -193,6 +196,52 @@ describe("CustomerSection gift sender", () => {
     fireEvent.change(senderInput, { target: { value: "Director Lee" } });
     expect(senderInput).toHaveValue("Director Lee");
     expect(screen.getByLabelText(/下單人／聯絡人/)).toHaveValue("Secretary Chan");
+  });
+
+  it("sets up a new walk-in customer in one click when the canonical contact does not exist", async () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "使用 Walk-in 客戶" }));
+
+    await waitFor(() => expect(searchOdooCustomerAccount).toHaveBeenCalledWith("WALK-IN"));
+    expect(useWalkInCustomer).toHaveBeenCalledOnce();
+    expect(selectCustomer).not.toHaveBeenCalled();
+  });
+
+  it("reuses the one canonical no-phone walk-in Odoo contact", async () => {
+    const walkIn = {
+      id: "odoo-77",
+      odooPartnerId: 77,
+      name: "Walk-in Customer",
+      phone: "",
+      customerCode: "WALK-IN",
+      history: [],
+    };
+    searchOdooCustomerAccount.mockResolvedValue({
+      customerCode: "WALK-IN",
+      contactCount: 1,
+      contacts: [walkIn],
+      truncated: false,
+    });
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "使用 Walk-in 客戶" }));
+
+    await waitFor(() => expect(selectCustomer).toHaveBeenCalledWith(walkIn));
+    expect(useWalkInCustomer).not.toHaveBeenCalled();
+  });
+
+  it("does not create a walk-in draft when the Odoo lookup fails", async () => {
+    searchOdooCustomerAccount.mockRejectedValue(new Error("Odoo timeout"));
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "使用 Walk-in 客戶" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "未能確認 Walk-in 客戶：Odoo timeout",
+    );
+    expect(useWalkInCustomer).not.toHaveBeenCalled();
+    expect(selectCustomer).not.toHaveBeenCalled();
   });
 
   it("keeps an empty backup phone collapsed until its row is expanded", () => {

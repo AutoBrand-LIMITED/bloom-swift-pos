@@ -41,6 +41,7 @@ import {
 } from "@/lib/phone-utils";
 import {
   customerResolutionIdentityKey,
+  WALK_IN_CUSTOMER_CODE,
   type CustomerResolutionState,
 } from "@/lib/customer-profile";
 import type { OdooNamedReference } from "@/types/order";
@@ -76,6 +77,7 @@ interface CustomerSectionProps {
   onBillingAddressChange: (v: string) => void;
   onCustomerGroupChange?: (label: string, groupId?: number) => void;
   onCustomerSelect: (c: DemoCustomer) => void;
+  onUseWalkInCustomer?: () => void;
   onStartCustomerSearch?: () => void;
   onStartNewCustomerUnderAccount?: (customerCode: string) => void;
   onCustomerAndRecipientSelect: (
@@ -104,6 +106,7 @@ const CustomerSection = ({
   onPhoneChange, onAlternatePhoneChange = () => undefined, onNameChange, onCustomerCodeChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
   onCustomerEmailChange, onBillingAddressChange, onCustomerGroupChange,
   onCustomerSelect, onCustomerAndRecipientSelect, onStartCustomerSearch,
+  onUseWalkInCustomer,
   onStartNewCustomerUnderAccount,
   phoneError, alternatePhoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
@@ -124,6 +127,8 @@ const CustomerSection = ({
     message: string;
   } | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [walkInLoading, setWalkInLoading] = useState(false);
+  const [walkInError, setWalkInError] = useState<string | null>(null);
   const [completedOdooSearch, setCompletedOdooSearch] = useState<{
     source: CustomerLookupSource;
     query: string;
@@ -520,6 +525,40 @@ const CustomerSection = ({
     setSearch("");
   };
 
+  const handleUseWalkInCustomer = async () => {
+    setActiveDropdown(null);
+    setWalkInError(null);
+    if (!hasOdooBackend) {
+      onUseWalkInCustomer?.();
+      return;
+    }
+
+    setWalkInLoading(true);
+    try {
+      const account = await searchOdooCustomerAccount(WALK_IN_CUSTOMER_CODE);
+      const canonicalContacts = account.contacts.filter((customer) => (
+        customer.customerCode?.trim().toLocaleLowerCase()
+          === WALK_IN_CUSTOMER_CODE.toLocaleLowerCase()
+        && !normalizePhoneNumber(customer.phone)
+        && !normalizePhoneNumber(customer.alternatePhone || "")
+      ));
+      if (canonicalContacts.length > 1) {
+        throw new Error("Odoo 有多過一個無電話 WALK-IN 聯絡人，請先處理重複記錄");
+      }
+      if (canonicalContacts.length === 1) {
+        handleSelect(canonicalContacts[0]);
+        return;
+      }
+      onUseWalkInCustomer?.();
+    } catch (error) {
+      setWalkInError(
+        `未能確認 Walk-in 客戶：${error instanceof Error ? error.message : "Odoo 暫時無法連線"}`,
+      );
+    } finally {
+      setWalkInLoading(false);
+    }
+  };
+
   const customerOptionContent = (c: DemoCustomer, actionLabel?: string) => (
     <>
       <div className="min-w-0">
@@ -750,38 +789,58 @@ const CustomerSection = ({
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
           <User className="w-4 h-4" />
           客戶資料
         </h2>
-        <div className="flex rounded-lg overflow-hidden border border-border">
-          <button
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
             type="button"
-            disabled={Boolean(selectedOdooPartnerId)}
-            onClick={() => onCustomerTypeChange("personal")}
-            className={`px-3 py-1 text-xs font-medium transition-colors ${
-              customerType === "personal"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-accent"
-            }`}
+            variant="outline"
+            size="sm"
+            aria-label="使用 Walk-in 客戶"
+            disabled={walkInLoading || !onUseWalkInCustomer}
+            onClick={() => { void handleUseWalkInCustomer(); }}
+            className="min-h-9 gap-1.5 border-dashed touch-manipulation"
           >
-            個人
-          </button>
-          <button
-            type="button"
-            disabled={Boolean(selectedOdooPartnerId)}
-            onClick={() => onCustomerTypeChange("company")}
-            className={`px-3 py-1 text-xs font-medium transition-colors ${
-              customerType === "company"
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-accent"
-            }`}
-          >
-            <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> 公司</span>
-          </button>
+            {walkInLoading && <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+            {walkInLoading ? "確認中..." : "Walk-in 客戶"}
+          </Button>
+          <div className="flex overflow-hidden rounded-lg border border-border">
+            <button
+              type="button"
+              disabled={Boolean(selectedOdooPartnerId)}
+              onClick={() => onCustomerTypeChange("personal")}
+              className={`px-3 py-1 text-xs font-medium transition-colors ${
+                customerType === "personal"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-accent"
+              }`}
+            >
+              個人
+            </button>
+            <button
+              type="button"
+              disabled={Boolean(selectedOdooPartnerId)}
+              onClick={() => onCustomerTypeChange("company")}
+              className={`px-3 py-1 text-xs font-medium transition-colors ${
+                customerType === "company"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-accent"
+              }`}
+            >
+              <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> 公司</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {walkInError && (
+        <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {walkInError}
+        </p>
+      )}
 
       {selectedOdooPartnerId && (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50/70 px-3 py-2" data-testid="selected-customer-identity">

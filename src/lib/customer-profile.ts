@@ -1,5 +1,8 @@
 import { canonicalPhoneValue } from "@/lib/phone-utils";
 
+export const WALK_IN_CUSTOMER_CODE = "WALK-IN";
+export const WALK_IN_CUSTOMER_NAME = "Walk-in Customer";
+
 export type CustomerResolutionPhase =
   | "idle"
   | "debouncing"
