@@ -154,4 +154,37 @@ describe("OrderItemsSection legacy line snapshots", () => {
     expect(screen.queryByLabelText("Daily bouquet 改價原因")).not.toBeInTheDocument();
     expect(screen.getByText(/浮動價格，可直接改價/)).toBeVisible();
   });
+
+  it("offers exactly five fixed delivery zones and does not allow free amount entry", () => {
+    const onDeliveryFeeChange = vi.fn();
+
+    render(
+      <OrderItemsSection
+        items={[]}
+        onItemsChange={vi.fn()}
+        deliveryFee={0}
+        urgentFee={0}
+        onDeliveryFeeChange={onDeliveryFeeChange}
+        onUrgentFeeChange={vi.fn()}
+        onCustomOrderSummary={vi.fn()}
+        budget={0}
+        onBudgetChange={vi.fn()}
+        subtotal={0}
+      />,
+    );
+
+    expect(screen.queryByRole("spinbutton", { name: "送貨費" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "送貨費" }));
+
+    expect(screen.getAllByRole("option")).toHaveLength(5);
+    expect(screen.getByRole("option", { name: "香港島第 1 區 — 80" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "香港島第 2 區 — 100" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "香港島第 3 區 — 120" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "九龍 — 130" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "新界 — 250" })).toBeVisible();
+
+    fireEvent.click(screen.getByRole("option", { name: "香港島第 3 區 — 120" }));
+    expect(onDeliveryFeeChange).toHaveBeenCalledWith(120);
+  });
 });

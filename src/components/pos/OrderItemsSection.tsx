@@ -55,6 +55,14 @@ interface OrderItemsSectionProps {
   subtotal: number;
 }
 
+const DELIVERY_FEE_OPTIONS = [
+  { label: "香港島第 1 區", amount: 80 },
+  { label: "香港島第 2 區", amount: 100 },
+  { label: "香港島第 3 區", amount: 120 },
+  { label: "九龍", amount: 130 },
+  { label: "新界", amount: 250 },
+] as const;
+
 const OrderItemsSection = ({
   items, onItemsChange,
   deliveryFee, urgentFee,
@@ -75,6 +83,8 @@ const OrderItemsSection = ({
   const [catalogHeight, setCatalogHeight] = useState(480);
   const [productManagerOpen, setProductManagerOpen] = useState(false);
   const [budgetExpanded, setBudgetExpanded] = useState(false);
+  const hasLegacyDeliveryFee = deliveryFee > 0
+    && !DELIVERY_FEE_OPTIONS.some((option) => option.amount === deliveryFee);
 
   const loadCatalog = useCallback(async (signal?: AbortSignal) => {
     if (!hasOdooBackend) return;
@@ -634,15 +644,40 @@ const OrderItemsSection = ({
           <Label className="text-xs flex items-center gap-1">
             <Truck className="w-3.5 h-3.5" /> 送貨費
           </Label>
-          <Input
-            type="number"
-            value={deliveryFee || ""}
-            onChange={(e) => onDeliveryFeeChange(normalizeWholeMoney(parseFloat(e.target.value) || 0))}
-            placeholder="0"
-            className="text-sm font-mono"
-            min={0}
-            step="1"
-          />
+          <div className="flex gap-2">
+            <Select
+              value={deliveryFee > 0 ? String(deliveryFee) : undefined}
+              onValueChange={(value) => onDeliveryFeeChange(Number(value))}
+            >
+              <SelectTrigger aria-label="送貨費" className="min-w-0 flex-1 text-sm">
+                <SelectValue placeholder="選擇地區及送貨費" />
+              </SelectTrigger>
+              <SelectContent>
+                {hasLegacyDeliveryFee && (
+                  <SelectItem value={String(deliveryFee)} disabled>
+                    舊有送貨費 — {formatMoney(deliveryFee)}（請重新選擇）
+                  </SelectItem>
+                )}
+                {DELIVERY_FEE_OPTIONS.map((option) => (
+                  <SelectItem key={option.amount} value={String(option.amount)}>
+                    {option.label} — {formatMoney(option.amount)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {deliveryFee > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="shrink-0 px-2 text-xs text-muted-foreground"
+                aria-label="清除送貨費"
+                onClick={() => onDeliveryFeeChange(0)}
+              >
+                清除
+              </Button>
+            )}
+          </div>
         </div>
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
