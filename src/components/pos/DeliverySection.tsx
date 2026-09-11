@@ -40,6 +40,7 @@ import {
   LoaderCircle,
   MapPin,
   RefreshCw,
+  ShoppingBag,
   Store,
   Truck,
   User,
@@ -56,6 +57,7 @@ interface RecipientDraft {
 
 interface DeliverySectionProps {
   showFulfillmentSelector?: boolean;
+  showGrabAndGoOption?: boolean;
   sectionTitle?: string;
   /** Split destinations cannot replace the order's selected customer. */
   allowLinkedCustomerSelection?: boolean;
@@ -137,6 +139,7 @@ const normalizeRecipientLookupQuery = (field: RecipientLookupField, value: strin
 
 const DeliverySection = ({
   showFulfillmentSelector = true,
+  showGrabAndGoOption = true,
   sectionTitle = "收貨方式",
   allowLinkedCustomerSelection = true,
   fulfillmentType,
@@ -707,7 +710,11 @@ const DeliverySection = ({
         )}
       </div>
       {showFulfillmentSelector && (
-      <div className="grid grid-cols-2 gap-2" role="group" aria-label="收貨方式">
+      <div
+        className={`grid gap-2 ${showGrabAndGoOption ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2"}`}
+        role="group"
+        aria-label="收貨方式"
+      >
         <Button
           type="button"
           variant="outline"
@@ -724,15 +731,32 @@ const DeliverySection = ({
           className={`min-h-11 ${fulfillmentType === "pickup" ? "border-primary bg-primary/10 text-primary" : ""}`}
           onClick={() => onFulfillmentTypeChange("pickup")}
         >
-          <Store className="mr-1.5 h-4 w-4" />自取
+          <Store className="mr-1.5 h-4 w-4" />預約自取
         </Button>
+        {showGrabAndGoOption && (
+          <Button
+            type="button"
+            variant="outline"
+            aria-pressed={fulfillmentType === "grab_and_go"}
+            className={`min-h-11 ${fulfillmentType === "grab_and_go" ? "border-primary bg-primary/10 text-primary" : ""}`}
+            onClick={() => onFulfillmentTypeChange("grab_and_go")}
+          >
+            <ShoppingBag className="mr-1.5 h-4 w-4" />即買即走
+          </Button>
+        )}
       </div>
       )}
       {fulfillmentType === "pickup" && (
         <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-          自取訂單只需選擇日期及時間，毋須填寫地址或收貨人資料。
+          預約自取只需選擇日期及時間，毋須填寫地址或收貨人資料。
         </p>
       )}
+      {fulfillmentType === "grab_and_go" && (
+        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+          即買即走毋須選擇日期、時間、地址或收貨人資料。
+        </p>
+      )}
+      {fulfillmentType !== "grab_and_go" && (
       <div className="space-y-3">
         <div className="space-y-1 max-w-xs">
           <Label htmlFor="delivery-date" className="text-xs flex items-center gap-1">
@@ -886,6 +910,7 @@ const DeliverySection = ({
           )}
         </fieldset>
       </div>
+      )}
 
       {fulfillmentType === "delivery" && <>
       {/* Address: Region → District → Area */}

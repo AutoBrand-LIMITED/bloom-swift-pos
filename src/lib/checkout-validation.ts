@@ -143,24 +143,26 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
     if (!input.deliveryAddress.trim()) errors.deliveryAddress = "請選擇或輸入送貨地址";
   }
 
-  if (!input.deliveryDate.trim()) {
-    errors.deliveryDate = "請選擇送貨日期";
-  } else if (!isValidDeliveryDate(input.deliveryDate)) {
-    errors.deliveryDate = "送貨日期必須是有效的 YYYY-MM-DD 日期";
-  }
+  if ((input.fulfillmentType || "delivery") !== "grab_and_go") {
+    if (!input.deliveryDate.trim()) {
+      errors.deliveryDate = "請選擇送貨日期";
+    } else if (!isValidDeliveryDate(input.deliveryDate)) {
+      errors.deliveryDate = "送貨日期必須是有效的 YYYY-MM-DD 日期";
+    }
 
-  if (!input.deliveryTimeMode) {
-    errors.deliveryTime = "請選擇送貨時間";
-  } else {
-    const selectionError = validateDeliveryTimeSelection({
-      deliveryDate: input.deliveryDate,
-      deliveryTime: input.deliveryTime,
-      deliveryTimeMode: input.deliveryTimeMode,
-      deliverySlotId: input.deliverySlotId,
-      slots: input.deliverySlots,
-      frozenSlotSelection: input.frozenSlotSelection,
-    });
-    if (selectionError) errors.deliveryTime = selectionError;
+    if (!input.deliveryTimeMode) {
+      errors.deliveryTime = "請選擇送貨時間";
+    } else {
+      const selectionError = validateDeliveryTimeSelection({
+        deliveryDate: input.deliveryDate,
+        deliveryTime: input.deliveryTime,
+        deliveryTimeMode: input.deliveryTimeMode,
+        deliverySlotId: input.deliverySlotId,
+        slots: input.deliverySlots,
+        frozenSlotSelection: input.frozenSlotSelection,
+      });
+      if (selectionError) errors.deliveryTime = selectionError;
+    }
   }
 
   return errors;

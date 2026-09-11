@@ -136,6 +136,23 @@ describe("print layout contract", () => {
     expect(html).not.toContain("SPLIT DISABLED CARD");
   });
 
+  it("omits delivery documents and delivery blanks for grab-and-go", () => {
+    const html = generateAllDocuments(orderFixture({
+      fulfillmentType: "grab_and_go",
+      deliveryDate: "",
+      deliveryTime: "",
+      deliveryAddress: "",
+      recipientName: "",
+      recipientPhone: "",
+      giftCardEnabled: false,
+    }));
+
+    expect(html).toContain('data-batch-print-document="receipt"');
+    expect(html).toContain('data-batch-print-document="picking-list"');
+    expect(html).not.toContain('data-batch-print-document="delivery-note"');
+    expect(html).toContain("即買即走");
+  });
+
   it.each(documentGenerators)("prints the %s as monochrome A4 landscape without emoji", (_, generator) => {
     const html = generator(orderFixture());
 

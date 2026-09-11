@@ -290,6 +290,13 @@ function itemsTable(order: Order, showPrice: boolean): string {
 }
 
 function pickingDeliveryInfo(order: Order): string {
+  if (order.fulfillmentType === "grab_and_go") {
+    return `
+      <div class="pick-delivery-grid" data-document-section="delivery-details">
+        <div><span class="label">收貨方式</span>即買即走</div>
+      </div>
+    `;
+  }
   const recipientCompanyRow = order.recipientCompanyName?.trim()
     ? `<div><span class="label">收貨公司</span>${displayValue(order.recipientCompanyName)}</div>`
     : "";
@@ -816,9 +823,11 @@ function printableDocumentParts(html: string): PrintableDocumentParts {
 export function generateAllDocuments(order: Order): string {
   const documents: Array<readonly [string, string]> = [
     ["receipt", generateReceipt(order)],
-    ["delivery-note", generateDeliveryNote(order)],
     ["picking-list", generatePickingList(order)],
   ];
+  if (order.fulfillmentType !== "grab_and_go") {
+    documents.splice(1, 0, ["delivery-note", generateDeliveryNote(order)]);
+  }
   if (hasEnabledMessageCards(order)) {
     documents.push(["message-card", generateMessageCards(order)]);
   }

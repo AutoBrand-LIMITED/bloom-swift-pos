@@ -136,6 +136,22 @@ describe("checkout required-field validation", () => {
     })).toEqual({});
   });
 
+  it("allows grab-and-go without delivery, pickup, or recipient details", () => {
+    expect(validateCheckout({
+      ...validCheckout,
+      fulfillmentType: "grab_and_go",
+      deliveryAddress: "",
+      deliveryDate: "",
+      deliveryTime: "",
+      deliveryTimeMode: undefined,
+      deliverySlotId: undefined,
+      recipientType: "company",
+      recipientCompanyName: "",
+      recipientName: "",
+      recipientPhone: "",
+    })).toEqual({});
+  });
+
   it("requires company name and billing address only for company customers", () => {
     const companyErrors = validateCheckout({
       ...validCheckout,

@@ -140,7 +140,7 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.getByText("訂單")).toBeVisible();
     expect(screen.getByText("落單時間")).toBeVisible();
     expect(screen.getByText("客戶")).toBeVisible();
-    expect(screen.getByText("送貨／自取")).toBeVisible();
+    expect(screen.getByText("收貨方式")).toBeVisible();
     expect(screen.getByText("訂單狀態")).toBeVisible();
     expect(screen.getByText("總額／操作")).toBeVisible();
     expect(screen.getByRole("button", { name: "全部列印訂單 S00020" })).toBeVisible();
@@ -804,7 +804,7 @@ describe("OrderHistory delivery summary", () => {
     );
 
     const order = screen.getByRole("button", { name: "查看訂單 S00017" });
-    expect(within(order).getByText("自取：2026-07-18")).toBeVisible();
+    expect(within(order).getByText("預約自取：2026-07-18")).toBeVisible();
     expect(within(order).getByText("上午 09:00-13:00")).toBeVisible();
     expect(within(order).queryByText("送貨：2026-07-18")).not.toBeInTheDocument();
 
@@ -812,6 +812,28 @@ describe("OrderHistory delivery summary", () => {
     const destinations = screen.getByRole("region", { name: "收貨點與商品分配" });
     expect(within(destinations).getByText("自取地點")).toBeVisible();
     expect(within(destinations).getByText("中西花店門市自取")).toBeVisible();
+  });
+
+  it("shows grab-and-go without missing delivery warnings", () => {
+    render(<OrderHistory orders={[orderFixture({
+      fulfillmentType: "grab_and_go",
+      deliveryDate: "",
+      deliveryTimeMode: undefined,
+      deliveryTime: "",
+      deliveryAddress: "",
+      recipientName: "",
+      recipientPhone: "",
+    })]} open onClose={vi.fn()} />);
+
+    const order = screen.getByRole("button", { name: "查看訂單 S00017" });
+    expect(within(order).getByText("即買即走")).toBeVisible();
+    expect(within(order).queryByText(/未指定日期|未指定時段/)).not.toBeInTheDocument();
+
+    fireEvent.click(order);
+    const destination = screen.getByRole("article", { name: "主要收貨點 1" });
+    expect(within(destination).getByText("即買即走，毋須日期、時間或收貨資料")).toBeVisible();
+    expect(within(destination).queryByText("未指定日期")).not.toBeInTheDocument();
+    expect(within(destination).queryByText("收貨人／聯絡人")).not.toBeInTheDocument();
   });
 
   it("edits an existing Odoo order and refreshes the drawer", async () => {

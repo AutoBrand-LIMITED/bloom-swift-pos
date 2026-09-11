@@ -1,6 +1,7 @@
 import type { CustomerTag, DemoCustomer, PurchaseRecord } from "@/data/demo-customers";
 import type {
   DeliverySplit,
+  FulfillmentType,
   OdooNamedReference,
   Order,
   OrderCancellationResolution,
@@ -377,9 +378,9 @@ export interface OrderOperationalUpdate {
   sourceReference: string;
   department: string;
   terms: string;
-  fulfillmentType: "delivery" | "pickup";
+  fulfillmentType: FulfillmentType;
   deliveryDate: string;
-  deliveryTimeMode: "slot" | "specified";
+  deliveryTimeMode?: "slot" | "specified";
   deliverySlotId?: number;
   deliveryTime: string;
   deliveryAddress: string;

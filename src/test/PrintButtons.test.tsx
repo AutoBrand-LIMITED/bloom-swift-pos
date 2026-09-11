@@ -64,6 +64,21 @@ describe("PrintButtons", () => {
     expect(screen.queryByRole("button", { name: "心意卡" })).not.toBeInTheDocument();
   });
 
+  it("omits the delivery-note action for grab-and-go orders", () => {
+    const order = {
+      id: "order-1",
+      fulfillmentType: "grab_and_go",
+      giftCardEnabled: false,
+      deliverySplits: [],
+    } as unknown as Order;
+
+    render(<PrintButtons order={order} />);
+
+    expect(screen.queryByRole("button", { name: "送貨單" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收據" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "執貨單" })).toBeVisible();
+  });
+
   it("shows the exact allocation error instead of opening a broken print job", () => {
     const order = { id: "order-1" } as Order;
     vi.mocked(generateAllDocuments).mockImplementationOnce(() => {

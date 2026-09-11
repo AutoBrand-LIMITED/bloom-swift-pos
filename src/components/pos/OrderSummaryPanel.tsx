@@ -1,9 +1,9 @@
-import { CalendarDays, ChevronRight, Package, Phone, Truck, UserRound } from "lucide-react";
+import { CalendarDays, ChevronRight, Package, Phone, ShoppingBag, Store, Truck, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { orderItemTotal } from "@/lib/order-pricing";
 import { formatMoney } from "@/lib/money";
-import type { OrderItem, PaymentStatus } from "@/types/order";
+import type { FulfillmentType, OrderItem, PaymentStatus } from "@/types/order";
 import type { WorkflowSectionId } from "@/components/pos/PosWorkflowTabs";
 
 interface OrderSummaryPanelProps {
@@ -11,6 +11,7 @@ interface OrderSummaryPanelProps {
   phone: string;
   recipientName: string;
   recipientPhone: string;
+  fulfillmentType: FulfillmentType;
   deliveryDate: string;
   deliveryTime: string;
   items: OrderItem[];
@@ -57,6 +58,7 @@ const OrderSummaryPanel = ({
   phone,
   recipientName,
   recipientPhone,
+  fulfillmentType,
   deliveryDate,
   deliveryTime,
   items,
@@ -73,6 +75,16 @@ const OrderSummaryPanel = ({
   onNavigate,
 }: OrderSummaryPanelProps) => {
   const completionPercent = Math.round((completedCount / requiredSectionCount) * 100);
+  const FulfillmentIcon = fulfillmentType === "grab_and_go"
+    ? ShoppingBag
+    : fulfillmentType === "pickup"
+      ? Store
+      : Truck;
+  const fulfillmentHeading = fulfillmentType === "grab_and_go"
+    ? "即買即走"
+    : fulfillmentType === "pickup"
+      ? "預約自取"
+      : "收貨及送貨";
 
   return (
     <aside aria-label="訂單摘要" className="rounded-2xl border border-border bg-card shadow-sm">
@@ -141,17 +153,26 @@ const OrderSummaryPanel = ({
       <div className="space-y-2 border-b border-border p-4">
         <div className="flex items-center justify-between gap-2">
           <p className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <Truck className="h-4 w-4" aria-hidden="true" />
-            收貨及送貨
+            <FulfillmentIcon className="h-4 w-4" aria-hidden="true" />
+            {fulfillmentHeading}
           </p>
           <SummaryLink label="修改" section="delivery" onNavigate={onNavigate} />
         </div>
-        <p className="truncate text-sm font-semibold">{recipientName.trim() || "尚未填寫收貨人"}</p>
-        {recipientPhone.trim() && <p className="text-xs text-muted-foreground">{recipientPhone}</p>}
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-          {[deliveryDate, deliveryTime].filter(Boolean).join(" · ") || "尚未選擇送貨時間"}
-        </p>
+        {fulfillmentType === "delivery" && (
+          <>
+            <p className="truncate text-sm font-semibold">{recipientName.trim() || "尚未填寫收貨人"}</p>
+            {recipientPhone.trim() && <p className="text-xs text-muted-foreground">{recipientPhone}</p>}
+          </>
+        )}
+        {fulfillmentType === "grab_and_go" ? (
+          <p className="text-sm text-muted-foreground">毋須安排日期、時間或收貨資料</p>
+        ) : (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+            {[deliveryDate, deliveryTime].filter(Boolean).join(" · ")
+              || (fulfillmentType === "pickup" ? "尚未選擇取貨時間" : "尚未選擇送貨時間")}
+          </p>
+        )}
       </div>
 
       <div className="p-4">

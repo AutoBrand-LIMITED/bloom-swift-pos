@@ -45,6 +45,7 @@ export const PrintAllButton = ({ order, size = "sm", ariaLabel }: PrintAllButton
 
 const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
   const hasMessageCards = hasEnabledMessageCards(order);
+  const hasDeliveryDocument = order.fulfillmentType !== "grab_and_go";
 
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -57,14 +58,14 @@ const PrintButtons = ({ order, size = "sm" }: PrintButtonsProps) => {
     >
       <Receipt className="w-3.5 h-3.5" /> 收據
     </Button>
-    <Button
+    {hasDeliveryDocument && <Button
       variant="outline"
       size={size}
       className="gap-1.5 text-xs"
       onClick={(e) => { e.stopPropagation(); safePrint(() => generateDeliveryNote(order)); }}
     >
       <Truck className="w-3.5 h-3.5" /> 送貨單
-    </Button>
+    </Button>}
     <Button
       variant="outline"
       size={size}

@@ -46,6 +46,7 @@ interface OrderItemsSectionProps {
   items: OrderItem[];
   onItemsChange: (items: OrderItem[]) => void;
   deliveryFee: number;
+  deliveryFeeEnabled?: boolean;
   urgentFee: number;
   onDeliveryFeeChange: (v: number) => void;
   onUrgentFeeChange: (v: number) => void;
@@ -65,7 +66,7 @@ const DELIVERY_FEE_OPTIONS = [
 
 const OrderItemsSection = ({
   items, onItemsChange,
-  deliveryFee, urgentFee,
+  deliveryFee, deliveryFeeEnabled = true, urgentFee,
   onDeliveryFeeChange, onUrgentFeeChange,
   onCustomOrderSummary,
   budget, onBudgetChange, subtotal,
@@ -648,9 +649,10 @@ const OrderItemsSection = ({
             <Select
               value={deliveryFee > 0 ? String(deliveryFee) : undefined}
               onValueChange={(value) => onDeliveryFeeChange(Number(value))}
+              disabled={!deliveryFeeEnabled}
             >
               <SelectTrigger aria-label="送貨費" className="min-w-0 flex-1 text-sm">
-                <SelectValue placeholder="選擇地區及送貨費" />
+                <SelectValue placeholder={deliveryFeeEnabled ? "選擇地區及送貨費" : "此收貨方式不適用"} />
               </SelectTrigger>
               <SelectContent>
                 {hasLegacyDeliveryFee && (
@@ -665,7 +667,7 @@ const OrderItemsSection = ({
                 ))}
               </SelectContent>
             </Select>
-            {deliveryFee > 0 && (
+            {deliveryFeeEnabled && deliveryFee > 0 && (
               <Button
                 type="button"
                 variant="ghost"

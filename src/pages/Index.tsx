@@ -707,7 +707,9 @@ const Index = () => {
       && !items.some(orderLineAdjustmentNeedsReason),
   );
   const deliverySectionComplete = Boolean(
-    isValidDeliveryDate(deliveryDate)
+    fulfillmentType === "grab_and_go"
+    || (
+      isValidDeliveryDate(deliveryDate)
       && deliveryTimeMode
       && deliveryTime.trim()
       && (
@@ -718,7 +720,8 @@ const Index = () => {
           && isValidPhoneNumber(recipientPhone)
           && (recipientType !== "company" || recipientCompanyName.trim())
         )
-      ),
+      )
+    ),
   ) && !validateDeliverySplits(deliverySplits, items);
   const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
   const paymentSectionComplete = Boolean(
@@ -1800,14 +1803,18 @@ const Index = () => {
       deliveryArea,
       deliveryDetail.trim(),
     ].filter(Boolean).join(" ");
-    const deliveryAddress = fulfillmentType === "pickup"
-      ? PICKUP_LOCATION_ADDRESS
-      : [
+    const deliveryAddress = fulfillmentType === "grab_and_go"
+      ? ""
+      : fulfillmentType === "pickup"
+        ? PICKUP_LOCATION_ADDRESS
+        : [
           deliveryGoogleAddress,
           deliveryBuilding.trim(),
           deliveryFloor.trim() ? `${deliveryFloor.trim()}樓` : "",
           deliveryUnit.trim() ? `${deliveryUnit.trim()}室` : "",
         ].filter(Boolean).join("，");
+    const hasDeliveryDetails = fulfillmentType === "delivery";
+    const hasSchedule = fulfillmentType !== "grab_and_go";
     const incompleteOrder: Order = {
       id: checkoutId,
       salesId,
@@ -1833,7 +1840,7 @@ const Index = () => {
       phone: phone.trim(),
       alternatePhone: alternatePhone.trim(),
       items,
-      deliveryFee,
+      deliveryFee: hasDeliveryDetails ? deliveryFee : 0,
       urgentFee,
       subtotal,
       finalPrice,
@@ -1845,24 +1852,24 @@ const Index = () => {
       paymentReceivedAt: "",
       paymentIdempotencyKey: "",
       fulfillmentType,
-      deliveryDate,
-      deliveryTimeMode,
-      deliverySlotId,
-      deliveryTime,
+      deliveryDate: hasSchedule ? deliveryDate : "",
+      deliveryTimeMode: hasSchedule ? deliveryTimeMode : undefined,
+      deliverySlotId: hasSchedule ? deliverySlotId : undefined,
+      deliveryTime: hasSchedule ? deliveryTime : "",
       deliveryAddress,
-      deliveryGoogleAddress,
-      deliveryBuilding: deliveryBuilding.trim(),
-      deliveryFloor: deliveryFloor.trim(),
-      deliveryUnit: deliveryUnit.trim(),
+      deliveryGoogleAddress: hasDeliveryDetails ? deliveryGoogleAddress : "",
+      deliveryBuilding: hasDeliveryDetails ? deliveryBuilding.trim() : "",
+      deliveryFloor: hasDeliveryDetails ? deliveryFloor.trim() : "",
+      deliveryUnit: hasDeliveryDetails ? deliveryUnit.trim() : "",
       deliverySplits: [],
       recipientType,
-      recipientCompanyName: recipientCompanyName.trim(),
-      recipientName: recipientName.trim(),
-      recipientPhone: recipientPhone.trim(),
-      ...(recipientOccasionsKnown ? { recipientOccasions } : {}),
-      recipientOccasionsVersion,
-      recipientPartnerId,
-      deliveryPerson: deliveryPerson.trim(),
+      recipientCompanyName: hasDeliveryDetails ? recipientCompanyName.trim() : "",
+      recipientName: hasDeliveryDetails ? recipientName.trim() : "",
+      recipientPhone: hasDeliveryDetails ? recipientPhone.trim() : "",
+      ...(hasDeliveryDetails && recipientOccasionsKnown ? { recipientOccasions } : {}),
+      recipientOccasionsVersion: hasDeliveryDetails ? recipientOccasionsVersion : undefined,
+      recipientPartnerId: hasDeliveryDetails ? recipientPartnerId : undefined,
+      deliveryPerson: hasDeliveryDetails ? deliveryPerson.trim() : "",
       giftCardEnabled,
       giftCardMessage: giftCardEnabled ? giftCardMessage.trim() : "",
       senderNote: senderNote.trim(),
@@ -1943,9 +1950,11 @@ const Index = () => {
       deliveryArea,
       deliveryDetail.trim(),
     ].filter(Boolean).join(" ");
-    const deliveryAddress = fulfillmentType === "pickup"
-      ? PICKUP_LOCATION_ADDRESS
-      : [
+    const deliveryAddress = fulfillmentType === "grab_and_go"
+      ? ""
+      : fulfillmentType === "pickup"
+        ? PICKUP_LOCATION_ADDRESS
+        : [
           deliveryGoogleAddress,
           deliveryBuilding.trim(),
           deliveryFloor.trim() ? `${deliveryFloor.trim()}樓` : "",
@@ -2000,10 +2009,12 @@ const Index = () => {
       );
       return;
     }
-    const primaryOccasionError = recipientOccasionValidationError(
-      recipientOccasions,
-      "主要收貨點收花人",
-    );
+    const primaryOccasionError = fulfillmentType === "delivery"
+      ? recipientOccasionValidationError(
+          recipientOccasions,
+          "主要收貨點收花人",
+        )
+      : null;
     if (primaryOccasionError) {
       toast.error(primaryOccasionError);
       scrollToWorkflowSection("delivery");
@@ -2155,7 +2166,7 @@ const Index = () => {
       phone: phone.trim(),
       alternatePhone: alternatePhone.trim(),
       items,
-      deliveryFee,
+      deliveryFee: fulfillmentType === "delivery" ? deliveryFee : 0,
       urgentFee,
       subtotal,
       finalPrice,
@@ -2167,13 +2178,15 @@ const Index = () => {
       paymentReceivedAt: receiptTimestamp,
       paymentIdempotencyKey: pendingSubmission?.order.paymentIdempotencyKey || receiptIdempotencyKey,
       fulfillmentType,
-      deliveryDate,
-      ...deliveryContractFieldsForSubmission(
-        deliveryTimeMode,
-        deliverySlotId,
-        hasLegacyPendingDelivery ? undefined : pendingSubmission?.order,
-      ),
-      deliveryTime,
+      deliveryDate: fulfillmentType === "grab_and_go" ? "" : deliveryDate,
+      ...(fulfillmentType === "grab_and_go"
+        ? { deliveryTimeMode: undefined, deliverySlotId: undefined }
+        : deliveryContractFieldsForSubmission(
+            deliveryTimeMode,
+            deliverySlotId,
+            hasLegacyPendingDelivery ? undefined : pendingSubmission?.order,
+          )),
+      deliveryTime: fulfillmentType === "grab_and_go" ? "" : deliveryTime,
       deliveryAddress,
       deliveryGoogleAddress: fulfillmentType === "delivery" ? deliveryGoogleAddress : "",
       deliveryBuilding: fulfillmentType === "delivery" ? deliveryBuilding.trim() : "",
@@ -2188,17 +2201,19 @@ const Index = () => {
         : {}),
       ...(includePendingField("recipientType") ? { recipientType } : {}),
       ...(includePendingField("recipientCompanyName")
-        ? { recipientCompanyName: recipientCompanyName.trim() }
+        ? { recipientCompanyName: fulfillmentType === "delivery" ? recipientCompanyName.trim() : "" }
         : {}),
-      recipientName: recipientName.trim(),
-      recipientPhone: recipientPhone.trim(),
-      ...recipientOccasionFieldsForSubmission(
-        recipientOccasions,
-        recipientOccasionsKnown,
-        pendingSubmission?.order,
-        recipientOccasionsVersion,
-      ),
-      deliveryPerson: deliveryPerson.trim(),
+      recipientName: fulfillmentType === "delivery" ? recipientName.trim() : "",
+      recipientPhone: fulfillmentType === "delivery" ? recipientPhone.trim() : "",
+      ...(fulfillmentType === "delivery"
+        ? recipientOccasionFieldsForSubmission(
+            recipientOccasions,
+            recipientOccasionsKnown,
+            pendingSubmission?.order,
+            recipientOccasionsVersion,
+          )
+        : {}),
+      deliveryPerson: fulfillmentType === "delivery" ? deliveryPerson.trim() : "",
       giftCardEnabled,
       giftCardMessage: giftCardEnabled ? giftCardMessage.trim() : "",
       senderNote: senderNote.trim(),
@@ -2206,8 +2221,8 @@ const Index = () => {
       internalNote: internalNote.trim(),
       completionStatus: "complete",
       ...(customerNoteMutation ? { customerNoteMutation } : {}),
-      ...(recipientNoteMutation ? { recipientNoteMutation } : {}),
-      recipientPartnerId,
+      ...(fulfillmentType === "delivery" && recipientNoteMutation ? { recipientNoteMutation } : {}),
+      recipientPartnerId: fulfillmentType === "delivery" ? recipientPartnerId : undefined,
       ...(replacementOrderId !== undefined ? { replacementOrderId } : {}),
       ...(customerCreditSourceOrderId !== undefined ? { customerCreditSourceOrderId } : {}),
       createdAt: pendingSubmission?.order.createdAt || checkoutCreatedAt,
@@ -2703,6 +2718,7 @@ const Index = () => {
           items={items}
           onItemsChange={setItems}
           deliveryFee={deliveryFee}
+          deliveryFeeEnabled={fulfillmentType === "delivery"}
           urgentFee={urgentFee}
           onDeliveryFeeChange={setDeliveryFee}
           onUrgentFeeChange={setUrgentFee}
@@ -2770,7 +2786,14 @@ const Index = () => {
           }}
           onFulfillmentTypeChange={(value) => {
             setFulfillmentType(value);
+            if (value !== "delivery") setDeliveryFee(0);
+            if (value === "grab_and_go") {
+              setDeliverySplits([]);
+              setActiveHistoryAddressSplitId(undefined);
+            }
             clearCheckoutErrors(
+              "deliveryDate",
+              "deliveryTime",
               "deliveryAddress",
               "recipientName",
               "recipientCompanyName",
@@ -2878,7 +2901,7 @@ const Index = () => {
           onEnabledChange={setGiftCardEnabled}
           onMessageChange={setGiftCardMessage}
         />
-        <SplitDeliverySection
+        {fulfillmentType !== "grab_and_go" && <SplitDeliverySection
           items={items}
           splits={deliverySplits}
           onChange={setDeliverySplits}
@@ -2900,7 +2923,7 @@ const Index = () => {
             activeHistoryAddressSplitIndex >= 0 ? activeHistoryAddressSplitId : undefined
           }
           onHistoryAddressTargetChange={setActiveHistoryAddressSplitId}
-        />
+        />}
         </section>
 
         <section
@@ -2996,6 +3019,7 @@ const Index = () => {
             <OrderSummaryPanel
               customerName={customerName}
               phone={phone}
+              fulfillmentType={fulfillmentType}
               recipientName={recipientType === "company" && recipientCompanyName.trim()
                 ? `${recipientCompanyName} · ${recipientName}`
                 : recipientName}

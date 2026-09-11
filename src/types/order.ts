@@ -31,7 +31,8 @@ export type OrderCancellationStatus =
   | "credit_used";
 export type DeliveryTimeMode = "slot" | "specified";
 export type RecipientType = "personal" | "company";
-export type FulfillmentType = "delivery" | "pickup";
+export type ScheduledFulfillmentType = "delivery" | "pickup";
+export type FulfillmentType = ScheduledFulfillmentType | "grab_and_go";
 export type RecipientOccasionType = "birthday" | "anniversary" | "valentines_day" | "other";
 
 export interface RecipientOccasion {
@@ -53,7 +54,7 @@ export interface DeliverySplitItemAllocation {
 export interface DeliverySplit {
   id: string;
   /** Each additional destination can be delivered or collected independently. */
-  fulfillmentType?: FulfillmentType;
+  fulfillmentType?: ScheduledFulfillmentType;
   deliveryDate: string;
   deliveryTimeMode?: DeliveryTimeMode;
   deliverySlotId?: number;

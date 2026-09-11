@@ -58,7 +58,7 @@ import type { PosEmployeeRole } from "@/lib/pos-auth";
 import { formatRecipientOccasions } from "@/lib/recipient-occasions";
 import { orderItemTotal } from "@/lib/order-pricing";
 import { formatHkd } from "@/lib/money";
-import type { DeliverySplit, OrderCancellationResolution, PaymentStatus } from "@/types/order";
+import type { DeliverySplit, FulfillmentType, OrderCancellationResolution, PaymentStatus } from "@/types/order";
 
 interface OrderHistoryProps {
   orders: OrderRecordView[];
@@ -162,9 +162,11 @@ const deliveryTimeLabel = (
     : order.deliveryTime || "未指定時段"
 );
 
-const fulfillmentLabel = (fulfillmentType?: "delivery" | "pickup") => (
-  fulfillmentType === "pickup" ? "自取" : "送貨"
-);
+const fulfillmentLabel = (fulfillmentType?: FulfillmentType) => {
+  if (fulfillmentType === "grab_and_go") return "即買即走";
+  if (fulfillmentType === "pickup") return "預約自取";
+  return "送貨";
+};
 
 const orderIdentity = (order: OrderRecordView) => order.odooOrderName || order.id;
 
@@ -393,7 +395,7 @@ const DestinationCard = ({
   allocations,
 }: {
   title: string;
-  fulfillmentType?: "delivery" | "pickup";
+  fulfillmentType?: FulfillmentType;
   deliveryDate: string;
   deliveryTimeMode?: "slot" | "specified";
   deliveryTime: string;
@@ -409,27 +411,46 @@ const DestinationCard = ({
   giftCardEnabled?: boolean;
   giftCardMessage?: string;
   allocations: Array<{ itemId: string; itemName: string; quantity: number }>;
-}) => (
+}) => {
+  const rows: Array<[string, ReactNode]> = fulfillmentType === "grab_and_go"
+    ? [
+        ["安排", "即買即走，毋須日期、時間或收貨資料"],
+        ["收貨點備註", deliveryNote || "—"],
+        ["心意卡", giftCardEnabled ? "需要" : "不需要"],
+        ["心意卡內容", giftCardEnabled ? giftCardMessage || "—" : "—"],
+      ]
+    : fulfillmentType === "pickup"
+      ? [
+          ["取貨日期", deliveryDate || "未指定日期"],
+          ["取貨時間", deliveryTimeLabel({ deliveryTimeMode, deliveryTime })],
+          ["自取地點", address || "—"],
+          ["收貨點備註", deliveryNote || "—"],
+          ["心意卡", giftCardEnabled ? "需要" : "不需要"],
+          ["心意卡內容", giftCardEnabled ? giftCardMessage || "—" : "—"],
+        ]
+      : [
+          ["日期", deliveryDate || "未指定日期"],
+          ["時間", deliveryTimeLabel({ deliveryTimeMode, deliveryTime })],
+          ["地址", address || "—"],
+          ["收件類型", recipientType === "company" ? "公司" : "個人"],
+          ["收貨公司", recipientCompanyName || "—"],
+          ["收貨人／聯絡人", recipientName || "—"],
+          ["收貨電話", recipientPhone || "—"],
+          ["收花人重要日子", recipientOccasions || "—"],
+          ["送貨員", deliveryPerson || "—"],
+          ["派送失敗安排", failedDeliveryAction || "—"],
+          ["收貨點備註", deliveryNote || "—"],
+          ["心意卡", giftCardEnabled ? "需要" : "不需要"],
+          ["心意卡內容", giftCardEnabled ? giftCardMessage || "—" : "—"],
+        ];
+
+  return (
   <article className="rounded-lg border border-border/80 bg-muted/20 p-4" aria-label={title}>
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
       <h4 className="font-semibold">{title}</h4>
       <Badge variant="outline">{fulfillmentLabel(fulfillmentType)}</Badge>
     </div>
-    <InfoGrid rows={[
-      ["日期", deliveryDate || "未指定日期"],
-      ["時間", deliveryTimeLabel({ deliveryTimeMode, deliveryTime })],
-      [fulfillmentType === "pickup" ? "自取地點" : "地址", address || "—"],
-      ["收件類型", recipientType === "company" ? "公司" : "個人"],
-      ["收貨公司", recipientCompanyName || "—"],
-      ["收貨人／聯絡人", recipientName || "—"],
-      ["收貨電話", recipientPhone || "—"],
-      ["收花人重要日子", recipientOccasions || "—"],
-      ["送貨員", deliveryPerson || "—"],
-      ["派送失敗安排", failedDeliveryAction || "—"],
-      ["收貨點備註", deliveryNote || "—"],
-      ["心意卡", giftCardEnabled ? "需要" : "不需要"],
-      ["心意卡內容", giftCardEnabled ? giftCardMessage || "—" : "—"],
-    ]} />
+    <InfoGrid rows={rows} />
     <div className="mt-4 border-t border-border pt-3">
       <p className="text-xs font-medium text-muted-foreground">商品分配</p>
       {allocations.length > 0 ? (
@@ -446,7 +467,8 @@ const DestinationCard = ({
       )}
     </div>
   </article>
-);
+  );
+};
 
 const OrderDetail = ({
   order,
@@ -1097,7 +1119,7 @@ const OrderHistory = ({
           <span>訂單</span>
           <span>落單時間</span>
           <span>客戶</span>
-          <span>送貨／自取</span>
+          <span>收貨方式</span>
           <span>訂單狀態</span>
         </div>
         <span className="px-5 text-right">總額／操作</span>
@@ -1140,8 +1162,13 @@ const OrderHistory = ({
             <p className="flex items-start gap-1.5 text-sm">
               <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 xl:hidden" />
               <span>
-                <span className="font-medium">{fulfillmentLabel(order.fulfillmentType)}：{order.deliveryDate || "未指定日期"}</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">{deliveryTimeLabel(order)}</span>
+                <span className="font-medium">
+                  {fulfillmentLabel(order.fulfillmentType)}
+                  {order.fulfillmentType !== "grab_and_go" && `：${order.deliveryDate || "未指定日期"}`}
+                </span>
+                {order.fulfillmentType !== "grab_and_go" && (
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{deliveryTimeLabel(order)}</span>
+                )}
               </span>
             </p>
             <div className="flex flex-wrap items-center gap-1.5">

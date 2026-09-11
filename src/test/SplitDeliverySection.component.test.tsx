@@ -106,8 +106,8 @@ describe("SplitDeliverySection fulfillment controls", () => {
     fireEvent.click(screen.getByRole("button", { name: /新增另一個收貨點/ }));
     expect(screen.getByRole("button", { name: "送貨" })).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(screen.getByRole("button", { name: "自取" }));
-    expect(screen.getByText(/自取訂單只需選擇日期及時間/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "預約自取" }));
+    expect(screen.getByText(/預約自取只需選擇日期及時間/)).toBeVisible();
   });
 
   it("targets the split destination that the cashier is editing", () => {

@@ -213,6 +213,7 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
 
           <DeliverySection
             showFulfillmentSelector
+            showGrabAndGoOption={false}
             sectionTitle={`額外收貨資料 ${index + 2}`}
             historyAddressTarget={props.activeHistoryAddressSplitId === split.id}
             allowLinkedCustomerSelection={false}
@@ -244,7 +245,11 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
             senderPhone={props.senderPhone}
             deliveryPerson={split.deliveryPerson}
             failedDeliveryAction={split.failedDeliveryAction}
-            onFulfillmentTypeChange={(fulfillmentType) => updateRecipientIdentity(split.id, { fulfillmentType })}
+            onFulfillmentTypeChange={(fulfillmentType) => {
+              if (fulfillmentType !== "grab_and_go") {
+                updateRecipientIdentity(split.id, { fulfillmentType });
+              }
+            }}
             onDateChange={(deliveryDate) => update(split.id, { deliveryDate })}
             onTimeChange={(deliveryTime) => update(split.id, { deliveryTime })}
             onSlotChange={(slot) => update(split.id, {

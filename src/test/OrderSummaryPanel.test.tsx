@@ -8,6 +8,7 @@ const baseProps = {
   phone: "67610707",
   recipientName: "May Chan",
   recipientPhone: "61234567",
+  fulfillmentType: "delivery" as const,
   deliveryDate: "2026-08-03",
   deliveryTime: "下午 13:00–18:00",
   items: [
@@ -84,5 +85,26 @@ describe("OrderSummaryPanel", () => {
 
     expect(onSaveIncomplete).toHaveBeenCalledTimes(1);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("summarizes grab-and-go without showing delivery requirements", () => {
+    render(
+      <OrderSummaryPanel
+        {...baseProps}
+        fulfillmentType="grab_and_go"
+        recipientName=""
+        recipientPhone=""
+        deliveryDate=""
+        deliveryTime=""
+        deliveryFee={0}
+        onSubmit={() => undefined}
+        onNavigate={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("即買即走")).toBeVisible();
+    expect(screen.getByText("毋須安排日期、時間或收貨資料")).toBeVisible();
+    expect(screen.queryByText("尚未填寫收貨人")).not.toBeInTheDocument();
+    expect(screen.queryByText("尚未選擇送貨時間")).not.toBeInTheDocument();
   });
 });

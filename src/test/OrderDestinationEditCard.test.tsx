@@ -46,7 +46,7 @@ describe("OrderDestinationEditCard fulfillment switching", () => {
     );
 
     fireEvent.click(screen.getByRole("combobox", { name: "額外收貨點 2 收貨方式 *" }));
-    fireEvent.click(screen.getByRole("option", { name: "自取" }));
+    fireEvent.click(screen.getByRole("option", { name: "預約自取" }));
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
       id: "split-2",

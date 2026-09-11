@@ -105,12 +105,26 @@ describe("DeliverySection delivery time controls", () => {
   it("shows only date and time details for pickup orders", () => {
     const props = renderSection({ fulfillmentType: "pickup" });
 
-    expect(screen.getByText(/自取訂單只需選擇日期及時間/)).toBeVisible();
+    expect(screen.getByText(/預約自取只需選擇日期及時間/)).toBeVisible();
     expect(screen.queryByLabelText("送貨地區")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/收貨人姓名/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /送貨/ }));
     expect(props.onFulfillmentTypeChange).toHaveBeenCalledWith("delivery");
+  });
+
+  it("offers grab-and-go and hides all delivery requirements", () => {
+    const props = renderSection({ fulfillmentType: "grab_and_go" });
+
+    expect(screen.getByRole("button", { name: /即買即走/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/毋須選擇日期、時間、地址或收貨人資料/)).toBeVisible();
+    expect(screen.queryByLabelText("送貨日期")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("送貨時間選擇")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("送貨地區")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/收貨人姓名/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /預約自取/ }));
+    expect(props.onFulfillmentTypeChange).toHaveBeenCalledWith("pickup");
   });
 
   it("copies the sender into the recipient fields with one confirmation", () => {

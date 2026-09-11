@@ -573,7 +573,7 @@ const OrderEditDialog = ({
                     <SelectTrigger className="min-h-11"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="delivery">送貨</SelectItem>
-                      <SelectItem value="pickup">自取</SelectItem>
+                      <SelectItem value="pickup">預約自取</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
