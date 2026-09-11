@@ -905,45 +905,53 @@ describe("CustomerSection gift sender", () => {
 
   it("treats an exact Customer ID as an account and requires a contact selection", async () => {
     searchOdooCustomerAccount.mockResolvedValue({
-      customerCode: "000A",
+      customerCode: "CHARMLINKC",
       contactCount: 2,
       truncated: false,
       contacts: [{
         id: "odoo-41",
         odooPartnerId: 41,
-        customerCode: "000A",
-        name: "Customer One",
-        phone: "91234567",
+        customerCode: "CHARMLINKC",
+        name: "Ms Tiffany Wai",
+        phone: "25296223",
+        createDate: "2026-07-09 10:39:03",
         history: [],
       }, {
         id: "odoo-42",
         odooPartnerId: 42,
-        customerCode: "000A",
-        name: "Customer Two",
-        phone: "92345678",
+        customerCode: "CHARMLINKC",
+        name: "Ms. Tiffany Wai",
+        phone: "97830133",
+        createDate: "2026-07-09 10:40:36",
         history: [],
       }],
     });
     render(<CustomerLookupHarness />);
 
     fireEvent.change(screen.getByLabelText("Customer ID／客戶編號"), {
-      target: { value: "000a" },
+      target: { value: "CHARMLINKC" },
     });
 
-    expect(await screen.findByText("Customer One")).toBeInTheDocument();
-    expect(screen.getByText("Customer Two")).toBeInTheDocument();
-    expect(screen.getByText("000A 帳戶 · 2 位聯絡人")).toBeInTheDocument();
+    expect(await screen.findByText("Ms Tiffany Wai")).toBeInTheDocument();
+    expect(screen.getByText("Ms. Tiffany Wai")).toBeInTheDocument();
+    expect(screen.getByText("CHARMLINKC 帳戶 · 2 位聯絡人")).toBeInTheDocument();
     expect(screen.getByText(/系統唔會自動套用第一位聯絡人/)).toBeInTheDocument();
-    expect(screen.getAllByText("客戶編號：000A")).toHaveLength(2);
+    expect(screen.getAllByText("客戶編號：CHARMLINKC")).toHaveLength(2);
+    expect(screen.getAllByText("最新")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /Ms\. Tiffany Wai/ })).toHaveTextContent("最新");
+    expect(screen.getByRole("button", { name: /Ms Tiffany Wai/ })).not.toHaveTextContent("最新");
+    expect(screen.queryByText("2026-07-09")).not.toBeInTheDocument();
+    expect(screen.queryByText("建立時間")).not.toBeInTheDocument();
+    expect(screen.queryByText("較早")).not.toBeInTheDocument();
     expect(searchOdooCustomerAccount).toHaveBeenCalledWith(
-      "000a",
+      "CHARMLINKC",
       expect.any(AbortSignal),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Customer Two/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Ms\. Tiffany Wai/ }));
     expect(selectCustomer).toHaveBeenCalledWith(expect.objectContaining({
       odooPartnerId: 42,
-      customerCode: "000A",
+      customerCode: "CHARMLINKC",
     }));
   });
 
