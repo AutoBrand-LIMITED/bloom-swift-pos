@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,8 +13,10 @@ const paymentOptions = [
 const renderPaymentSection = (
   paymentStatus: "unpaid" | "paid" | "deposit" = "paid",
   paymentOptionsError: string | null = null,
+  overrides: Partial<ComponentProps<typeof PaymentSection>> = {},
 ) => {
   const onPaymentMethodChange = vi.fn();
+  const onCustomerCreditAmountChange = vi.fn();
   render(
     <PaymentSection
       subtotal={680}
@@ -33,10 +36,16 @@ const renderPaymentSection = (
       paymentOptionsError={paymentOptionsError}
       depositAmount={0}
       onDepositAmountChange={vi.fn()}
+      customerCreditAvailable={0}
+      customerCreditAmount={0}
+      customerCreditLoading={false}
+      customerCreditError={null}
+      onCustomerCreditAmountChange={onCustomerCreditAmountChange}
       priceWarning={false}
+      {...overrides}
     />,
   );
-  return { onPaymentMethodChange };
+  return { onCustomerCreditAmountChange, onPaymentMethodChange };
 };
 
 describe("PaymentSection accounting payment options", () => {
@@ -65,5 +74,40 @@ describe("PaymentSection accounting payment options", () => {
 
     expect(screen.getByText(/現正沿用上次成功取得嘅付款方式/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
+  });
+
+  it("shows the available balance and defaults to the usable amount when enabled", () => {
+    const { onCustomerCreditAmountChange } = renderPaymentSection("unpaid", null, {
+      customerCreditAvailable: 800,
+    });
+
+    expect(screen.getByText("可用餘額 $800")).toBeVisible();
+    fireEvent.click(screen.getByRole("switch", { name: "使用 Customer Credit" }));
+
+    expect(onCustomerCreditAmountChange).toHaveBeenCalledWith(680);
+  });
+
+  it("allows a whole-dollar partial credit amount", () => {
+    const { onCustomerCreditAmountChange } = renderPaymentSection("deposit", null, {
+      customerCreditAvailable: 300,
+      customerCreditAmount: 100,
+    });
+
+    fireEvent.change(screen.getByLabelText("今次使用 Customer Credit 金額"), {
+      target: { value: "125" },
+    });
+
+    expect(onCustomerCreditAmountChange).toHaveBeenCalledWith(125);
+    expect(screen.getByText("尚欠")).toHaveTextContent("$580");
+  });
+
+  it("does not ask for another payment method when credit covers the order", () => {
+    renderPaymentSection("paid", null, {
+      customerCreditAvailable: 680,
+      customerCreditAmount: 680,
+    });
+
+    expect(screen.queryByRole("button", { name: "Cash" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("付款參考編號（建議填寫）")).not.toBeInTheDocument();
   });
 });

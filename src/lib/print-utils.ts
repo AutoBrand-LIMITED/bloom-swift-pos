@@ -7,6 +7,7 @@ import {
 } from "@/lib/order-pricing";
 import { renderSafeMarkdown } from "@/lib/safe-markdown";
 import { formatMoney } from "@/lib/money";
+import { paymentBreakdown } from "@/lib/payment-breakdown";
 
 const paymentLabel: Record<string, string> = {
   unpaid: "未付款",
@@ -322,6 +323,20 @@ function pickingInstructions(order: Order): string {
 /** 客人收據 */
 export function generateReceipt(order: Order): string {
   const status = paymentLabel[order.paymentStatus] || order.paymentStatus;
+  const payment = paymentBreakdown(order);
+  const paymentDetails = payment.customerCredit > 0 || order.paymentStatus === "deposit"
+    ? `<div class="payment-detail">${[
+        payment.customerCredit > 0
+          ? `<span>Customer Credit $${formatMoney(payment.customerCredit)}</span>`
+          : "",
+        payment.externalPayment > 0
+          ? `<span>${payment.customerCredit > 0 ? "其他付款" : "訂金"} $${formatMoney(payment.externalPayment)}</span>`
+          : "",
+        payment.outstanding > 0
+          ? `<span>尚欠 $${formatMoney(payment.outstanding)}</span>`
+          : "",
+      ].filter(Boolean).join("")}</div>`
+    : "";
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>收據 - ${escapeHtml(orderReference(order))}</title>
     <style>${commonStyles}</style></head><body>
     <main class="print-document receipt-document" data-print-document="receipt">
@@ -333,11 +348,7 @@ export function generateReceipt(order: Order): string {
       </section>
       <section class="payment-summary" data-document-section="payment-summary">
         <div><span class="field-label">付款狀態 / PAYMENT STATUS：</span><span class="payment-status">${escapeHtml(status)}</span></div>
-        ${
-          order.paymentStatus === "deposit"
-            ? `<div class="payment-detail"><span>訂金 $${formatMoney(order.depositAmount)}</span><span>尚欠 $${formatMoney(order.finalPrice - order.depositAmount)}</span></div>`
-            : ""
-        }
+        ${paymentDetails}
       </section>
       <div class="footer">此收據由花店 POS 系統產生 | ${new Date().toLocaleDateString("zh-HK")}</div>
     </main>

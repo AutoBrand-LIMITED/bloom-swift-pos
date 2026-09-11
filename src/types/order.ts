@@ -136,6 +136,8 @@ export interface Order {
   priceOverridden: boolean;
   paymentStatus: PaymentStatus;
   depositAmount: number;
+  /** Customer Credit selected for this checkout, in HKD. */
+  customerCreditAmount?: number;
   /** Outstanding amount reported by Odoo Accounting. */
   balanceAmount?: number;
   paymentMethod: string;

@@ -201,6 +201,31 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.queryByRole("region", { name: "操作" })).not.toBeInTheDocument();
   });
 
+  it("shows generic Customer Credit and keeps it separate from other receipts", () => {
+    render(<OrderHistory
+      orders={[orderFixture({
+        finalPrice: 700,
+        subtotal: 700,
+        paymentStatus: "deposit",
+        depositAmount: 600,
+        balanceAmount: 100,
+        customerCreditApplied: 500,
+        paymentMethod: "customer_credit+cash_other",
+      })]}
+      open
+      onClose={vi.fn()}
+    />);
+    openOrderDetails();
+
+    const identity = screen.getByRole("region", { name: "訂單身份與時間" });
+    expect(within(identity).getByText("HK$500")).toBeVisible();
+    const pricing = screen.getByRole("region", { name: "產品與價錢" });
+    expect(within(pricing).getByText("已套用 Customer Credit")).toBeVisible();
+    expect(within(pricing).getByText("HK$500")).toBeVisible();
+    expect(within(pricing).getByText("其他已收款")).toBeVisible();
+    expect(within(pricing).getAllByText("HK$100").length).toBeGreaterThanOrEqual(2);
+  });
+
   it("previews and posts an auditable product correction", async () => {
     getOdooProducts.mockResolvedValue([{
       id: 301,

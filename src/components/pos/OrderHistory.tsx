@@ -58,6 +58,7 @@ import type { PosEmployeeRole } from "@/lib/pos-auth";
 import { formatRecipientOccasions } from "@/lib/recipient-occasions";
 import { orderItemTotal } from "@/lib/order-pricing";
 import { formatHkd } from "@/lib/money";
+import { paymentBreakdown } from "@/lib/payment-breakdown";
 import type { DeliverySplit, FulfillmentType, OrderCancellationResolution, PaymentStatus } from "@/types/order";
 
 interface OrderHistoryProps {
@@ -528,8 +529,8 @@ const OrderDetail = ({
     && order.orderState !== "cancel"
     && Boolean(order.odooOrderId && order.writeDate);
   const deliveryEditable = operationalEditable && Boolean(order.deliveryTimeMode);
-  const outstandingAmount = order.balanceAmount
-    ?? Math.max(0, order.finalPrice - order.depositAmount);
+  const paymentAmounts = paymentBreakdown(order);
+  const outstandingAmount = paymentAmounts.outstanding;
   const paymentEditable = order.source === "odoo"
     && Boolean(order.odooOrderId)
     && order.paymentStatus !== "paid"
@@ -645,8 +646,8 @@ const OrderDetail = ({
           ["付款記錄", order.odooPaymentName || (order.odooPaymentId ? `#${order.odooPaymentId}` : "—")],
           ["修改期限", order.editableUntil || "—"],
           ["替代原單", order.replacementOrderName || (order.replacementOrderId ? `#${order.replacementOrderId}` : "—")],
-          ["已套用 Customer Credit", order.customerCreditSourceOrderId
-            ? formatMoney(order.customerCreditApplied)
+          ["已套用 Customer Credit", paymentAmounts.customerCredit > 0
+            ? formatMoney(paymentAmounts.customerCredit)
             : "—"],
         ]} />
       </DetailSection>
@@ -807,14 +808,19 @@ const OrderDetail = ({
           </table>
         </div>
         <dl className="ml-auto mt-4 max-w-sm space-y-2 border-t border-border pt-4 text-sm">
-          {[
+          {([
             ["產品小計", productsSubtotal],
             ["送貨費", order.deliveryFee],
             ["急單費", order.urgentFee],
             ["計算小計", order.subtotal],
-            ["已付訂金", order.depositAmount],
-            ["尚欠金額", order.balanceAmount],
-          ].map(([label, amount]) => (
+            ...(paymentAmounts.customerCredit > 0
+              ? [
+                  ["已套用 Customer Credit", paymentAmounts.customerCredit],
+                  ["其他已收款", paymentAmounts.externalPayment],
+                ]
+              : [["已付訂金", order.depositAmount]]),
+            ["尚欠金額", paymentAmounts.outstanding],
+          ] as Array<[string, number | undefined]>).map(([label, amount]) => (
             <div key={String(label)} className="flex justify-between gap-4">
               <dt className="text-muted-foreground">{label}</dt>
               <dd className="font-mono">{amount === undefined ? "—" : formatMoney(amount as number)}</dd>
@@ -837,6 +843,12 @@ const OrderDetail = ({
         <InfoGrid rows={[
           ["目前狀態", displayStatus.label],
           ["付款方式", order.paymentMethod || "—"],
+          ["Customer Credit", paymentAmounts.customerCredit > 0
+            ? formatMoney(paymentAmounts.customerCredit)
+            : "—"],
+          ["其他已收款", paymentAmounts.externalPayment > 0
+            ? formatMoney(paymentAmounts.externalPayment)
+            : "—"],
           ["付款參考編號", order.paymentReference || "—"],
           ["收款時間", formatDateTime(order.paymentReceivedAt)],
           ["發票編號", order.odooInvoiceName || "—"],

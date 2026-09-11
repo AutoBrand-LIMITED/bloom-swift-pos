@@ -7,6 +7,7 @@ import {
   Building2,
   ChevronDown,
   Hash,
+  HandCoins,
   LoaderCircle,
   Mail,
   MapPin,
@@ -45,6 +46,7 @@ import {
   type CustomerResolutionState,
 } from "@/lib/customer-profile";
 import type { OdooNamedReference } from "@/types/order";
+import { formatMoney } from "@/lib/money";
 
 export type CustomerType = "personal" | "company";
 type CustomerLookupSource = "phone" | "name" | "email" | "customerCode";
@@ -92,6 +94,9 @@ interface CustomerSectionProps {
   customerEmailError?: string;
   billingAddressError?: string;
   selectedCustomer: DemoCustomer | null;
+  customerCreditAvailable?: number;
+  customerCreditLoading?: boolean;
+  customerCreditError?: string | null;
   confirmedNewCustomerName?: string | null;
   confirmedNewCustomerPhone?: string | null;
   onConfirmNewCustomer?: (normalizedPhone: string, normalizedName: string) => void;
@@ -110,6 +115,7 @@ const CustomerSection = ({
   onStartNewCustomerUnderAccount,
   phoneError, alternatePhoneError, customerNameError, senderNameError,
   companyNameError, customerEmailError, billingAddressError, selectedCustomer, refreshKey,
+  customerCreditAvailable = 0, customerCreditLoading = false, customerCreditError,
   confirmedNewCustomerName, confirmedNewCustomerPhone, onConfirmNewCustomer,
   onResolutionStateChange,
 }: CustomerSectionProps) => {
@@ -862,6 +868,31 @@ const CustomerSection = ({
               </Button>
             )}
           </div>
+          {(customerCreditLoading || customerCreditAvailable > 0 || customerCreditError) && (
+            <div
+              className="mt-2 flex items-center gap-2 border-t border-emerald-200 pt-2 text-xs"
+              data-testid="customer-credit-balance"
+            >
+              {customerCreditLoading ? (
+                <>
+                  <LoaderCircle className="h-3.5 w-3.5 animate-spin text-emerald-700" aria-hidden="true" />
+                  <span className="text-emerald-900">正在查詢 Customer Credit…</span>
+                </>
+              ) : customerCreditError ? (
+                <>
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-700" aria-hidden="true" />
+                  <span className="text-amber-800">暫時未能讀取 Customer Credit</span>
+                </>
+              ) : (
+                <>
+                  <HandCoins className="h-4 w-4 text-emerald-700" aria-hidden="true" />
+                  <span className="font-medium text-emerald-950">
+                    可用 Customer Credit：${formatMoney(customerCreditAvailable)}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 

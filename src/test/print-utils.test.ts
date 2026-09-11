@@ -108,6 +108,23 @@ describe("print launcher", () => {
 });
 
 describe("print layout contract", () => {
+  it("prints Customer Credit separately from the external payment and balance", () => {
+    const html = generateReceipt(orderFixture({
+      finalPrice: 700,
+      subtotal: 700,
+      paymentStatus: "deposit",
+      depositAmount: 600,
+      balanceAmount: 100,
+      customerCreditAmount: 500,
+      customerCreditApplied: 500,
+    }));
+
+    expect(html).toContain("Customer Credit $500");
+    expect(html).toContain("其他付款 $100");
+    expect(html).toContain("尚欠 $100");
+    expect(html).not.toContain("訂金 $600");
+  });
+
   it("bundles all enabled document types into one print job with page breaks", () => {
     const html = generateAllDocuments(orderFixture());
 

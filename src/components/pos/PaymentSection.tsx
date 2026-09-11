@@ -1,7 +1,8 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { CreditCard, AlertTriangle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { CreditCard, AlertTriangle, HandCoins } from "lucide-react";
 import type { PaymentStatus } from "@/types/order";
 import type { AccountingPaymentOption } from "@/lib/odoo-api";
 import { formatMoney, normalizeWholeMoney } from "@/lib/money";
@@ -24,13 +25,18 @@ interface PaymentSectionProps {
   paymentOptionsError: string | null;
   depositAmount: number;
   onDepositAmountChange: (v: number) => void;
+  customerCreditAvailable: number;
+  customerCreditAmount: number;
+  customerCreditLoading: boolean;
+  customerCreditError: string | null;
+  onCustomerCreditAmountChange: (v: number) => void;
   priceWarning: boolean;
 }
 
 const statusConfig: Record<PaymentStatus, { label: string; className: string }> = {
   unpaid: { label: "未付款", className: "bg-destructive text-destructive-foreground" },
   paid: { label: "立即付款", className: "bg-success text-success-foreground" },
-  deposit: { label: "已付訂金", className: "bg-warning text-warning-foreground" },
+  deposit: { label: "部分付款 / 訂金", className: "bg-warning text-warning-foreground" },
 };
 
 const PaymentSection = ({
@@ -42,8 +48,23 @@ const PaymentSection = ({
   paymentReference, onPaymentReferenceChange,
   paymentOptions, paymentOptionsLoading, paymentOptionsError,
   depositAmount, onDepositAmountChange,
+  customerCreditAvailable, customerCreditAmount,
+  customerCreditLoading, customerCreditError,
+  onCustomerCreditAmountChange,
   priceWarning,
-}: PaymentSectionProps) => (
+}: PaymentSectionProps) => {
+  const maximumCredit = Math.max(0, Math.min(customerCreditAvailable, finalPrice));
+  const externalPaymentAmount = paymentStatus === "paid"
+    ? Math.max(0, finalPrice - customerCreditAmount)
+    : paymentStatus === "deposit"
+      ? depositAmount
+      : 0;
+  const shouldShowCredit = customerCreditLoading
+    || Boolean(customerCreditError)
+    || customerCreditAvailable > 0
+    || customerCreditAmount > 0;
+
+  return (
   <div className="rounded-xl border border-border bg-card p-4 space-y-4">
     <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
       <CreditCard className="w-4 h-4" />
@@ -86,6 +107,61 @@ const PaymentSection = ({
       )}
     </div>
 
+    {shouldShowCredit && (
+      <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <HandCoins className="h-4 w-4 shrink-0 text-emerald-700" />
+            <div>
+              <Label htmlFor="use-customer-credit" className="text-sm font-medium">
+                使用 Customer Credit
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {customerCreditLoading
+                  ? "正在查詢可用餘額..."
+                  : `可用餘額 $${formatMoney(customerCreditAvailable)}`}
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="use-customer-credit"
+            aria-label="使用 Customer Credit"
+            checked={customerCreditAmount > 0}
+            disabled={customerCreditLoading || Boolean(customerCreditError) || maximumCredit <= 0}
+            onCheckedChange={(checked) => onCustomerCreditAmountChange(checked ? maximumCredit : 0)}
+          />
+        </div>
+        {customerCreditError && (
+          <p role="alert" className="text-xs text-destructive">
+            {customerCreditError}
+          </p>
+        )}
+        {customerCreditAmount > 0 && (
+          <div className="space-y-1 animate-in fade-in slide-in-from-top-1 duration-150">
+            <Label htmlFor="customer-credit-amount" className="text-xs">
+              今次使用 Customer Credit 金額 ($)
+            </Label>
+            <Input
+              id="customer-credit-amount"
+              aria-label="今次使用 Customer Credit 金額"
+              type="number"
+              value={customerCreditAmount || ""}
+              onChange={(event) => onCustomerCreditAmountChange(
+                normalizeWholeMoney(parseFloat(event.target.value) || 0),
+              )}
+              className="font-mono"
+              min={0}
+              max={maximumCredit}
+              step="1"
+            />
+            <p className="text-xs text-muted-foreground">
+              最多可用 ${formatMoney(maximumCredit)}；提交時會由 Odoo 再核對餘額。
+            </p>
+          </div>
+        )}
+      </div>
+    )}
+
     {/* Payment status */}
     <div className="space-y-2">
       <Label className="text-xs">付款狀態</Label>
@@ -111,7 +187,7 @@ const PaymentSection = ({
     </div>
 
     {/* Payment method - show for paid and deposit */}
-    {(paymentStatus === "paid" || paymentStatus === "deposit") && (
+    {(paymentStatus === "paid" || paymentStatus === "deposit") && externalPaymentAmount > 0 && (
       <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
         <Label className="text-xs">付款方式</Label>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
@@ -170,15 +246,18 @@ const PaymentSection = ({
           min={0}
           step="1"
         />
-        {depositAmount > 0 && (
+        {(depositAmount > 0 || customerCreditAmount > 0) && (
           <p className="text-xs text-muted-foreground">
-            尚欠 <span className="font-mono font-medium text-destructive">${formatMoney(finalPrice - depositAmount)}</span>
+            尚欠 <span className="font-mono font-medium text-destructive">
+              ${formatMoney(Math.max(0, finalPrice - customerCreditAmount - depositAmount))}
+            </span>
           </p>
         )}
       </div>
     )}
 
   </div>
-);
+  );
+};
 
 export default PaymentSection;

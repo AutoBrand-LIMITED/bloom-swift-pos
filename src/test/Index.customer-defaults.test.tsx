@@ -10,6 +10,7 @@ const odooMocks = vi.hoisted(() => ({
   getOdooEmployees: vi.fn(),
   getOdooSalesTeams: vi.fn(),
   getOdooCustomerGroups: vi.fn(),
+  getOdooCustomerCredit: vi.fn(),
   getOdooOrderRecords: vi.fn(),
   getOdooProductCategories: vi.fn(),
   getOdooProducts: vi.fn(),
@@ -56,6 +57,7 @@ vi.mock("@/components/pos/CustomerSection", () => ({
       id: string;
       name: string;
       phone: string;
+      odooPartnerId?: number;
       history: [];
     }) => void;
   }) => (
@@ -66,6 +68,7 @@ vi.mock("@/components/pos/CustomerSection", () => ({
         type="button"
         onClick={() => onCustomerSelect({
           id: "odoo-11764",
+          odooPartnerId: 11764,
           name: "JASON KWONG",
           phone: "90274536",
           history: [],
@@ -83,6 +86,35 @@ vi.mock("@/components/pos/CustomerSection", () => ({
   ),
 }));
 
+vi.mock("@/components/pos/OrderItemsSection", () => ({
+  default: ({
+    onItemsChange,
+  }: {
+    onItemsChange: (items: Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity: number;
+      productId: number;
+      productCode: string;
+    }>) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => onItemsChange([{
+        id: "credit-item",
+        name: "Credit Test Bouquet",
+        price: 100,
+        quantity: 1,
+        productId: 501,
+        productCode: "CREDIT-TEST",
+      }])}
+    >
+      加入測試商品
+    </button>
+  ),
+}));
+
 describe("Index customer defaults", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -93,6 +125,13 @@ describe("Index customer defaults", () => {
     odooMocks.getOdooEmployees.mockResolvedValue([]);
     odooMocks.getOdooSalesTeams.mockResolvedValue([]);
     odooMocks.getOdooCustomerGroups.mockResolvedValue([]);
+    odooMocks.getOdooCustomerCredit.mockResolvedValue({
+      partnerId: 11764,
+      commercialPartnerId: 11764,
+      currency: "HKD",
+      availableCreditMinor: 0,
+      sources: [],
+    });
     odooMocks.getOdooOrderRecords.mockResolvedValue({
       generatedAt: new Date().toISOString(),
       truncated: false,
@@ -128,5 +167,37 @@ describe("Index customer defaults", () => {
     fireEvent.click(screen.getByRole("button", { name: "自訂送花人" }));
     fireEvent.click(screen.getByRole("button", { name: "更新聯絡人名稱" }));
     expect(screen.getByTestId("sender-name")).toHaveTextContent("OTHER SENDER");
+  });
+
+  it("loads customer credit and treats a credit-covered order as fully paid", async () => {
+    odooMocks.getOdooCustomerCredit.mockResolvedValue({
+      partnerId: 11764,
+      commercialPartnerId: 11764,
+      currency: "HKD",
+      availableCreditMinor: 15000,
+      sources: [{
+        creditNoteId: 901,
+        creditNoteName: "RINV/2026/00901",
+        sourceOrderId: 801,
+        sourceOrderName: "S00801",
+        sourceType: "cancellation",
+        sourceDate: "2026-09-11",
+        availableCreditMinor: 15000,
+      }],
+    });
+    render(<MemoryRouter><Index /></MemoryRouter>);
+    await waitFor(() => expect(odooMocks.getOperationalOrders).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByRole("button", { name: "選擇測試聯絡人" }));
+    await waitFor(() => expect(odooMocks.getOdooCustomerCredit).toHaveBeenCalledWith(
+      11764,
+      expect.any(AbortSignal),
+    ));
+    fireEvent.click(screen.getByRole("button", { name: "加入測試商品" }));
+    fireEvent.click(await screen.findByRole("switch", { name: "使用 Customer Credit" }));
+
+    expect(screen.getByLabelText("今次使用 Customer Credit 金額")).toHaveValue(100);
+    expect(screen.getByRole("button", { name: "立即付款" })).toHaveClass("bg-success");
+    expect(screen.queryByRole("button", { name: "Cash" })).not.toBeInTheDocument();
   });
 });

@@ -90,6 +90,7 @@ describe("odoo-api note contracts", () => {
       completionStatus: "incomplete",
       paymentStatus: "unpaid",
       depositAmount: 0,
+      customerCreditAmount: 0,
       paymentMethod: "",
       paymentReference: "",
       paymentReceivedAt: "",
@@ -862,6 +863,37 @@ describe("odoo-api note contracts", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "https://backend.test/customers/42",
       expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
+  it("loads the selected contact's available Customer Credit", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const summary = {
+      partnerId: 42,
+      commercialPartnerId: 42,
+      currency: "HKD",
+      availableCreditMinor: 32500,
+      sources: [{
+        creditNoteId: 81,
+        creditNoteName: "RINV/2026/00081",
+        sourceOrderId: 60,
+        sourceOrderName: "S00060",
+        sourceType: "cancellation",
+        sourceDate: "2026-09-10",
+        availableCreditMinor: 32500,
+      }],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(summary));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getOdooCustomerCredit } = await import("@/lib/odoo-api");
+
+    await expect(getOdooCustomerCredit(42)).resolves.toEqual(summary);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/customers/42/credit",
+      expect.objectContaining({
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }),
     );
   });
 

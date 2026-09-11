@@ -69,6 +69,24 @@ export interface CustomerAccountLookup {
   truncated: boolean;
 }
 
+export interface CustomerCreditSource {
+  creditNoteId: number;
+  creditNoteName: string;
+  sourceOrderId: number;
+  sourceOrderName: string;
+  sourceType: "cancellation" | "product_correction";
+  sourceDate?: string | null;
+  availableCreditMinor: number;
+}
+
+export interface CustomerCreditSummary {
+  partnerId: number;
+  commercialPartnerId: number;
+  currency: "HKD";
+  availableCreditMinor: number;
+  sources: CustomerCreditSource[];
+}
+
 export type CustomerCodeMatchMode = "exact" | "prefix";
 
 interface OdooEmployee {
@@ -1013,6 +1031,7 @@ export async function saveIncompleteOdooOrder(
       completionStatus: "incomplete",
       paymentStatus: "unpaid",
       depositAmount: 0,
+      customerCreditAmount: 0,
       paymentMethod: "",
       paymentReference: "",
       paymentReceivedAt: "",
@@ -1493,6 +1512,27 @@ export async function getOdooCustomer(
     return throwApiError<DemoCustomer>(res, `Odoo customer lookup failed: ${res.status}`);
   }
   return mapOdooPartner((await res.json()) as OdooPartner);
+}
+
+export async function getOdooCustomerCredit(
+  partnerId: number,
+  signal?: AbortSignal,
+): Promise<CustomerCreditSummary> {
+  if (!BACKEND_URL) {
+    throw new Error("Odoo backend is not configured");
+  }
+  const res = await authenticatedFetch(`${BACKEND_URL}/customers/${partnerId}/credit`, {
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+  if (!res.ok) {
+    return throwApiError<CustomerCreditSummary>(
+      res,
+      `Odoo customer credit lookup failed: ${res.status}`,
+    );
+  }
+  return (await res.json()) as CustomerCreditSummary;
 }
 
 export async function updateOdooCustomerProfile(

@@ -139,7 +139,15 @@ function CustomerLookupHarness() {
   );
 }
 
-function ExistingCustomerWithoutCodeHarness() {
+function ExistingCustomerWithoutCodeHarness({
+  customerCreditAvailable = 0,
+  customerCreditLoading = false,
+  customerCreditError = null,
+}: {
+  customerCreditAvailable?: number;
+  customerCreditLoading?: boolean;
+  customerCreditError?: string | null;
+} = {}) {
   const [customerCode, setCustomerCode] = useState("");
 
   return (
@@ -159,6 +167,9 @@ function ExistingCustomerWithoutCodeHarness() {
       onCompanyNameChange={noop}
       onCustomerSelect={selectCustomer}
       onCustomerAndRecipientSelect={selectCustomerAndRecipient}
+      customerCreditAvailable={customerCreditAvailable}
+      customerCreditLoading={customerCreditLoading}
+      customerCreditError={customerCreditError}
       selectedCustomer={{
         id: "odoo-42",
         odooPartnerId: 42,
@@ -274,6 +285,14 @@ describe("CustomerSection gift sender", () => {
     expect(alternatePhoneRow).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(alternatePhoneRow);
     expect(screen.queryByLabelText("後備電話")).not.toBeInTheDocument();
+  });
+
+  it("shows available Customer Credit on the selected Odoo contact", () => {
+    render(<ExistingCustomerWithoutCodeHarness customerCreditAvailable={325} />);
+
+    expect(screen.getByTestId("customer-credit-balance")).toHaveTextContent(
+      "可用 Customer Credit：$325",
+    );
   });
 
   it("selects Customer Group from existing Odoo Contact Tags inside Customer Details", () => {

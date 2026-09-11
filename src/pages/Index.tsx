@@ -84,6 +84,7 @@ import {
 import {
   getDeliverySlots,
   getOdooCustomer,
+  getOdooCustomerCredit,
   getOdooPartnerNotes,
   getOperationalOrders,
   getOdooOrderRecords,
@@ -98,6 +99,7 @@ import {
   updateOdooCustomerProfile,
   updateOdooPartnerNotes,
   type AccountingPaymentOption,
+  type CustomerCreditSummary,
   type DeliverySlot,
   type PartnerNoteRecord,
   type RecipientSuggestion,
@@ -121,7 +123,7 @@ import {
 import { orderItemsTotal, orderLineAdjustmentNeedsReason } from "@/lib/order-pricing";
 import { parseDeliveryAddress, type DeliveryAddressSelection } from "@/lib/hk-address";
 import { mobileCheckoutBarClassName } from "@/lib/pos-layout";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, normalizeWholeMoney } from "@/lib/money";
 import { cloneOrderContent } from "@/lib/order-copy";
 import {
   loadCachedPaymentOptions,
@@ -340,6 +342,12 @@ const Index = () => {
   const [customerCreditSourceOrderId, setCustomerCreditSourceOrderId] = useState<number | undefined>(
     restoredEmployeePendingSubmission?.order.customerCreditSourceOrderId,
   );
+  const [customerCreditAmount, setCustomerCreditAmount] = useState(
+    () => restoredEmployeePendingSubmission?.order.customerCreditAmount || 0,
+  );
+  const [customerCreditSummary, setCustomerCreditSummary] = useState<CustomerCreditSummary | null>(null);
+  const [customerCreditLoading, setCustomerCreditLoading] = useState(false);
+  const [customerCreditError, setCustomerCreditError] = useState<string | null>(null);
   const [paymentOptions, setPaymentOptions] = useState<AccountingPaymentOption[]>(loadCachedPaymentOptions);
   const [paymentOptionsLoading, setPaymentOptionsLoading] = useState(false);
   const [paymentOptionsError, setPaymentOptionsError] = useState<string | null>(null);
@@ -671,6 +679,10 @@ const Index = () => {
   }, [items, deliveryFee, urgentFee]);
 
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
+  const customerCreditAvailable = Math.max(
+    0,
+    Math.floor((customerCreditSummary?.availableCreditMinor || 0) / 100),
+  );
   const customerResolutionComplete = !hasOdooBackend
     || Boolean(pendingSubmission)
     || Boolean(selectedCustomer?.odooPartnerId)
@@ -723,19 +735,22 @@ const Index = () => {
       )
     ),
   ) && !validateDeliverySplits(deliverySplits, items);
-  const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
+  const customerCreditValid = customerCreditAmount >= 0
+    && customerCreditAmount <= customerCreditAvailable
+    && customerCreditAmount <= finalPrice;
+  const externalPaymentAmount = paymentStatus === "paid"
+    ? Math.max(0, finalPrice - customerCreditAmount)
+    : paymentStatus === "deposit"
+      ? depositAmount
+      : 0;
+  const receivesExternalPayment = externalPaymentAmount > 0;
+  const totalSettledAmount = customerCreditAmount + externalPaymentAmount;
   const paymentSectionComplete = Boolean(
     finalPrice > 0
-      && (
-        !receivesPayment
-        || (
-          paymentMethod
-          && (
-            paymentStatus !== "deposit"
-            || (depositAmount > 0 && depositAmount < finalPrice)
-          )
-        )
-      ),
+      && customerCreditValid
+      && (paymentStatus !== "unpaid" || customerCreditAmount === 0)
+      && (paymentStatus !== "deposit" || (totalSettledAmount > 0 && totalSettledAmount < finalPrice))
+      && (!receivesExternalPayment || Boolean(paymentMethod)),
   );
   const completedRequiredSectionCount = [
     customerSectionComplete,
@@ -817,10 +832,51 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    if (!receivesPayment || paymentOptions.length === 0) return;
+    if (!receivesExternalPayment || paymentOptions.length === 0) return;
     if (paymentOptions.some((option) => option.code === paymentMethod)) return;
     setPaymentMethod(paymentOptions[0].code);
-  }, [paymentMethod, paymentOptions, receivesPayment]);
+  }, [paymentMethod, paymentOptions, receivesExternalPayment]);
+
+  useEffect(() => {
+    const partnerId = selectedCustomer?.odooPartnerId;
+    if (!hasOdooBackend || !partnerId) {
+      setCustomerCreditSummary(null);
+      setCustomerCreditLoading(false);
+      setCustomerCreditError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    setCustomerCreditSummary(null);
+    setCustomerCreditLoading(true);
+    setCustomerCreditError(null);
+    getOdooCustomerCredit(partnerId, controller.signal)
+      .then((summary) => {
+        if (controller.signal.aborted) return;
+        setCustomerCreditSummary(summary);
+        const available = Math.max(0, Math.floor(summary.availableCreditMinor / 100));
+        setCustomerCreditAmount((current) => Math.min(current, available));
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setCustomerCreditSummary(null);
+        setCustomerCreditError(
+          error instanceof Error
+            ? `未能讀取 Customer Credit：${error.message}`
+            : "未能讀取 Customer Credit",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCustomerCreditLoading(false);
+      });
+    return () => controller.abort();
+  }, [selectedCustomer?.odooPartnerId]);
+
+  useEffect(() => {
+    if (!customerCreditSummary) return;
+    const maximum = Math.max(0, Math.min(customerCreditAvailable, finalPrice));
+    setCustomerCreditAmount((current) => Math.min(current, maximum));
+  }, [customerCreditAvailable, customerCreditSummary, finalPrice]);
 
   useEffect(() => {
     if (!hasOdooBackend) {
@@ -856,6 +912,36 @@ const Index = () => {
     setManualPrice(null);
   };
 
+  const handleCustomerCreditAmountChange = useCallback((value: number) => {
+    if (customerCreditSourceOrderId) {
+      toast.error("呢張替代單已經綁定原單 Customer Credit，唔可以再重複套用其他 Credit。");
+      return;
+    }
+    const maximum = Math.max(0, Math.min(customerCreditAvailable, finalPrice));
+    const nextAmount = Math.max(0, Math.min(normalizeWholeMoney(value), maximum));
+    setCustomerCreditAmount(nextAmount);
+
+    if (nextAmount >= finalPrice && finalPrice > 0) {
+      setPaymentStatus("paid");
+      setDepositAmount(0);
+      setPaymentMethod("");
+      setPaymentReference("");
+      setPaymentReceivedAt("");
+      return;
+    }
+    if (nextAmount > 0 && paymentStatus === "unpaid") {
+      setPaymentStatus("deposit");
+      setDepositAmount(0);
+      setPaymentMethod("");
+      setPaymentReference("");
+      setPaymentReceivedAt("");
+      return;
+    }
+    if (nextAmount === 0 && paymentStatus === "deposit" && depositAmount === 0) {
+      setPaymentStatus("unpaid");
+    }
+  }, [customerCreditAvailable, customerCreditSourceOrderId, depositAmount, finalPrice, paymentStatus]);
+
   const clearRecipientPersistenceBinding = useCallback(() => {
     setRecipientPartnerId(undefined);
     setRecipientOccasionsVersion(undefined);
@@ -883,6 +969,9 @@ const Index = () => {
       ? customer.customerGroupId
       : undefined;
     setSelectedCustomer(customer);
+    setCustomerCreditAmount(0);
+    setCustomerCreditSummary(null);
+    setCustomerCreditError(null);
     setEditingSelectedCustomer(false);
     setCustomerProfileError(null);
     setConfirmedNewCustomerName(null);
@@ -934,6 +1023,9 @@ const Index = () => {
   const resetCustomerForSearch = useCallback((accountCode = "") => {
     const emptyProfile = detachedCustomerProfile();
     setSelectedCustomer(null);
+    setCustomerCreditAmount(0);
+    setCustomerCreditSummary(null);
+    setCustomerCreditError(null);
     setEditingSelectedCustomer(false);
     setCustomerProfileError(null);
     setConfirmedNewCustomerName(null);
@@ -1280,6 +1372,10 @@ const Index = () => {
     setCheckoutCreatedAt(new Date().toISOString());
     setReplacementOrderId(undefined);
     setCustomerCreditSourceOrderId(undefined);
+    setCustomerCreditAmount(0);
+    setCustomerCreditSummary(null);
+    setCustomerCreditLoading(false);
+    setCustomerCreditError(null);
     setPriceOverridden(false);
     setManualPrice(null);
     setSalesId(employee?.salesLabel || "");
@@ -1371,6 +1467,7 @@ const Index = () => {
     setCheckoutCreatedAt(new Date().toISOString());
     setReplacementOrderId(options.replacementOrderId);
     setCustomerCreditSourceOrderId(options.customerCreditSourceOrderId);
+    setCustomerCreditAmount(0);
     setPriceOverridden(order.priceOverridden);
     setManualPrice(order.priceOverridden ? order.finalPrice : null);
     setSalesId(order.salesId);
@@ -1589,6 +1686,7 @@ const Index = () => {
     setGiftCardMessage(order.giftCardMessage);
     setPaymentStatus(order.paymentStatus);
     setDepositAmount(order.depositAmount);
+    setCustomerCreditAmount(order.customerCreditAmount || 0);
     setPaymentMethod(order.paymentMethod);
     setPaymentReference(order.paymentReference || "");
     setPaymentReceivedAt(order.paymentReceivedAt || "");
@@ -1847,6 +1945,7 @@ const Index = () => {
       priceOverridden: false,
       paymentStatus: "unpaid",
       depositAmount: 0,
+      customerCreditAmount: 0,
       paymentMethod: "",
       paymentReference: "",
       paymentReceivedAt: "",
@@ -2073,28 +2172,58 @@ const Index = () => {
       return;
     }
 
-    const receivesPayment = paymentStatus === "paid" || paymentStatus === "deposit";
-    if (receivesPayment && !paymentMethod) {
+    if (customerCreditSourceOrderId && customerCreditAmount > 0) {
+      toast.error("替代單已經綁定原單 Customer Credit，唔可以再重複套用其他 Credit");
+      scrollToWorkflowSection("payment");
+      return;
+    }
+    if (customerCreditAmount > 0 && (customerCreditLoading || customerCreditError)) {
+      toast.error(customerCreditError || "Customer Credit 餘額仍在核對中，請稍後再試");
+      scrollToWorkflowSection("payment");
+      return;
+    }
+    if (
+      customerCreditAmount < 0
+      || customerCreditAmount > customerCreditAvailable
+      || customerCreditAmount > finalPrice
+    ) {
+      toast.error("Customer Credit 金額超過目前可用餘額或訂單總額");
+      scrollToWorkflowSection("payment");
+      return;
+    }
+    if (paymentStatus === "unpaid" && customerCreditAmount > 0) {
+      toast.error("已使用 Customer Credit 嘅訂單唔可以標示為未付款");
+      scrollToWorkflowSection("payment");
+      return;
+    }
+    const externalPaymentAmount = paymentStatus === "paid"
+      ? Math.max(0, finalPrice - customerCreditAmount)
+      : paymentStatus === "deposit"
+        ? depositAmount
+        : 0;
+    const receivesExternalPayment = externalPaymentAmount > 0;
+    if (receivesExternalPayment && !paymentMethod) {
       toast.error("請選擇已啟用嘅 Odoo 付款方式");
       scrollToWorkflowSection("payment");
       return;
     }
-    const resolvedPaymentReference = receivesPayment
+    const resolvedPaymentReference = receivesExternalPayment
       ? resolvePaymentReference(paymentReference, checkoutId)
       : "";
-    if (receivesPayment && !paymentReference.trim()) {
+    if (receivesExternalPayment && !paymentReference.trim()) {
       toast.warning(`未填付款參考編號；系統已使用 ${resolvedPaymentReference} 方便後補核對`);
     }
-    if (paymentStatus === "deposit" && (depositAmount <= 0 || depositAmount >= finalPrice)) {
-      toast.error("訂金必須大過 $0 並少過訂單總額");
+    const totalSettledAmount = customerCreditAmount + externalPaymentAmount;
+    if (paymentStatus === "deposit" && (totalSettledAmount <= 0 || totalSettledAmount >= finalPrice)) {
+      toast.error("Customer Credit 加訂金必須大過 $0 並少過訂單總額");
       scrollToWorkflowSection("payment");
       return;
     }
-    const receiptTimestamp = receivesPayment
+    const receiptTimestamp = receivesExternalPayment
       ? (paymentReceivedAt || new Date().toISOString())
       : "";
-    const receiptIdempotencyKey = receivesPayment ? paymentIdempotencyKey : "";
-    if (receivesPayment && !paymentReceivedAt) setPaymentReceivedAt(receiptTimestamp);
+    const receiptIdempotencyKey = receivesExternalPayment ? paymentIdempotencyKey : "";
+    if (receivesExternalPayment && !paymentReceivedAt) setPaymentReceivedAt(receiptTimestamp);
 
     const hasRecipientIdentity = Boolean(
       recipientPartnerId
@@ -2173,7 +2302,8 @@ const Index = () => {
       priceOverridden,
       paymentStatus,
       depositAmount: paymentStatus === "deposit" ? depositAmount : 0,
-      paymentMethod,
+      ...(includePendingField("customerCreditAmount") ? { customerCreditAmount } : {}),
+      paymentMethod: receivesExternalPayment ? paymentMethod : "",
       paymentReference: resolvedPaymentReference,
       paymentReceivedAt: receiptTimestamp,
       paymentIdempotencyKey: pendingSubmission?.order.paymentIdempotencyKey || receiptIdempotencyKey,
@@ -2694,6 +2824,9 @@ const Index = () => {
           customerEmailError={checkoutErrors.customerEmail}
           billingAddressError={checkoutErrors.billingAddress}
           selectedCustomer={selectedCustomer}
+          customerCreditAvailable={customerCreditAvailable}
+          customerCreditLoading={customerCreditLoading}
+          customerCreditError={customerCreditError}
           confirmedNewCustomerName={confirmedNewCustomerName}
           confirmedNewCustomerPhone={confirmedNewCustomerPhone}
           onConfirmNewCustomer={(normalizedPhone, confirmedName) => {
@@ -2988,6 +3121,8 @@ const Index = () => {
             }
             setPaymentStatus(status);
             if (status === "unpaid") {
+              setCustomerCreditAmount(0);
+              setDepositAmount(0);
               setPaymentMethod("");
               setPaymentReference("");
               setPaymentReceivedAt("");
@@ -3002,6 +3137,11 @@ const Index = () => {
           paymentOptionsError={paymentOptionsError}
           depositAmount={depositAmount}
           onDepositAmountChange={setDepositAmount}
+          customerCreditAvailable={customerCreditSourceOrderId ? 0 : customerCreditAvailable}
+          customerCreditAmount={customerCreditSourceOrderId ? 0 : customerCreditAmount}
+          customerCreditLoading={customerCreditSourceOrderId ? false : customerCreditLoading}
+          customerCreditError={customerCreditSourceOrderId ? null : customerCreditError}
+          onCustomerCreditAmountChange={handleCustomerCreditAmountChange}
           priceWarning={finalPrice <= 0 && items.length > 0}
         />
         </section>

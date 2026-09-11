@@ -14,6 +14,7 @@ const odooMocks = vi.hoisted(() => ({
   getOdooSalesTeams: vi.fn(),
   getOdooCustomerGroups: vi.fn(),
   getOdooCustomer: vi.fn(),
+  getOdooCustomerCredit: vi.fn(),
   getOdooOrderRecords: vi.fn(),
   getOdooProductCategories: vi.fn(),
   getOdooProducts: vi.fn(),
@@ -95,6 +96,13 @@ describe("Index correlated order search", () => {
       phone: "91234567",
       customerCode: "REPEAT-42",
       history: [],
+    });
+    odooMocks.getOdooCustomerCredit.mockResolvedValue({
+      partnerId: 42,
+      commercialPartnerId: 42,
+      currency: "HKD",
+      availableCreditMinor: 0,
+      sources: [],
     });
     odooMocks.getOdooOrderRecords.mockResolvedValue({
       date: "2026-08-26",
