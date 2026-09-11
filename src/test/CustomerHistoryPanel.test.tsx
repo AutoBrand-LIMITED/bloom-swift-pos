@@ -147,6 +147,20 @@ describe("CustomerHistoryPanel resizable history", () => {
     expect(panel).not.toHaveClass("fixed", "left-0", "order-last", "border-l", "shadow-2xl");
   });
 
+  it("shows the available Customer Credit in the customer history summary", () => {
+    render(
+      <CustomerHistoryPanel
+        customer={customer}
+        onClose={vi.fn()}
+        customerCreditAvailable={100}
+      />,
+    );
+
+    const creditSummary = screen.getByTestId("customer-history-credit");
+    expect(creditSummary).toHaveTextContent("可用 Customer Credit");
+    expect(creditSummary).toHaveTextContent("$100");
+  });
+
   it("keeps the three-dot contact settings separate from labels and long-term notes", async () => {
     const onSave = vi.fn();
     const onContactSelect = vi.fn();

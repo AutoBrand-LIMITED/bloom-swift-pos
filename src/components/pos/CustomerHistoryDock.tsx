@@ -22,6 +22,9 @@ interface CustomerHistoryDockProps {
   addressTargetLabel?: string;
   contactEditor?: CustomerContactEditorProps;
   onContactSelect?: (customer: DemoCustomer) => void;
+  customerCreditAvailable?: number;
+  customerCreditLoading?: boolean;
+  customerCreditError?: string | null;
 }
 
 const CustomerHistoryDock = ({
@@ -31,6 +34,9 @@ const CustomerHistoryDock = ({
   addressTargetLabel,
   contactEditor,
   onContactSelect,
+  customerCreditAvailable,
+  customerCreditLoading,
+  customerCreditError,
 }: CustomerHistoryDockProps) => {
   const [inlineHistory, setInlineHistory] = useState(usesInlineHistory);
   const [open, setOpen] = useState(usesInlineHistory);
@@ -70,6 +76,9 @@ const CustomerHistoryDock = ({
         inline={inlineHistory}
         contactEditor={contactEditor}
         onContactSelect={onContactSelect}
+        customerCreditAvailable={customerCreditAvailable}
+        customerCreditLoading={customerCreditLoading}
+        customerCreditError={customerCreditError}
       />
     );
   }

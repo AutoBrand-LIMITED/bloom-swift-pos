@@ -2600,6 +2600,9 @@ const Index = () => {
             customer={selectedCustomer}
             onUseAddress={applyHistoryAddressSelection}
             addressTargetLabel={historyAddressTargetLabel}
+            customerCreditAvailable={customerCreditAvailable}
+            customerCreditLoading={customerCreditLoading}
+            customerCreditError={customerCreditError}
             contactEditor={selectedCustomer.odooPartnerId ? {
               open: editingSelectedCustomer,
               saving: savingCustomerProfile,

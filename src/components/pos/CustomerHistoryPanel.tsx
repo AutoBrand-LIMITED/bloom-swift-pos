@@ -33,6 +33,9 @@ interface CustomerHistoryPanelProps {
   inline?: boolean;
   contactEditor?: CustomerContactEditorProps;
   onContactSelect?: (customer: DemoCustomer) => void;
+  customerCreditAvailable?: number;
+  customerCreditLoading?: boolean;
+  customerCreditError?: string | null;
 }
 
 const formatDateTime = (value?: string) => {
@@ -102,6 +105,9 @@ const CustomerHistoryPanel = ({
   inline = false,
   contactEditor,
   onContactSelect,
+  customerCreditAvailable,
+  customerCreditLoading = false,
+  customerCreditError,
 }: CustomerHistoryPanelProps) => {
   const [odooHistoryState, setOdooHistoryState] = useState<{
     customerId: string;
@@ -181,6 +187,9 @@ const CustomerHistoryPanel = ({
 
   const totalSpent = displayCustomer?.totalSpent ?? displayCustomer?.history.reduce((s, h) => s + h.total, 0) ?? 0;
   const orderCount = displayCustomer?.historyCount ?? displayCustomer?.history.length ?? 0;
+  const showCustomerCredit = customerCreditAvailable !== undefined
+    || customerCreditLoading
+    || Boolean(customerCreditError);
 
   const pastAddresses = useMemo(() => {
     if (!displayCustomer) return [];
@@ -347,6 +356,23 @@ const CustomerHistoryPanel = ({
                           : orderCount}
                     </p>
                   </div>
+                  {showCustomerCredit && (
+                    <div
+                      data-testid="customer-history-credit"
+                      className="col-span-2 flex min-h-11 items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"
+                    >
+                      <p className="text-[11px] font-medium text-muted-foreground">
+                        可用 Customer Credit
+                      </p>
+                      <p className="shrink-0 font-mono text-sm font-bold text-primary">
+                        {customerCreditLoading
+                          ? "載入中"
+                          : customerCreditError
+                            ? "未確認"
+                            : formatMoney(Math.max(0, customerCreditAvailable ?? 0))}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 {historyError && (
                   <div role="alert" className="rounded-lg border border-destructive/25 bg-destructive/5 p-2.5">
