@@ -176,7 +176,7 @@ describe("Index pending recovery without POS authentication", () => {
     }));
     await waitFor(() => expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull());
 
-    fireEvent.click(screen.getAllByRole("button", { name: "確認訂單" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "儲存訂單" })[0]);
 
     await waitFor(() => expect(localStorage.getItem(UNSYNCED_ORDERS_KEY)).not.toBeNull());
     const submitted = JSON.parse(localStorage.getItem(UNSYNCED_ORDERS_KEY) || "[]") as Order[];
@@ -208,7 +208,7 @@ describe("Index pending recovery without POS authentication", () => {
     fireEvent.change(screen.getByLabelText(/收貨人姓名／聯絡人姓名/), {
       target: { value: "Changed Recipient" },
     });
-    fireEvent.click(screen.getAllByRole("button", { name: "確認訂單" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "儲存訂單" })[0]);
 
     await waitFor(() => expect(localStorage.getItem(UNSYNCED_ORDERS_KEY)).not.toBeNull());
     const submitted = JSON.parse(localStorage.getItem(UNSYNCED_ORDERS_KEY) || "[]") as Order[];

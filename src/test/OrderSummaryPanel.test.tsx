@@ -53,20 +53,25 @@ describe("OrderSummaryPanel", () => {
   it("links back to editable sections and submits from the desktop panel", () => {
     const onNavigate = vi.fn();
     const onSubmit = vi.fn();
+    const onSaveIncomplete = vi.fn();
     render(
       <OrderSummaryPanel
         {...baseProps}
+        completedCount={4}
         onSubmit={onSubmit}
+        onSaveIncomplete={onSaveIncomplete}
         onNavigate={onNavigate}
       />,
     );
 
     const editButtons = screen.getAllByRole("button", { name: "修改" });
     fireEvent.click(editButtons[1]);
-    fireEvent.click(screen.getByRole("button", { name: "確認訂單" }));
+    fireEvent.click(screen.getByRole("button", { name: "儲存訂單" }));
 
     expect(onNavigate).toHaveBeenCalledWith("items");
     expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSaveIncomplete).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "儲存未完成訂單" })).not.toBeInTheDocument();
   });
 
   it("saves an intentionally incomplete order separately from final checkout", () => {
@@ -85,6 +90,8 @@ describe("OrderSummaryPanel", () => {
 
     expect(onSaveIncomplete).toHaveBeenCalledTimes(1);
     expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "儲存訂單" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "確認訂單" })).not.toBeInTheDocument();
   });
 
   it("summarizes grab-and-go without showing delivery requirements", () => {

@@ -759,6 +759,7 @@ const Index = () => {
     deliverySectionComplete,
     paymentSectionComplete,
   ].filter(Boolean).length;
+  const isOrderComplete = completedRequiredSectionCount === 4;
   const hasSalesperson = salesId.trim().length > 0;
 
   const scrollToWorkflowSection = useCallback((sectionId: WorkflowSectionId) => {
@@ -3219,7 +3220,7 @@ const Index = () => {
       </div>
       {/* Sticky submit */}
       {hasSalesperson && <div
-        aria-label="流動版確認訂單列"
+        aria-label="流動版儲存訂單列"
         className={mobileCheckoutBarClassName}
       >
         <div className="mx-auto flex max-w-3xl min-w-0 items-center justify-between gap-2 px-3 py-3 sm:gap-4 sm:px-4">
@@ -3228,21 +3229,16 @@ const Index = () => {
             <p className="truncate font-mono text-xl font-bold tracking-tight sm:text-2xl">${formatMoney(finalPrice)}</p>
           </div>
           <Button
-            variant="outline"
-            onClick={handleSaveIncomplete}
-            disabled={isSubmitting || isSavingIncomplete}
-            size="lg"
-            className="shrink-0 px-3 text-sm font-semibold"
-          >
-            {isSavingIncomplete ? "儲存中" : "未完成"}
-          </Button>
-          <Button
-            onClick={handleSubmit}
+            onClick={isOrderComplete ? handleSubmit : handleSaveIncomplete}
             disabled={isSubmitting || isSavingIncomplete}
             size="lg"
             className="shrink-0 px-4 text-base font-semibold shadow-lg sm:px-8"
           >
-            {isSubmitting ? "下單中" : "確認訂單"}
+            {isSubmitting || isSavingIncomplete
+              ? "儲存中"
+              : isOrderComplete
+                ? "儲存訂單"
+                : "儲存未完成訂單"}
           </Button>
         </div>
       </div>}

@@ -75,6 +75,8 @@ const OrderSummaryPanel = ({
   onNavigate,
 }: OrderSummaryPanelProps) => {
   const completionPercent = Math.round((completedCount / requiredSectionCount) * 100);
+  const isOrderComplete = requiredSectionCount > 0 && completedCount >= requiredSectionCount;
+  const isSaving = isSubmitting || isSavingIncomplete;
   const FulfillmentIcon = fulfillmentType === "grab_and_go"
     ? ShoppingBag
     : fulfillmentType === "pickup"
@@ -185,22 +187,16 @@ const OrderSummaryPanel = ({
         </div>
         <Button
           type="button"
-          variant="outline"
           size="lg"
-          onClick={onSaveIncomplete}
-          disabled={isSubmitting || isSavingIncomplete}
-          className="mt-4 min-h-12 w-full touch-manipulation text-base font-semibold"
+          onClick={isOrderComplete ? onSubmit : onSaveIncomplete}
+          disabled={isSaving}
+          className="mt-4 min-h-12 w-full touch-manipulation text-base font-semibold shadow-md"
         >
-          {isSavingIncomplete ? "儲存中" : "儲存未完成訂單"}
-        </Button>
-        <Button
-          type="button"
-          size="lg"
-          onClick={onSubmit}
-          disabled={isSubmitting || isSavingIncomplete}
-          className="mt-2 min-h-12 w-full touch-manipulation text-base font-semibold shadow-md"
-        >
-          {isSubmitting ? "下單中" : "確認訂單"}
+          {isSaving
+            ? "儲存中"
+            : isOrderComplete
+              ? "儲存訂單"
+              : "儲存未完成訂單"}
         </Button>
       </div>
     </aside>
