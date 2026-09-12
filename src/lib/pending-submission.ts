@@ -55,11 +55,22 @@ const employeeScopeKey = (employee: PosEmployeeScope): string => `employee:${emp
 function isPendingSubmission(value: unknown): value is PendingOrderSubmission {
   if (!value || typeof value !== "object") return false;
   const pending = value as Partial<PendingOrderSubmission>;
+  const creditAmount = Number(pending.order?.customerCreditAmount || 0);
+  const hasCreditSettlement = Number.isFinite(creditAmount) && creditAmount > 0;
+  const sourceOrderId = pending.order?.customerCreditSourceOrderId;
+  const hasBoundSourceCredit = typeof sourceOrderId === "number"
+    && Number.isInteger(sourceOrderId)
+    && sourceOrderId > 0;
   return Boolean(
     pending.order?.id
       && pending.order.createdAt
       && pending.savedAt
-      && (pending.order.paymentStatus === "unpaid" || pending.order.paymentIdempotencyKey),
+      && (
+        pending.order.paymentStatus === "unpaid"
+        || pending.order.paymentIdempotencyKey
+        || hasCreditSettlement
+        || hasBoundSourceCredit
+      ),
   );
 }
 

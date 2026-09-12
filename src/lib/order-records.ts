@@ -186,6 +186,10 @@ export const mergeOrderRecords = (
   const operationalByOdooName = new Set<string>();
   const operational: OrderRecordView[] = [];
   for (const record of operationalOrders) {
+    // A synced outbox row is only a short-lived transport acknowledgement.
+    // Odoo history is authoritative once sync completes; rendering both rows
+    // can leak the checkout UUID and push a 50-order page to 51 entries.
+    if (record.syncState === "synced") continue;
     const unresolvedOdooIdentity = unresolvedOdooIdentityByLocalId.get(record.order.id);
     const order = unresolvedOdooIdentity
       ? {
@@ -194,20 +198,17 @@ export const mergeOrderRecords = (
           odooOrderName: record.order.odooOrderName ?? unresolvedOdooIdentity.odooOrderName,
         }
       : record.order;
-    const remoteMatch = remoteByLocalId.has(order.id)
-      || Boolean(order.odooOrderId && remoteByOdooId.has(order.odooOrderId))
-      || Boolean(order.odooOrderName && remoteByOdooName.has(order.odooOrderName));
     const operationalDuplicate = operationalByOrderId.has(order.id)
       || Boolean(order.odooOrderId && operationalByOdooId.has(order.odooOrderId))
       || Boolean(order.odooOrderName && operationalByOdooName.has(order.odooOrderName));
-    if ((remoteMatch && record.syncState === "synced") || operationalDuplicate) continue;
+    if (operationalDuplicate) continue;
     operationalByOrderId.add(order.id);
     if (order.odooOrderId) operationalByOdooId.add(order.odooOrderId);
     if (order.odooOrderName) operationalByOdooName.add(order.odooOrderName);
     operational.push({
       ...order,
       source: "operational",
-      syncState: record.syncState === "synced" ? "operational_synced" : record.syncState,
+      syncState: record.syncState,
       operationalReviewError: record.reviewError,
       operationalLastError: record.lastError,
       operationalOrderId: record.operationalOrderId,

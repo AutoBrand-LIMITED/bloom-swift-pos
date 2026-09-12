@@ -939,7 +939,7 @@ const OrderHistory = ({
 
   const filteredOrders = useMemo(() => orders.filter((order) => (
     statusFilter === "all" || effectiveOrderStatus(order) === statusFilter
-  )), [orders, statusFilter]);
+  )).slice(0, pageSize), [orders, pageSize, statusFilter]);
   const selectedOrder = selectedOrderId
     ? orders.find((order) => order.id === selectedOrderId) || null
     : null;

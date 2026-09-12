@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { DemoCustomer } from "@/data/demo-customers";
+import { customerIdentityKey, latestCustomerContactKey } from "@/lib/customer-utils";
 import { searchOdooCustomerAccount, searchOdooCustomers } from "@/lib/odoo-api";
 
 interface CustomerContactChooserDialogProps {
@@ -34,18 +35,6 @@ const sameContact = (left: DemoCustomer, right: DemoCustomer) => (
     ? left.odooPartnerId === right.odooPartnerId
     : left.id === right.id
 );
-
-const contactKey = (contact: DemoCustomer) => String(contact.odooPartnerId ?? contact.id);
-
-const parseOdooDate = (value?: string) => {
-  const trimmed = value?.trim();
-  if (!trimmed) return null;
-  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(trimmed)
-    ? `${trimmed.replace(" ", "T")}Z`
-    : trimmed;
-  const timestamp = Date.parse(normalized);
-  return Number.isFinite(timestamp) ? timestamp : null;
-};
 
 const CustomerContactChooserDialog = ({
   open,
@@ -114,27 +103,10 @@ const CustomerContactChooserDialog = ({
   }, [lookup.contacts, query]);
 
   const alternativeCount = lookup.contacts.filter((contact) => !sameContact(contact, customer)).length;
-  const latestContactKey = useMemo(() => {
-    const datedContacts = lookup.contacts.flatMap((contact) => {
-      const timestamp = parseOdooDate(contact.createDate);
-      return timestamp === null ? [] : [{ contact, timestamp }];
-    });
-    if (datedContacts.length < 2 || datedContacts.length !== lookup.contacts.length) return null;
-
-    const latest = datedContacts.reduce((currentLatest, candidate) => {
-      if (candidate.timestamp !== currentLatest.timestamp) {
-        return candidate.timestamp > currentLatest.timestamp ? candidate : currentLatest;
-      }
-      return contactKey(candidate.contact).localeCompare(
-        contactKey(currentLatest.contact),
-        undefined,
-        { numeric: true },
-      ) > 0
-        ? candidate
-        : currentLatest;
-    });
-    return contactKey(latest.contact);
-  }, [lookup.contacts]);
+  const latestContactKey = useMemo(
+    () => latestCustomerContactKey(lookup.contacts),
+    [lookup.contacts],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -193,7 +165,7 @@ const CustomerContactChooserDialog = ({
               <div className="divide-y divide-border">
                 {visibleContacts.map((contact) => {
                   const current = sameContact(contact, customer);
-                  const latest = latestContactKey === contactKey(contact);
+                  const latest = latestContactKey === customerIdentityKey(contact);
                   return (
                     <button
                       key={contact.odooPartnerId ?? contact.id}

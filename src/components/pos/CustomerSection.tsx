@@ -22,7 +22,12 @@ import type { DemoCustomer } from "@/data/demo-customers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CustomerFlags from "@/components/pos/CustomerFlags";
 import RegionalPhoneInput from "@/components/pos/RegionalPhoneInput";
-import { customerIdentityKey, loadStoredCustomers, mergeCustomers } from "@/lib/customer-utils";
+import {
+  customerIdentityKey,
+  latestCustomerContactKey,
+  loadStoredCustomers,
+  mergeCustomers,
+} from "@/lib/customer-utils";
 import {
   hasOdooBackend,
   searchOdooCustomerAccount,
@@ -359,6 +364,10 @@ const CustomerSection = ({
     ));
   }, [activeDropdown, completedCurrentSearch, customerAccount, odooCustomers, search]);
   const hasCustomerCodeSuggestions = customerCodeSuggestions.length > 0;
+  const latestAccountContactKey = useMemo(() => {
+    if (!customerAccount || customerAccount.truncated) return null;
+    return latestCustomerContactKey(customerAccount.contacts);
+  }, [customerAccount]);
 
   const searchHint =
     sourceRequiresMoreInput(activeDropdown, search)
@@ -565,7 +574,11 @@ const CustomerSection = ({
     }
   };
 
-  const customerOptionContent = (c: DemoCustomer, actionLabel?: string) => (
+  const customerOptionContent = (
+    c: DemoCustomer,
+    actionLabel?: string,
+    isLatestAccountContact = false,
+  ) => (
     <>
       <div className="min-w-0">
         {c.customerCode && (
@@ -574,6 +587,11 @@ const CustomerSection = ({
           </p>
         )}
         <span className="text-sm font-medium">{c.name}</span>
+        {isLatestAccountContact && (
+          <span className="ml-2 inline-flex rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+            最新
+          </span>
+        )}
         <span className="text-xs text-muted-foreground ml-2 font-mono break-all">
           {c.phone || "沒有電話"}
         </span>
@@ -771,7 +789,11 @@ const CustomerSection = ({
                 }}
                 className="min-h-11 w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-accent/50 transition-colors touch-manipulation"
               >
-                {customerOptionContent(c, "一鍵套用下單人＋收貨人")}
+                {customerOptionContent(
+                  c,
+                  "一鍵套用下單人＋收貨人",
+                  latestAccountContactKey === customerIdentityKey(c),
+                )}
               </button>
               <button
                 type="button"
@@ -794,7 +816,11 @@ const CustomerSection = ({
               }}
               className="min-h-11 w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-accent/50 transition-colors border-b border-border last:border-0 touch-manipulation"
             >
-              {customerOptionContent(c)}
+              {customerOptionContent(
+                c,
+                undefined,
+                latestAccountContactKey === customerIdentityKey(c),
+              )}
             </button>
           ))}
         </div>

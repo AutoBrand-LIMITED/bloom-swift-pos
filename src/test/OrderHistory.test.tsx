@@ -1588,6 +1588,27 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.queryByText(/目前只顯示最新 100 張訂單/)).not.toBeInTheDocument();
   });
 
+  it("never renders more rows than the configured page size", () => {
+    const orders = Array.from({ length: 51 }, (_, index) => orderFixture({
+      id: `order-${index + 1}`,
+      odooOrderId: index + 1,
+      odooOrderName: `S${String(index + 1).padStart(5, "0")}`,
+    }));
+
+    render(
+      <OrderHistory
+        orders={orders}
+        open
+        onClose={vi.fn()}
+        pageSize={50}
+      />,
+    );
+
+    expect(screen.getByText("訂單記錄 (本頁 50)")).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /查看訂單 S/ })).toHaveLength(50);
+    expect(screen.queryByRole("button", { name: "查看訂單 S00051" })).not.toBeInTheDocument();
+  });
+
   it("opens a full-page detail and provides a 44px back control", () => {
     render(<OrderHistory orders={[orderFixture()]} open onClose={vi.fn()} />);
 

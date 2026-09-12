@@ -415,6 +415,34 @@ describe("pending Odoo submission", () => {
     expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
   });
 
+  it("accepts and clears a fully customer-credit-paid submission without a payment key", async () => {
+    const submission = buildSubmission();
+    submission.order.paymentStatus = "paid";
+    submission.order.customerCreditAmount = submission.order.finalPrice;
+    submission.order.paymentIdempotencyKey = "";
+    submission.order.paymentMethod = "";
+    submission.order.paymentReference = "";
+    submission.order.paymentReceivedAt = "";
+
+    const submitter = vi.fn().mockResolvedValue({ id: 502 });
+    await expect(submitPersistedOrder(submission, submitter)).resolves.toEqual({ id: 502 });
+
+    expect(submitter).toHaveBeenCalledWith(submission.order, submission.options);
+    expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
+  });
+
+  it("accepts and clears a source-order credit submission without a payment key", async () => {
+    const submission = buildSubmission();
+    submission.order.paymentStatus = "paid";
+    submission.order.customerCreditAmount = 0;
+    submission.order.customerCreditSourceOrderId = 17843;
+    submission.order.paymentIdempotencyKey = "";
+
+    await expect(submitPersistedOrder(submission, async () => ({ id: 503 })))
+      .resolves.toEqual({ id: 503 });
+    expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull();
+  });
+
   it("unlocks a rejected request when Odoo confirms a validation failure", async () => {
     const submission = buildSubmission();
     const submitter = vi.fn().mockRejectedValue(new OdooApiError("改價原因必填", 422));

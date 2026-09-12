@@ -27,6 +27,38 @@ export function customerIdentityKey(
     : `local:${customer.id}`;
 }
 
+function parseOdooDate(value?: string): number | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(trimmed)
+    ? `${trimmed.replace(" ", "T")}Z`
+    : trimmed;
+  const timestamp = Date.parse(normalized);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+export function latestCustomerContactKey(customers: DemoCustomer[]): string | null {
+  const datedCustomers = customers.flatMap((customer) => {
+    const timestamp = parseOdooDate(customer.createDate);
+    return timestamp === null ? [] : [{ customer, timestamp }];
+  });
+  if (datedCustomers.length < 2 || datedCustomers.length !== customers.length) return null;
+
+  const latest = datedCustomers.reduce((currentLatest, candidate) => {
+    if (candidate.timestamp !== currentLatest.timestamp) {
+      return candidate.timestamp > currentLatest.timestamp ? candidate : currentLatest;
+    }
+    return customerIdentityKey(candidate.customer).localeCompare(
+      customerIdentityKey(currentLatest.customer),
+      undefined,
+      { numeric: true },
+    ) > 0
+      ? candidate
+      : currentLatest;
+  });
+  return customerIdentityKey(latest.customer);
+}
+
 export function loadStoredCustomers(): DemoCustomer[] {
   try {
     return JSON.parse(localStorage.getItem(CUSTOMERS_STORAGE_KEY) || "[]");

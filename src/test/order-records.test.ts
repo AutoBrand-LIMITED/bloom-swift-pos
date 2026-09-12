@@ -106,6 +106,30 @@ describe("order record sources", () => {
     ]);
   });
 
+  it("does not render a synced transport row while Odoo history refreshes", () => {
+    const remote = Array.from({ length: 50 }, (_, index) => order(`remote-${index}`, {
+      odooOrderId: index + 1,
+      odooOrderName: `S${String(index + 1).padStart(5, "0")}`,
+    }));
+    const staleOperational: OperationalOrderRecord = {
+      operationalOrderId: "eb9f4481-6432-47c3-9032-21a6608d0219",
+      operatorEmployeeId: 17,
+      order: order("eb9f4481-6432-47c3-9032-21a6608d0219"),
+      syncState: "synced",
+      reviewError: null,
+      lastError: null,
+      attemptCount: 1,
+      updatedAt: new Date().toISOString(),
+      retryEligible: false,
+    };
+
+    const records = mergeOrderRecords(remote, [], null, [staleOperational]);
+
+    expect(records).toHaveLength(50);
+    expect(records.every((record) => record.odooOrderName)).toBe(true);
+    expect(records.some((record) => record.id === staleOperational.operationalOrderId)).toBe(false);
+  });
+
   it("keeps an unresolved operational row visible when Odoo has only a matching draft", () => {
     const remoteDraft = order("same-operational", {
       odooOrderId: 91,
