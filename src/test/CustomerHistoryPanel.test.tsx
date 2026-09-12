@@ -240,6 +240,7 @@ describe("CustomerHistoryPanel resizable history", () => {
             onBillingAddressChange: setBillingAddress,
             onSave,
           }}
+          customerCodeManager={{ onCompleted: vi.fn() }}
         />
       );
     };
@@ -255,9 +256,18 @@ describe("CustomerHistoryPanel resizable history", () => {
     expect(screen.getByText(/呢段係一個好長嘅客戶長期備註/)).toBeVisible();
 
     fireEvent.keyDown(settings, { key: "Enter" });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "編輯聯絡人" }));
+    const unifiedSettings = await screen.findByRole("menuitem", {
+      name: "編輯客戶資料",
+    });
+    expect(screen.queryByRole("menuitem", { name: "管理 Customer ID" })).not.toBeInTheDocument();
+    fireEvent.click(unifiedSettings);
 
-    expect(screen.getByRole("dialog", { name: "編輯聯絡人" })).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "編輯客戶資料" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "聯絡人資料" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Customer ID" }));
+    expect(screen.getByLabelText("目前 Customer ID")).toHaveValue("ACCT-42");
+    expect(screen.getByRole("tab", { name: "Customer ID" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "聯絡人資料" }));
     expect(screen.getByLabelText("聯絡人名稱")).toHaveValue(profileCustomer.name);
     expect(screen.getByLabelText("編輯聯絡人電話")).toHaveValue("67610707");
     expect(screen.getByLabelText("編輯聯絡人後備電話")).toBeVisible();

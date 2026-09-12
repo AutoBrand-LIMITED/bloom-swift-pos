@@ -197,6 +197,11 @@ const CustomerHistoryPanel = ({
   const showCustomerCredit = customerCreditAvailable !== undefined
     || customerCreditLoading
     || Boolean(customerCreditError);
+  const manageableCustomerCode = customerCodeManager
+    && displayCustomer?.customerCode?.trim()
+    && displayCustomer.customerCode.trim().toLocaleLowerCase() !== "walk-in"
+    ? displayCustomer.customerCode.trim()
+    : null;
 
   const pastAddresses = useMemo(() => {
     if (!displayCustomer) return [];
@@ -298,11 +303,7 @@ const CustomerHistoryPanel = ({
                   </div>
                   {displayCustomer.odooPartnerId && (
                     contactEditor
-                    || (
-                      customerCodeManager
-                      && displayCustomer.customerCode?.trim()
-                      && displayCustomer.customerCode.trim().toLocaleLowerCase() !== "walk-in"
-                    )
+                    || manageableCustomerCode
                   ) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -326,7 +327,7 @@ const CustomerHistoryPanel = ({
                             onSelect={() => contactEditor.onOpenChange(true)}
                           >
                             <Pencil className="h-4 w-4" aria-hidden="true" />
-                            編輯聯絡人
+                            {manageableCustomerCode ? "編輯客戶資料" : "編輯聯絡人"}
                           </DropdownMenuItem>
                         )}
                         {onContactSelect && (
@@ -338,9 +339,8 @@ const CustomerHistoryPanel = ({
                             選擇其他聯絡人
                           </DropdownMenuItem>
                         )}
-                        {customerCodeManager
-                          && displayCustomer.customerCode?.trim()
-                          && displayCustomer.customerCode.trim().toLocaleLowerCase() !== "walk-in"
+                        {!contactEditor
+                          && manageableCustomerCode
                           && (
                             <DropdownMenuItem
                               className="min-h-11 gap-2 touch-manipulation"
@@ -750,7 +750,15 @@ const CustomerHistoryPanel = ({
         </ResizablePanelGroup>
       </div>
 
-      {contactEditor && <CustomerContactEditDialog editor={contactEditor} />}
+      {contactEditor && (
+        <CustomerContactEditDialog
+          editor={contactEditor}
+          customerCodeManager={manageableCustomerCode && customerCodeManager ? {
+            sourceCode: manageableCustomerCode,
+            onCompleted: customerCodeManager.onCompleted,
+          } : undefined}
+        />
+      )}
       {onContactSelect && (
         <CustomerContactChooserDialog
           open={contactChooserOpen}
@@ -759,10 +767,10 @@ const CustomerHistoryPanel = ({
           onSelect={onContactSelect}
         />
       )}
-      {customerCodeManager && displayCustomer.customerCode?.trim() && (
+      {!contactEditor && customerCodeManager && manageableCustomerCode && (
         <CustomerCodeManagementDialog
           open={customerCodeDialogOpen}
-          sourceCode={displayCustomer.customerCode}
+          sourceCode={manageableCustomerCode}
           onOpenChange={setCustomerCodeDialogOpen}
           onCompleted={customerCodeManager.onCompleted}
         />

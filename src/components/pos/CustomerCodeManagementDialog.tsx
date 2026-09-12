@@ -21,6 +21,14 @@ import {
   type CustomerCodeChangeResult,
 } from "@/lib/odoo-api";
 
+export interface CustomerCodeManagementContentProps {
+  active: boolean;
+  sourceCode: string;
+  onCancel: () => void;
+  onCompleted: (result: CustomerCodeChangeResult) => void | Promise<void>;
+  onSavingChange?: (saving: boolean) => void;
+}
+
 interface CustomerCodeManagementDialogProps {
   open: boolean;
   sourceCode: string;
@@ -39,12 +47,13 @@ const newRequestKey = () => {
   });
 };
 
-const CustomerCodeManagementDialog = ({
-  open,
+export const CustomerCodeManagementContent = ({
+  active,
   sourceCode,
-  onOpenChange,
+  onCancel,
   onCompleted,
-}: CustomerCodeManagementDialogProps) => {
+  onSavingChange,
+}: CustomerCodeManagementContentProps) => {
   const [targetCode, setTargetCode] = useState("");
   const [reason, setReason] = useState("");
   const [preview, setPreview] = useState<CustomerCodeChangePreview | null>(null);
@@ -54,15 +63,16 @@ const CustomerCodeManagementDialog = ({
   const requestKeyRef = useRef(newRequestKey());
 
   useEffect(() => {
-    if (!open) return;
+    if (!active) return;
     setTargetCode("");
     setReason("");
     setPreview(null);
     setError(null);
     setLoading(false);
     setSaving(false);
+    onSavingChange?.(false);
     requestKeyRef.current = newRequestKey();
-  }, [open, sourceCode]);
+  }, [active, onSavingChange, sourceCode]);
 
   const targetIsValid = Boolean(
     targetCode.trim()
@@ -89,6 +99,7 @@ const CustomerCodeManagementDialog = ({
   const applyChange = async () => {
     if (!preview || !reason.trim()) return;
     setSaving(true);
+    onSavingChange?.(true);
     setError(null);
     try {
       const result = await applyCustomerCodeChange({
@@ -99,7 +110,7 @@ const CustomerCodeManagementDialog = ({
         reason: reason.trim(),
       });
       await onCompleted(result);
-      onOpenChange(false);
+      onCancel();
     } catch (cause) {
       if (cause instanceof OdooConflictError) {
         setPreview(null);
@@ -108,25 +119,13 @@ const CustomerCodeManagementDialog = ({
       setError(cause instanceof Error ? cause.message : "暫時未能完成 Customer ID 更改。");
     } finally {
       setSaving(false);
+      onSavingChange?.(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => {
-      if (!saving) onOpenChange(nextOpen);
-    }}>
-      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] max-w-xl overflow-y-auto p-0">
-        <DialogHeader className="border-b border-border px-5 py-5 pr-12 text-left">
-          <DialogTitle className="flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-primary" aria-hidden="true" />
-            管理 Customer ID
-          </DialogTitle>
-          <DialogDescription>
-            更名會建立新 ID；如果新 ID 已經存在，就會將兩個帳戶合併。只有 Manager 可以確認。
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 px-5 py-1">
+    <>
+      <div className="space-y-4 px-5 py-1">
           <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
             <div className="space-y-1.5">
               <Label htmlFor="customer-code-source">目前 Customer ID</Label>
@@ -215,15 +214,15 @@ const CustomerCodeManagementDialog = ({
               {error}
             </p>
           )}
-        </div>
+      </div>
 
-        <DialogFooter className="gap-2 border-t border-border px-5 py-4 sm:space-x-0">
+      <DialogFooter className="gap-2 border-t border-border px-5 py-4 sm:space-x-0">
           <Button
             type="button"
             variant="outline"
             className="min-h-11 touch-manipulation"
             disabled={saving}
-            onClick={() => onOpenChange(false)}
+            onClick={onCancel}
           >
             取消
           </Button>
@@ -238,7 +237,40 @@ const CustomerCodeManagementDialog = ({
               確認{preview.operationType === "rename" ? "更名" : "合併"}
             </Button>
           )}
-        </DialogFooter>
+      </DialogFooter>
+    </>
+  );
+};
+
+const CustomerCodeManagementDialog = ({
+  open,
+  sourceCode,
+  onOpenChange,
+  onCompleted,
+}: CustomerCodeManagementDialogProps) => {
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (!saving) onOpenChange(nextOpen);
+    }}>
+      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] max-w-xl overflow-y-auto p-0">
+        <DialogHeader className="border-b border-border px-5 py-5 pr-12 text-left">
+          <DialogTitle className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5 text-primary" aria-hidden="true" />
+            管理 Customer ID
+          </DialogTitle>
+          <DialogDescription>
+            更名會建立新 ID；如果新 ID 已經存在，就會將兩個帳戶合併。只有 Manager 可以確認。
+          </DialogDescription>
+        </DialogHeader>
+        <CustomerCodeManagementContent
+          active={open}
+          sourceCode={sourceCode}
+          onCancel={() => onOpenChange(false)}
+          onCompleted={onCompleted}
+          onSavingChange={setSaving}
+        />
       </DialogContent>
     </Dialog>
   );
