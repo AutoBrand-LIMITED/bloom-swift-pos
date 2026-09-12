@@ -67,6 +67,31 @@ export interface CustomerAccountLookup {
   contactCount: number;
   contacts: DemoCustomer[];
   truncated: boolean;
+  redirectedFrom?: string | null;
+}
+
+export interface CustomerCodeChangePreview {
+  operationType: "rename" | "merge";
+  sourceCode: string;
+  targetCode: string;
+  sourceContactCount: number;
+  targetContactCount: number;
+  contactsAfterCount: number;
+  targetWasAlias: boolean;
+  previewToken: string;
+}
+
+export interface CustomerCodeChangeResult {
+  operationId: number;
+  operationType: "rename" | "merge";
+  sourceCode: string;
+  targetCode: string;
+  sourceContactCount: number;
+  targetContactCount: number;
+  contactsAfterCount: number;
+  movedContactIds: number[];
+  aliasCode: string;
+  idempotentReplay: boolean;
 }
 
 export interface CustomerCreditSource {
@@ -1422,13 +1447,62 @@ export async function searchOdooCustomerAccount(
     contactCount: number;
     contacts: OdooPartner[];
     truncated: boolean;
+    redirectedFrom?: string | null;
   };
   return {
     customerCode: account.customerCode,
     contactCount: account.contactCount,
     contacts: account.contacts.map(mapOdooPartner),
     truncated: account.truncated,
+    redirectedFrom: account.redirectedFrom,
   };
+}
+
+export async function previewCustomerCodeChange(
+  sourceCode: string,
+  targetCode: string,
+  signal?: AbortSignal,
+): Promise<CustomerCodeChangePreview> {
+  if (!BACKEND_URL) throw new Error("Odoo backend is not configured");
+  const response = await authenticatedFetch(`${BACKEND_URL}/customer-accounts/change/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sourceCode, targetCode }),
+    signal,
+  });
+  if (!response.ok) {
+    return throwApiError<CustomerCodeChangePreview>(
+      response,
+      `Customer ID preview failed: ${response.status}`,
+    );
+  }
+  return (await response.json()) as CustomerCodeChangePreview;
+}
+
+export async function applyCustomerCodeChange(
+  values: {
+    sourceCode: string;
+    targetCode: string;
+    previewToken: string;
+    requestKey: string;
+    reason: string;
+  },
+  signal?: AbortSignal,
+): Promise<CustomerCodeChangeResult> {
+  if (!BACKEND_URL) throw new Error("Odoo backend is not configured");
+  const response = await authenticatedFetch(`${BACKEND_URL}/customer-accounts/change`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(values),
+    signal,
+  });
+  if (!response.ok) {
+    return throwApiError<CustomerCodeChangeResult>(
+      response,
+      `Customer ID change failed: ${response.status}`,
+    );
+  }
+  return (await response.json()) as CustomerCodeChangeResult;
 }
 
 function mapOdooPartner(p: OdooPartner): DemoCustomer {

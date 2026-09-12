@@ -99,6 +99,7 @@ import {
   updateOdooCustomerProfile,
   updateOdooPartnerNotes,
   type AccountingPaymentOption,
+  type CustomerCodeChangeResult,
   type CustomerCreditSummary,
   type DeliverySlot,
   type PartnerNoteRecord,
@@ -1005,6 +1006,32 @@ const Index = () => {
     setNotesConflict(null);
     resetRecipientPersistence();
   }, [clearCheckoutErrors, customerGroups, resetRecipientPersistence]);
+
+  const handleCustomerCodeChanged = useCallback(async (
+    result: CustomerCodeChangeResult,
+  ) => {
+    const selectedPartnerId = selectedCustomer?.odooPartnerId;
+    setCustomerCode(result.targetCode);
+    setSelectedCustomer((current) => (
+      current ? { ...current, customerCode: result.targetCode } : current
+    ));
+    setCustomerRefreshKey((current) => current + 1);
+
+    if (selectedPartnerId) {
+      try {
+        const refreshed = await getOdooCustomer(selectedPartnerId);
+        applyCustomerSelection(refreshed);
+      } catch {
+        toast.warning("Customer ID 已完成更改，但客戶資料未能即時重新載入；重新搜尋即可見到最新資料。");
+      }
+    }
+    toast.success(
+      result.operationType === "rename"
+        ? `Customer ID 已改為 ${result.targetCode}`
+        : `Customer ID 已合併到 ${result.targetCode}`,
+      { description: `舊 ID ${result.aliasCode} 仍可用作搜尋。` },
+    );
+  }, [applyCustomerSelection, selectedCustomer?.odooPartnerId]);
 
   useEffect(() => {
     const selectedGroupId = selectedCustomer?.customerGroupId;
@@ -2653,6 +2680,9 @@ const Index = () => {
               onSave: () => { void saveSelectedCustomerProfile(); },
             } : undefined}
             onContactSelect={applyCustomerSelection}
+            customerCodeManager={employee?.role === "manager" ? {
+              onCompleted: handleCustomerCodeChanged,
+            } : undefined}
           />
         )}
 

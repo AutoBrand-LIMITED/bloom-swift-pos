@@ -909,6 +909,35 @@ describe("CustomerSection gift sender", () => {
     );
   });
 
+  it("shows that an old Customer ID was redirected to the current account", async () => {
+    searchOdooCustomerAccount.mockResolvedValue({
+      customerCode: "CURRENT-88",
+      contactCount: 1,
+      contacts: [{
+        id: "odoo-88",
+        odooPartnerId: 88,
+        customerCode: "CURRENT-88",
+        name: "Current Contact",
+        phone: "91234567",
+        history: [],
+      }],
+      truncated: false,
+      redirectedFrom: "OLD-88",
+    });
+    searchOdooCustomers.mockResolvedValue([]);
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText("Customer ID／客戶編號"), {
+      target: { value: "OLD-88" },
+    });
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "舊 Customer ID「OLD-88」已改為「CURRENT-88」",
+    );
+    expect(screen.getByText("CURRENT-88 帳戶 · 1 位聯絡人")).toBeVisible();
+    expect(screen.getByText("Current Contact")).toBeVisible();
+  });
+
   it("waits for two Customer ID characters before searching", async () => {
     render(<CustomerLookupHarness />);
 

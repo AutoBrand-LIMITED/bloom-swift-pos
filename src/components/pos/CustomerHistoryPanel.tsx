@@ -1,13 +1,14 @@
-import { AlertCircle, ChevronDown, ChevronUp, Clock, History, MapPin, MoreVertical, Package, Pencil, Phone, RefreshCw, Truck, User, UserRoundPlus, X } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, Clock, History, KeyRound, MapPin, MoreVertical, Package, Pencil, Phone, RefreshCw, Truck, User, UserRoundPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useEffect, useMemo, useState } from "react";
 import type { DemoCustomer } from "@/data/demo-customers";
-import { getOdooCustomerHistory, hasOdooBackend } from "@/lib/odoo-api";
+import { getOdooCustomerHistory, hasOdooBackend, type CustomerCodeChangeResult } from "@/lib/odoo-api";
 import CustomerContactEditDialog, {
   type CustomerContactEditorProps,
 } from "@/components/pos/CustomerContactEditDialog";
 import CustomerContactChooserDialog from "@/components/pos/CustomerContactChooserDialog";
+import CustomerCodeManagementDialog from "@/components/pos/CustomerCodeManagementDialog";
 import CustomerFlags from "@/components/pos/CustomerFlags";
 import {
   DropdownMenu,
@@ -33,6 +34,9 @@ interface CustomerHistoryPanelProps {
   inline?: boolean;
   contactEditor?: CustomerContactEditorProps;
   onContactSelect?: (customer: DemoCustomer) => void;
+  customerCodeManager?: {
+    onCompleted: (result: CustomerCodeChangeResult) => void | Promise<void>;
+  };
   customerCreditAvailable?: number;
   customerCreditLoading?: boolean;
   customerCreditError?: string | null;
@@ -105,6 +109,7 @@ const CustomerHistoryPanel = ({
   inline = false,
   contactEditor,
   onContactSelect,
+  customerCodeManager,
   customerCreditAvailable,
   customerCreditLoading = false,
   customerCreditError,
@@ -120,11 +125,13 @@ const CustomerHistoryPanel = ({
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [showAllAddresses, setShowAllAddresses] = useState(false);
   const [contactChooserOpen, setContactChooserOpen] = useState(false);
+  const [customerCodeDialogOpen, setCustomerCodeDialogOpen] = useState(false);
 
   useEffect(() => {
     setHistoryExpanded(false);
     setExpandedRecord(null);
     setShowAllAddresses(false);
+    setCustomerCodeDialogOpen(false);
   }, [customer?.id]);
 
   useEffect(() => {
@@ -289,7 +296,14 @@ const CustomerHistoryPanel = ({
                       </p>
                     )}
                   </div>
-                  {displayCustomer.odooPartnerId && contactEditor && (
+                  {displayCustomer.odooPartnerId && (
+                    contactEditor
+                    || (
+                      customerCodeManager
+                      && displayCustomer.customerCode?.trim()
+                      && displayCustomer.customerCode.trim().toLocaleLowerCase() !== "walk-in"
+                    )
+                  ) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -306,13 +320,15 @@ const CustomerHistoryPanel = ({
                       <DropdownMenuContent align="end" className="w-52">
                         <DropdownMenuLabel>聯絡人設定</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="min-h-11 gap-2 touch-manipulation"
-                          onSelect={() => contactEditor.onOpenChange(true)}
-                        >
-                          <Pencil className="h-4 w-4" aria-hidden="true" />
-                          編輯聯絡人
-                        </DropdownMenuItem>
+                        {contactEditor && (
+                          <DropdownMenuItem
+                            className="min-h-11 gap-2 touch-manipulation"
+                            onSelect={() => contactEditor.onOpenChange(true)}
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                            編輯聯絡人
+                          </DropdownMenuItem>
+                        )}
                         {onContactSelect && (
                           <DropdownMenuItem
                             className="min-h-11 gap-2 touch-manipulation"
@@ -322,6 +338,18 @@ const CustomerHistoryPanel = ({
                             選擇其他聯絡人
                           </DropdownMenuItem>
                         )}
+                        {customerCodeManager
+                          && displayCustomer.customerCode?.trim()
+                          && displayCustomer.customerCode.trim().toLocaleLowerCase() !== "walk-in"
+                          && (
+                            <DropdownMenuItem
+                              className="min-h-11 gap-2 touch-manipulation"
+                              onSelect={() => setCustomerCodeDialogOpen(true)}
+                            >
+                              <KeyRound className="h-4 w-4" aria-hidden="true" />
+                              管理 Customer ID
+                            </DropdownMenuItem>
+                          )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
@@ -729,6 +757,14 @@ const CustomerHistoryPanel = ({
           customer={displayCustomer}
           onOpenChange={setContactChooserOpen}
           onSelect={onContactSelect}
+        />
+      )}
+      {customerCodeManager && displayCustomer.customerCode?.trim() && (
+        <CustomerCodeManagementDialog
+          open={customerCodeDialogOpen}
+          sourceCode={displayCustomer.customerCode}
+          onOpenChange={setCustomerCodeDialogOpen}
+          onCompleted={customerCodeManager.onCompleted}
         />
       )}
     </aside>

@@ -690,6 +690,15 @@ const CustomerSection = ({
         <div className="max-h-64 overflow-y-auto">
           {hasExistingCustomerAccount && customerAccount && (
             <div className="sticky top-0 z-10 space-y-2 border-b border-border bg-card p-3">
+              {customerAccount.redirectedFrom && (
+                <div
+                  role="status"
+                  className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs leading-relaxed text-primary"
+                >
+                  舊 Customer ID「{customerAccount.redirectedFrom}」已改為「{customerAccount.customerCode}」；
+                  以下係目前帳戶資料。
+                </div>
+              )}
               <p className="text-sm font-semibold">
                 {customerAccount.customerCode} 帳戶 · {customerAccount.contactCount} 位聯絡人
               </p>

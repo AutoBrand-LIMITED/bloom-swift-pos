@@ -6,6 +6,7 @@ import CustomerHistoryPanel from "@/components/pos/CustomerHistoryPanel";
 import type { CustomerContactEditorProps } from "@/components/pos/CustomerContactEditDialog";
 import type { DemoCustomer } from "@/data/demo-customers";
 import type { DeliveryAddressSelection } from "@/lib/hk-address";
+import type { CustomerCodeChangeResult } from "@/lib/odoo-api";
 
 const INLINE_HISTORY_QUERY = "(min-width: 1280px), (min-width: 1024px) and (orientation: landscape)";
 
@@ -22,6 +23,9 @@ interface CustomerHistoryDockProps {
   addressTargetLabel?: string;
   contactEditor?: CustomerContactEditorProps;
   onContactSelect?: (customer: DemoCustomer) => void;
+  customerCodeManager?: {
+    onCompleted: (result: CustomerCodeChangeResult) => void | Promise<void>;
+  };
   customerCreditAvailable?: number;
   customerCreditLoading?: boolean;
   customerCreditError?: string | null;
@@ -34,6 +38,7 @@ const CustomerHistoryDock = ({
   addressTargetLabel,
   contactEditor,
   onContactSelect,
+  customerCodeManager,
   customerCreditAvailable,
   customerCreditLoading,
   customerCreditError,
@@ -76,6 +81,7 @@ const CustomerHistoryDock = ({
         inline={inlineHistory}
         contactEditor={contactEditor}
         onContactSelect={onContactSelect}
+        customerCodeManager={customerCodeManager}
         customerCreditAvailable={customerCreditAvailable}
         customerCreditLoading={customerCreditLoading}
         customerCreditError={customerCreditError}

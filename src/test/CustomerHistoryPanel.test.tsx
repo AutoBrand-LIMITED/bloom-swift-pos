@@ -9,12 +9,18 @@ const odooApiMocks = vi.hoisted(() => ({
   getOdooCustomerHistory: vi.fn(),
   searchOdooCustomerAccount: vi.fn(),
   searchOdooCustomers: vi.fn(),
+  previewCustomerCodeChange: vi.fn(),
+  applyCustomerCodeChange: vi.fn(),
+  OdooConflictError: class MockOdooConflictError extends Error {},
 }));
 
 vi.mock("@/lib/odoo-api", () => ({
   getOdooCustomerHistory: odooApiMocks.getOdooCustomerHistory,
   searchOdooCustomerAccount: odooApiMocks.searchOdooCustomerAccount,
   searchOdooCustomers: odooApiMocks.searchOdooCustomers,
+  previewCustomerCodeChange: odooApiMocks.previewCustomerCodeChange,
+  applyCustomerCodeChange: odooApiMocks.applyCustomerCodeChange,
+  OdooConflictError: odooApiMocks.OdooConflictError,
   hasOdooBackend: true,
 }));
 
@@ -73,6 +79,8 @@ describe("CustomerHistoryPanel resizable history", () => {
     odooApiMocks.getOdooCustomerHistory.mockReset();
     odooApiMocks.searchOdooCustomerAccount.mockReset();
     odooApiMocks.searchOdooCustomers.mockReset();
+    odooApiMocks.previewCustomerCodeChange.mockReset();
+    odooApiMocks.applyCustomerCodeChange.mockReset();
   });
 
   it("keeps addresses and history in vertically resizable panes", () => {
@@ -308,6 +316,141 @@ describe("CustomerHistoryPanel resizable history", () => {
       "ACCT-42",
       expect.any(AbortSignal),
     );
+  });
+
+  it("lets a manager preview and confirm an audited Customer ID rename", async () => {
+    const profileCustomer: DemoCustomer = {
+      ...customer,
+      id: "odoo-52",
+      odooPartnerId: 52,
+      customerCode: "OLD-52",
+      writeDate: "2026-09-12 10:00:00",
+    };
+    const preview = {
+      operationType: "rename" as const,
+      sourceCode: "OLD-52",
+      targetCode: "NEW-52",
+      sourceContactCount: 2,
+      targetContactCount: 0,
+      contactsAfterCount: 2,
+      targetWasAlias: false,
+      previewToken: "a".repeat(64),
+    };
+    const applied = {
+      operationId: 17,
+      operationType: "rename" as const,
+      sourceCode: "OLD-52",
+      targetCode: "NEW-52",
+      sourceContactCount: 2,
+      targetContactCount: 0,
+      contactsAfterCount: 2,
+      movedContactIds: [52, 53],
+      aliasCode: "OLD-52",
+      idempotentReplay: false,
+    };
+    const onCompleted = vi.fn();
+    odooApiMocks.getOdooCustomerHistory.mockResolvedValue({
+      history: [],
+      historyCount: 0,
+      totalSpent: 0,
+    });
+    odooApiMocks.previewCustomerCodeChange.mockResolvedValue(preview);
+    odooApiMocks.applyCustomerCodeChange.mockResolvedValue(applied);
+
+    render(
+      <CustomerHistoryPanel
+        customer={profileCustomer}
+        onClose={vi.fn()}
+        customerCodeManager={{ onCompleted }}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", {
+      name: "測試客人 聯絡人設定",
+    }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "管理 Customer ID" }));
+
+    expect(screen.getByRole("dialog", { name: "管理 Customer ID" })).toBeVisible();
+    expect(screen.getByLabelText("目前 Customer ID")).toHaveValue("OLD-52");
+    fireEvent.change(screen.getByLabelText("新／目標 Customer ID"), {
+      target: { value: " NEW-52 " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "預覽更改" }));
+
+    expect(await screen.findByText("更改 Customer ID")).toBeVisible();
+    expect(screen.getByText(/舊 ID「OLD-52」會保留做 alias/)).toBeVisible();
+    expect(odooApiMocks.previewCustomerCodeChange).toHaveBeenCalledWith(
+      "OLD-52",
+      "NEW-52",
+    );
+
+    fireEvent.change(screen.getByLabelText("更改原因"), {
+      target: { value: "Customer moved to a new company" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "確認更名" }));
+
+    await waitFor(() => expect(onCompleted).toHaveBeenCalledWith(applied));
+    expect(odooApiMocks.applyCustomerCodeChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceCode: "OLD-52",
+        targetCode: "NEW-52",
+        previewToken: "a".repeat(64),
+        reason: "Customer moved to a new company",
+        requestKey: expect.any(String),
+      }),
+    );
+  });
+
+  it("requires a fresh preview when Customer ID contacts changed before confirmation", async () => {
+    const profileCustomer: DemoCustomer = {
+      ...customer,
+      id: "odoo-54",
+      odooPartnerId: 54,
+      customerCode: "OLD-54",
+    };
+    odooApiMocks.getOdooCustomerHistory.mockResolvedValue({
+      history: [],
+      historyCount: 0,
+      totalSpent: 0,
+    });
+    odooApiMocks.previewCustomerCodeChange.mockResolvedValue({
+      operationType: "rename",
+      sourceCode: "OLD-54",
+      targetCode: "NEW-54",
+      sourceContactCount: 1,
+      targetContactCount: 0,
+      contactsAfterCount: 1,
+      targetWasAlias: false,
+      previewToken: "c".repeat(64),
+    });
+    odooApiMocks.applyCustomerCodeChange.mockRejectedValue(
+      new odooApiMocks.OdooConflictError("Customer ID 資料已經改變，請重新預覽再確認。"),
+    );
+
+    render(
+      <CustomerHistoryPanel
+        customer={profileCustomer}
+        onClose={vi.fn()}
+        customerCodeManager={{ onCompleted: vi.fn() }}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", {
+      name: "測試客人 聯絡人設定",
+    }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "管理 Customer ID" }));
+    fireEvent.change(screen.getByLabelText("新／目標 Customer ID"), {
+      target: { value: "NEW-54" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "預覽更改" }));
+    await screen.findByText("更改 Customer ID");
+    fireEvent.change(screen.getByLabelText("更改原因"), {
+      target: { value: "Confirmed correction" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "確認更名" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("請重新預覽再確認");
+    expect(screen.getByRole("button", { name: "預覽更改" })).toBeVisible();
   });
 
   it("keeps different recipients at the same address as separate choices", () => {
