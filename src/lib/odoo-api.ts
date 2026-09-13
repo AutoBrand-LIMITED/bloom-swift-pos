@@ -71,27 +71,65 @@ export interface CustomerAccountLookup {
 }
 
 export interface CustomerCodeChangePreview {
-  operationType: "rename" | "merge";
+  operationType: "rename" | "merge" | "transfer";
+  selectionMode?: "all" | "selected";
   sourceCode: string;
   targetCode: string;
   sourceContactCount: number;
   targetContactCount: number;
   contactsAfterCount: number;
+  movedContactCount?: number;
+  movedOrderCount?: number;
+  selectedContactIds?: number[];
+  selectedOrderIds?: number[];
   targetWasAlias: boolean;
   previewToken: string;
 }
 
 export interface CustomerCodeChangeResult {
   operationId: number;
-  operationType: "rename" | "merge";
+  operationType: "rename" | "merge" | "transfer";
   sourceCode: string;
   targetCode: string;
   sourceContactCount: number;
   targetContactCount: number;
   contactsAfterCount: number;
   movedContactIds: number[];
-  aliasCode: string;
+  movedOrderIds?: number[];
+  aliasCode?: string | null;
   idempotentReplay: boolean;
+}
+
+export interface CustomerCodeTransferContact {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  active: boolean;
+}
+
+export interface CustomerCodeTransferOrder {
+  id: number;
+  name: string;
+  dateOrder?: string | null;
+  amountTotal: number;
+  currency: string;
+  contactId: number;
+  contactName: string;
+  state: string;
+}
+
+export interface CustomerCodeTransferOptions {
+  sourceCode: string;
+  contacts: CustomerCodeTransferContact[];
+  orders: CustomerCodeTransferOrder[];
+  ordersTruncated: boolean;
+}
+
+export interface CustomerCodeChangeSelection {
+  selectionMode: "selected";
+  contactIds: number[];
+  orderIds: number[];
 }
 
 export interface CustomerCreditSource {
@@ -1461,13 +1499,14 @@ export async function searchOdooCustomerAccount(
 export async function previewCustomerCodeChange(
   sourceCode: string,
   targetCode: string,
+  selection?: CustomerCodeChangeSelection,
   signal?: AbortSignal,
 ): Promise<CustomerCodeChangePreview> {
   if (!BACKEND_URL) throw new Error("Odoo backend is not configured");
   const response = await authenticatedFetch(`${BACKEND_URL}/customer-accounts/change/preview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sourceCode, targetCode }),
+    body: JSON.stringify({ sourceCode, targetCode, ...selection }),
     signal,
   });
   if (!response.ok) {
@@ -1479,6 +1518,28 @@ export async function previewCustomerCodeChange(
   return (await response.json()) as CustomerCodeChangePreview;
 }
 
+export async function getCustomerCodeTransferOptions(
+  sourceCode: string,
+  signal?: AbortSignal,
+): Promise<CustomerCodeTransferOptions> {
+  if (!BACKEND_URL) throw new Error("Odoo backend is not configured");
+  const params = new URLSearchParams({ sourceCode });
+  const response = await authenticatedFetch(
+    `${BACKEND_URL}/customer-accounts/change/options?${params.toString()}`,
+    {
+      headers: { "Content-Type": "application/json" },
+      signal,
+    },
+  );
+  if (!response.ok) {
+    return throwApiError<CustomerCodeTransferOptions>(
+      response,
+      `Customer ID transfer options failed: ${response.status}`,
+    );
+  }
+  return (await response.json()) as CustomerCodeTransferOptions;
+}
+
 export async function applyCustomerCodeChange(
   values: {
     sourceCode: string;
@@ -1486,6 +1547,9 @@ export async function applyCustomerCodeChange(
     previewToken: string;
     requestKey: string;
     reason: string;
+    selectionMode?: "selected";
+    contactIds?: number[];
+    orderIds?: number[];
   },
   signal?: AbortSignal,
 ): Promise<CustomerCodeChangeResult> {

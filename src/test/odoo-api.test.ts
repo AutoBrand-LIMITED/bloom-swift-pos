@@ -806,6 +806,61 @@ describe("odoo-api note contracts", () => {
     });
   });
 
+  it("loads the manager's bounded Customer ID transfer choices", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const options = {
+      sourceCode: "OLD / 1",
+      contacts: [],
+      orders: [],
+      ordersTruncated: false,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(options));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getCustomerCodeTransferOptions } = await import("@/lib/odoo-api");
+
+    await expect(getCustomerCodeTransferOptions("OLD / 1")).resolves.toEqual(options);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://backend.test/customer-accounts/change/options?sourceCode=OLD+%2F+1",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
+
+  it("previews only the selected contacts and Sales History", async () => {
+    vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
+    const preview = {
+      operationType: "transfer",
+      selectionMode: "selected",
+      sourceCode: "OLD-1",
+      targetCode: "TARGET-1",
+      sourceContactCount: 2,
+      targetContactCount: 1,
+      contactsAfterCount: 2,
+      movedContactCount: 1,
+      movedOrderCount: 1,
+      selectedContactIds: [52],
+      selectedOrderIds: [701],
+      targetWasAlias: false,
+      previewToken: "a".repeat(64),
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(preview));
+    vi.stubGlobal("fetch", fetchMock);
+    const { previewCustomerCodeChange } = await import("@/lib/odoo-api");
+
+    await expect(previewCustomerCodeChange(
+      "OLD-1",
+      "TARGET-1",
+      { selectionMode: "selected", contactIds: [52], orderIds: [701] },
+    )).resolves.toEqual(preview);
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toEqual({
+      sourceCode: "OLD-1",
+      targetCode: "TARGET-1",
+      selectionMode: "selected",
+      contactIds: [52],
+      orderIds: [701],
+    });
+  });
+
   it("searches historical recipients from a single phone digit", async () => {
     vi.stubEnv("VITE_BACKEND_URL", "https://backend.test");
     const suggestions = [{

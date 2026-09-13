@@ -151,7 +151,7 @@ describe("OrderHistory delivery summary", () => {
     expect(screen.queryByRole("main", { name: "訂單列表" })).not.toBeInTheDocument();
   });
 
-  it("shows only the final cancelled or refunded status instead of the old payment status", () => {
+  it("shows the cancellation and refund lifecycle instead of the old payment status", () => {
     const cancelledOrder = orderFixture({
       id: "cancelled-order",
       odooOrderName: "S17840",
@@ -166,12 +166,29 @@ describe("OrderHistory delivery summary", () => {
       cancellationResolution: "refund",
       cancellationStatus: "refunded",
     });
+    const matchingOrder = orderFixture({
+      id: "refund-bank-match-order",
+      odooOrderName: "S17841",
+      orderState: "cancel",
+      cancellationResolution: "refund",
+      cancellationStatus: "refund_in_payment",
+    });
 
-    render(<OrderHistory orders={[cancelledOrder, refundedOrder]} open onClose={vi.fn()} />);
+    render(
+      <OrderHistory
+        orders={[cancelledOrder, matchingOrder, refundedOrder]}
+        open
+        onClose={vi.fn()}
+      />,
+    );
 
     const cancelledRow = screen.getByRole("button", { name: "查看訂單 S17840" });
     expect(within(cancelledRow).getByText("已取消")).toBeVisible();
     expect(within(cancelledRow).queryByText("已付款")).not.toBeInTheDocument();
+
+    const matchingRow = screen.getByRole("button", { name: "查看訂單 S17841" });
+    expect(within(matchingRow).getByText("退款待銀行配對")).toBeVisible();
+    expect(within(matchingRow).queryByText("已退款")).not.toBeInTheDocument();
 
     const refundedRow = screen.getByRole("button", { name: "查看訂單 S17842" });
     expect(within(refundedRow).getByText("已退款")).toBeVisible();

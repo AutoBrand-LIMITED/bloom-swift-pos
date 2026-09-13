@@ -9,6 +9,7 @@ const odooApiMocks = vi.hoisted(() => ({
   getOdooCustomerHistory: vi.fn(),
   searchOdooCustomerAccount: vi.fn(),
   searchOdooCustomers: vi.fn(),
+  getCustomerCodeTransferOptions: vi.fn(),
   previewCustomerCodeChange: vi.fn(),
   applyCustomerCodeChange: vi.fn(),
   OdooConflictError: class MockOdooConflictError extends Error {},
@@ -18,6 +19,7 @@ vi.mock("@/lib/odoo-api", () => ({
   getOdooCustomerHistory: odooApiMocks.getOdooCustomerHistory,
   searchOdooCustomerAccount: odooApiMocks.searchOdooCustomerAccount,
   searchOdooCustomers: odooApiMocks.searchOdooCustomers,
+  getCustomerCodeTransferOptions: odooApiMocks.getCustomerCodeTransferOptions,
   previewCustomerCodeChange: odooApiMocks.previewCustomerCodeChange,
   applyCustomerCodeChange: odooApiMocks.applyCustomerCodeChange,
   OdooConflictError: odooApiMocks.OdooConflictError,
@@ -79,6 +81,7 @@ describe("CustomerHistoryPanel resizable history", () => {
     odooApiMocks.getOdooCustomerHistory.mockReset();
     odooApiMocks.searchOdooCustomerAccount.mockReset();
     odooApiMocks.searchOdooCustomers.mockReset();
+    odooApiMocks.getCustomerCodeTransferOptions.mockReset();
     odooApiMocks.previewCustomerCodeChange.mockReset();
     odooApiMocks.applyCustomerCodeChange.mockReset();
   });
@@ -461,6 +464,117 @@ describe("CustomerHistoryPanel resizable history", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("請重新預覽再確認");
     expect(screen.getByRole("button", { name: "預覽更改" })).toBeVisible();
+  });
+
+  it("lets a manager transfer selected contacts and Sales History without merging the account", async () => {
+    const profileCustomer: DemoCustomer = {
+      ...customer,
+      id: "odoo-52",
+      odooPartnerId: 52,
+      customerCode: "OLD-52",
+    };
+    const applied = {
+      operationId: 18,
+      operationType: "transfer" as const,
+      sourceCode: "OLD-52",
+      targetCode: "EXISTING-60",
+      sourceContactCount: 2,
+      targetContactCount: 1,
+      contactsAfterCount: 2,
+      movedContactIds: [52],
+      movedOrderIds: [701],
+      aliasCode: null,
+      idempotentReplay: false,
+    };
+    odooApiMocks.getOdooCustomerHistory.mockResolvedValue({
+      history: [],
+      historyCount: 0,
+      totalSpent: 0,
+    });
+    odooApiMocks.getCustomerCodeTransferOptions.mockResolvedValue({
+      sourceCode: "OLD-52",
+      contacts: [{
+        id: 52,
+        name: "測試客人",
+        phone: "91234567",
+        email: null,
+        active: true,
+      }, {
+        id: 53,
+        name: "保留聯絡人",
+        phone: "92345678",
+        email: null,
+        active: true,
+      }],
+      orders: [{
+        id: 701,
+        name: "S00701",
+        dateOrder: "2026-09-10 10:00:00",
+        amountTotal: 680,
+        currency: "HKD",
+        contactId: 52,
+        contactName: "測試客人",
+        state: "sale",
+      }],
+      ordersTruncated: false,
+    });
+    odooApiMocks.previewCustomerCodeChange.mockResolvedValue({
+      operationType: "transfer",
+      selectionMode: "selected",
+      sourceCode: "OLD-52",
+      targetCode: "EXISTING-60",
+      sourceContactCount: 2,
+      targetContactCount: 1,
+      contactsAfterCount: 2,
+      movedContactCount: 1,
+      movedOrderCount: 1,
+      selectedContactIds: [52],
+      selectedOrderIds: [701],
+      targetWasAlias: false,
+      previewToken: "d".repeat(64),
+    });
+    odooApiMocks.applyCustomerCodeChange.mockResolvedValue(applied);
+    const onCompleted = vi.fn();
+
+    render(
+      <CustomerHistoryPanel
+        customer={profileCustomer}
+        onClose={vi.fn()}
+        customerCodeManager={{ onCompleted }}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", {
+      name: "測試客人 聯絡人設定",
+    }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "管理 Customer ID" }));
+    fireEvent.click(screen.getByRole("radio", { name: /只轉移指定資料/ }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "轉移聯絡人 測試客人" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "轉移訂單 S00701" }));
+    fireEvent.change(screen.getByLabelText("新／目標 Customer ID"), {
+      target: { value: "EXISTING-60" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "預覽更改" }));
+
+    expect(await screen.findByText("轉移指定資料")).toBeVisible();
+    expect(odooApiMocks.previewCustomerCodeChange).toHaveBeenCalledWith(
+      "OLD-52",
+      "EXISTING-60",
+      { selectionMode: "selected", contactIds: [52], orderIds: [701] },
+    );
+    fireEvent.change(screen.getByLabelText("更改原因"), {
+      target: { value: "Move confirmed records only" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "確認轉移" }));
+
+    await waitFor(() => expect(onCompleted).toHaveBeenCalledWith(applied));
+    expect(odooApiMocks.applyCustomerCodeChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectionMode: "selected",
+        contactIds: [52],
+        orderIds: [701],
+      }),
+    );
   });
 
   it("keeps different recipients at the same address as separate choices", () => {

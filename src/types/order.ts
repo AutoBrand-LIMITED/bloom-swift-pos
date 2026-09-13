@@ -26,6 +26,7 @@ export type OrderCancellationResolution = "void" | "refund" | "credit";
 export type OrderCancellationStatus =
   | "closed"
   | "refund_pending"
+  | "refund_in_payment"
   | "refunded"
   | "credit_available"
   | "credit_used";

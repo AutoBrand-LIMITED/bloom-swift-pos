@@ -94,7 +94,7 @@ interface OrderHistoryProps {
   currentEmployeeRole?: PosEmployeeRole;
 }
 
-type OrderStatus = PaymentStatus | "incomplete" | "cancelled" | "refunded";
+type OrderStatus = PaymentStatus | "incomplete" | "cancelled" | "refund_in_payment" | "refunded";
 export type OrderStatusFilter = OdooOrderStatusFilter;
 
 const statusBadge: Record<OrderStatus, { label: string; variant: "destructive" | "default" | "secondary" }> = {
@@ -103,12 +103,14 @@ const statusBadge: Record<OrderStatus, { label: string; variant: "destructive" |
   paid: { label: "已付款", variant: "default" },
   deposit: { label: "已付訂金", variant: "secondary" },
   cancelled: { label: "已取消", variant: "destructive" },
+  refund_in_payment: { label: "退款待銀行配對", variant: "secondary" },
   refunded: { label: "已退款", variant: "secondary" },
 };
 
 const effectiveOrderStatus = (order: OrderRecordView): OrderStatus => {
   if (order.completionStatus === "incomplete") return "incomplete";
   if (order.orderState !== "cancel") return order.paymentStatus;
+  if (order.cancellationStatus === "refund_in_payment") return "refund_in_payment";
   return order.cancellationStatus === "refunded" ? "refunded" : "cancelled";
 };
 
@@ -121,6 +123,7 @@ const cancellationResolutionLabel = {
 const cancellationStatusLabel = {
   closed: "已沖銷",
   refund_pending: "等待會計退款",
+  refund_in_payment: "已記錄退款，等待銀行配對",
   refunded: "已退款",
   credit_available: "Customer Credit 可用",
   credit_used: "Customer Credit 已用完",
