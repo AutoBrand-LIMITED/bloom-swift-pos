@@ -567,7 +567,7 @@ const CustomerSection = ({
       onUseWalkInCustomer?.();
     } catch (error) {
       setWalkInError(
-        `未能確認 Walk-in 客戶：${error instanceof Error ? error.message : "Odoo 暫時無法連線"}`,
+        `未能確認匿名客戶：${error instanceof Error ? error.message : "Odoo 暫時無法連線"}`,
       );
     } finally {
       setWalkInLoading(false);
@@ -840,13 +840,13 @@ const CustomerSection = ({
             type="button"
             variant="outline"
             size="sm"
-            aria-label="使用 Walk-in 客戶"
+            aria-label="使用匿名客戶"
             disabled={walkInLoading || !onUseWalkInCustomer}
             onClick={() => { void handleUseWalkInCustomer(); }}
             className="min-h-9 gap-1.5 border-dashed touch-manipulation"
           >
             {walkInLoading && <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-            {walkInLoading ? "確認中..." : "Walk-in 客戶"}
+            {walkInLoading ? "確認中..." : "匿名客戶"}
           </Button>
           <div className="flex overflow-hidden rounded-lg border border-border">
             <button

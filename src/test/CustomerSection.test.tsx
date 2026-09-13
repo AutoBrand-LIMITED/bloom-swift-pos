@@ -212,7 +212,9 @@ describe("CustomerSection gift sender", () => {
   it("sets up a new walk-in customer in one click when the canonical contact does not exist", async () => {
     render(<Harness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "使用 Walk-in 客戶" }));
+    const anonymousCustomerButton = screen.getByRole("button", { name: "使用匿名客戶" });
+    expect(anonymousCustomerButton).toHaveTextContent("匿名客戶");
+    fireEvent.click(anonymousCustomerButton);
 
     await waitFor(() => expect(searchOdooCustomerAccount).toHaveBeenCalledWith("WALK-IN"));
     expect(useWalkInCustomer).toHaveBeenCalledOnce();
@@ -236,7 +238,7 @@ describe("CustomerSection gift sender", () => {
     });
     render(<Harness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "使用 Walk-in 客戶" }));
+    fireEvent.click(screen.getByRole("button", { name: "使用匿名客戶" }));
 
     await waitFor(() => expect(selectCustomer).toHaveBeenCalledWith(walkIn));
     expect(useWalkInCustomer).not.toHaveBeenCalled();
@@ -246,10 +248,10 @@ describe("CustomerSection gift sender", () => {
     searchOdooCustomerAccount.mockRejectedValue(new Error("Odoo timeout"));
     render(<Harness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "使用 Walk-in 客戶" }));
+    fireEvent.click(screen.getByRole("button", { name: "使用匿名客戶" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "未能確認 Walk-in 客戶：Odoo timeout",
+      "未能確認匿名客戶：Odoo timeout",
     );
     expect(useWalkInCustomer).not.toHaveBeenCalled();
     expect(selectCustomer).not.toHaveBeenCalled();
