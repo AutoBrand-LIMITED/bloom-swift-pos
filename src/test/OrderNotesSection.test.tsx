@@ -52,12 +52,20 @@ describe("OrderNotesSection", () => {
       />
     );
 
+    const toggle = screen.getByRole("button", { name: /訂單備註/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("4 項有內容")).toBeVisible();
+    expect(screen.queryByLabelText("送花人備註")).not.toBeInTheDocument();
+    expect(screen.getByText("VIP")).toBeInTheDocument();
+    expect(screen.queryByText("Wholesale")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByLabelText("送花人備註")).toHaveValue("No baby's breath");
     expect(screen.getByLabelText("送貨備註")).toHaveValue("Call first");
     expect(screen.getByLabelText("內部備註")).toHaveValue("Use stock from cooler B");
     expect(screen.getByLabelText("客戶長期備註")).toHaveValue("Updated persistent note");
-    expect(screen.getByText("VIP")).toBeInTheDocument();
-    expect(screen.queryByText("Wholesale")).not.toBeInTheDocument();
 
     const saveButtons = screen.getAllByRole("button", { name: "儲存" });
     expect(saveButtons[0]).toBeEnabled();
@@ -78,6 +86,8 @@ describe("OrderNotesSection", () => {
         {...callbacks}
       />
     );
+
+    fireEvent.click(screen.getByRole("button", { name: /訂單備註/ }));
 
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.getByText(/此欄內容會長期儲存於客戶聯絡人/)).toBeVisible();
@@ -122,6 +132,10 @@ describe("OrderNotesSection", () => {
       />
     );
 
+    expect(screen.getByRole("button", { name: /訂單備註/ })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("Reload the latest Odoo value.");
     expect(screen.getByRole("button", { name: "重新載入客戶長期備註" })).toBeEnabled();
   });

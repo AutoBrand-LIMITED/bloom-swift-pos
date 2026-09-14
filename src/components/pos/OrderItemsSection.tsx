@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -17,9 +16,6 @@ import {
   Search,
   Loader2,
   RefreshCw,
-  Maximize2,
-  Minimize2,
-  GripHorizontal,
   Settings2,
   ChevronDown,
   ChevronUp,
@@ -80,8 +76,6 @@ const OrderItemsSection = ({
   const [activeCategory, setActiveCategory] = useState<number | "all">("all");
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [catalogExpanded, setCatalogExpanded] = useState(false);
-  const [catalogHeight, setCatalogHeight] = useState(480);
   const [productManagerOpen, setProductManagerOpen] = useState(false);
   const [budgetExpanded, setBudgetExpanded] = useState(false);
   const hasLegacyDeliveryFee = deliveryFee > 0
@@ -141,34 +135,6 @@ const OrderItemsSection = ({
       ].some((value) => value.toLowerCase().includes(query));
     });
   }, [activeCategory, catalogProducts, catalogQuery]);
-
-  const displayedCatalogProducts = catalogExpanded
-    ? filteredCatalogProducts
-    : filteredCatalogProducts.slice(0, 60);
-
-  const startCatalogResize = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    const startY = event.clientY;
-    const startHeight = catalogHeight;
-    const maxHeight = Math.max(420, Math.round(window.innerHeight * 0.82));
-
-    const resize = (moveEvent: MouseEvent) => {
-      const nextHeight = Math.min(Math.max(startHeight + moveEvent.clientY - startY, 380), maxHeight);
-      setCatalogHeight(nextHeight);
-    };
-
-    const stopResize = () => {
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      window.removeEventListener("mousemove", resize);
-      window.removeEventListener("mouseup", stopResize);
-    };
-
-    document.body.style.cursor = "row-resize";
-    document.body.style.userSelect = "none";
-    window.addEventListener("mousemove", resize);
-    window.addEventListener("mouseup", stopResize, { once: true });
-  }, [catalogHeight]);
 
   const addCatalogProduct = (product: OdooProduct) => {
     onItemsChange([
@@ -311,12 +277,7 @@ const OrderItemsSection = ({
       </div>
 
       {/* Odoo product catalog */}
-      <div
-        className={`rounded-lg border border-border bg-background p-3 ${
-          catalogExpanded ? "flex min-h-[380px] flex-col overflow-hidden" : "space-y-2"
-        }`}
-        style={catalogExpanded ? { height: catalogHeight } : undefined}
-      >
+      <div className="space-y-2 rounded-lg border border-border bg-background p-3">
         <div className="flex items-center justify-between gap-2">
           <Label className="text-xs font-medium">Odoo 商品</Label>
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -339,16 +300,6 @@ const OrderItemsSection = ({
               <Settings2 className="h-3.5 w-3.5" />
               管理
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 px-2 text-xs"
-              onClick={() => setCatalogExpanded((expanded) => !expanded)}
-            >
-              {catalogExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-              {catalogExpanded ? "收合" : "展開"}
-            </Button>
           </div>
         </div>
 
@@ -364,7 +315,7 @@ const OrderItemsSection = ({
         </div>
 
         {catalogCategories.length > 0 && (
-          <div className={`flex flex-wrap gap-1.5 pr-1 ${catalogExpanded ? "max-h-44 overflow-y-auto" : "max-h-32 overflow-hidden"}`}>
+          <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto pr-1">
             <button
               type="button"
               onClick={() => setActiveCategory("all")}
@@ -411,11 +362,9 @@ const OrderItemsSection = ({
               重試
             </Button>
           </div>
-        ) : displayedCatalogProducts.length > 0 ? (
-          <div className={`grid grid-cols-1 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2 ${
-            catalogExpanded ? "min-h-0 flex-1 auto-rows-min" : "max-h-80"
-          }`}>
-            {displayedCatalogProducts.map((product) => (
+        ) : filteredCatalogProducts.length > 0 ? (
+          <div className="grid max-h-80 grid-cols-1 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
+            {filteredCatalogProducts.map((product) => (
               <button
                 key={product.id}
                 type="button"
@@ -437,16 +386,6 @@ const OrderItemsSection = ({
           </div>
         )}
 
-        {catalogExpanded && (
-          <button
-            type="button"
-            aria-label="調整商品目錄高度"
-            onMouseDown={startCatalogResize}
-            className="mt-2 flex h-6 w-full cursor-row-resize items-center justify-center rounded-md border border-dashed border-border bg-secondary/40 text-muted-foreground hover:bg-secondary"
-          >
-            <GripHorizontal className="h-4 w-4" />
-          </button>
-        )}
       </div>
 
       {/* Item list */}

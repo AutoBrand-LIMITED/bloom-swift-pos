@@ -1,4 +1,14 @@
-import { AlertTriangle, Contact, MessageSquareText, RefreshCw, Save, Truck } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Contact,
+  MessageSquareText,
+  RefreshCw,
+  Save,
+  Truck,
+} from "lucide-react";
 import CustomerFlags from "@/components/pos/CustomerFlags";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -58,6 +68,8 @@ const OrderNotesSection = ({
   savingRecipient = false,
   conflict,
 }: OrderNotesSectionProps) => {
+  const [expanded, setExpanded] = useState(false);
+  const isExpanded = expanded || Boolean(conflict);
   const senderContactCanSave = Boolean(
     senderCustomer?.odooPartnerId &&
     senderCustomer.writeDate &&
@@ -68,169 +80,196 @@ const OrderNotesSection = ({
     recipientContact?.writeDate &&
     recipientContactDraft !== recipientContact.commentText
   );
+  const completedNoteCount = [
+    senderNote,
+    deliveryNote,
+    internalNote,
+    senderContactDraft,
+    recipientContactDraft,
+  ].filter((value) => value.trim()).length;
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4 space-y-4" aria-labelledby="order-notes-title">
-      <div className="flex items-center justify-between gap-3">
-        <h2
-          id="order-notes-title"
-          className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2"
+    <section className="rounded-xl border border-border bg-card" aria-labelledby="order-notes-title">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2">
+        <button
+          type="button"
+          className="flex min-h-11 min-w-0 flex-1 touch-manipulation items-center gap-2 text-left"
+          aria-expanded={isExpanded}
+          aria-controls="order-notes-content"
+          onClick={() => setExpanded((current) => !current)}
         >
           <MessageSquareText className="h-4 w-4" />
-          訂單備註
-        </h2>
+          <span
+            id="order-notes-title"
+            className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            訂單備註
+          </span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {completedNoteCount > 0 ? `${completedNoteCount} 項有內容` : "選填"}
+          </span>
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          )}
+        </button>
         <CustomerFlags tags={senderCustomer?.tags} />
       </div>
 
-      {conflict && (
-        <Alert variant="destructive" className="py-3">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle className="text-sm">聯絡人備註已在 Odoo 更新</AlertTitle>
-          <AlertDescription className="text-xs">{conflict.message}</AlertDescription>
-        </Alert>
+      {isExpanded && (
+        <div id="order-notes-content" className="space-y-4 border-t border-border p-4">
+          {conflict && (
+            <Alert variant="destructive" className="py-3">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="text-sm">聯絡人備註已在 Odoo 更新</AlertTitle>
+              <AlertDescription className="text-xs">{conflict.message}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="sender-note" className="text-xs font-medium">送花人備註</Label>
+              <Textarea
+                id="sender-note"
+                placeholder="例如：喜歡紅白配、不要滿天星"
+                value={senderNote}
+                onChange={(event) => onSenderNoteChange(event.target.value)}
+                className="min-h-24 text-sm"
+                maxLength={1000}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="delivery-note" className="text-xs font-medium">送貨備註</Label>
+              <Textarea
+                id="delivery-note"
+                placeholder="例如：到達前先致電、交管理處"
+                value={deliveryNote}
+                onChange={(event) => onDeliveryNoteChange(event.target.value)}
+                className="min-h-24 text-sm"
+                maxLength={1000}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t border-border pt-4">
+            <Label htmlFor="internal-note" className="text-xs font-medium">內部備註</Label>
+            <Textarea
+              id="internal-note"
+              placeholder="店內製作、拾貨或跟進備註"
+              value={internalNote}
+              onChange={(event) => onInternalNoteChange(event.target.value)}
+              className="min-h-24 text-sm"
+              maxLength={3000}
+            />
+          </div>
+
+          <div className="grid gap-4 border-t border-border pt-4 md:grid-cols-2">
+            <div className="space-y-2 md:border-r md:border-border md:pr-4">
+              <div className="flex min-h-8 items-center justify-between gap-2">
+                <Label htmlFor="sender-contact-note" className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Contact className="h-3.5 w-3.5 text-primary" />
+                  客戶長期備註
+                </Label>
+                <div className="flex items-center gap-1">
+                  {senderCustomer?.odooPartnerId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={onRefreshSender}
+                      disabled={refreshingSender || savingSender}
+                      aria-label="重新載入客戶長期備註"
+                      title="重新載入"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${refreshingSender ? "animate-spin" : ""}`} />
+                    </Button>
+                  )}
+                  {senderCustomer?.odooPartnerId ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 gap-1.5 px-2 text-xs"
+                      onClick={onSaveSenderContact}
+                      disabled={!senderContactCanSave || savingSender || refreshingSender}
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      {savingSender ? "儲存中" : "儲存"}
+                    </Button>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">訂單成功後儲存</span>
+                  )}
+                </div>
+              </div>
+              <Textarea
+                id="sender-contact-note"
+                value={senderContactDraft}
+                onChange={(event) => onSenderContactDraftChange(event.target.value)}
+                placeholder={senderCustomer?.odooPartnerId ? "未有長期備註" : "輸入新客戶長期備註"}
+                disabled={refreshingSender || savingSender}
+                className="min-h-20 text-xs leading-relaxed"
+                maxLength={5000}
+              />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                此欄內容會長期儲存於客戶聯絡人，日後搜尋同一客戶時會自動載入；上方送花人備註只屬本張訂單。
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex min-h-8 items-center justify-between gap-2">
+                <Label htmlFor="recipient-contact-note" className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Truck className="h-3.5 w-3.5 text-primary" />
+                  收花人長期備註
+                </Label>
+                <div className="flex items-center gap-1">
+                  {recipientPartnerId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={onRefreshRecipient}
+                      disabled={refreshingRecipient || savingRecipient}
+                      aria-label="重新載入收花人長期備註"
+                      title="重新載入"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${refreshingRecipient ? "animate-spin" : ""}`} />
+                    </Button>
+                  )}
+                  {recipientPartnerId ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 gap-1.5 px-2 text-xs"
+                      onClick={onSaveRecipientContact}
+                      disabled={!recipientContactCanSave || savingRecipient || refreshingRecipient}
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      {savingRecipient ? "儲存中" : "儲存"}
+                    </Button>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">訂單成功後儲存</span>
+                  )}
+                </div>
+              </div>
+              <Textarea
+                id="recipient-contact-note"
+                value={recipientContactDraft}
+                onChange={(event) => onRecipientContactDraftChange(event.target.value)}
+                placeholder={!recipientPartnerId ? "輸入新收花人長期備註" : "未有長期備註"}
+                disabled={refreshingRecipient || savingRecipient}
+                className="min-h-20 text-xs leading-relaxed"
+                maxLength={5000}
+              />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                此欄內容會長期儲存於收花人聯絡人，日後搜尋同一收花人時會自動載入；上方送貨備註只屬本張訂單。
+              </p>
+            </div>
+          </div>
+        </div>
       )}
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="sender-note" className="text-xs font-medium">送花人備註</Label>
-          <Textarea
-            id="sender-note"
-            placeholder="例如：喜歡紅白配、不要滿天星"
-            value={senderNote}
-            onChange={(event) => onSenderNoteChange(event.target.value)}
-            className="min-h-24 text-sm"
-            maxLength={1000}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="delivery-note" className="text-xs font-medium">送貨備註</Label>
-          <Textarea
-            id="delivery-note"
-            placeholder="例如：到達前先致電、交管理處"
-            value={deliveryNote}
-            onChange={(event) => onDeliveryNoteChange(event.target.value)}
-            className="min-h-24 text-sm"
-            maxLength={1000}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2 border-t border-border pt-4">
-        <Label htmlFor="internal-note" className="text-xs font-medium">內部備註</Label>
-        <Textarea
-          id="internal-note"
-          placeholder="店內製作、拾貨或跟進備註"
-          value={internalNote}
-          onChange={(event) => onInternalNoteChange(event.target.value)}
-          className="min-h-24 text-sm"
-          maxLength={3000}
-        />
-      </div>
-
-      <div className="grid gap-4 border-t border-border pt-4 md:grid-cols-2">
-        <div className="space-y-2 md:border-r md:border-border md:pr-4">
-          <div className="flex min-h-8 items-center justify-between gap-2">
-            <Label htmlFor="sender-contact-note" className="flex items-center gap-1.5 text-xs font-semibold">
-              <Contact className="h-3.5 w-3.5 text-primary" />
-              客戶長期備註
-            </Label>
-            <div className="flex items-center gap-1">
-              {senderCustomer?.odooPartnerId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={onRefreshSender}
-                  disabled={refreshingSender || savingSender}
-                  aria-label="重新載入客戶長期備註"
-                  title="重新載入"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${refreshingSender ? "animate-spin" : ""}`} />
-                </Button>
-              )}
-              {senderCustomer?.odooPartnerId ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 gap-1.5 px-2 text-xs"
-                  onClick={onSaveSenderContact}
-                  disabled={!senderContactCanSave || savingSender || refreshingSender}
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  {savingSender ? "儲存中" : "儲存"}
-                </Button>
-              ) : (
-                <span className="text-[11px] text-muted-foreground">訂單成功後儲存</span>
-              )}
-            </div>
-          </div>
-          <Textarea
-            id="sender-contact-note"
-            value={senderContactDraft}
-            onChange={(event) => onSenderContactDraftChange(event.target.value)}
-            placeholder={senderCustomer?.odooPartnerId ? "未有長期備註" : "輸入新客戶長期備註"}
-            disabled={refreshingSender || savingSender}
-            className="min-h-20 text-xs leading-relaxed"
-            maxLength={5000}
-          />
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            此欄內容會長期儲存於客戶聯絡人，日後搜尋同一客戶時會自動載入；上方送花人備註只屬本張訂單。
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex min-h-8 items-center justify-between gap-2">
-            <Label htmlFor="recipient-contact-note" className="flex items-center gap-1.5 text-xs font-semibold">
-              <Truck className="h-3.5 w-3.5 text-primary" />
-              收花人長期備註
-            </Label>
-            <div className="flex items-center gap-1">
-              {recipientPartnerId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={onRefreshRecipient}
-                  disabled={refreshingRecipient || savingRecipient}
-                  aria-label="重新載入收花人長期備註"
-                  title="重新載入"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${refreshingRecipient ? "animate-spin" : ""}`} />
-                </Button>
-              )}
-              {recipientPartnerId ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 gap-1.5 px-2 text-xs"
-                  onClick={onSaveRecipientContact}
-                  disabled={!recipientContactCanSave || savingRecipient || refreshingRecipient}
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  {savingRecipient ? "儲存中" : "儲存"}
-                </Button>
-              ) : (
-                <span className="text-[11px] text-muted-foreground">訂單成功後儲存</span>
-              )}
-            </div>
-          </div>
-          <Textarea
-            id="recipient-contact-note"
-            value={recipientContactDraft}
-            onChange={(event) => onRecipientContactDraftChange(event.target.value)}
-            placeholder={!recipientPartnerId ? "輸入新收花人長期備註" : "未有長期備註"}
-            disabled={refreshingRecipient || savingRecipient}
-            className="min-h-20 text-xs leading-relaxed"
-            maxLength={5000}
-          />
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            此欄內容會長期儲存於收花人聯絡人，日後搜尋同一收花人時會自動載入；上方送貨備註只屬本張訂單。
-          </p>
-        </div>
-      </div>
     </section>
   );
 };

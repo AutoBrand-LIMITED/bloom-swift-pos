@@ -100,6 +100,14 @@ describe("OrderItemsSection legacy line snapshots", () => {
     expect(onBudgetChange).toHaveBeenCalledWith(1200);
   });
 
+  it("keeps the product catalog compact without an expand or collapse control", () => {
+    renderItems([]);
+
+    expect(screen.queryByRole("button", { name: "展開" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "收合" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "調整商品目錄高度" })).not.toBeInTheDocument();
+  });
+
   it("locks an existing product name and offers only five-percent discount steps", () => {
     renderItems([{ id: "line-1", name: "花束", price: 680, quantity: 1 }]);
 
