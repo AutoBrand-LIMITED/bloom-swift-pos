@@ -506,6 +506,23 @@ const CustomerSection = ({
     setRetryKey((key) => key + 1);
   };
 
+  const openNameLookup = () => {
+    const shouldKeepPhoneLookupOpen = activeDropdown === "phone"
+      && phoneLocalDigits(phone).length >= 4
+      && !currentOdooError;
+
+    if (shouldKeepPhoneLookupOpen) {
+      // Moving focus to the contact-name field must not cancel a phone lookup
+      // that is still debouncing, loading, or waiting for an explicit choice.
+      setSearch(phone);
+      setActiveDropdown("phone");
+      return;
+    }
+
+    setSearch(customerName);
+    setActiveDropdown("name");
+  };
+
   const handleStartCustomerSearch = () => {
     setActiveDropdown(null);
     setSearch("");
@@ -1089,11 +1106,10 @@ const CustomerSection = ({
                   setActiveDropdown("name");
                 }}
                 onFocus={() => {
-                  setSearch(customerName);
-                  setActiveDropdown("name");
+                  openNameLookup();
                 }}
                 onClick={() => {
-                  setActiveDropdown("name");
+                  openNameLookup();
                 }}
                 className={`pr-10 text-base ${customerNameError ? "border-destructive ring-1 ring-destructive" : ""}`}
                 maxLength={100}
@@ -1108,8 +1124,7 @@ const CustomerSection = ({
                 onMouseDown={(e) => {
                   e.preventDefault();
                   nameInputRef.current?.focus();
-                  setSearch(customerName);
-                  setActiveDropdown("name");
+                  openNameLookup();
                 }}
               >
                 <ChevronDown className="h-4 w-4" />

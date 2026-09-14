@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -725,6 +725,48 @@ describe("CustomerSection gift sender", () => {
       "等待確認當前電話及聯絡人",
     );
     expect(screen.queryByRole("button", { name: "確認新增聯絡人" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a phone lookup active when the contact-name field receives focus", async () => {
+    const customer = {
+      id: "odoo-91",
+      odooPartnerId: 91,
+      name: "Race Condition Contact",
+      phone: "94936593",
+      history: [],
+    };
+    let resolveLookup: (customers: DemoCustomer[]) => void = () => undefined;
+    let requestSignal: AbortSignal | undefined;
+    searchOdooCustomers.mockImplementation((_query, signal) => {
+      requestSignal = signal;
+      return new Promise<DemoCustomer[]>((resolve) => {
+        resolveLookup = resolve;
+      });
+    });
+    render(<CustomerLookupHarness />);
+
+    fireEvent.change(screen.getByLabelText(/下單人電話/), {
+      target: { value: "94936593" },
+    });
+    fireEvent.click(screen.getByLabelText(/下單人／聯絡人/));
+
+    await waitFor(() => expect(searchOdooCustomers).toHaveBeenCalledWith(
+      "94936593",
+      expect.any(AbortSignal),
+      "general",
+    ));
+    expect(requestSignal?.aborted).toBe(false);
+
+    await act(async () => {
+      resolveLookup([customer]);
+    });
+    const resultName = await screen.findByText("Race Condition Contact");
+    expect(requestSignal?.aborted).toBe(false);
+
+    const resultButton = resultName.closest("button");
+    expect(resultButton).not.toBeNull();
+    fireEvent.click(resultButton!);
+    expect(selectCustomer).toHaveBeenCalledWith(customer);
   });
 
   it("invalidates a confirmed new customer when the normalized phone changes", async () => {
