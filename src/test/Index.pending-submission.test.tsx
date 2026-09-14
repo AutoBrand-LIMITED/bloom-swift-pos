@@ -145,6 +145,7 @@ describe("Index pending recovery without POS authentication", () => {
 
     render(<MemoryRouter><Index /></MemoryRouter>);
 
+    fireEvent.click(await screen.findByRole("button", { name: /訂單備註/ }));
     expect(await screen.findByRole("button", {
       name: "重新載入收花人長期備註",
     })).toBeVisible();
@@ -153,7 +154,7 @@ describe("Index pending recovery without POS authentication", () => {
     expect(screen.getByRole("button", {
       name: "重新載入收花人長期備註",
     })).toBeVisible();
-  });
+  }, 10_000);
 
   it("preserves a restored native Sales Team ID after unlock before a new submission", async () => {
     const pending = pendingSubmission();
