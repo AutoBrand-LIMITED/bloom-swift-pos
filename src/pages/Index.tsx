@@ -229,6 +229,8 @@ const Index = () => {
   const [alternatePhone, setAlternatePhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerCode, setCustomerCode] = useState("");
+  const [confirmedCustomerCode, setConfirmedCustomerCode] = useState<string | null>(null);
+  const draftCustomerBinding = useRef<{ checkoutId: string; customerId: number } | null>(null);
   const [senderName, setSenderName] = useState("");
   const [customerType, setCustomerType] = useState<"personal" | "company">("personal");
   const [companyName, setCompanyName] = useState("");
@@ -680,10 +682,12 @@ const Index = () => {
   }, [items, deliveryFee, urgentFee]);
 
   const finalPrice = priceOverridden && manualPrice !== null ? manualPrice : subtotal;
-  const customerCreditAvailable = Math.max(
+  const customerCodeConfirmed = !hasOdooBackend || Boolean(pendingSubmission)
+    || (Boolean(confirmedCustomerCode) && confirmedCustomerCode === customerCode.trim());
+  const customerCreditAvailable = customerCodeConfirmed ? Math.max(
     0,
     Math.floor((customerCreditSummary?.availableCreditMinor || 0) / 100),
-  );
+  ) : 0;
   const customerResolutionComplete = !hasOdooBackend
     || Boolean(pendingSubmission)
     || Boolean(selectedCustomer?.odooPartnerId)
@@ -711,6 +715,7 @@ const Index = () => {
       && (!alternatePhone.trim() || isValidPhoneNumber(alternatePhone))
       && isValidEmailAddress(customerEmail)
       && customerResolutionComplete
+      && customerCodeConfirmed
       && (customerType !== "company" || (companyName.trim() && billingAddress.trim())),
   );
   const itemsSectionComplete = Boolean(
@@ -841,7 +846,7 @@ const Index = () => {
 
   useEffect(() => {
     const partnerId = selectedCustomer?.odooPartnerId;
-    if (!hasOdooBackend || !partnerId) {
+    if (!hasOdooBackend || !partnerId || !customerCodeConfirmed) {
       setCustomerCreditSummary(null);
       setCustomerCreditLoading(false);
       setCustomerCreditError(null);
@@ -872,7 +877,7 @@ const Index = () => {
         if (!controller.signal.aborted) setCustomerCreditLoading(false);
       });
     return () => controller.abort();
-  }, [selectedCustomer?.odooPartnerId]);
+  }, [customerCodeConfirmed, selectedCustomer?.odooPartnerId]);
 
   useEffect(() => {
     if (!customerCreditSummary) return;
@@ -965,7 +970,18 @@ const Index = () => {
     });
   }, []);
 
+  const allowsDraftCustomer = useCallback((customerId?: number) => {
+    const binding = draftCustomerBinding.current;
+    if (binding && binding.customerId !== customerId) {
+      toast.error("呢張未完成訂單已綁定原本客戶，不能更換。請重新選擇原本客戶；如需換客戶，請清空表格另開新單。");
+      return false;
+    }
+    return true;
+  }, []);
+
   const applyCustomerSelection = useCallback((customer: DemoCustomer) => {
+    if (!allowsDraftCustomer(customer.odooPartnerId)) return false;
+    setConfirmedCustomerCode(customer.customerCode?.trim() || null);
     const verifiedCustomerGroupId = customer.customerGroupId !== undefined
       && customerGroups.some((group) => group.id === customer.customerGroupId)
       ? customer.customerGroupId
@@ -1006,13 +1022,15 @@ const Index = () => {
     setSenderContactDraft(customer.commentText || "");
     setNotesConflict(null);
     resetRecipientPersistence();
-  }, [clearCheckoutErrors, customerGroups, resetRecipientPersistence]);
+    return true;
+  }, [allowsDraftCustomer, clearCheckoutErrors, customerGroups, resetRecipientPersistence]);
 
   const handleCustomerCodeChanged = useCallback(async (
     result: CustomerCodeChangeResult,
   ) => {
     const selectedPartnerId = selectedCustomer?.odooPartnerId;
     setCustomerCode(result.targetCode);
+    setConfirmedCustomerCode(result.targetCode);
     setSelectedCustomer((current) => (
       current ? { ...current, customerCode: result.targetCode } : current
     ));
@@ -1059,6 +1077,7 @@ const Index = () => {
     setConfirmedNewCustomerName(null);
     setConfirmedNewCustomerPhone(null);
     setCustomerCode(accountCode);
+    setConfirmedCustomerCode(null);
     setPhone("");
     setAlternatePhone("");
     setCustomerName("");
@@ -1077,16 +1096,20 @@ const Index = () => {
   }, [clearCheckoutErrors, resetRecipientPersistence]);
 
   const startNewCustomerUnderAccount = useCallback((accountCode: string) => {
+    if (!allowsDraftCustomer()) return;
     resetCustomerForSearch(accountCode);
-  }, [resetCustomerForSearch]);
+    setConfirmedCustomerCode(accountCode.trim());
+  }, [allowsDraftCustomer, resetCustomerForSearch]);
 
   const useWalkInCustomer = useCallback(() => {
+    if (!allowsDraftCustomer()) return;
     resetCustomerForSearch(WALK_IN_CUSTOMER_CODE);
+    setConfirmedCustomerCode(WALK_IN_CUSTOMER_CODE);
     setCustomerName(WALK_IN_CUSTOMER_NAME);
     setSenderName(WALK_IN_CUSTOMER_NAME);
     setConfirmedNewCustomerName(WALK_IN_CUSTOMER_NAME);
     setConfirmedNewCustomerPhone("");
-  }, [resetCustomerForSearch]);
+  }, [allowsDraftCustomer, resetCustomerForSearch]);
 
   const restoreSelectedCustomerProfile = useCallback((customer: DemoCustomer) => {
     setSenderName((current) => (
@@ -1267,7 +1290,7 @@ const Index = () => {
     customer: DemoCustomer,
     recipient: NonNullable<DemoCustomer["recipientMatch"]>,
   ) => {
-    applyCustomerSelection(customer);
+    if (!applyCustomerSelection(customer)) return;
     applyRecipientSelection({
       recipientType: recipient.recipientType || "personal",
       recipientCompanyName: recipient.companyName || null,
@@ -1306,7 +1329,7 @@ const Index = () => {
     try {
       const customer = await getOdooCustomer(suggestion.orderingCustomerId);
       if (linkedPartySelectionRequestRef.current !== requestId) return;
-      applyCustomerSelection(customer);
+      if (!applyCustomerSelection(customer)) return;
       applyRecipientSelection(suggestion);
       toast.success("已同時套用收貨人及下單人資料");
     } catch (error: unknown) {
@@ -1325,6 +1348,8 @@ const Index = () => {
   }, [applyCustomerSelection, applyRecipientSelection, selectedCustomer?.odooPartnerId]);
 
   const resetOrderForm = useCallback(() => {
+    draftCustomerBinding.current = null;
+    setConfirmedCustomerCode(null);
     const defaultSalesperson = staff.find(
       (candidate) => candidate.odooEmployeeId === employee?.id,
     );
@@ -1588,6 +1613,7 @@ const Index = () => {
     setGiftCardMessage(order.giftCardMessage || "");
     setPaymentStatus("unpaid");
     setCheckoutId(order.id);
+    draftCustomerBinding.current = { checkoutId: order.id, customerId: order.customerId };
     setCheckoutCreatedAt(order.createdAt);
     setSalesId(order.salesId);
     setSalespersonEmployeeId(order.salespersonEmployeeId);
@@ -1647,6 +1673,7 @@ const Index = () => {
     setAlternatePhone(order.alternatePhone || "");
     setCustomerName(order.customerName);
     setCustomerCode(order.customerCode || "");
+    setConfirmedCustomerCode(order.customerCode?.trim() || "");
     setSenderName(order.senderName ?? order.customerName ?? "");
     setCustomerType(order.customerType || options.customerType || "personal");
     setCompanyName(order.companyName || options.companyName || "");
@@ -1883,8 +1910,18 @@ const Index = () => {
     }
   };
 
+  const validateCustomerAccount = () => {
+    if (!customerCodeConfirmed) {
+      toast.error("請先選擇現有 Customer ID 及聯絡人，或者明確確認新 Customer ID。");
+      scrollToWorkflowSection("customer");
+      return false;
+    }
+    return allowsDraftCustomer(selectedCustomer?.odooPartnerId);
+  };
+
   const handleSaveIncomplete = async () => {
     if (isSubmitting || isSavingIncomplete) return;
+    if (!validateCustomerAccount()) return;
     if (!hasOdooBackend) {
       toast.error("未完成訂單需要連接 Odoo 先可以儲存。");
       return;
@@ -2024,6 +2061,7 @@ const Index = () => {
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    if (!pendingSubmission && !validateCustomerAccount()) return;
     if (editingSelectedCustomer) {
       toast.error("請先儲存或取消聯絡人編輯，再提交訂單。");
       scrollToWorkflowSection("customer");
@@ -2111,6 +2149,7 @@ const Index = () => {
       confirmedNewCustomerPhone,
       restoredPendingSubmission: Boolean(pendingSubmission),
       requiresCustomerResolution: hasOdooBackend,
+      customerCodeConfirmed,
       customerResolution,
       senderName,
       recipientType,
@@ -2784,6 +2823,7 @@ const Index = () => {
               && confirmedNewCustomerPhone !== normalizedPhone
             ) {
               setCustomerCode("");
+              setConfirmedCustomerCode(null);
             }
             setConfirmedNewCustomerPhone((current) => (
               current !== null && current !== normalizedPhone ? null : current
@@ -2817,7 +2857,30 @@ const Index = () => {
               setConfirmedNewCustomerPhone(null);
             }
           }}
-          onCustomerCodeChange={setCustomerCode}
+          allowCodeBackfill={!pendingSubmission}
+          identityLocked={Boolean(draftCustomerBinding.current) || Boolean(pendingSubmission)}
+          customerCodeConfirmed={customerCodeConfirmed}
+          onConfirmCustomerCode={(code) => {
+            if (pendingSubmission) return;
+            setCustomerCode(code);
+            setConfirmedCustomerCode(code.trim());
+          }}
+          onCustomerCodeChange={(value) => {
+            if (pendingSubmission || (draftCustomerBinding.current && selectedCustomer?.customerCode?.trim())) {
+              toast.error("此訂單已綁定客戶，請另開新單更換客戶。");
+              return;
+            }
+            setCustomerCreditSourceOrderId(undefined);
+            // Editing a query must synchronously revoke the old identity, even before debounce.
+            const legacyBackfill = selectedCustomer?.odooPartnerId && !selectedCustomer.customerCode?.trim();
+            if (selectedCustomer && !legacyBackfill) resetCustomerForSearch();
+            setCustomerCode(value);
+            setConfirmedCustomerCode(null);
+            setCustomerCreditAmount(0);
+            setCustomerCreditSummary(null);
+            setCustomerCreditError(null);
+            if (customerCreditAmount > 0 && depositAmount === 0) setPaymentStatus("unpaid");
+          }}
           onSenderNameChange={(value) => {
             setSenderName(value);
             clearCheckoutErrors("senderName");
@@ -2847,7 +2910,10 @@ const Index = () => {
           }}
           onCustomerSelect={applyCustomerSelection}
           onUseWalkInCustomer={useWalkInCustomer}
-          onStartCustomerSearch={() => resetCustomerForSearch()}
+          onStartCustomerSearch={() => {
+            if (!allowsDraftCustomer()) return;
+            resetCustomerForSearch();
+          }}
           onStartNewCustomerUnderAccount={startNewCustomerUnderAccount}
           onCustomerAndRecipientSelect={applyCustomerAndRecipient}
           phoneError={checkoutErrors.phone}

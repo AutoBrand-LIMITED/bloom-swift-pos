@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Index from "@/pages/Index";
 
 const odooMocks = vi.hoisted(() => ({
+  getOdooCustomer: vi.fn(),
   getAccountingPaymentOptions: vi.fn(),
   getDeliverySlots: vi.fn(),
   getOdooEmployees: vi.fn(),
@@ -48,7 +49,15 @@ vi.mock("@/components/pos/CustomerSection", () => ({
     onNameChange,
     onSenderNameChange,
     onCustomerSelect,
+    onCustomerCodeChange,
+    onConfirmCustomerCode,
+    customerCodeConfirmed,
+    selectedCustomer,
   }: {
+    onCustomerCodeChange: (code: string) => void;
+    onConfirmCustomerCode: (code: string) => void;
+    customerCodeConfirmed: boolean;
+    selectedCustomer: { odooPartnerId?: number } | null;
     customerName: string;
     senderName: string;
     onNameChange: (value: string) => void;
@@ -59,9 +68,15 @@ vi.mock("@/components/pos/CustomerSection", () => ({
       phone: string;
       odooPartnerId?: number;
       history: [];
+      customerCode?: string;
     }) => void;
   }) => (
     <section aria-label="customer-defaults-harness">
+      <output data-testid="code-confirmed">{String(customerCodeConfirmed)}</output>
+      <output data-testid="selected-partner">{selectedCustomer?.odooPartnerId}</output>
+      <button onClick={() => onCustomerSelect({ id: "legacy", odooPartnerId: 88, name: "Legacy", phone: "91234567", history: [] })}>選擇舊聯絡人</button>
+      <button onClick={() => onConfirmCustomerCode("testing")}>確認補填 ID</button>
+      <button onClick={() => onCustomerCodeChange("testing")}>更改 Customer ID</button>
       <output data-testid="customer-name">{customerName}</output>
       <output data-testid="sender-name">{senderName}</output>
       <button
@@ -69,6 +84,7 @@ vi.mock("@/components/pos/CustomerSection", () => ({
         onClick={() => onCustomerSelect({
           id: "odoo-11764",
           odooPartnerId: 11764,
+          customerCode: "test",
           name: "JASON KWONG",
           phone: "90274536",
           history: [],
@@ -112,6 +128,16 @@ vi.mock("@/components/pos/OrderItemsSection", () => ({
     >
       加入測試商品
     </button>
+  ),
+}));
+
+vi.mock("@/components/pos/OrderHistory", () => ({
+  default: ({ onResumeIncomplete }: { onResumeIncomplete: (order: import("@/types/order").Order) => void }) => (
+    <button onClick={() => onResumeIncomplete({
+      salesId: "Manager", id: "saved-draft", customerId: 99, customerName: "Draft Customer", phone: "91234567",
+      completionStatus: "incomplete", items: [], createdAt: new Date().toISOString(),
+      finalPrice: 0, deliveryFee: 0, urgentFee: 0,
+    } as import("@/types/order").Order)}>繼續測試草稿</button>
   ),
 }));
 
@@ -199,5 +225,38 @@ describe("Index customer defaults", () => {
     expect(screen.getByLabelText("今次使用 Customer Credit 金額")).toHaveValue(100);
     expect(screen.getByRole("button", { name: "立即付款" })).toHaveClass("bg-success");
     expect(screen.queryByRole("button", { name: "Cash" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("code-confirmed")).toHaveTextContent("true");
+    fireEvent.click(screen.getByRole("button", { name: "更改 Customer ID" }));
+    expect(screen.getByTestId("code-confirmed")).toHaveTextContent("false");
+    expect(screen.getByTestId("selected-partner")).toBeEmptyDOMElement();
+    expect(screen.queryByLabelText("今次使用 Customer Credit 金額")).not.toBeInTheDocument();
   });
+it("keeps a resumed draft bound to its original partner across code edits and selection", async () => {
+  odooMocks.getOdooCustomer.mockResolvedValue({ id: "odoo-99", odooPartnerId: 99,
+    customerCode: "draft", name: "Draft Customer", phone: "91234567", history: [] });
+  render(<MemoryRouter><Index /></MemoryRouter>);
+  fireEvent.click(screen.getByRole("button", { name: "繼續測試草稿" }));
+  await waitFor(() => expect(screen.getByTestId("selected-partner")).toHaveTextContent("99"));
+  fireEvent.click(screen.getByRole("button", { name: "更改 Customer ID" }));
+  expect(screen.getByTestId("selected-partner")).toHaveTextContent("99");
+  expect(screen.getByTestId("code-confirmed")).toHaveTextContent("true");
+  fireEvent.click(screen.getByRole("button", { name: "選擇測試聯絡人" }));
+  expect(screen.getByTestId("selected-partner")).toHaveTextContent("99");
+});
+
+  it("requires legacy customer code backfill confirmation while preserving its partner", async () => {
+    render(<MemoryRouter><Index /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "選擇舊聯絡人" }));
+    expect(screen.getByTestId("code-confirmed")).toHaveTextContent("false");
+    expect(screen.getByTestId("selected-partner")).toHaveTextContent("88");
+    expect(odooMocks.getOdooCustomerCredit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "更改 Customer ID" }));
+    expect(screen.getByTestId("selected-partner")).toHaveTextContent("88");
+    expect(screen.getByTestId("code-confirmed")).toHaveTextContent("false");
+    fireEvent.click(screen.getByRole("button", { name: "確認補填 ID" }));
+    expect(screen.getByTestId("selected-partner")).toHaveTextContent("88");
+    expect(screen.getByTestId("code-confirmed")).toHaveTextContent("true");
+    await waitFor(() => expect(odooMocks.getOdooCustomerCredit).toHaveBeenCalledWith(88, expect.any(AbortSignal)));
+  });
+
 });

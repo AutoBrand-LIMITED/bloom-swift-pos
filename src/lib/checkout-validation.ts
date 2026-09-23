@@ -44,6 +44,7 @@ interface CheckoutValidationInput {
   confirmedNewCustomerPhone?: string | null;
   restoredPendingSubmission?: boolean;
   requiresCustomerResolution?: boolean;
+  customerCodeConfirmed?: boolean;
   customerResolution?: CustomerResolutionState;
   senderName: string;
   recipientType: RecipientType;
@@ -170,6 +171,7 @@ export function validateCheckout(input: CheckoutValidationInput): CheckoutErrors
 
 function hasResolvedCustomer(input: CheckoutValidationInput): boolean {
   if (input.restoredPendingSubmission) return true;
+  if (input.customerCodeConfirmed === false) return false;
   if (input.selectedCustomerId) return true;
 
   const currentPhone = normalizePhoneNumber(input.phone);

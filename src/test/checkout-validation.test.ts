@@ -372,3 +372,17 @@ describe("checkout total validation", () => {
     expect(validatePositiveOrderTotal(0.01)).toBeNull();
   });
 });
+
+
+describe("Customer ID confirmation gate", () => {
+  it("does not let an old selected partner bypass an unconfirmed edited code", () => {
+    const errors = validateCheckout({ ...validCheckout, requiresCustomerResolution: true,
+      selectedCustomerId: 42, customerCodeConfirmed: false });
+    expect(errors.phone).toBeTruthy();
+  });
+  it("preserves immutable pending retries even if new confirmation state is absent", () => {
+    const errors = validateCheckout({ ...validCheckout, requiresCustomerResolution: true,
+      selectedCustomerId: 42, customerCodeConfirmed: false, restoredPendingSubmission: true });
+    expect(errors.phone).toBeUndefined();
+  });
+});

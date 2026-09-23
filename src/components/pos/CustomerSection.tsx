@@ -62,6 +62,10 @@ interface CustomerSectionProps {
   alternatePhone?: string;
   customerName: string;
   customerCode: string;
+  identityLocked?: boolean;
+  allowCodeBackfill?: boolean;
+  customerCodeConfirmed?: boolean;
+  onConfirmCustomerCode?: (code: string) => void;
   senderName: string;
   customerType: CustomerType;
   companyName: string;
@@ -110,7 +114,7 @@ interface CustomerSectionProps {
 }
 
 const CustomerSection = ({
-  phone, alternatePhone = "", customerName, customerCode, senderName, customerType, companyName, customerEmail, billingAddress,
+  phone, alternatePhone = "", customerName, customerCode, customerCodeConfirmed = true, identityLocked = false, allowCodeBackfill = true, onConfirmCustomerCode, senderName, customerType, companyName, customerEmail, billingAddress,
   customerGroup = "", customerGroupId, customerGroups = [], customerGroupsLoading = false,
   customerGroupsError, customerGroupLocked = false,
   onPhoneChange, onAlternatePhoneChange = () => undefined, onNameChange, onCustomerCodeChange, onSenderNameChange, onCustomerTypeChange, onCompanyNameChange,
@@ -127,7 +131,6 @@ const CustomerSection = ({
   const [alternatePhoneExpanded, setAlternatePhoneExpanded] = useState(Boolean(alternatePhone.trim()));
   const [activeDropdown, setActiveDropdown] = useState<CustomerLookupSource | null>(null);
   const [search, setSearch] = useState("");
-  const [customerCodeSearchDraft, setCustomerCodeSearchDraft] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [odooCustomers, setOdooCustomers] = useState<DemoCustomer[]>([]);
   const [customerAccount, setCustomerAccount] = useState<CustomerAccountLookup | null>(null);
@@ -190,9 +193,7 @@ const CustomerSection = ({
     return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
 
-  useEffect(() => {
-    setCustomerCodeSearchDraft(selectedCustomer?.customerCode || customerCode || "");
-  }, [customerCode, selectedCustomer?.customerCode, selectedCustomer?.id]);
+
 
   // Keep only real imported/local customers here. Odoo results are merged below.
   const allCustomers = useMemo(() => {
@@ -454,7 +455,7 @@ const CustomerSection = ({
     ? phoneSearchQueryKey(debouncedSearch)
     : debouncedSearch.trim().toLocaleLowerCase();
   let customerResolutionPhase: CustomerResolutionState["phase"] = "idle";
-  if (!hasOdooBackend || selectedCustomerConfirmed || isNewCustomerConfirmed) {
+  if (!hasOdooBackend || (customerCodeConfirmed && (selectedCustomerConfirmed || isNewCustomerConfirmed))) {
     customerResolutionPhase = "confirmed";
   } else if (currentIdentityKey && (!phone.trim() || isValidPhoneNumber(phone))) {
     if (activeLookupMatchesCurrentIdentity && activeDebouncedKey !== currentSearchKey) {
@@ -483,11 +484,10 @@ const CustomerSection = ({
     onResolutionStateChange,
   ]);
   const isNewCustomerDraft = Boolean(
-    isNewCustomerConfirmed
-      || (!selectedCustomer && customerCode.trim()),
+    customerCodeConfirmed && !selectedCustomer && customerCode.trim(),
   );
   const canBackfillSelectedCustomerCode = Boolean(
-    selectedCustomer?.odooPartnerId
+    allowCodeBackfill && selectedCustomer?.odooPartnerId
       && !selectedCustomer.customerCode?.trim(),
   );
   const isCustomerCodeEntry = isNewCustomerDraft || canBackfillSelectedCustomerCode;
@@ -524,9 +524,9 @@ const CustomerSection = ({
   };
 
   const handleStartCustomerSearch = () => {
+    if (identityLocked) return;
     setActiveDropdown(null);
     setSearch("");
-    setCustomerCodeSearchDraft("");
     setOdooCustomers([]);
     setCustomerAccount(null);
     setOdooError(null);
@@ -538,7 +538,6 @@ const CustomerSection = ({
     const customer = { ...c };
     delete customer.recipientMatch;
     onCustomerSelect(customer);
-    setCustomerCodeSearchDraft(customer.customerCode || "");
     setActiveDropdown(null);
     setSearch("");
   };
@@ -552,12 +551,12 @@ const CustomerSection = ({
     const recipient = customer.recipientMatch;
     delete customer.recipientMatch;
     onCustomerAndRecipientSelect(customer, recipient);
-    setCustomerCodeSearchDraft(customer.customerCode || "");
     setActiveDropdown(null);
     setSearch("");
   };
 
   const handleUseWalkInCustomer = async () => {
+    if (identityLocked) return;
     setActiveDropdown(null);
     setWalkInError(null);
     if (!hasOdooBackend) {
@@ -707,14 +706,13 @@ const CustomerSection = ({
                 onClick={(event) => {
                   event.stopPropagation();
                   const confirmedCode = search.trim();
-                  onCustomerCodeChange(confirmedCode);
-                  setCustomerCodeSearchDraft(confirmedCode);
+                  (onConfirmCustomerCode || onCustomerCodeChange)(confirmedCode);
                   setActiveDropdown(null);
                   setSearch("");
                   window.requestAnimationFrame(() => phoneInputRef.current?.focus());
                 }}
               >
-                確認用此 Customer ID 新增客戶
+                {canBackfillSelectedCustomerCode ? "確認將此 Customer ID 加入已選聯絡人" : "確認用此 Customer ID 新增客戶"}
               </Button>
             </>
           ) : (
@@ -741,6 +739,15 @@ const CustomerSection = ({
                 Customer ID 只代表帳戶。請揀實際下單人，系統唔會自動套用第一位聯絡人。
                 {customerAccount.truncated ? " 以下只顯示部分聯絡人；可用電話、姓名或電郵搜尋指定人士。" : ""}
               </p>
+              {canBackfillSelectedCustomerCode && (
+                <Button type="button" variant="outline" className="min-h-11 w-full touch-manipulation"
+                  onClick={() => {
+                    (onConfirmCustomerCode || onCustomerCodeChange)(customerAccount.customerCode);
+                    setActiveDropdown(null);
+                  }}>
+                  確認將已選聯絡人加入 {customerAccount.customerCode} 帳戶
+                </Button>
+              )}
               <Button
                 type="button"
                 size="sm"
@@ -749,7 +756,6 @@ const CustomerSection = ({
                 onClick={(event) => {
                   event.stopPropagation();
                   onStartNewCustomerUnderAccount?.(customerAccount.customerCode);
-                  setCustomerCodeSearchDraft(customerAccount.customerCode);
                   setActiveDropdown(null);
                   setSearch("");
                   window.requestAnimationFrame(() => phoneInputRef.current?.focus());
@@ -782,7 +788,7 @@ const CustomerSection = ({
                   onClick={(event) => {
                     event.stopPropagation();
                     setSearch(code);
-                    setCustomerCodeSearchDraft(code);
+                    onCustomerCodeChange(code);
                     setCustomerAccount(null);
                     setOdooCustomers([]);
                     setCompletedOdooSearch(null);
@@ -995,39 +1001,33 @@ const CustomerSection = ({
         <div className="space-y-1.5 relative">
           <Label htmlFor="customer-code-search" className="text-xs font-medium">
             {canBackfillSelectedCustomerCode
-              ? "補填 Customer ID／客戶編號（選填）"
+              ? "補填 Customer ID／客戶編號"
               : isNewCustomerDraft
-                ? "新 Customer ID／客戶編號（選填）"
+                ? "新 Customer ID／客戶編號"
                 : "Customer ID／客戶編號"}
           </Label>
           <div className="relative" data-customer-lookup-interactive>
             <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               id="customer-code-search"
+              disabled={identityLocked && !canBackfillSelectedCustomerCode}
               placeholder={isCustomerCodeEntry
-                ? "輸入 Customer ID，落單時儲存到 Odoo"
+                ? "輸入 Customer ID，再選擇或確認建立"
                 : "輸入 Customer ID 搜尋客戶"}
-              value={isCustomerCodeEntry
-                ? customerCode
-                : customerCodeSearchDraft}
+              value={customerCode}
               onChange={(event) => {
                 const nextCustomerCode = event.target.value;
-                setCustomerCodeSearchDraft(nextCustomerCode);
-                if (isCustomerCodeEntry) {
-                  onCustomerCodeChange(nextCustomerCode);
-                  setSearch(nextCustomerCode);
-                  setActiveDropdown("customerCode");
-                  return;
-                }
-                setSearch(event.target.value);
+                searchRequestRef.current += 1;
+                setRetryKey((key) => key + 1);
+                setCompletedOdooSearch(null);
+                setCustomerAccount(null);
+                setOdooCustomers([]);
+                onCustomerCodeChange(nextCustomerCode);
+                setSearch(nextCustomerCode);
                 setActiveDropdown("customerCode");
               }}
               onFocus={() => {
-                const nextCustomerCode = isCustomerCodeEntry
-                  ? customerCode
-                  : selectedCustomer?.customerCode || customerCodeSearchDraft;
-                setCustomerCodeSearchDraft(nextCustomerCode);
-                setSearch(nextCustomerCode);
+                setSearch(customerCode);
                 setActiveDropdown("customerCode");
               }}
               className="pl-9 font-mono text-base"
@@ -1049,6 +1049,16 @@ const CustomerSection = ({
                 輸入最少 2 個 Customer ID 字元搜尋帳戶；揀完整編號後仍要揀實際聯絡人。
               </p>
             </>
+          )}
+          {identityLocked && <p className="text-xs text-muted-foreground">此訂單已綁定客戶；如需更換，請清空表格另開新單。</p>}
+          {!customerCodeConfirmed && (
+            <div role="status" data-customer-lookup-interactive className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs space-y-2">
+              <p>Customer ID 尚未確認。請選擇現有帳戶及聯絡人，或者確認建立新 ID；確認前不能下單或使用 Credit。</p>
+              <Button type="button" variant="outline" className="min-h-11 touch-manipulation"
+                onClick={() => { setSearch(customerCode); setActiveDropdown("customerCode"); }}>
+                選擇或建立 Customer ID
+              </Button>
+            </div>
           )}
           {customerDropdown("customerCode")}
         </div>
