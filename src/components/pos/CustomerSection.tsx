@@ -160,6 +160,9 @@ const CustomerSection = ({
     || customerGroups.length === 0;
   const selectedOdooPartnerId = selectedCustomer?.odooPartnerId;
   const selectedProfileLocked = Boolean(selectedOdooPartnerId);
+  const hasPendingCustomerCodeChoice = activeDropdown === "customerCode"
+    && !customerCodeConfirmed
+    && Boolean(customerCode.trim());
 
   useEffect(() => {
     const selectedCustomerChanged = previousSelectedCustomerIdRef.current !== selectedCustomer?.id;
@@ -185,13 +188,14 @@ const CustomerSection = ({
       ) {
         return;
       }
+      if (hasPendingCustomerCodeChoice) return;
       setActiveDropdown(null);
     };
     // A touch scroll starts with pointerdown. Waiting for click prevents iPad
     // scrolling from being mistaken for an outside tap that closes the lookup.
     document.addEventListener("click", handleOutsideClick);
     return () => document.removeEventListener("click", handleOutsideClick);
-  }, []);
+  }, [hasPendingCustomerCodeChoice]);
 
 
 
@@ -507,6 +511,12 @@ const CustomerSection = ({
   };
 
   const openNameLookup = () => {
+    if (hasPendingCustomerCodeChoice) {
+      setSearch(customerCode);
+      setActiveDropdown("customerCode");
+      return;
+    }
+
     const shouldKeepPhoneLookupOpen = activeDropdown === "phone"
       && phoneLocalDigits(phone).length >= 4
       && !currentOdooError;
@@ -1067,10 +1077,16 @@ const CustomerSection = ({
                 disabled={selectedProfileLocked}
                 onChange={(nextPhone) => {
                   onPhoneChange(nextPhone);
+                  if (hasPendingCustomerCodeChoice) {
+                    setSearch(customerCode);
+                    setActiveDropdown("customerCode");
+                    return;
+                  }
                   setSearch(nextPhone);
                   setActiveDropdown("phone");
                 }}
                 onFocus={() => {
+                  if (hasPendingCustomerCodeChoice) return;
                   if (phone.trim()) {
                     setSearch(phone);
                     setActiveDropdown("phone");
@@ -1279,10 +1295,16 @@ const CustomerSection = ({
           onChange={(event) => {
             const nextEmail = event.target.value;
             onCustomerEmailChange(nextEmail);
+            if (hasPendingCustomerCodeChoice) {
+              setSearch(customerCode);
+              setActiveDropdown("customerCode");
+              return;
+            }
             setSearch(nextEmail);
             setActiveDropdown("email");
           }}
           onFocus={() => {
+            if (hasPendingCustomerCodeChoice) return;
             setSearch(customerEmail);
             setActiveDropdown("email");
           }}

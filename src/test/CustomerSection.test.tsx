@@ -1191,19 +1191,18 @@ describe("explicit Customer ID confirmation", () => {
     />;
   }
 
-  it("revokes confirmation immediately and preserves a rapid edit after outside click", () => {
+  it("keeps the Customer ID dropdown open until the edited ID is explicitly resolved", () => {
     render(<ConfirmationHarness />);
     const input = screen.getByLabelText("Customer ID／客戶編號");
     fireEvent.change(input, { target: { value: "testing" } });
     fireEvent.click(screen.getByText("客戶資料"));
     expect(input).toHaveValue("testing");
-    expect(screen.queryByText(/可以繼續下單/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/可以繼續下單/)).not.toBeInTheDocument();
+    expect(document.getElementById("customer-customerCode-results")).toBeInTheDocument();
+
+    fireEvent.focus(screen.getByLabelText(/下單人／聯絡人/));
+    expect(document.getElementById("customer-customerCode-results")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "選擇或建立 Customer ID" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Customer ID 尚未確認/)).not.toBeInTheDocument();
-    fireEvent.focus(input);
-    expect(input).toHaveValue("testing");
-    expect(document.getElementById("customer-customerCode-results")).toBeInTheDocument();
   });
 
   it("requires an explicit create choice and invalidates it on another edit", async () => {
