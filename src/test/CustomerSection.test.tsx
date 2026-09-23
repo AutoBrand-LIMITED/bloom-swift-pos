@@ -1197,9 +1197,11 @@ describe("explicit Customer ID confirmation", () => {
     fireEvent.change(input, { target: { value: "testing" } });
     fireEvent.click(screen.getByText("客戶資料"));
     expect(input).toHaveValue("testing");
-    expect(screen.getByText(/Customer ID 尚未確認/)).toBeVisible();
     expect(screen.queryByText(/可以繼續下單/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "選擇或建立 Customer ID" }));
+    expect(screen.queryByText(/可以繼續下單/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "選擇或建立 Customer ID" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Customer ID 尚未確認/)).not.toBeInTheDocument();
+    fireEvent.focus(input);
     expect(input).toHaveValue("testing");
     expect(document.getElementById("customer-customerCode-results")).toBeInTheDocument();
   });
@@ -1211,11 +1213,11 @@ describe("explicit Customer ID confirmation", () => {
     const input = screen.getByLabelText("Customer ID／客戶編號");
     fireEvent.change(input, { target: { value: "unique" } });
     const confirm = await screen.findByRole("button", { name: "確認用此 Customer ID 新增客戶" });
-    expect(screen.getByText(/Customer ID 尚未確認/)).toBeVisible();
+    expect(screen.queryByText(/可以繼續下單/)).not.toBeInTheDocument();
     fireEvent.click(confirm);
-    expect(screen.queryByText(/Customer ID 尚未確認/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("新 Customer ID／客戶編號")).toHaveValue("unique");
     fireEvent.change(input, { target: { value: "unique2" } });
-    expect(screen.getByText(/Customer ID 尚未確認/)).toBeVisible();
+    expect(screen.queryByText(/可以繼續下單/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "確認用此 Customer ID 新增客戶" })).not.toBeInTheDocument();
   });
 
@@ -1233,7 +1235,7 @@ describe("explicit Customer ID confirmation", () => {
     await act(async () => resolveOld({ customerCode: "older", contactCount: 1, contacts: [{ id: "old", name: "Old Contact", phone: "", history: [] }] }));
     expect(screen.queryByText("Old Contact")).not.toBeInTheDocument();
     expect(input).toHaveValue("newer");
-    expect(screen.getByText(/Customer ID 尚未確認/)).toBeVisible();
+    expect(screen.queryByText(/可以繼續下單/)).not.toBeInTheDocument();
   });
   it("retries a whitespace-only edit while a lookup is pending", async () => {
     searchOdooCustomerAccount.mockImplementationOnce(() => new Promise(() => undefined))

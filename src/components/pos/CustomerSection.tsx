@@ -1051,15 +1051,6 @@ const CustomerSection = ({
             </>
           )}
           {identityLocked && <p className="text-xs text-muted-foreground">此訂單已綁定客戶；如需更換，請清空表格另開新單。</p>}
-          {!customerCodeConfirmed && (
-            <div role="status" data-customer-lookup-interactive className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs space-y-2">
-              <p>Customer ID 尚未確認。請選擇現有帳戶及聯絡人，或者確認建立新 ID；確認前不能下單或使用 Credit。</p>
-              <Button type="button" variant="outline" className="min-h-11 touch-manipulation"
-                onClick={() => { setSearch(customerCode); setActiveDropdown("customerCode"); }}>
-                選擇或建立 Customer ID
-              </Button>
-            </div>
-          )}
           {customerDropdown("customerCode")}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
