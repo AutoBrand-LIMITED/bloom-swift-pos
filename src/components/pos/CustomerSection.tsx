@@ -1010,7 +1010,7 @@ const CustomerSection = ({
       <div className="space-y-3">
         <div data-testid="customer-code-email-row" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 relative">
-          <Label htmlFor="customer-code-search" className="text-xs font-medium">
+          <Label htmlFor="customer-code-search" className="flex min-h-5 items-center text-xs font-medium">
             {canBackfillSelectedCustomerCode
               ? "補填 Customer ID／客戶編號"
               : isNewCustomerDraft
@@ -1065,7 +1065,7 @@ const CustomerSection = ({
           {customerDropdown("customerCode")}
         </div>
         <div className="space-y-1.5 relative">
-          <Label htmlFor="customer-email" className="text-xs font-medium flex items-center gap-1.5">
+          <Label htmlFor="customer-email" className="flex min-h-5 items-center gap-1.5 text-xs font-medium">
             <Mail className="h-3.5 w-3.5" />
             客戶電郵
           </Label>
@@ -1110,7 +1110,7 @@ const CustomerSection = ({
         </div>
         <div data-testid="customer-phone-contact-row" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 relative">
-            <Label htmlFor="phone" className="text-xs font-medium">
+            <Label htmlFor="phone" className="flex min-h-5 items-center text-xs font-medium">
               下單人電話（選填）
             </Label>
             <div data-customer-lookup-interactive>
@@ -1152,7 +1152,7 @@ const CustomerSection = ({
             )}
           </div>
           <div className="space-y-1.5 relative">
-            <Label htmlFor="customer-name" className="text-xs font-medium">
+            <Label htmlFor="customer-name" className="flex min-h-5 items-center text-xs font-medium">
               下單人／聯絡人 <span className="text-destructive">*</span>
             </Label>
             <div className="relative" data-customer-lookup-interactive>
@@ -1326,7 +1326,7 @@ const CustomerSection = ({
 
       <div data-testid="customer-group-sender-row" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium">客戶群組（選填）</Label>
+        <Label className="flex min-h-5 items-center text-xs font-medium">客戶群組（選填）</Label>
         {customerGroupIsLegacySnapshot ? (
           <div
             className="flex min-h-11 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-medium"
@@ -1376,7 +1376,7 @@ const CustomerSection = ({
         )}
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="sender-name" className="text-xs font-medium flex items-center gap-1.5">
+        <Label htmlFor="sender-name" className="flex min-h-5 items-center gap-1.5 text-xs font-medium">
           <UserRoundCheck className="h-3.5 w-3.5" />
           送花人名稱 <span className="text-destructive">*</span>
         </Label>
