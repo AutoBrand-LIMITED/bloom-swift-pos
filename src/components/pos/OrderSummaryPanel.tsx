@@ -16,6 +16,7 @@ interface OrderSummaryPanelProps {
   deliveryTime: string;
   items: OrderItem[];
   deliveryFee: number;
+  deliveryFeeLabel?: string;
   urgentFee: number;
   finalPrice: number;
   paymentStatus: PaymentStatus;
@@ -63,6 +64,7 @@ const OrderSummaryPanel = ({
   deliveryTime,
   items,
   deliveryFee,
+  deliveryFeeLabel,
   urgentFee,
   finalPrice,
   paymentStatus,
@@ -146,7 +148,7 @@ const OrderSummaryPanel = ({
         )}
         {(deliveryFee > 0 || urgentFee > 0) && (
           <div className="mt-3 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
-            {deliveryFee > 0 && <p className="flex justify-between"><span>送貨費</span><span>${formatMoney(deliveryFee)}</span></p>}
+            {deliveryFee > 0 && <p className="flex justify-between"><span>{deliveryFeeLabel || "送貨費"}</span><span>${formatMoney(deliveryFee)}</span></p>}
             {urgentFee > 0 && <p className="flex justify-between"><span>急單費</span><span>${formatMoney(urgentFee)}</span></p>}
           </div>
         )}

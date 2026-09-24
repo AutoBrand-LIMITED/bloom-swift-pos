@@ -252,7 +252,7 @@ function itemsTable(order: Order, showPrice: boolean): string {
 
   const extras: string[] = [];
   if (showPrice && order.deliveryFee > 0) {
-    extras.push(`<tr><td colspan="3">送貨費</td><td class="num">$${formatMoney(order.deliveryFee)}</td></tr>`);
+    extras.push(`<tr><td colspan="3">${escapeHtml(order.deliveryFeeLabel || "送貨費")}</td><td class="num">$${formatMoney(order.deliveryFee)}</td></tr>`);
   }
   if (showPrice && order.urgentFee > 0) {
     extras.push(`<tr><td colspan="3">急單費</td><td class="num">$${formatMoney(order.urgentFee)}</td></tr>`);

@@ -22,12 +22,15 @@ import {
 } from "lucide-react";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import ProductManagementDialog from "@/components/pos/ProductManagementDialog";
+import DeliveryFeeManagementDialog from "@/components/pos/DeliveryFeeManagementDialog";
 import {
   getOdooProductCategories,
   getOdooProducts,
+  getDeliveryFees,
   hasOdooBackend,
   type OdooProduct,
   type OdooProductCategory,
+  type DeliveryFeeOption,
 } from "@/lib/odoo-api";
 import type { OrderItem } from "@/types/order";
 import {
@@ -42,9 +45,13 @@ interface OrderItemsSectionProps {
   items: OrderItem[];
   onItemsChange: (items: OrderItem[]) => void;
   deliveryFee: number;
+  deliveryFeeOptionId?: number;
+  deliveryFeeLabel?: string;
+  canManageDeliveryFees?: boolean;
   deliveryFeeEnabled?: boolean;
   urgentFee: number;
   onDeliveryFeeChange: (v: number) => void;
+  onDeliveryFeeSelectionChange?: (option?: DeliveryFeeOption) => void;
   onUrgentFeeChange: (v: number) => void;
   onCustomOrderSummary: (summary: string) => void;
   budget: number;
@@ -52,18 +59,19 @@ interface OrderItemsSectionProps {
   subtotal: number;
 }
 
-const DELIVERY_FEE_OPTIONS = [
-  { label: "香港島第 1 區", amount: 80 },
-  { label: "香港島第 2 區", amount: 100 },
-  { label: "香港島第 3 區", amount: 120 },
-  { label: "九龍", amount: 130 },
-  { label: "新界", amount: 250 },
-] as const;
+const DEMO_DELIVERY_FEES: DeliveryFeeOption[] = [
+  { id: 1, label: "香港島第 1 區", amount: 80, sequence: 10, active: true },
+  { id: 2, label: "香港島第 2 區", amount: 100, sequence: 20, active: true },
+  { id: 3, label: "香港島第 3 區", amount: 120, sequence: 30, active: true },
+  { id: 4, label: "九龍", amount: 130, sequence: 40, active: true },
+  { id: 5, label: "新界", amount: 250, sequence: 50, active: true },
+];
 
 const OrderItemsSection = ({
   items, onItemsChange,
-  deliveryFee, deliveryFeeEnabled = true, urgentFee,
-  onDeliveryFeeChange, onUrgentFeeChange,
+  deliveryFee, deliveryFeeOptionId, deliveryFeeLabel, canManageDeliveryFees = false,
+  deliveryFeeEnabled = true, urgentFee,
+  onDeliveryFeeChange, onDeliveryFeeSelectionChange, onUrgentFeeChange,
   onCustomOrderSummary,
   budget, onBudgetChange, subtotal,
 }: OrderItemsSectionProps) => {
@@ -77,9 +85,30 @@ const OrderItemsSection = ({
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [productManagerOpen, setProductManagerOpen] = useState(false);
+  const [deliveryFeeManagerOpen, setDeliveryFeeManagerOpen] = useState(false);
+  const [deliveryFeeOptions, setDeliveryFeeOptions] = useState<DeliveryFeeOption[]>(
+    hasOdooBackend ? [] : DEMO_DELIVERY_FEES,
+  );
+  const [deliveryFeeLoading, setDeliveryFeeLoading] = useState(hasOdooBackend);
+  const [deliveryFeeError, setDeliveryFeeError] = useState<string | null>(null);
+  const [deliveryFeeRefreshKey, setDeliveryFeeRefreshKey] = useState(0);
   const [budgetExpanded, setBudgetExpanded] = useState(false);
-  const hasLegacyDeliveryFee = deliveryFee > 0
-    && !DELIVERY_FEE_OPTIONS.some((option) => option.amount === deliveryFee);
+  const selectedDeliveryFee = deliveryFeeOptions.find((option) => option.id === deliveryFeeOptionId);
+  const hasLegacyDeliveryFee = deliveryFee > 0 && (
+    !selectedDeliveryFee
+    || selectedDeliveryFee.amount !== deliveryFee
+    || Boolean(deliveryFeeLabel && selectedDeliveryFee.label !== deliveryFeeLabel)
+  );
+
+  useEffect(() => {
+    if (!hasOdooBackend) return;
+    const controller = new AbortController();
+    setDeliveryFeeLoading(true); setDeliveryFeeError(null);
+    getDeliveryFees(controller.signal).then(setDeliveryFeeOptions).catch((error) => {
+      if ((error as Error).name !== "AbortError") setDeliveryFeeError(error instanceof Error ? error.message : "未能載入送貨費");
+    }).finally(() => { if (!controller.signal.aborted) setDeliveryFeeLoading(false); });
+    return () => controller.abort();
+  }, [deliveryFeeRefreshKey]);
 
   const loadCatalog = useCallback(async (signal?: AbortSignal) => {
     if (!hasOdooBackend) return;
@@ -586,21 +615,25 @@ const OrderItemsSection = ({
           </Label>
           <div className="flex gap-2">
             <Select
-              value={deliveryFee > 0 ? String(deliveryFee) : undefined}
-              onValueChange={(value) => onDeliveryFeeChange(Number(value))}
-              disabled={!deliveryFeeEnabled}
+              value={!hasLegacyDeliveryFee && deliveryFeeOptionId ? `fee:${deliveryFeeOptionId}` : hasLegacyDeliveryFee ? "legacy" : undefined}
+              onValueChange={(value) => {
+                const option = deliveryFeeOptions.find((entry) => `fee:${entry.id}` === value);
+                if (!option) return;
+                onDeliveryFeeChange(option.amount); onDeliveryFeeSelectionChange?.(option);
+              }}
+              disabled={!deliveryFeeEnabled || deliveryFeeLoading || Boolean(deliveryFeeError)}
             >
               <SelectTrigger aria-label="送貨費" className="min-w-0 flex-1 text-sm">
                 <SelectValue placeholder={deliveryFeeEnabled ? "選擇地區及送貨費" : "此收貨方式不適用"} />
               </SelectTrigger>
               <SelectContent>
                 {hasLegacyDeliveryFee && (
-                  <SelectItem value={String(deliveryFee)} disabled>
-                    舊有送貨費 — {formatMoney(deliveryFee)}（請重新選擇）
+                  <SelectItem value="legacy" disabled>
+                    {deliveryFeeLabel || "舊有送貨費"} — {formatMoney(deliveryFee)}（請重新選擇）
                   </SelectItem>
                 )}
-                {DELIVERY_FEE_OPTIONS.map((option) => (
-                  <SelectItem key={option.amount} value={String(option.amount)}>
+                {deliveryFeeOptions.map((option) => (
+                  <SelectItem key={option.id} value={`fee:${option.id}`}>
                     {option.label} — {formatMoney(option.amount)}
                   </SelectItem>
                 ))}
@@ -613,12 +646,14 @@ const OrderItemsSection = ({
                 size="sm"
                 className="shrink-0 px-2 text-xs text-muted-foreground"
                 aria-label="清除送貨費"
-                onClick={() => onDeliveryFeeChange(0)}
+                onClick={() => { onDeliveryFeeChange(0); onDeliveryFeeSelectionChange?.(undefined); }}
               >
                 清除
               </Button>
             )}
+            {canManageDeliveryFees && <Button type="button" variant="outline" size="icon" aria-label="管理送貨費" onClick={() => setDeliveryFeeManagerOpen(true)}><Settings2 className="h-4 w-4"/></Button>}
           </div>
+          {deliveryFeeError && <button type="button" className="text-left text-xs text-destructive underline" onClick={() => setDeliveryFeeRefreshKey((key) => key + 1)}>送貨費載入失敗，按此重試</button>}
         </div>
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
@@ -635,6 +670,7 @@ const OrderItemsSection = ({
           />
         </div>
       </div>
+      <DeliveryFeeManagementDialog open={deliveryFeeManagerOpen} onOpenChange={setDeliveryFeeManagerOpen} onChanged={() => setDeliveryFeeRefreshKey((key) => key + 1)}/>
 
     </div>
   );

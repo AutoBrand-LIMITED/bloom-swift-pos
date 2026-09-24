@@ -387,6 +387,22 @@ export interface DeliverySlot {
   endTime: string;
 }
 
+export interface DeliveryFeeOption {
+  id: number;
+  label: string;
+  amount: number;
+  sequence: number;
+  active: boolean;
+}
+
+export interface DeliveryFeeWritePayload {
+  label: string;
+  amount: number;
+  sequence: number;
+  active: boolean;
+}
+export type DeliveryFeeUpdatePayload = Partial<DeliveryFeeWritePayload>;
+
 export interface RecipientSuggestion {
   id: number;
   recipientType: "personal" | "company";
@@ -1426,6 +1442,37 @@ export async function getDeliverySlots(signal?: AbortSignal): Promise<DeliverySl
     return throwApiError(res, `Odoo delivery slot sync failed: ${res.status}`);
   }
   return (await res.json()) as DeliverySlot[];
+}
+
+export async function getDeliveryFees(signal?: AbortSignal, manage = false): Promise<DeliveryFeeOption[]> {
+  if (!BACKEND_URL) return [];
+  const path = manage ? "/delivery-fees/manage?include_archived=true" : "/delivery-fees";
+  const res = await authenticatedFetch(`${BACKEND_URL}${path}`, { signal });
+  if (!res.ok) return throwApiError(res, `Odoo delivery fee sync failed: ${res.status}`);
+  return (await res.json()) as DeliveryFeeOption[];
+}
+
+export async function createDeliveryFee(payload: DeliveryFeeWritePayload): Promise<DeliveryFeeOption> {
+  const res = await authenticatedFetch(`${BACKEND_URL}/delivery-fees`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+  });
+  if (!res.ok) return throwApiError(res, `Delivery fee create failed: ${res.status}`);
+  return (await res.json()) as DeliveryFeeOption;
+}
+
+export async function updateDeliveryFee(id: number, payload: DeliveryFeeUpdatePayload): Promise<DeliveryFeeOption> {
+  const res = await authenticatedFetch(`${BACKEND_URL}/delivery-fees/${id}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+  });
+  if (!res.ok) return throwApiError(res, `Delivery fee update failed: ${res.status}`);
+  return (await res.json()) as DeliveryFeeOption;
+}
+
+export async function reorderDeliveryFees(fees: Array<{ id: number; sequence: number }>): Promise<void> {
+  const res = await authenticatedFetch(`${BACKEND_URL}/delivery-fees/reorder`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fees }),
+  });
+  if (!res.ok) return throwApiError(res, `Delivery fee reorder failed: ${res.status}`);
 }
 
 export async function searchOdooCustomers(

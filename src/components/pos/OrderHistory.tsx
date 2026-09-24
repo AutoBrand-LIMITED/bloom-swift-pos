@@ -813,7 +813,7 @@ const OrderDetail = ({
         <dl className="ml-auto mt-4 max-w-sm space-y-2 border-t border-border pt-4 text-sm">
           {([
             ["產品小計", productsSubtotal],
-            ["送貨費", order.deliveryFee],
+            [order.deliveryFeeLabel || "送貨費", order.deliveryFee],
             ["急單費", order.urgentFee],
             ["計算小計", order.subtotal],
             ...(paymentAmounts.customerCredit > 0

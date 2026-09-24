@@ -1,13 +1,18 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import OrderItemsSection from "@/components/pos/OrderItemsSection";
+import { getDeliveryFees, reorderDeliveryFees, updateDeliveryFee } from "@/lib/odoo-api";
 import type { OrderItem } from "@/types/order";
 
 vi.mock("@/lib/odoo-api", () => ({
   hasOdooBackend: false,
   getOdooProducts: vi.fn().mockResolvedValue([]),
   getOdooProductCategories: vi.fn().mockResolvedValue([]),
+  getDeliveryFees: vi.fn().mockResolvedValue([]),
+  createDeliveryFee: vi.fn(),
+  updateDeliveryFee: vi.fn(),
+  reorderDeliveryFees: vi.fn(),
 }));
 
 describe("OrderItemsSection legacy line snapshots", () => {
@@ -163,7 +168,7 @@ describe("OrderItemsSection legacy line snapshots", () => {
     expect(screen.getByText(/浮動價格，可直接改價/)).toBeVisible();
   });
 
-  it("offers exactly five fixed delivery zones and does not allow free amount entry", () => {
+  it("offers the five seeded delivery zones by option ID and does not allow free amount entry", () => {
     const onDeliveryFeeChange = vi.fn();
 
     render(
@@ -194,5 +199,54 @@ describe("OrderItemsSection legacy line snapshots", () => {
 
     fireEvent.click(screen.getByRole("option", { name: "香港島第 3 區 — 120" }));
     expect(onDeliveryFeeChange).toHaveBeenCalledWith(120);
+  });
+
+  it("shows delivery-fee management only to managers", async () => {
+    const { rerender } = render(
+      <OrderItemsSection items={[]} onItemsChange={vi.fn()} deliveryFee={0} urgentFee={0}
+        onDeliveryFeeChange={vi.fn()} onUrgentFeeChange={vi.fn()} onCustomOrderSummary={vi.fn()}
+        budget={0} onBudgetChange={vi.fn()} subtotal={0} />,
+    );
+    expect(screen.queryByRole("button", { name: "管理送貨費" })).not.toBeInTheDocument();
+    rerender(
+      <OrderItemsSection items={[]} onItemsChange={vi.fn()} deliveryFee={0} urgentFee={0}
+        canManageDeliveryFees onDeliveryFeeChange={vi.fn()} onUrgentFeeChange={vi.fn()}
+        onCustomOrderSummary={vi.fn()} budget={0} onBudgetChange={vi.fn()} subtotal={0} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "管理送貨費" }));
+    expect(screen.getByRole("dialog", { name: "送貨費設定" })).toBeVisible();
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("requires an explicit save before archive or reorder so edits are not lost", async () => {
+    const rows = [
+      { id: 1, label: "港島", amount: 80, sequence: 10, active: true },
+      { id: 2, label: "九龍", amount: 130, sequence: 20, active: true },
+    ];
+    vi.mocked(getDeliveryFees).mockResolvedValue(rows);
+    vi.mocked(updateDeliveryFee)
+      .mockResolvedValueOnce({ ...rows[0], amount: 90 })
+      .mockResolvedValueOnce({ ...rows[1], label: "九龍新" })
+      .mockResolvedValueOnce({ ...rows[0], amount: 90, active: false });
+    vi.mocked(reorderDeliveryFees).mockResolvedValue();
+    render(<OrderItemsSection items={[]} onItemsChange={vi.fn()} deliveryFee={0} urgentFee={0}
+      canManageDeliveryFees onDeliveryFeeChange={vi.fn()} onUrgentFeeChange={vi.fn()}
+      onCustomOrderSummary={vi.fn()} budget={0} onBudgetChange={vi.fn()} subtotal={0} />);
+    fireEvent.click(screen.getByRole("button", { name: "管理送貨費" }));
+    await screen.findByLabelText("港島金額");
+    fireEvent.change(screen.getByLabelText("港島金額"), { target: { value: "0" } });
+    expect(screen.getByRole("button", { name: "儲存 港島" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("港島金額"), { target: { value: "90" } });
+    fireEvent.change(screen.getByLabelText("九龍名稱"), { target: { value: "九龍新" } });
+    expect(screen.getAllByRole("button", { name: "停用" })[0]).toBeDisabled();
+    expect(screen.getAllByLabelText("向下移")[0]).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "儲存 港島" }));
+    await waitFor(() => expect(updateDeliveryFee).toHaveBeenCalledWith(1, { label: "港島", amount: 90 }));
+    expect(screen.getByLabelText("九龍名稱")).toHaveValue("九龍新");
+    fireEvent.click(screen.getByRole("button", { name: "儲存 九龍" }));
+    await waitFor(() => expect(updateDeliveryFee).toHaveBeenCalledWith(2, { label: "九龍新", amount: 130 }));
+    expect(reorderDeliveryFees).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole("button", { name: "停用" })[0]);
+    await waitFor(() => expect(updateDeliveryFee).toHaveBeenCalledWith(1, { active: false }));
   });
 });

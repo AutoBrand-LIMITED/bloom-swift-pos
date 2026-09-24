@@ -131,6 +131,8 @@ export interface Order {
   alternatePhone?: string;
   items: OrderItem[];
   deliveryFee: number;
+  deliveryFeeOptionId?: number;
+  deliveryFeeLabel?: string;
   urgentFee: number;
   subtotal: number;
   finalPrice: number;

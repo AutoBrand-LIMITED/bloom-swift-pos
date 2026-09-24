@@ -273,6 +273,8 @@ const Index = () => {
   const [budget, setBudget] = useState(0);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [deliveryFeeOptionId, setDeliveryFeeOptionId] = useState<number>();
+  const [deliveryFeeLabel, setDeliveryFeeLabel] = useState("");
   const [urgentFee, setUrgentFee] = useState(0);
   const [senderNote, setSenderNote] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
@@ -1392,6 +1394,8 @@ const Index = () => {
     setItems([]);
     setBudget(0);
     setDeliveryFee(0);
+    setDeliveryFeeOptionId(undefined);
+    setDeliveryFeeLabel("");
     setUrgentFee(0);
     setSenderNote("");
     setDeliveryNote("");
@@ -1489,6 +1493,8 @@ const Index = () => {
     if (order.terms) setTerms(order.terms);
     setItems(clonedContent.items);
     setDeliveryFee(order.deliveryFee);
+    setDeliveryFeeOptionId(order.deliveryFeeOptionId);
+    setDeliveryFeeLabel(order.deliveryFeeLabel || "");
     setUrgentFee(order.urgentFee);
     setSenderNote(order.senderNote || "");
     setDeliveryNote(order.deliveryNote || "");
@@ -1594,6 +1600,8 @@ const Index = () => {
     setSalesTeamId(order.salesTeamId);
     setItems(order.items.map((item) => ({ ...item })));
     setDeliveryFee(order.deliveryFee);
+    setDeliveryFeeOptionId(order.deliveryFeeOptionId);
+    setDeliveryFeeLabel(order.deliveryFeeLabel || "");
     setUrgentFee(order.urgentFee);
     setSenderNote(order.senderNote || "");
     setDeliveryNote(order.deliveryNote || "");
@@ -1715,6 +1723,8 @@ const Index = () => {
     setConfirmedNewCustomerPhone(options.customerId ? null : normalizePhoneNumber(order.phone));
     setItems(order.items);
     setDeliveryFee(order.deliveryFee);
+    setDeliveryFeeOptionId(order.deliveryFeeOptionId);
+    setDeliveryFeeLabel(order.deliveryFeeLabel || "");
     setUrgentFee(order.urgentFee);
     setSenderNote(order.senderNote);
     setDeliveryNote(order.deliveryNote);
@@ -2015,6 +2025,8 @@ const Index = () => {
       alternatePhone: alternatePhone.trim(),
       items,
       deliveryFee: hasDeliveryDetails ? deliveryFee : 0,
+      deliveryFeeOptionId: hasDeliveryDetails ? deliveryFeeOptionId : undefined,
+      deliveryFeeLabel: hasDeliveryDetails ? deliveryFeeLabel : "",
       urgentFee,
       subtotal,
       finalPrice,
@@ -2379,6 +2391,8 @@ const Index = () => {
       alternatePhone: alternatePhone.trim(),
       items,
       deliveryFee: fulfillmentType === "delivery" ? deliveryFee : 0,
+      deliveryFeeOptionId: fulfillmentType === "delivery" ? deliveryFeeOptionId : undefined,
+      deliveryFeeLabel: fulfillmentType === "delivery" ? deliveryFeeLabel : "",
       urgentFee,
       subtotal,
       finalPrice,
@@ -2967,9 +2981,16 @@ const Index = () => {
           items={items}
           onItemsChange={setItems}
           deliveryFee={deliveryFee}
+          deliveryFeeOptionId={deliveryFeeOptionId}
+          deliveryFeeLabel={deliveryFeeLabel}
+          canManageDeliveryFees={employee?.role === "manager"}
           deliveryFeeEnabled={fulfillmentType === "delivery"}
           urgentFee={urgentFee}
           onDeliveryFeeChange={setDeliveryFee}
+          onDeliveryFeeSelectionChange={(option) => {
+            setDeliveryFeeOptionId(option?.id);
+            setDeliveryFeeLabel(option?.label || "");
+          }}
           onUrgentFeeChange={setUrgentFee}
           onCustomOrderSummary={(summary) => {
             setInternalNote((current) => current ? `${current}\n\n${summary}` : summary);
@@ -3035,7 +3056,11 @@ const Index = () => {
           }}
           onFulfillmentTypeChange={(value) => {
             setFulfillmentType(value);
-            if (value !== "delivery") setDeliveryFee(0);
+            if (value !== "delivery") {
+              setDeliveryFee(0);
+              setDeliveryFeeOptionId(undefined);
+              setDeliveryFeeLabel("");
+            }
             if (value === "grab_and_go") {
               setDeliverySplits([]);
               setActiveHistoryAddressSplitId(undefined);
@@ -3284,6 +3309,7 @@ const Index = () => {
               deliveryTime={deliveryTime}
               items={items}
               deliveryFee={deliveryFee}
+              deliveryFeeLabel={deliveryFeeLabel}
               urgentFee={urgentFee}
               finalPrice={finalPrice}
               paymentStatus={paymentStatus}
