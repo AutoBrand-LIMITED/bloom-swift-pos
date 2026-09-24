@@ -197,6 +197,30 @@ describe("CustomerSection gift sender", () => {
     useWalkInCustomer.mockReset();
   });
 
+  it("groups related customer fields into compact responsive rows without removing inputs", () => {
+    render(<Harness />);
+
+    expect(screen.getByTestId("customer-code-email-row")).toHaveClass("sm:grid-cols-2");
+    expect(screen.getByTestId("customer-code-email-row")).toContainElement(
+      screen.getByLabelText("Customer ID／客戶編號"),
+    );
+    expect(screen.getByTestId("customer-code-email-row")).toContainElement(
+      screen.getByLabelText("客戶電郵"),
+    );
+    expect(screen.getByTestId("customer-phone-contact-row")).toContainElement(
+      screen.getByLabelText("下單人電話"),
+    );
+    expect(screen.getByTestId("customer-phone-contact-row")).toContainElement(
+      screen.getByLabelText(/下單人／聯絡人/),
+    );
+    expect(screen.getByTestId("customer-group-sender-row")).toContainElement(
+      screen.getByLabelText("客戶群組（選填）"),
+    );
+    expect(screen.getByTestId("customer-group-sender-row")).toContainElement(
+      screen.getByLabelText(/送花人名稱/),
+    );
+  });
+
   it("defaults the gift sender to the ordering contact and allows direct edits", () => {
     render(<Harness />);
 

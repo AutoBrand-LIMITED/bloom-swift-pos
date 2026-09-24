@@ -1008,6 +1008,7 @@ const CustomerSection = ({
         </div>
       )}
       <div className="space-y-3">
+        <div data-testid="customer-code-email-row" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 relative">
           <Label htmlFor="customer-code-search" className="text-xs font-medium">
             {canBackfillSelectedCustomerCode
@@ -1063,7 +1064,51 @@ const CustomerSection = ({
           {identityLocked && <p className="text-xs text-muted-foreground">此訂單已綁定客戶；如需更換，請清空表格另開新單。</p>}
           {customerDropdown("customerCode")}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5 relative">
+          <Label htmlFor="customer-email" className="text-xs font-medium flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5" />
+            客戶電郵
+          </Label>
+          <Input
+            data-customer-lookup-interactive
+            id="customer-email"
+            type="email"
+            inputMode="email"
+            placeholder="例如：accounts@example.com"
+            value={customerEmail}
+            disabled={selectedProfileLocked}
+            onChange={(event) => {
+              const nextEmail = event.target.value;
+              onCustomerEmailChange(nextEmail);
+              if (hasPendingCustomerCodeChoice) {
+                setSearch(customerCode);
+                setActiveDropdown("customerCode");
+                return;
+              }
+              setSearch(nextEmail);
+              setActiveDropdown("email");
+            }}
+            onFocus={() => {
+              if (hasPendingCustomerCodeChoice) return;
+              setSearch(customerEmail);
+              setActiveDropdown("email");
+            }}
+            className={`text-base ${customerEmailError ? "border-destructive ring-1 ring-destructive" : ""}`}
+            maxLength={254}
+            autoComplete="off"
+            aria-autocomplete="list"
+            aria-controls={activeDropdown === "email" ? "customer-email-results" : undefined}
+            aria-expanded={activeDropdown === "email"}
+            aria-invalid={Boolean(customerEmailError)}
+            aria-describedby={customerEmailError ? "customer-email-error" : undefined}
+          />
+          {customerDropdown("email")}
+          {customerEmailError && (
+            <p id="customer-email-error" role="alert" className="text-xs text-destructive">{customerEmailError}</p>
+          )}
+        </div>
+        </div>
+        <div data-testid="customer-phone-contact-row" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 relative">
             <Label htmlFor="phone" className="text-xs font-medium">
               下單人電話（選填）
@@ -1279,50 +1324,7 @@ const CustomerSection = ({
           </div>
         )}
 
-      <div className="space-y-1.5 relative">
-        <Label htmlFor="customer-email" className="text-xs font-medium flex items-center gap-1.5">
-          <Mail className="h-3.5 w-3.5" />
-          客戶電郵
-        </Label>
-        <Input
-          data-customer-lookup-interactive
-          id="customer-email"
-          type="email"
-          inputMode="email"
-          placeholder="例如：accounts@example.com"
-          value={customerEmail}
-          disabled={selectedProfileLocked}
-          onChange={(event) => {
-            const nextEmail = event.target.value;
-            onCustomerEmailChange(nextEmail);
-            if (hasPendingCustomerCodeChoice) {
-              setSearch(customerCode);
-              setActiveDropdown("customerCode");
-              return;
-            }
-            setSearch(nextEmail);
-            setActiveDropdown("email");
-          }}
-          onFocus={() => {
-            if (hasPendingCustomerCodeChoice) return;
-            setSearch(customerEmail);
-            setActiveDropdown("email");
-          }}
-          className={`text-base ${customerEmailError ? "border-destructive ring-1 ring-destructive" : ""}`}
-          maxLength={254}
-          autoComplete="off"
-          aria-autocomplete="list"
-          aria-controls={activeDropdown === "email" ? "customer-email-results" : undefined}
-          aria-expanded={activeDropdown === "email"}
-          aria-invalid={Boolean(customerEmailError)}
-          aria-describedby={customerEmailError ? "customer-email-error" : undefined}
-        />
-        {customerDropdown("email")}
-        {customerEmailError && (
-          <p id="customer-email-error" role="alert" className="text-xs text-destructive">{customerEmailError}</p>
-        )}
-      </div>
-
+      <div data-testid="customer-group-sender-row" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
         <Label className="text-xs font-medium">客戶群組（選填）</Label>
         {customerGroupIsLegacySnapshot ? (
@@ -1373,8 +1375,6 @@ const CustomerSection = ({
           </p>
         )}
       </div>
-      </div>
-
       <div className="space-y-1.5">
         <Label htmlFor="sender-name" className="text-xs font-medium flex items-center gap-1.5">
           <UserRoundCheck className="h-3.5 w-3.5" />
@@ -1395,6 +1395,8 @@ const CustomerSection = ({
             {senderNameError}
           </p>
         )}
+      </div>
+      </div>
       </div>
     </div>
   );

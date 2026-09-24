@@ -17,7 +17,46 @@ const operator = {
   role: "staff" as const,
 };
 
+const openSalesDetails = () => {
+  const trigger = screen.getByRole("button", { name: /^銷售員詳細設定/ });
+  if (trigger.getAttribute("aria-expanded") === "false") fireEvent.click(trigger);
+};
+
 describe("SalesIdSection assignment", () => {
+  it("collapses after an initially missing assignment becomes valid", () => {
+    const baseProps = {
+      department: "",
+      employee: operator,
+      onSalespersonChange: vi.fn(),
+      onSalesTeamChange: vi.fn(),
+    };
+    const { rerender } = render(
+      <SalesIdSection {...baseProps} salesId="" staff={[]} />,
+    );
+
+    expect(screen.getByRole("button", { name: /^銷售員詳細設定/ })).toHaveAttribute("aria-expanded", "true");
+
+    rerender(
+      <SalesIdSection
+        {...baseProps}
+        salesId="AC02 — Elma"
+        salespersonEmployeeId={95}
+        salesTeamId={7}
+        department="Retail"
+        staff={[{
+          id: "AC02",
+          name: "Elma",
+          code: "AC02",
+          odooEmployeeId: 95,
+          salesTeamId: 7,
+          salesTeamName: "Retail",
+        }]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /^銷售員詳細設定/ })).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("keeps the operator and team read-only while applying the selected employee Sales Team", () => {
     const onSalespersonChange = vi.fn();
     const onSalesTeamChange = vi.fn();
@@ -51,6 +90,12 @@ describe("SalesIdSection assignment", () => {
       />,
     );
 
+    expect(screen.queryByRole("combobox", { name: "負責銷售員" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^銷售員詳細設定/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("登入：").parentElement).toHaveTextContent("AC02 — Elma");
+    expect(screen.getByText("負責：").parentElement).toHaveTextContent("AC02 — Elma");
+    expect(screen.getByText("Team：").parentElement).toHaveTextContent("Retail");
+    openSalesDetails();
     expect(screen.getByLabelText("登入操作員")).toHaveTextContent("AC02 — Elma");
     fireEvent.click(screen.getByRole("combobox", { name: "負責銷售員" }));
     expect(screen.getByPlaceholderText("搜尋員工編號或姓名...")).toBeVisible();
@@ -78,6 +123,7 @@ describe("SalesIdSection assignment", () => {
       />,
     );
 
+    openSalesDetails();
     fireEvent.click(screen.getByRole("combobox", { name: "負責銷售員" }));
     fireEvent.change(screen.getByPlaceholderText("搜尋員工編號或姓名..."), {
       target: { value: "rita" },
@@ -101,6 +147,7 @@ describe("SalesIdSection assignment", () => {
       />,
     );
 
+    expect(screen.getByRole("button", { name: /^銷售員詳細設定/ })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("combobox", { name: "負責銷售員" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "負責銷售員" })).toHaveTextContent("AC03 — May");
     expect(screen.getByLabelText("Sales Team")).toHaveTextContent("Corporate");
@@ -120,6 +167,7 @@ describe("SalesIdSection assignment", () => {
       />,
     );
 
+    expect(screen.getByRole("button", { name: /^銷售員詳細設定/ })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByLabelText("Sales Team")).toHaveTextContent("未連結 Sales Team");
     expect(screen.getByText(/Odoo Employees 連結 Sales Team/)).toBeVisible();
   });
@@ -150,6 +198,7 @@ describe("SalesIdSection assignment", () => {
       />,
     );
 
+    openSalesDetails();
     fireEvent.click(screen.getByRole("combobox", { name: "Sales Team" }));
     fireEvent.click(screen.getByRole("option", { name: "Corporate Events" }));
 
@@ -172,6 +221,7 @@ describe("SalesIdSection assignment", () => {
       />,
     );
 
+    openSalesDetails();
     expect(screen.getByRole("combobox", { name: "Sales Team" })).toBeDisabled();
   });
 });

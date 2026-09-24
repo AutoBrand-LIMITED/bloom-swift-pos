@@ -188,6 +188,7 @@ const OrderSummaryPanel = ({
         <Button
           type="button"
           size="lg"
+          variant={isOrderComplete ? "default" : "warning"}
           onClick={isOrderComplete ? onSubmit : onSaveIncomplete}
           disabled={isSaving}
           className="mt-4 min-h-12 w-full touch-manipulation text-base font-semibold shadow-md"

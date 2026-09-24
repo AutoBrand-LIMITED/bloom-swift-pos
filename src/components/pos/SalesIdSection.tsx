@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +10,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, ChevronsUpDown, UserCheck } from "lucide-react";
+import { Check, ChevronDown, ChevronsUpDown, UserCheck } from "lucide-react";
 import { salesStaffDisplayName } from "@/hooks/use-odoo-employees";
 import { cn } from "@/lib/utils";
 import type { PosEmployeeIdentity } from "@/lib/pos-auth";
@@ -78,15 +79,61 @@ const SalesIdSection = ({
     && salesTeamId
     && salesTeamId !== selectedStaff?.salesTeamId,
   );
+  const assignmentNeedsAttention = !salesId.trim()
+    || Boolean(staffError)
+    || Boolean(salesTeamsError)
+    || Boolean(selectedStaff && !hasLinkedSalesTeam)
+    || Boolean(
+      !staffLoading
+      && salespersonEmployeeId !== undefined
+      && !selectedStaff
+      && !salespersonIsLegacySnapshot
+    );
+  const [detailsOpen, setDetailsOpen] = useState(assignmentNeedsAttention);
+
+  useEffect(() => {
+    setDetailsOpen(assignmentNeedsAttention);
+  }, [assignmentNeedsAttention]);
+
+  const salespersonSummary = selectedStaff
+    ? salesStaffDisplayName(selectedStaff)
+    : salesId.trim() || "未指定";
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
-        <UserCheck className="w-4 h-4" />
-        銷售員
-      </h2>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <Collapsible
+      open={detailsOpen}
+      onOpenChange={setDetailsOpen}
+      className="overflow-hidden rounded-xl border border-border bg-card"
+    >
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          aria-label={`銷售員詳細設定，登入 ${employee?.salesLabel || "未登入"}，負責 ${salespersonSummary}，Sales Team ${salesTeamName || "未連結"}`}
+          className="flex min-h-11 w-full touch-manipulation items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+        >
+          <UserCheck className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">銷售員</span>
+            <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-foreground">
+              <span><span className="text-muted-foreground">登入：</span>{employee?.salesLabel || "未登入"}</span>
+              <span><span className="text-muted-foreground">負責：</span>{salespersonSummary}</span>
+              <span><span className="text-muted-foreground">Team：</span>{salesTeamName || "未連結"}</span>
+            </span>
+          </span>
+          {assignmentNeedsAttention && (
+            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-medium text-amber-800">
+              需要處理
+            </span>
+          )}
+          <ChevronDown
+            className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", detailsOpen && "rotate-180")}
+            aria-hidden="true"
+          />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="border-t border-border p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label className="text-xs">登入操作員</Label>
           <div
@@ -241,8 +288,10 @@ const SalesIdSection = ({
                     : "由 Odoo Employees 連結；選擇負責銷售員後會自動帶入。"}
           </p>
         </div>
-      </div>
-    </div>
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
 

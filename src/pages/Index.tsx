@@ -1,5 +1,15 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { AlertTriangle, Calculator, ClipboardList, HandCoins, LogOut, RotateCcw, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -392,6 +402,7 @@ const Index = () => {
   const [orderRecordsRefreshKey, setOrderRecordsRefreshKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingIncomplete, setIsSavingIncomplete] = useState(false);
+  const [incompleteSaveConfirmationOpen, setIncompleteSaveConfirmationOpen] = useState(false);
   const workflowHeaderRef = useRef<HTMLElement | null>(null);
   const workflowSectionRefs = useRef<Record<WorkflowSectionId, HTMLElement | null>>({
     customer: null,
@@ -2059,6 +2070,11 @@ const Index = () => {
     }
   };
 
+  const requestSaveIncomplete = () => {
+    if (isSubmitting || isSavingIncomplete) return;
+    setIncompleteSaveConfirmationOpen(true);
+  };
+
   const handleSubmit = async () => {
     if (isSubmitting) return;
     if (!pendingSubmission && !validateCustomerAccount()) return;
@@ -3276,7 +3292,7 @@ const Index = () => {
               isSubmitting={isSubmitting}
               isSavingIncomplete={isSavingIncomplete}
               onSubmit={handleSubmit}
-              onSaveIncomplete={handleSaveIncomplete}
+              onSaveIncomplete={requestSaveIncomplete}
               onNavigate={scrollToWorkflowSection}
             />
           </div>
@@ -3295,9 +3311,10 @@ const Index = () => {
             <p className="truncate font-mono text-xl font-bold tracking-tight sm:text-2xl">${formatMoney(finalPrice)}</p>
           </div>
           <Button
-            onClick={isOrderComplete ? handleSubmit : handleSaveIncomplete}
+            onClick={isOrderComplete ? handleSubmit : requestSaveIncomplete}
             disabled={isSubmitting || isSavingIncomplete}
             size="lg"
+            variant={isOrderComplete ? "default" : "warning"}
             className="shrink-0 px-4 text-base font-semibold shadow-lg sm:px-8"
           >
             {isSubmitting || isSavingIncomplete
@@ -3308,6 +3325,29 @@ const Index = () => {
           </Button>
         </div>
       </div>}
+
+      <AlertDialog
+        open={incompleteSaveConfirmationOpen}
+        onOpenChange={setIncompleteSaveConfirmationOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確認儲存未完成訂單？</AlertDialogTitle>
+            <AlertDialogDescription>
+              此訂單尚有必填資料未完成，會儲存為 Odoo 草稿，之後可從訂單記錄繼續填寫。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-warning text-warning-foreground hover:bg-warning/90 focus-visible:ring-warning"
+              onClick={() => { void handleSaveIncomplete(); }}
+            >
+              確認儲存未完成訂單
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Order history drawer */}
       <OrderHistory

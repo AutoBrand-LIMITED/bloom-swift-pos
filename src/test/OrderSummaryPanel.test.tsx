@@ -72,6 +72,7 @@ describe("OrderSummaryPanel", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSaveIncomplete).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "儲存未完成訂單" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "儲存訂單" })).toHaveClass("bg-primary");
   });
 
   it("saves an intentionally incomplete order separately from final checkout", () => {
@@ -92,6 +93,7 @@ describe("OrderSummaryPanel", () => {
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "儲存訂單" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "確認訂單" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "儲存未完成訂單" })).toHaveClass("bg-warning");
   });
 
   it("summarizes grab-and-go without showing delivery requirements", () => {

@@ -17,6 +17,7 @@ const odooMocks = vi.hoisted(() => ({
   getOdooProducts: vi.fn(),
   getOperationalOrders: vi.fn(),
   searchOdooOrderRecords: vi.fn(),
+  saveIncompleteOdooOrder: vi.fn(),
 }));
 
 vi.mock("@/lib/odoo-api", async (importOriginal) => {
@@ -177,6 +178,7 @@ describe("Index customer defaults", () => {
       truncated: false,
       orders: [],
     });
+    odooMocks.saveIncompleteOdooOrder.mockResolvedValue({ id: 701, name: "S00701" });
   });
 
   it("defaults sender to the selected contact and preserves a later manual override", async () => {
@@ -230,6 +232,28 @@ describe("Index customer defaults", () => {
     expect(screen.getByTestId("code-confirmed")).toHaveTextContent("false");
     expect(screen.getByTestId("selected-partner")).toBeEmptyDOMElement();
     expect(screen.queryByLabelText("今次使用 Customer Credit 金額")).not.toBeInTheDocument();
+  });
+
+  it("uses one confirmation flow for desktop and mobile incomplete-save buttons", async () => {
+    render(<MemoryRouter><Index /></MemoryRouter>);
+    await waitFor(() => expect(odooMocks.getOperationalOrders).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByRole("button", { name: "選擇測試聯絡人" }));
+    fireEvent.click(screen.getByRole("button", { name: "加入測試商品" }));
+
+    const incompleteButtons = screen.getAllByRole("button", { name: "儲存未完成訂單" });
+    expect(incompleteButtons).toHaveLength(2);
+    incompleteButtons.forEach((button) => expect(button).toHaveClass("bg-warning"));
+
+    fireEvent.click(incompleteButtons[0]);
+    expect(screen.getByRole("alertdialog")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(odooMocks.saveIncompleteOdooOrder).not.toHaveBeenCalled();
+
+    fireEvent.click(incompleteButtons[1]);
+    fireEvent.click(screen.getByRole("button", { name: "確認儲存未完成訂單" }));
+    await waitFor(() => expect(odooMocks.saveIncompleteOdooOrder).toHaveBeenCalledOnce());
   });
 it("keeps a resumed draft bound to its original partner across code edits and selection", async () => {
   odooMocks.getOdooCustomer.mockResolvedValue({ id: "odoo-99", odooPartnerId: 99,
