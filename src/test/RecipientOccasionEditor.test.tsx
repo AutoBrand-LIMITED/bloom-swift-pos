@@ -21,7 +21,7 @@ describe("RecipientOccasionEditor", () => {
       autoDateFromDelivery: true,
     }]);
     expect(screen.queryByRole("textbox", { name: /日期/ })).not.toBeInTheDocument();
-    expect(screen.getByText("日期自動跟收貨點送貨日；無需輸入年份。")).toBeVisible();
+    expect(screen.getByText("未有紀錄")).toBeVisible();
   });
 
   it("requires a delivery date before adding an occasion", () => {
@@ -30,7 +30,7 @@ describe("RecipientOccasionEditor", () => {
     );
 
     expect(screen.getByRole("button", { name: "新增收花人重要日子" })).toBeDisabled();
-    expect(screen.getByText("請先選擇這個收貨點的送貨日期。")).toBeVisible();
+    expect(screen.getByText("先選擇送貨日期")).toBeVisible();
   });
 
   it("keeps saved contact occasions and allows editing their type and label", () => {

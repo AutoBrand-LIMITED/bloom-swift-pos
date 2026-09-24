@@ -66,15 +66,24 @@ const RecipientOccasionEditor = ({
   };
 
   return (
-    <fieldset className="space-y-2 rounded-lg border border-border bg-muted/10 p-3">
+    <fieldset className="space-y-2">
       <legend className="sr-only">{label}</legend>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold">{label}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="text-xs font-medium">收花人重要日子</p>
+          <span className="text-[11px] text-muted-foreground">
+            {occasions.length > 0
+              ? `${occasions.length} 項`
+              : deliveryDate
+                ? "未有紀錄"
+                : "先選擇送貨日期"}
+          </span>
+        </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="min-h-11 touch-manipulation"
+          className="h-8 gap-1 px-2 text-xs touch-manipulation"
           disabled={disabled || !deliveryDate}
           onClick={() => onChange([...occasions, {
             type: "birthday",
@@ -83,25 +92,21 @@ const RecipientOccasionEditor = ({
           }])}
           aria-label={`新增${label}`}
         >
-          <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />新增
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />新增
         </Button>
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        {deliveryDate
-          ? "日期自動跟收貨點送貨日；無需輸入年份。"
-          : "請先選擇這個收貨點的送貨日期。"}
-      </p>
-      {occasions.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">未有重要日子；需要時可新增多項。</p>
-      ) : occasions.map((occasion, index) => {
+      {occasions.length > 0 && (
+        <p className="text-[10px] text-muted-foreground">日期沿用收貨點送貨日，無需輸入年份。</p>
+      )}
+      {occasions.map((occasion, index) => {
         const rowLabel = `${label} ${index + 1}`;
         return (
           <div
             key={`${occasion.id ?? "new"}-${index}`}
-            className="grid gap-2 rounded-md border border-border bg-background p-2 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)_44px]"
+            className="grid items-end gap-2 border-t border-border/70 pt-2 sm:grid-cols-[minmax(0,1fr)_minmax(130px,0.55fr)_36px]"
           >
-            <div className="space-y-1">
-              <Label className="text-[11px]">類型</Label>
+            <div>
+              <Label className="sr-only">類型</Label>
               <Select
                 value={occasion.type}
                 disabled={disabled}
@@ -110,7 +115,7 @@ const RecipientOccasionEditor = ({
                   ...(type === "other" ? {} : { label: undefined }),
                 })}
               >
-                <SelectTrigger className="min-h-11 touch-manipulation" aria-label={`${rowLabel} 類型`}>
+                <SelectTrigger className="h-9 touch-manipulation text-sm" aria-label={`${rowLabel} 類型`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -120,11 +125,11 @@ const RecipientOccasionEditor = ({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-[11px]">日期</Label>
+            <div>
+              <Label className="sr-only">日期</Label>
               <div
                 aria-label={`${rowLabel} 日期`}
-                className="flex min-h-11 items-center rounded-md border border-input bg-muted/20 px-3 text-sm"
+                className="flex h-9 items-center rounded-md border border-input bg-muted/20 px-3 text-sm"
               >
                 {monthDayLabel(occasion.date)}
               </div>
@@ -133,7 +138,7 @@ const RecipientOccasionEditor = ({
               type="button"
               variant="ghost"
               size="icon"
-              className="min-h-11 min-w-11 self-end touch-manipulation text-destructive"
+              className="h-9 w-9 touch-manipulation text-destructive"
               disabled={disabled}
               onClick={() => onChange(occasions.filter((_, candidateIndex) => candidateIndex !== index).map((entry) => ({ ...entry })))}
               aria-label={`移除${rowLabel}`}
@@ -141,8 +146,8 @@ const RecipientOccasionEditor = ({
               <Trash2 className="h-4 w-4" aria-hidden="true" />
             </Button>
             {occasion.type === "other" && (
-              <div className="space-y-1 sm:col-span-3">
-                <Label className="text-[11px]">自訂名稱 *</Label>
+              <div className="sm:col-span-3">
+                <Label className="sr-only">自訂名稱 *</Label>
                 <Input
                   required
                   maxLength={200}
@@ -150,7 +155,8 @@ const RecipientOccasionEditor = ({
                   value={occasion.label || ""}
                   onChange={(event) => update(index, { label: event.target.value })}
                   aria-label={`${rowLabel} 自訂名稱`}
-                  className="min-h-11 touch-manipulation"
+                  className="h-9 touch-manipulation text-sm"
+                  placeholder="輸入重要日子名稱"
                 />
               </div>
             )}
