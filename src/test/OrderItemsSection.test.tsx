@@ -113,6 +113,16 @@ describe("OrderItemsSection legacy line snapshots", () => {
     expect(screen.queryByRole("button", { name: "調整商品目錄高度" })).not.toBeInTheDocument();
   });
 
+  it("opens the large product picker for ordinary staff", () => {
+    renderItems([]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Full View" }));
+
+    expect(screen.getByRole("dialog", { name: "商品 Full View" })).toBeVisible();
+    expect(screen.getByLabelText("Full View 搜尋商品")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "管理" })).not.toBeInTheDocument();
+  });
+
   it("shows product management only to managers", () => {
     const props = {
       items: [] as OrderItem[],

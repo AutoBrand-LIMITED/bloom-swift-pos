@@ -17,11 +17,13 @@ import {
   Loader2,
   RefreshCw,
   Settings2,
+  Maximize2,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
 import CustomOrderDialog from "@/components/pos/CustomOrderDialog";
 import ProductManagementDialog from "@/components/pos/ProductManagementDialog";
+import ProductCatalogDialog from "@/components/pos/ProductCatalogDialog";
 import DeliveryFeeManagementDialog from "@/components/pos/DeliveryFeeManagementDialog";
 import {
   getOdooProductCategories,
@@ -86,6 +88,7 @@ const OrderItemsSection = ({
   const [activeCategory, setActiveCategory] = useState<number | "all">("all");
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogFullViewOpen, setCatalogFullViewOpen] = useState(false);
   const [productManagerOpen, setProductManagerOpen] = useState(false);
   const [deliveryFeeManagerOpen, setDeliveryFeeManagerOpen] = useState(false);
   const [deliveryFeeOptions, setDeliveryFeeOptions] = useState<DeliveryFeeOption[]>(
@@ -252,6 +255,23 @@ const OrderItemsSection = ({
         />
       )}
 
+      <ProductCatalogDialog
+        open={catalogFullViewOpen}
+        onOpenChange={setCatalogFullViewOpen}
+        products={filteredCatalogProducts}
+        totalCount={catalogProducts.length}
+        categories={catalogCategories}
+        query={catalogQuery}
+        onQueryChange={setCatalogQuery}
+        activeCategory={activeCategory}
+        onActiveCategoryChange={setActiveCategory}
+        onSelectProduct={addCatalogProduct}
+        orderItemCount={items.length}
+        loading={catalogLoading}
+        error={catalogError}
+        onRetry={() => void loadCatalog()}
+      />
+
       {/* Budget */}
       <div className="rounded-lg border border-border bg-secondary/30">
         <button
@@ -323,6 +343,16 @@ const OrderItemsSection = ({
             {!catalogLoading && catalogProducts.length > 0 && (
               <span>{filteredCatalogProducts.length} / {catalogProducts.length}</span>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={() => setCatalogFullViewOpen(true)}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              Full View
+            </Button>
             {canManageProducts && (
               <Button
                 type="button"
