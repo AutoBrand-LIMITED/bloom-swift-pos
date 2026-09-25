@@ -47,6 +47,7 @@ interface OrderItemsSectionProps {
   deliveryFee: number;
   deliveryFeeOptionId?: number;
   deliveryFeeLabel?: string;
+  canManageProducts?: boolean;
   canManageDeliveryFees?: boolean;
   deliveryFeeEnabled?: boolean;
   urgentFee: number;
@@ -69,7 +70,8 @@ const DEMO_DELIVERY_FEES: DeliveryFeeOption[] = [
 
 const OrderItemsSection = ({
   items, onItemsChange,
-  deliveryFee, deliveryFeeOptionId, deliveryFeeLabel, canManageDeliveryFees = false,
+  deliveryFee, deliveryFeeOptionId, deliveryFeeLabel,
+  canManageProducts = false, canManageDeliveryFees = false,
   deliveryFeeEnabled = true, urgentFee,
   onDeliveryFeeChange, onDeliveryFeeSelectionChange, onUrgentFeeChange,
   onCustomOrderSummary,
@@ -241,12 +243,14 @@ const OrderItemsSection = ({
         }}
       />
 
-      <ProductManagementDialog
-        open={productManagerOpen}
-        onOpenChange={setProductManagerOpen}
-        categories={catalogCategories}
-        onCatalogChanged={() => void loadCatalog()}
-      />
+      {canManageProducts && (
+        <ProductManagementDialog
+          open={productManagerOpen}
+          onOpenChange={setProductManagerOpen}
+          categories={catalogCategories}
+          onCatalogChanged={() => void loadCatalog()}
+        />
+      )}
 
       {/* Budget */}
       <div className="rounded-lg border border-border bg-secondary/30">
@@ -319,16 +323,18 @@ const OrderItemsSection = ({
             {!catalogLoading && catalogProducts.length > 0 && (
               <span>{filteredCatalogProducts.length} / {catalogProducts.length}</span>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 px-2 text-xs"
-              onClick={() => setProductManagerOpen(true)}
-            >
-              <Settings2 className="h-3.5 w-3.5" />
-              管理
-            </Button>
+            {canManageProducts && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                onClick={() => setProductManagerOpen(true)}
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                管理
+              </Button>
+            )}
           </div>
         </div>
 

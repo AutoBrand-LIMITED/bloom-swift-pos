@@ -3038,6 +3038,7 @@ const Index = () => {
           deliveryFee={deliveryFee}
           deliveryFeeOptionId={deliveryFeeOptionId}
           deliveryFeeLabel={deliveryFeeLabel}
+          canManageProducts={employee?.role === "manager"}
           canManageDeliveryFees={employee?.role === "manager"}
           deliveryFeeEnabled={fulfillmentType === "delivery"}
           urgentFee={urgentFee}

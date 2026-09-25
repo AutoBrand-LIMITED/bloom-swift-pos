@@ -113,6 +113,27 @@ describe("OrderItemsSection legacy line snapshots", () => {
     expect(screen.queryByRole("button", { name: "調整商品目錄高度" })).not.toBeInTheDocument();
   });
 
+  it("shows product management only to managers", () => {
+    const props = {
+      items: [] as OrderItem[],
+      onItemsChange: vi.fn(),
+      deliveryFee: 0,
+      urgentFee: 0,
+      onDeliveryFeeChange: vi.fn(),
+      onUrgentFeeChange: vi.fn(),
+      onCustomOrderSummary: vi.fn(),
+      budget: 0,
+      onBudgetChange: vi.fn(),
+      subtotal: 0,
+    };
+    const { rerender } = render(<OrderItemsSection {...props} />);
+
+    expect(screen.queryByRole("button", { name: "管理" })).not.toBeInTheDocument();
+
+    rerender(<OrderItemsSection {...props} canManageProducts />);
+    expect(screen.getByRole("button", { name: "管理" })).toBeVisible();
+  });
+
   it("locks an existing product name and offers only five-percent discount steps", () => {
     renderItems([{ id: "line-1", name: "花束", price: 680, quantity: 1 }]);
 
