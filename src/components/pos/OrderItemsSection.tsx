@@ -266,7 +266,9 @@ const OrderItemsSection = ({
         activeCategory={activeCategory}
         onActiveCategoryChange={setActiveCategory}
         onSelectProduct={addCatalogProduct}
-        orderItemCount={items.length}
+        orderItems={items}
+        onItemQuantityChange={(itemId, quantity) => updateItem(itemId, "quantity", quantity)}
+        onRemoveItem={removeItem}
         loading={catalogLoading}
         error={catalogError}
         onRetry={() => void loadCatalog()}
