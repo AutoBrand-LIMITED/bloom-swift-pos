@@ -57,8 +57,13 @@ describe("OrderItemsSection legacy line snapshots", () => {
     );
 
     expect(screen.queryByLabelText("花束 包裝")).not.toBeInTheDocument();
+    const remarksToggle = screen.getByRole("button", { name: "花束 項目備註 未填寫" });
+    expect(remarksToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("花束 項目備註內容")).not.toBeInTheDocument();
 
-    const remarks = screen.getByLabelText("花束 項目備註");
+    fireEvent.click(remarksToggle);
+
+    const remarks = screen.getByLabelText("花束 項目備註內容");
     expect(remarks.tagName).toBe("TEXTAREA");
     fireEvent.change(remarks, { target: { value: "白色絲帶\n星期五前完成" } });
     expect(onItemsChange).toHaveBeenLastCalledWith([
@@ -103,6 +108,29 @@ describe("OrderItemsSection legacy line snapshots", () => {
       target: { value: "1200" },
     });
     expect(onBudgetChange).toHaveBeenCalledWith(1200);
+  });
+
+  it("keeps manual item creation collapsed and closes it after adding", () => {
+    const onItemsChange = vi.fn();
+    renderItems([], onItemsChange);
+
+    const toggle = screen.getByRole("button", { name: /新增項目/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByPlaceholderText("例如：玫瑰花束、植物盆栽")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    fireEvent.change(screen.getByPlaceholderText("例如：玫瑰花束、植物盆栽"), {
+      target: { value: "自訂花束" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "新增項目價格" }), {
+      target: { value: "380" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "加入" }));
+
+    expect(onItemsChange).toHaveBeenCalledWith([
+      expect.objectContaining({ name: "自訂花束", price: 380, quantity: 1 }),
+    ]);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
   it("keeps the product catalog compact without an expand or collapse control", () => {

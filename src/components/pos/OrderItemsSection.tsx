@@ -98,6 +98,8 @@ const OrderItemsSection = ({
   const [deliveryFeeError, setDeliveryFeeError] = useState<string | null>(null);
   const [deliveryFeeRefreshKey, setDeliveryFeeRefreshKey] = useState(0);
   const [budgetExpanded, setBudgetExpanded] = useState(false);
+  const [manualItemExpanded, setManualItemExpanded] = useState(false);
+  const [expandedItemRemarks, setExpandedItemRemarks] = useState<Set<string>>(() => new Set());
   const selectedDeliveryFee = deliveryFeeOptions.find((option) => option.id === deliveryFeeOptionId);
   const hasLegacyDeliveryFee = deliveryFee > 0 && (
     !selectedDeliveryFee
@@ -201,10 +203,17 @@ const OrderItemsSection = ({
     ]);
     setNewName("");
     setNewPrice("");
+    setManualItemExpanded(false);
   };
 
   const removeItem = (id: string) => {
     onItemsChange(items.filter((i) => i.id !== id));
+    setExpandedItemRemarks((current) => {
+      if (!current.has(id)) return current;
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
   };
 
   const updateItem = (id: string, field: keyof OrderItem, value: string | number) => {
@@ -218,6 +227,15 @@ const OrderItemsSection = ({
       discountPercent: 0,
       discountAmount: 0,
     } : item));
+  };
+
+  const toggleItemRemarks = (id: string) => {
+    setExpandedItemRemarks((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   return (
@@ -460,6 +478,8 @@ const OrderItemsSection = ({
         <div className="space-y-2">
           {items.map((item) => {
             const requiresAdjustmentReason = orderLineAdjustmentRequiresReason(item);
+            const remarksExpanded = expandedItemRemarks.has(item.id);
+            const hasRemarks = Boolean(item.remarks?.trim());
             return (
               <div key={item.id} className="space-y-2 rounded-lg bg-secondary/50 p-3">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_112px_104px_112px_72px_40px] sm:items-end">
@@ -578,16 +598,37 @@ const OrderItemsSection = ({
                   <span className="font-mono font-semibold">小計 ${formatMoney(orderItemTotal(item))}</span>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-[11px] text-muted-foreground">項目備註</Label>
-                  <Textarea
-                    aria-label={`${item.name} 項目備註`}
-                    value={item.remarks || ""}
-                    onChange={(event) => updateItem(item.id, "remarks", event.target.value)}
-                    className="min-h-20 resize-y bg-card text-sm"
-                    placeholder="可自由填寫只適用於此項目嘅備註"
-                    maxLength={1000}
-                  />
+                <div className="rounded-lg border border-border bg-card/60">
+                  <button
+                    type="button"
+                    className="flex min-h-10 w-full items-center gap-2 px-3 py-2 text-left"
+                    aria-expanded={remarksExpanded}
+                    aria-controls={`item-remarks-${item.id}`}
+                    aria-label={`${item.name} 項目備註 ${hasRemarks ? "已填寫" : "未填寫"}`}
+                    onClick={() => toggleItemRemarks(item.id)}
+                  >
+                    <span className="text-xs font-medium">項目備註</span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {hasRemarks ? "已填寫" : "未填寫"}
+                    </span>
+                    {remarksExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                  {remarksExpanded && (
+                    <div id={`item-remarks-${item.id}`} className="border-t border-border p-3">
+                      <Textarea
+                        aria-label={`${item.name} 項目備註內容`}
+                        value={item.remarks || ""}
+                        onChange={(event) => updateItem(item.id, "remarks", event.target.value)}
+                        className="min-h-20 resize-y bg-card text-sm"
+                        placeholder="可自由填寫只適用於此項目嘅備註"
+                        maxLength={1000}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {requiresAdjustmentReason && (
@@ -615,34 +656,57 @@ const OrderItemsSection = ({
       )}
 
       {/* Add new item */}
-      <div className="flex items-end gap-2">
-        <div className="flex-1 space-y-1">
-          <Label className="text-xs">新增項目</Label>
-          <Input
-            placeholder="例如：玫瑰花束、植物盆栽"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addItem()}
-            className="text-sm"
-            maxLength={100}
-          />
-        </div>
-        <div className="w-28 space-y-1">
-          <Label className="text-xs">價格 ($)</Label>
-          <Input
-            type="number"
-            placeholder="0"
-            value={newPrice}
-            onChange={(e) => setNewPrice(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addItem()}
-            className="text-sm font-mono"
-            min={0}
-            step="1"
-          />
-        </div>
-        <Button onClick={addItem} size="default" variant="outline" className="gap-1.5">
-          <Plus className="w-4 h-4" /> 加入
-        </Button>
+      <div className="rounded-lg border border-border bg-secondary/20">
+        <button
+          type="button"
+          className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left"
+          aria-expanded={manualItemExpanded}
+          aria-controls="manual-item-content"
+          onClick={() => setManualItemExpanded((expanded) => !expanded)}
+        >
+          <Plus className="h-4 w-4 text-primary" />
+          <span className="text-xs font-medium">新增項目</span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {newName.trim() ? "未加入" : "選填"}
+          </span>
+          {manualItemExpanded ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+        {manualItemExpanded && (
+          <div id="manual-item-content" className="flex items-end gap-2 border-t border-border p-3">
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs">項目名稱</Label>
+              <Input
+                placeholder="例如：玫瑰花束、植物盆栽"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addItem()}
+                className="text-sm"
+                maxLength={100}
+              />
+            </div>
+            <div className="w-28 space-y-1">
+              <Label className="text-xs">價格 ($)</Label>
+              <Input
+                type="number"
+                aria-label="新增項目價格"
+                placeholder="0"
+                value={newPrice}
+                onChange={(e) => setNewPrice(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addItem()}
+                className="text-sm font-mono"
+                min={0}
+                step="1"
+              />
+            </div>
+            <Button onClick={addItem} size="default" variant="outline" className="gap-1.5">
+              <Plus className="w-4 h-4" /> 加入
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Quick add fees */}
