@@ -24,6 +24,7 @@ interface OrderSummaryPanelProps {
   requiredSectionCount: number;
   isSubmitting: boolean;
   isSavingIncomplete: boolean;
+  hasDraftContent: boolean;
   onSubmit: () => void;
   onSaveIncomplete: () => void;
   onNavigate: (section: WorkflowSectionId) => void;
@@ -72,6 +73,7 @@ const OrderSummaryPanel = ({
   requiredSectionCount,
   isSubmitting,
   isSavingIncomplete,
+  hasDraftContent,
   onSubmit,
   onSaveIncomplete,
   onNavigate,
@@ -190,9 +192,9 @@ const OrderSummaryPanel = ({
         <Button
           type="button"
           size="lg"
-          variant={isOrderComplete ? "default" : "warning"}
+          variant={isOrderComplete ? "default" : hasDraftContent ? "warning" : "secondary"}
           onClick={isOrderComplete ? onSubmit : onSaveIncomplete}
-          disabled={isSaving}
+          disabled={isSaving || (!isOrderComplete && !hasDraftContent)}
           className="mt-4 min-h-12 w-full touch-manipulation text-base font-semibold shadow-md"
         >
           {isSaving

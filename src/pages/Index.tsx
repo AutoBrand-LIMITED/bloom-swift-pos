@@ -778,6 +778,61 @@ const Index = () => {
     paymentSectionComplete,
   ].filter(Boolean).length;
   const isOrderComplete = completedRequiredSectionCount === 4;
+  const hasOrderDraftContent = Boolean(
+    pendingSubmission
+      || selectedCustomer
+      || customerCode.trim()
+      || phone.trim()
+      || alternatePhone.trim()
+      || customerName.trim()
+      || senderName.trim()
+      || customerEmail.trim()
+      || customerType !== "personal"
+      || companyName.trim()
+      || billingAddress.trim()
+      || customerGroupId !== undefined
+      || customerGroup.trim()
+      || senderDoNumber.trim()
+      || recipientDoNumber.trim()
+      || sourceReference.trim()
+      || terms.trim()
+      || budget > 0
+      || items.length > 0
+      || deliveryFee > 0
+      || urgentFee > 0
+      || fulfillmentType !== "delivery"
+      || deliveryDate.trim()
+      || deliveryTime.trim()
+      || deliveryTimeMode
+      || deliveryRegion.trim()
+      || deliveryDistrict.trim()
+      || deliveryArea.trim()
+      || deliveryDetail.trim()
+      || deliveryBuilding.trim()
+      || deliveryFloor.trim()
+      || deliveryUnit.trim()
+      || recipientType !== "personal"
+      || recipientCompanyName.trim()
+      || recipientName.trim()
+      || recipientPhone.trim()
+      || recipientOccasions.length > 0
+      || deliveryPerson.trim()
+      || failedDeliveryAction !== "none"
+      || deliverySplits.length > 0
+      || giftCardEnabled
+      || giftCardMessage.trim()
+      || senderNote.trim()
+      || deliveryNote.trim()
+      || internalNote.trim()
+      || senderContactDraft.trim()
+      || recipientContactDraft.trim()
+      || paymentStatus !== "unpaid"
+      || depositAmount > 0
+      || customerCreditAmount > 0
+      || paymentMethod
+      || paymentReference.trim()
+      || priceOverridden,
+  );
   const hasSalesperson = salesId.trim().length > 0;
 
   const scrollToWorkflowSection = useCallback((sectionId: WorkflowSectionId) => {
@@ -3317,6 +3372,7 @@ const Index = () => {
               requiredSectionCount={4}
               isSubmitting={isSubmitting}
               isSavingIncomplete={isSavingIncomplete}
+              hasDraftContent={hasOrderDraftContent}
               onSubmit={handleSubmit}
               onSaveIncomplete={requestSaveIncomplete}
               onNavigate={scrollToWorkflowSection}
@@ -3338,9 +3394,9 @@ const Index = () => {
           </div>
           <Button
             onClick={isOrderComplete ? handleSubmit : requestSaveIncomplete}
-            disabled={isSubmitting || isSavingIncomplete}
+            disabled={isSubmitting || isSavingIncomplete || (!isOrderComplete && !hasOrderDraftContent)}
             size="lg"
-            variant={isOrderComplete ? "default" : "warning"}
+            variant={isOrderComplete ? "default" : hasOrderDraftContent ? "warning" : "secondary"}
             className="shrink-0 px-4 text-base font-semibold shadow-lg sm:px-8"
           >
             {isSubmitting || isSavingIncomplete

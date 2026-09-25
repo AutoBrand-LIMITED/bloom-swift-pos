@@ -355,6 +355,34 @@ describe("CustomerSection gift sender", () => {
     expect(screen.queryByRole("option", { name: /Corporate|VIP Wholesale/ })).not.toBeInTheDocument();
   });
 
+  it("does not show the Contact Tags sync error before any customer data is entered", () => {
+    render(
+      <CustomerSection
+        phone=""
+        customerName=""
+        customerCode=""
+        senderName=""
+        customerType="personal"
+        companyName=""
+        customerGroups={[]}
+        customerGroupsError="Forbidden"
+        {...emptyBusinessProps}
+        onPhoneChange={noop}
+        onNameChange={noop}
+        onCustomerCodeChange={noop}
+        onSenderNameChange={noop}
+        onCustomerTypeChange={noop}
+        onCompanyNameChange={noop}
+        onCustomerSelect={selectCustomer}
+        onCustomerAndRecipientSelect={selectCustomerAndRecipient}
+        selectedCustomer={null}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "客戶群組（選填）" })).toBeDisabled();
+    expect(screen.queryByText(/未能同步 Odoo Contact Tags/)).not.toBeInTheDocument();
+  });
+
   it("marks required customer fields invalid and exposes inline alerts", () => {
     render(
       <CustomerSection

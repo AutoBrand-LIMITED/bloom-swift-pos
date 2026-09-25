@@ -28,10 +28,38 @@ const baseProps = {
   requiredSectionCount: 4,
   isSubmitting: false,
   isSavingIncomplete: false,
+  hasDraftContent: true,
   onSaveIncomplete: vi.fn(),
 };
 
 describe("OrderSummaryPanel", () => {
+  it("keeps the incomplete-save action neutral and disabled before the order starts", () => {
+    render(
+      <OrderSummaryPanel
+        {...baseProps}
+        customerName=""
+        phone=""
+        recipientName=""
+        recipientPhone=""
+        deliveryDate=""
+        deliveryTime=""
+        items={[]}
+        deliveryFee={0}
+        urgentFee={0}
+        finalPrice={0}
+        completedCount={0}
+        hasDraftContent={false}
+        onSubmit={() => undefined}
+        onNavigate={() => undefined}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "儲存未完成訂單" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveClass("bg-secondary");
+    expect(button).not.toHaveClass("bg-warning");
+  });
+
   it("shows the live order, delivery and completion summary", () => {
     render(
       <OrderSummaryPanel

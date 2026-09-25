@@ -154,6 +154,18 @@ const CustomerSection = ({
   const previousAlternatePhoneRef = useRef(alternatePhone);
   const selectedCustomerGroup = customerGroups.find((group) => group.id === customerGroupId);
   const customerGroupIsLegacySnapshot = customerGroupId === undefined && Boolean(customerGroup.trim());
+  const hasCustomerIdentityInput = Boolean(
+    selectedCustomer
+      || customerCode.trim()
+      || phone.trim()
+      || alternatePhone.trim()
+      || customerName.trim()
+      || senderName.trim()
+      || customerEmail.trim()
+      || companyName.trim()
+      || billingAddress.trim(),
+  );
+  const showCustomerGroupsError = Boolean(customerGroupsError) && hasCustomerIdentityInput;
   const customerGroupDisabled = customerGroupLocked
     || customerGroupsLoading
     || Boolean(customerGroupsError)
@@ -1366,7 +1378,7 @@ const CustomerSection = ({
         {customerGroupIsLegacySnapshot && (
           <p className="text-[10px] text-muted-foreground">舊訂單快照；不會當成新 Contact Tag 選項。</p>
         )}
-        {customerGroupsError && (
+        {showCustomerGroupsError && (
           <p role="status" className="text-[10px] text-destructive">未能同步 Odoo Contact Tags；不會提供未驗證選項。</p>
         )}
         {!customerGroupsError && (
