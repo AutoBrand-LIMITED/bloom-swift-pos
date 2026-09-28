@@ -681,6 +681,8 @@ export interface DayEndPaymentRow {
   orderDate: string | null;
   invoiceReference: string | null;
   customerName: string | null;
+  teamKey?: string;
+  teamName?: string;
 }
 
 export interface DayEndOrderRow {
@@ -705,6 +707,18 @@ export interface DayEndOrderRow {
   recipientName: string | null;
   recipientPhone: string | null;
   deliveryAddress: string | null;
+  teamKey?: string;
+  teamName?: string;
+}
+
+export interface DayEndTeamSummary {
+  key: string;
+  label: string;
+  orderCount: number;
+  saleTotal: number;
+  receivedToday: number;
+  receivedForOtherDays: number;
+  totalMoneyReceived: number;
 }
 
 export interface DayEndSection {
@@ -723,10 +737,12 @@ interface DayEndSummaryBase {
   date: string;
   timezone: string;
   generatedAt: string;
+  selectedTeam: string;
 }
 
 export interface AvailableDayEndSummary extends DayEndSummaryBase {
   odooAvailable: true;
+  teamSummaries: DayEndTeamSummary[];
   salesToday: DayEndSection;
   receivedForOtherDays: DayEndSection;
   totalMoneyReceived: number;
@@ -1958,12 +1974,12 @@ export async function getOdooCustomerGroups(signal?: AbortSignal): Promise<OdooN
   return (await res.json()) as OdooNamedReference[];
 }
 
-export async function getDayEndSummary(date: string, signal?: AbortSignal): Promise<DayEndSummary> {
+export async function getDayEndSummary(date: string, signal?: AbortSignal, team = "all"): Promise<DayEndSummary> {
   if (!BACKEND_URL) {
     throw new Error("Odoo backend is not configured");
   }
 
-  const res = await authenticatedFetch(`${BACKEND_URL}/day-end/summary?date=${encodeURIComponent(date)}`, {
+  const res = await authenticatedFetch(`${BACKEND_URL}/day-end/summary?date=${encodeURIComponent(date)}&team=${encodeURIComponent(team)}`, {
     headers: { "Content-Type": "application/json" },
     signal,
   });

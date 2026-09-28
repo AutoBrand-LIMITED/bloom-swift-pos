@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, Calculator, LogOut, Printer, RefreshCw, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDayEndMoney } from "@/lib/day-end";
 import {
   getDayEndSummary,
+  getOdooSalesTeams,
   hasOdooBackend,
   type DayEndOrderRow,
   type DayEndPaymentBucket,
   type DayEndPaymentRow,
   type DayEndSummary,
+  type DayEndTeamSummary,
 } from "@/lib/odoo-api";
+import type { OdooNamedReference } from "@/types/order";
 import { usePosAuth } from "@/components/auth/PosAuthContext";
 
 const todayString = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Hong_Kong" });
@@ -30,9 +33,22 @@ const DayEndSettlement = () => {
   const navigate = useNavigate();
   const { employee, logout } = usePosAuth();
   const [date, setDate] = useState(initialDateString);
+  const [team, setTeam] = useState("all");
+  const [activeTeams, setActiveTeams] = useState<OdooNamedReference[]>([]);
+  const [inputBy, setInputBy] = useState("");
+  const [checkBy, setCheckBy] = useState("");
   const [summary, setSummary] = useState<DayEndSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getOdooSalesTeams(controller.signal)
+      .then(setActiveTeams)
+      .catch(() => { /* Day-end totals remain usable if the team list is unavailable. */ });
+    return () => controller.abort();
+  }, []);
 
   const loadSummary = useCallback((signal?: AbortSignal) => {
     if (!hasOdooBackend) {
@@ -41,19 +57,28 @@ const DayEndSettlement = () => {
       return;
     }
 
+    const currentRequest = ++requestId.current;
     setLoading(true);
     setError(null);
-    getDayEndSummary(date, signal)
-      .then(setSummary)
+    setSummary(null);
+    getDayEndSummary(date, signal, team)
+      .then((data) => {
+        if (currentRequest !== requestId.current || signal?.aborted) return;
+        if (data.odooAvailable && (data.selectedTeam !== team || !Array.isArray(data.teamSummaries))) {
+          setError("日結後端尚未支援 Sales Team 篩選，請更新後再試。");
+          return;
+        }
+        setSummary(data);
+      })
       .catch((err: unknown) => {
-        if (signal?.aborted) return;
+        if (currentRequest !== requestId.current || signal?.aborted) return;
         setSummary(null);
         setError(err instanceof Error ? err.message : "讀取日結失敗");
       })
       .finally(() => {
-        if (!signal?.aborted) setLoading(false);
+        if (currentRequest === requestId.current && !signal?.aborted) setLoading(false);
       });
-  }, [date]);
+  }, [date, team]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -61,15 +86,33 @@ const DayEndSettlement = () => {
     return () => controller.abort();
   }, [loadSummary]);
 
+  const currentSummary = summary?.date === date && summary.selectedTeam === team ? summary : null;
+  const availableSummary = currentSummary?.odooAvailable ? currentSummary : null;
+  const odooUnavailable = currentSummary?.odooAvailable === false;
   const nonZeroBuckets = useMemo(
-    () => summary?.odooAvailable
-      ? (summary.paymentBuckets ?? summary.salesToday.buckets)
+    () => availableSummary
+      ? (availableSummary.paymentBuckets ?? availableSummary.salesToday.buckets)
         .filter((bucket) => bucket.amount || bucket.orderCount)
       : [],
-    [summary],
+    [availableSummary],
   );
-  const availableSummary = summary?.odooAvailable ? summary : null;
-  const odooUnavailable = summary?.odooAvailable === false;
+  const teamOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const item of activeTeams) options.set(String(item.id), item.name);
+    if (availableSummary) {
+      for (const item of availableSummary.teamSummaries ?? []) {
+        if (item.key !== "unassigned" && item.key !== "unmatched") options.set(item.key, item.label);
+      }
+    }
+    if (team !== "all" && team !== "unassigned" && team !== "unmatched" && !options.has(team)) {
+      options.set(team, `Sales Team #${team}`);
+    }
+    return [...options.entries()].sort((a, b) => a[1].localeCompare(b[1], "zh-HK"));
+  }, [activeTeams, availableSummary, team]);
+  const selectedTeamLabel = team === "all" ? "全部 Sales Teams"
+    : team === "unassigned" ? "未分配 Sales Team"
+      : team === "unmatched" ? "未匹配訂單收款"
+        : teamOptions.find(([key]) => key === team)?.[1] || `Sales Team #${team}`;
 
   return (
     <div className="day-end-page min-h-screen bg-background">
@@ -93,9 +136,24 @@ const DayEndSettlement = () => {
               aria-label="日結日期"
               type="date"
               value={date}
-              onChange={(event) => setDate(event.target.value)}
+              onChange={(event) => {
+                setDate(event.target.value);
+                setInputBy("");
+                setCheckBy("");
+              }}
               className="min-h-11 w-[150px]"
             />
+            <select
+              aria-label="Sales Team"
+              value={team}
+              onChange={(event) => setTeam(event.target.value)}
+              className="min-h-11 max-w-[220px] rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="all">全部 Sales Teams</option>
+              {teamOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              <option value="unassigned">未分配 Sales Team</option>
+              <option value="unmatched">未匹配訂單收款</option>
+            </select>
             <Button
               variant="outline"
               size="sm"
@@ -138,6 +196,7 @@ const DayEndSettlement = () => {
       </header>
 
       <main className="day-end-main max-w-7xl mx-auto px-4 py-5 space-y-5">
+        <p className="text-sm font-medium text-muted-foreground">{date} · {selectedTeamLabel}</p>
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive flex gap-2">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -153,7 +212,7 @@ const DayEndSettlement = () => {
             <AlertTriangle className="mx-auto h-9 w-9 text-amber-700" aria-hidden="true" />
             <h2 className="mt-3 text-lg font-semibold text-amber-950">Odoo 暫時無法使用</h2>
             <p className="mx-auto mt-2 max-w-xl text-sm text-amber-900">
-              {summary.availabilityMessage}
+              {currentSummary?.availabilityMessage}
             </p>
             <p className="mx-auto mt-2 max-w-xl text-xs text-amber-800">
               系統不會顯示訂單數、營業額、收款總額或訂單表，請在 Odoo 恢復後重新整理。
@@ -177,6 +236,17 @@ const DayEndSettlement = () => {
               <MetricCard label="Money received" value={formatDayEndMoney(availableSummary.totalMoneyReceived)} />
               <MetricCard label="Avg spend" value={formatDayEndMoney(availableSummary.salesToday.averageSpend)} />
             </div>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Sales Team 分佈</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TeamSummaryTable
+                  teams={availableSummary.teamSummaries.filter((item) => team === "all" || item.key === team)}
+                />
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader className="pb-3">
@@ -229,11 +299,11 @@ const DayEndSettlement = () => {
               <CardContent className="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
                 <div className="space-y-1">
                   <Label className="text-xs">Input by</Label>
-                  <Input placeholder="負責輸入同事名" />
+                  <Input placeholder="負責輸入同事名" value={inputBy} onChange={(event) => setInputBy(event.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Check by</Label>
-                  <Input placeholder="負責覆核同事名" />
+                  <Input placeholder="負責覆核同事名" value={checkBy} onChange={(event) => setCheckBy(event.target.value)} />
                 </div>
                 <div className="rounded-lg border bg-primary/5 px-4 py-3 text-right">
                   <p className="text-xs text-muted-foreground">總收款</p>
@@ -279,6 +349,34 @@ const BucketGrid = ({ buckets }: { buckets: DayEndPaymentBucket[] }) => (
   </div>
 );
 
+const TeamSummaryTable = ({ teams }: { teams: DayEndTeamSummary[] }) => (
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead>Sales Team</TableHead>
+        <TableHead className="text-right">訂單數</TableHead>
+        <TableHead className="text-right">落單金額</TableHead>
+        <TableHead className="text-right">新單收款</TableHead>
+        <TableHead className="text-right">舊單／未匹配收款</TableHead>
+        <TableHead className="text-right">總收款</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      {teams.map((team) => (
+        <TableRow key={team.key}>
+          <TableCell>{team.label}</TableCell>
+          <TableCell className="text-right font-mono">{team.orderCount}</TableCell>
+          <TableCell className="text-right font-mono">{formatDayEndMoney(team.saleTotal)}</TableCell>
+          <TableCell className="text-right font-mono">{formatDayEndMoney(team.receivedToday)}</TableCell>
+          <TableCell className="text-right font-mono">{formatDayEndMoney(team.receivedForOtherDays)}</TableCell>
+          <TableCell className="text-right font-mono font-semibold">{formatDayEndMoney(team.totalMoneyReceived)}</TableCell>
+        </TableRow>
+      ))}
+      {teams.length === 0 && <TableRow><TableCell colSpan={6} className="text-muted-foreground">沒有記錄</TableCell></TableRow>}
+    </TableBody>
+  </Table>
+);
+
 export const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
   if (!orders.length) {
     return <p className="text-sm text-muted-foreground">沒有記錄</p>;
@@ -308,7 +406,10 @@ export const OrderTable = ({ orders }: { orders: DayEndOrderRow[] }) => {
             </TableCell>
             <TableCell className="font-mono text-xs">{order.dateOrder}</TableCell>
             <TableCell>{order.customerName}</TableCell>
-            <TableCell>{order.salesperson || "-"}</TableCell>
+            <TableCell>
+              <div>{order.salesperson || "-"}</div>
+              {order.teamName && <div className="text-xs text-muted-foreground">{order.teamName}</div>}
+            </TableCell>
             <TableCell>
               <div>{statusLabel[order.paymentStatus] || order.paymentStatus}</div>
               <div className="text-xs text-muted-foreground">{order.paymentMethod || "未分類"}</div>
@@ -365,6 +466,7 @@ export const PaymentTable = ({ payments }: { payments: DayEndPaymentRow[] }) => 
               {!payment.orderName && (
                 <div className="text-xs text-muted-foreground break-all">{payment.checkoutKey}</div>
               )}
+              {payment.teamName && <div className="text-xs text-muted-foreground">{payment.teamName}</div>}
             </TableCell>
             <TableCell className="font-mono text-xs">{payment.orderDate || "-"}</TableCell>
             <TableCell>{payment.customerName || "-"}</TableCell>
