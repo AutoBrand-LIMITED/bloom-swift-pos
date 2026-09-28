@@ -1119,26 +1119,28 @@ const DeliverySection = ({
 
       {/* Recipient info */}
       <div ref={recipientLookupRef} className="space-y-3 border-t border-border pt-3">
-        <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
-          <div>
-            <Label htmlFor={`${recipientListboxId}-same-as-sender`} className="text-sm font-medium">
-              收貨人同送花人相同
-            </Label>
-            <p className="text-xs text-muted-foreground">一鍵套用送花人姓名、電話及公司資料。</p>
-          </div>
-          <Checkbox
-            id={`${recipientListboxId}-same-as-sender`}
-            aria-label="收貨人同送花人相同"
-            checked={recipientMatchesSender}
-            disabled={!canUseSenderAsRecipient}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                handleUseSenderAsRecipient();
-              } else {
-                handleStopUsingSenderAsRecipient();
-              }
-            }}
-          />
+        <div className="flex justify-end">
+          <Label
+            htmlFor={`${recipientListboxId}-same-as-sender`}
+            className={`inline-flex min-h-11 w-fit items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium touch-manipulation ${
+              canUseSenderAsRecipient ? "cursor-pointer hover:bg-muted/50" : "cursor-not-allowed opacity-60"
+            }`}
+          >
+            <Checkbox
+              id={`${recipientListboxId}-same-as-sender`}
+              aria-label="收貨人同送花人相同"
+              checked={recipientMatchesSender}
+              disabled={!canUseSenderAsRecipient}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  handleUseSenderAsRecipient();
+                } else {
+                  handleStopUsingSenderAsRecipient();
+                }
+              }}
+            />
+            <span>收貨人同送花人相同</span>
+          </Label>
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">收貨人類型</Label>

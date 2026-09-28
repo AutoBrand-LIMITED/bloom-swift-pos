@@ -141,6 +141,7 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onRecipientCompanyNameChange).toHaveBeenCalledWith("Sender Limited");
     expect(props.onRecipientNameChange).toHaveBeenCalledWith("Ms Chan");
     expect(props.onRecipientPhoneChange).toHaveBeenCalledWith("+852 6123 4567");
+    expect(screen.queryByText("一鍵套用送花人姓名、電話及公司資料。")).not.toBeInTheDocument();
   });
 
   it("copies all sender fields through one atomic recipient update when provided", () => {
