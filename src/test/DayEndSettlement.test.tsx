@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,6 +6,8 @@ import DayEndSettlement, { OrderTable, PaymentTable } from "@/pages/DayEndSettle
 import type { DayEndOrderRow, DayEndPaymentRow } from "@/lib/odoo-api";
 
 const getDayEndSummary = vi.hoisted(() => vi.fn());
+const getOdooSalesTeams = vi.hoisted(() => vi.fn());
+const reportDate = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Hong_Kong" });
 
 vi.mock("@/lib/odoo-api", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/odoo-api")>();
@@ -13,6 +15,7 @@ vi.mock("@/lib/odoo-api", async (importOriginal) => {
     ...original,
     hasOdooBackend: true,
     getDayEndSummary,
+    getOdooSalesTeams,
   };
 });
 
@@ -38,6 +41,8 @@ const order: DayEndOrderRow = {
   recipientName: "Ng",
   recipientPhone: "67610707",
   deliveryAddress: "觀塘巧明街",
+  teamKey: "24",
+  teamName: "Central",
 };
 
 const laterPayment: DayEndPaymentRow = {
@@ -56,10 +61,16 @@ const laterPayment: DayEndPaymentRow = {
   orderDate: "2026-08-26 09:39",
   invoiceReference: "POS-old-order",
   customerName: "Alex",
+  teamKey: "25",
+  teamName: "Kowloon",
 };
 
 describe("DayEndSettlement order table", () => {
-  beforeEach(() => getDayEndSummary.mockReset());
+  beforeEach(() => {
+    getDayEndSummary.mockReset();
+    getOdooSalesTeams.mockReset();
+    getOdooSalesTeams.mockResolvedValue([{ id: 24, name: "Central" }, { id: 25, name: "Kowloon" }]);
+  });
 
   it("shows the employee or sales identity for every order", () => {
     render(<OrderTable orders={[order]} />);
@@ -82,10 +93,15 @@ describe("DayEndSettlement order table", () => {
 
   it("uses A plus B payment buckets and labels order value without claiming revenue", async () => {
     getDayEndSummary.mockResolvedValue({
-      date: "2026-08-27",
+      date: reportDate,
       timezone: "Asia/Hong_Kong",
       generatedAt: "2026-08-27T18:00:00+08:00",
       odooAvailable: true,
+      selectedTeam: "all",
+      teamSummaries: [
+        { key: "24", label: "Central", orderCount: 1, saleTotal: 1111, receivedToday: 400, receivedForOtherDays: 0, totalMoneyReceived: 400 },
+        { key: "25", label: "Kowloon", orderCount: 0, saleTotal: 0, receivedToday: 0, receivedForOtherDays: 600, totalMoneyReceived: 600 },
+      ],
       salesToday: {
         label: "今日落單",
         orderCount: 1,
@@ -127,14 +143,68 @@ describe("DayEndSettlement order table", () => {
     expect(screen.getByText("Bank-in / FPS")).toBeVisible();
     expect(screen.getAllByText("HK$600").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("HK$1,000").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Sales Team 分佈")).toBeVisible();
+    expect(screen.getByText(/· 全部 Sales Teams$/)).toBeVisible();
+  });
+
+  it("passes the selected team to Odoo and shows only that team's report", async () => {
+    getDayEndSummary.mockImplementation(async (_date: string, _signal: AbortSignal, team: string) => ({
+      date: reportDate,
+      timezone: "Asia/Hong_Kong",
+      generatedAt: "2026-08-27T18:00:00+08:00",
+      odooAvailable: true,
+      selectedTeam: team,
+      teamSummaries: [
+        { key: "24", label: "Central", orderCount: 1, saleTotal: 38, receivedToday: 2, receivedForOtherDays: 0, totalMoneyReceived: 2 },
+        { key: "25", label: "Kowloon", orderCount: 1, saleTotal: 100, receivedToday: 100, receivedForOtherDays: 0, totalMoneyReceived: 100 },
+      ],
+      salesToday: {
+        label: "今日落單", orderCount: team === "24" ? 1 : 2,
+        saleTotal: team === "24" ? 38 : 138,
+        receivedTotal: team === "24" ? 2 : 102,
+        averageSpend: team === "24" ? 38 : 69,
+        buckets: [], orders: [], payments: [], unsupportedReason: null,
+      },
+      receivedForOtherDays: {
+        label: "今日舊單或未匹配收款", orderCount: 0, saleTotal: 0,
+        receivedTotal: 0, averageSpend: 0, buckets: [], orders: [], payments: [], unsupportedReason: null,
+      },
+      totalMoneyReceived: team === "24" ? 2 : 102,
+      paymentBuckets: [],
+      summaryHash: `hash-${team}`,
+    }));
+
+    render(<MemoryRouter><DayEndSettlement /></MemoryRouter>);
+    await screen.findByText("Sales Team 分佈");
+    fireEvent.change(screen.getByPlaceholderText("負責輸入同事名"), { target: { value: "Alice" } });
+    fireEvent.change(screen.getByPlaceholderText("負責覆核同事名"), { target: { value: "Bob" } });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Sales Team" }), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: "Central" }));
+
+    await waitFor(() => expect(getDayEndSummary).toHaveBeenLastCalledWith(expect.any(String), expect.anything(), "24"));
+    expect(await screen.findByText(/· Central$/)).toBeVisible();
+    expect(screen.getAllByText("HK$38").length).toBeGreaterThan(0);
+    expect(screen.queryByText("HK$138")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("負責輸入同事名")).toHaveValue("Alice");
+    expect(screen.getByPlaceholderText("負責覆核同事名")).toHaveValue("Bob");
+
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Sales Team" }), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: "未匹配訂單收款" }));
+    await waitFor(() => expect(getDayEndSummary).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.anything(),
+      "unmatched",
+    ));
+    expect(await screen.findByText(/· 未匹配訂單收款$/)).toBeVisible();
   });
 
   it("hides every official metric and table when Odoo is unavailable", async () => {
     getDayEndSummary.mockResolvedValue({
-      date: "2026-08-27",
+      date: reportDate,
       timezone: "Asia/Hong_Kong",
       generatedAt: "2026-08-27T18:00:00+08:00",
       odooAvailable: false,
+      selectedTeam: "all",
       availabilityMessage: "Odoo 暫時未能連線，請稍後重試。",
       salesToday: null,
       receivedForOtherDays: null,
@@ -157,5 +227,22 @@ describe("DayEndSettlement order table", () => {
     expect(screen.queryByText("付款方式總覽")).not.toBeInTheDocument();
     expect(screen.queryByText("A. 今日落單金額 Orders Booked Today")).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("does not show unfiltered totals as a team's totals when the API is outdated", async () => {
+    getDayEndSummary.mockResolvedValue({
+      date: reportDate,
+      timezone: "Asia/Hong_Kong",
+      generatedAt: "2026-08-27T18:00:00+08:00",
+      odooAvailable: true,
+      salesToday: { orderCount: 1, saleTotal: 9999 },
+      totalMoneyReceived: 9999,
+    });
+
+    render(<MemoryRouter><DayEndSettlement /></MemoryRouter>);
+
+    expect(await screen.findByText("日結後端尚未支援 Sales Team 篩選，請更新後再試。")).toBeVisible();
+    expect(screen.queryByText("HK$9,999")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "列印埋數表" })).toBeDisabled();
   });
 });
