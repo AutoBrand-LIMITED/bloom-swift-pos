@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDayEndMoney } from "@/lib/day-end";
 import {
@@ -143,17 +144,26 @@ const DayEndSettlement = () => {
               }}
               className="min-h-11 w-[150px]"
             />
-            <select
-              aria-label="Sales Team"
-              value={team}
-              onChange={(event) => setTeam(event.target.value)}
-              className="min-h-11 max-w-[220px] rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">全部 Sales Teams</option>
-              {teamOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              <option value="unassigned">未分配 Sales Team</option>
-              <option value="unmatched">未匹配訂單收款</option>
-            </select>
+            <Select value={team} onValueChange={setTeam}>
+              <SelectTrigger
+                aria-label="Sales Team"
+                className="min-h-11 w-[220px] touch-manipulation text-sm"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent
+                side="bottom"
+                align="start"
+                sideOffset={4}
+                collisionPadding={12}
+                className="max-h-[min(20rem,var(--radix-select-content-available-height))]"
+              >
+                <SelectItem value="all">全部 Sales Teams</SelectItem>
+                {teamOptions.map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+                <SelectItem value="unassigned">未分配 Sales Team</SelectItem>
+                <SelectItem value="unmatched">未匹配訂單收款</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"

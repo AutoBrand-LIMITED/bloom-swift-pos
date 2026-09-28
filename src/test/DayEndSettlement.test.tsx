@@ -178,7 +178,8 @@ describe("DayEndSettlement order table", () => {
     await screen.findByText("Sales Team 分佈");
     fireEvent.change(screen.getByPlaceholderText("負責輸入同事名"), { target: { value: "Alice" } });
     fireEvent.change(screen.getByPlaceholderText("負責覆核同事名"), { target: { value: "Bob" } });
-    fireEvent.change(screen.getByRole("combobox", { name: "Sales Team" }), { target: { value: "24" } });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Sales Team" }), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: "Central" }));
 
     await waitFor(() => expect(getDayEndSummary).toHaveBeenLastCalledWith(expect.any(String), expect.anything(), "24"));
     expect(await screen.findByText(/· Central$/)).toBeVisible();
@@ -186,6 +187,15 @@ describe("DayEndSettlement order table", () => {
     expect(screen.queryByText("HK$138")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("負責輸入同事名")).toHaveValue("Alice");
     expect(screen.getByPlaceholderText("負責覆核同事名")).toHaveValue("Bob");
+
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Sales Team" }), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: "未匹配訂單收款" }));
+    await waitFor(() => expect(getDayEndSummary).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.anything(),
+      "unmatched",
+    ));
+    expect(await screen.findByText(/· 未匹配訂單收款$/)).toBeVisible();
   });
 
   it("hides every official metric and table when Odoo is unavailable", async () => {
