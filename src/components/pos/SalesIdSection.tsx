@@ -103,7 +103,7 @@ const SalesIdSection = ({
     <Collapsible
       open={detailsOpen}
       onOpenChange={setDetailsOpen}
-      className="overflow-hidden rounded-xl border border-border bg-card"
+      className="overflow-visible bg-transparent"
     >
       <CollapsibleTrigger asChild>
         <button
@@ -132,7 +132,7 @@ const SalesIdSection = ({
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="border-t border-border p-4">
+        <div className="border-t border-border/60 px-5 py-4 sm:px-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label className="text-xs">登入操作員</Label>

@@ -4,9 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -55,22 +53,13 @@ const ProductCatalogDialog = ({
   const productTotal = orderItems.reduce((total, item) => total + orderItemTotal(item), 0);
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="grid h-[92dvh] max-h-[92dvh] w-[calc(100vw-1rem)] max-w-[1500px] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
-      <DialogHeader className="border-b border-border px-4 py-4 pr-12 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <DialogTitle>商品 Full View</DialogTitle>
-            <DialogDescription className="mt-1">
-              搜尋或按分類揀商品；撳商品後可以繼續加入其他商品。
-            </DialogDescription>
-          </div>
-          <div className="rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-            訂單已有 {orderItems.length} 項
-          </div>
-        </div>
-      </DialogHeader>
+    <DialogContent
+      aria-describedby={undefined}
+      className="grid h-[92dvh] max-h-[92dvh] w-[calc(100vw-1rem)] max-w-[1500px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0"
+    >
+      <DialogTitle className="sr-only">商品 Full View</DialogTitle>
 
-      <div className="space-y-3 border-b border-border bg-card px-4 py-3 sm:px-6">
+      <div className="space-y-3 border-b border-border bg-card px-4 py-3 pr-12 sm:px-6 sm:pr-14">
         <div className="flex items-center gap-3">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -260,8 +249,7 @@ const ProductCatalogDialog = ({
         </aside>
       </div>
 
-      <DialogFooter className="flex-row items-center justify-between border-t border-border bg-card px-4 py-3 sm:justify-between sm:px-6">
-        <span className="text-sm text-muted-foreground">撳商品即可加入訂單</span>
+      <DialogFooter className="flex-row items-center justify-end border-t border-border bg-card px-4 py-2.5 sm:justify-end sm:px-6">
         <Button type="button" onClick={() => onOpenChange(false)}>完成</Button>
       </DialogFooter>
     </DialogContent>

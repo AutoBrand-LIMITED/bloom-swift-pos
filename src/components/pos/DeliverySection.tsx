@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import RegionalPhoneInput from "@/components/pos/RegionalPhoneInput";
 import RecipientOccasionEditor from "@/components/pos/RecipientOccasionEditor";
 import QuarterHourTimeSelect from "@/components/pos/QuarterHourTimeSelect";
-import { RadioGroup } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGoogleAddressSuggestions } from "@/hooks/useGoogleAddressSuggestions";
 import { publicGoogleAddressQuery } from "@/lib/google-address";
@@ -29,7 +28,6 @@ import {
 } from "@/lib/hk-address";
 import { cloneRecipientOccasions } from "@/lib/recipient-occasions";
 import type { DeliveryTimeMode, FulfillmentType, RecipientOccasion, RecipientType } from "@/types/order";
-import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
@@ -54,6 +52,18 @@ interface RecipientDraft {
   phone: string;
   occasions?: RecipientOccasion[];
 }
+
+type DayPeriod = "morning" | "afternoon";
+
+const dayPeriodForTime = (value: string): DayPeriod | "" => {
+  const match = value.match(/(?:^|\s)(\d{1,2}):\d{2}/);
+  if (!match) return "";
+  return Number(match[1]) < 13 ? "morning" : "afternoon";
+};
+
+const dayPeriodForSlot = (slot?: DeliverySlot): DayPeriod | "" => (
+  slot ? dayPeriodForTime(slot.startTime) : ""
+);
 
 interface DeliverySectionProps {
   showFulfillmentSelector?: boolean;
@@ -100,6 +110,7 @@ interface DeliverySectionProps {
   onTimeChange: (v: string) => void;
   onSlotChange: (slot: DeliverySlot) => void;
   onSpecifiedTimeSelect: () => void;
+  onClearTimeSelection?: () => void;
   onRetryDeliverySlots: () => void;
   onRegionChange: (v: string) => void;
   onDistrictChange: (v: string) => void;
@@ -154,7 +165,8 @@ const DeliverySection = ({
   recipientType, recipientCompanyName, recipientName, recipientPhone, recipientOccasions,
   senderType = "personal", senderCompanyName = "", senderName = "", senderPhone = "",
   deliveryPerson, failedDeliveryAction,
-  onDateChange, onFulfillmentTypeChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect, onRetryDeliverySlots,
+  onDateChange, onFulfillmentTypeChange, onTimeChange, onSlotChange, onSpecifiedTimeSelect,
+  onClearTimeSelection, onRetryDeliverySlots,
   onRegionChange, onDistrictChange, onAreaChange, onAddressHierarchyChange, onDetailChange,
   onBuildingChange, onFloorChange, onUnitChange,
   onGoogleAddressSelect,
@@ -250,6 +262,16 @@ const DeliverySection = ({
     : deliveryTimeMode === "specified"
       ? "specified"
       : "";
+  const selectedDayPeriod = dayPeriodForSlot(selectedSlot)
+    || (deliveryTimeMode === "specified" ? dayPeriodForTime(deliveryTime) : "");
+  const [dayPeriod, setDayPeriod] = useState<DayPeriod | "">(selectedDayPeriod);
+  const periodSlots = deliverySlots.filter((slot) => dayPeriodForSlot(slot) === dayPeriod);
+
+  useEffect(() => {
+    if (selectedDayPeriod) {
+      setDayPeriod(selectedDayPeriod);
+    }
+  }, [selectedDayPeriod]);
   const activeRecipientQuery = (
     recipientLookupField === "company"
       ? recipientCompanyName
@@ -490,11 +512,12 @@ const DeliverySection = ({
     if (slot) onSlotChange(slot);
   };
 
-  const handleTimeSelectionKeyUp = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(event.key)) return;
-    const focusedRadio = event.currentTarget.querySelector<HTMLElement>('[role="radio"]:focus');
-    const focusedValue = focusedRadio?.getAttribute("value");
-    if (focusedValue) handleTimeSelectionChange(focusedValue);
+  const handleDayPeriodChange = (value: DayPeriod) => {
+    setDayPeriod(value);
+    if (selectedTimeValue && selectedDayPeriod !== value) {
+      if (onClearTimeSelection) onClearTimeSelection();
+      else onTimeChange("");
+    }
   };
 
   const handleRegionChange = (v: string) => {
@@ -697,7 +720,7 @@ const DeliverySection = ({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="space-y-4 bg-transparent px-5 py-5 sm:px-6 sm:py-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
           <MapPin className="w-4 h-4" />
@@ -804,91 +827,90 @@ const DeliverySection = ({
               />
             </div>
           )}
-          <>
-            <RadioGroup
-                aria-label="送貨時間選擇"
-                value={selectedTimeValue}
-                onValueChange={handleTimeSelectionChange}
-                onKeyUp={handleTimeSelectionKeyUp}
-                className="grid gap-2 sm:grid-cols-2"
-              >
-                {deliverySlotsLoading && (
-                  <div className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground sm:col-span-2">
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                    正在載入標準時段...
-                  </div>
-                )}
-
-                {!deliverySlotsLoading && deliverySlotsError && (
-                  <div role="alert" className="flex min-h-11 flex-wrap items-center justify-between gap-2 border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm sm:col-span-2">
-                    <span>{deliverySlotsError}</span>
-                    <Button type="button" variant="outline" size="sm" onClick={onRetryDeliverySlots} className="min-h-11 gap-2">
-                      <RefreshCw className="h-4 w-4" />
-                      重試
-                    </Button>
-                  </div>
-                )}
-
-                {!deliverySlotsLoading && !deliverySlotsError && deliverySlots.length === 0 && (
-                  <p className="flex min-h-11 items-center text-sm text-muted-foreground sm:col-span-2">
-                    目前沒有標準時段
-                  </p>
-                )}
-
-                {!deliverySlotsLoading && !deliverySlotsError && deliverySlots.map((slot) => {
-                  const selected = deliveryTimeMode === "slot" && deliverySlotId === slot.id;
-                  const snapshot = selected && frozenSelectedSnapshot?.trim()
-                    ? frozenSelectedSnapshot
-                    : deliverySlotSnapshot(slot);
-                  const value = `slot:${slot.id}`;
-                  return (
-                    <RadioGroupPrimitive.Item
-                      key={slot.id}
-                      id={`delivery-slot-${slot.id}`}
-                      value={value}
-                      aria-label={snapshot}
-                      className={`min-h-11 border px-3 py-2 text-left text-sm font-medium transition-colors touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                        selected
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background hover:bg-muted"
-                      }`}
-                    >
-                      {snapshot}
-                    </RadioGroupPrimitive.Item>
-                  );
-                })}
-
-                {selectedUnavailableSlot && (
-                  <RadioGroupPrimitive.Item
-                    id="delivery-slot-unavailable"
-                    value={`slot:${deliverySlotId}`}
-                    aria-label={frozenSelectedSnapshot || deliveryTime}
-                    className="min-h-11 border border-primary bg-primary px-3 py-2 text-left text-sm font-medium text-primary-foreground opacity-80"
-                    disabled
-                  >
-                    {frozenSelectedSnapshot || deliveryTime}
-                  </RadioGroupPrimitive.Item>
-                )}
-
-                <RadioGroupPrimitive.Item
-                  id="delivery-time-specified"
-                  value="specified"
-                  aria-label="指定時間"
-                  className={`min-h-11 border px-3 py-2 text-left text-sm font-medium transition-colors touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                    deliveryTimeMode === "specified"
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-background hover:bg-muted"
-                  }`}
+          <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="delivery-period">上午／下午</Label>
+                <Select
+                  value={dayPeriod}
+                  onValueChange={(value: DayPeriod) => handleDayPeriodChange(value)}
                 >
-                  指定時間
-                </RadioGroupPrimitive.Item>
-              </RadioGroup>
+                  <SelectTrigger
+                    id="delivery-period"
+                    aria-label={fulfillmentType === "pickup" ? "取貨時段" : "送貨時段"}
+                    className="min-h-11 text-sm"
+                  >
+                    <SelectValue placeholder="先選擇上午或下午" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="morning">上午</SelectItem>
+                    <SelectItem value="afternoon">下午</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {deliveryTimeMode === "specified" && (
+              {dayPeriod && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="delivery-time-slot">
+                    {dayPeriod === "morning" ? "上午時段" : "下午時段"}
+                  </Label>
+                  <Select
+                    value={selectedDayPeriod === dayPeriod ? selectedTimeValue : ""}
+                    onValueChange={handleTimeSelectionChange}
+                    disabled={deliverySlotsLoading}
+                  >
+                    <SelectTrigger
+                      id="delivery-time-slot"
+                      aria-label={`${dayPeriod === "morning" ? "上午" : "下午"}${fulfillmentType === "pickup" ? "取貨" : "送貨"}時間`}
+                      aria-invalid={Boolean(deliveryTimeError)}
+                      className="min-h-11 text-sm"
+                    >
+                      <SelectValue placeholder="選擇取貨時間" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {periodSlots.map((slot) => (
+                        <SelectItem key={slot.id} value={`slot:${slot.id}`}>
+                          {deliveryTimeMode === "slot" && deliverySlotId === slot.id && frozenSelectedSnapshot
+                            ? frozenSelectedSnapshot
+                            : deliverySlotSnapshot(slot)}
+                        </SelectItem>
+                      ))}
+                      {selectedUnavailableSlot && selectedDayPeriod === dayPeriod && (
+                        <SelectItem value={`slot:${deliverySlotId}`} disabled>
+                          {frozenSelectedSnapshot || deliveryTime}
+                        </SelectItem>
+                      )}
+                      <SelectItem value="specified">指定時間</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {deliverySlotsLoading && (
+                <div className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground sm:col-span-2">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  正在載入標準時段...
+                </div>
+              )}
+              {!deliverySlotsLoading && deliverySlotsError && (
+                <div role="alert" className="flex min-h-11 flex-wrap items-center justify-between gap-2 border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm sm:col-span-2">
+                  <span>{deliverySlotsError}</span>
+                  <Button type="button" variant="outline" size="sm" onClick={onRetryDeliverySlots} className="min-h-11 gap-2">
+                    <RefreshCw className="h-4 w-4" />重試
+                  </Button>
+                </div>
+              )}
+              {dayPeriod && !deliverySlotsLoading && !deliverySlotsError && periodSlots.length === 0 && (
+                <p className="text-sm text-muted-foreground sm:col-span-2">
+                  呢個時段暫時未有標準{fulfillmentType === "pickup" ? "取貨" : "送貨"}時間，可選擇「指定時間」。
+                </p>
+              )}
+            </div>
+
+            {deliveryTimeMode === "specified" && dayPeriod && (
               <div className="space-y-1 pt-1">
                   <QuarterHourTimeSelect
                     id="specified-delivery-time"
-                    label="指定送貨時間"
+                    label={fulfillmentType === "pickup" ? "指定取貨時間" : "指定送貨時間"}
                     value={deliveryTime}
                     onChange={onTimeChange}
                     ariaInvalid={Boolean(deliveryTimeError)}
@@ -901,8 +923,6 @@ const DeliverySection = ({
                   </p>
               </div>
             )}
-          </>
-
           {deliveryTimeError && (
             <p id="delivery-time-error" role="alert" className="text-xs font-medium text-destructive">
               {deliveryTimeError}
@@ -1119,26 +1139,28 @@ const DeliverySection = ({
 
       {/* Recipient info */}
       <div ref={recipientLookupRef} className="space-y-3 border-t border-border pt-3">
-        <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
-          <div>
-            <Label htmlFor={`${recipientListboxId}-same-as-sender`} className="text-sm font-medium">
-              收貨人同送花人相同
-            </Label>
-            <p className="text-xs text-muted-foreground">一鍵套用送花人姓名、電話及公司資料。</p>
-          </div>
-          <Checkbox
-            id={`${recipientListboxId}-same-as-sender`}
-            aria-label="收貨人同送花人相同"
-            checked={recipientMatchesSender}
-            disabled={!canUseSenderAsRecipient}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                handleUseSenderAsRecipient();
-              } else {
-                handleStopUsingSenderAsRecipient();
-              }
-            }}
-          />
+        <div className="flex justify-end">
+          <Label
+            htmlFor={`${recipientListboxId}-same-as-sender`}
+            className={`inline-flex min-h-11 w-fit items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium touch-manipulation ${
+              canUseSenderAsRecipient ? "cursor-pointer hover:bg-muted/50" : "cursor-not-allowed opacity-60"
+            }`}
+          >
+            <Checkbox
+              id={`${recipientListboxId}-same-as-sender`}
+              aria-label="收貨人同送花人相同"
+              checked={recipientMatchesSender}
+              disabled={!canUseSenderAsRecipient}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  handleUseSenderAsRecipient();
+                } else {
+                  handleStopUsingSenderAsRecipient();
+                }
+              }}
+            />
+            <span>收貨人同送花人相同</span>
+          </Label>
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">收貨人類型</Label>

@@ -290,7 +290,7 @@ describe("odoo-api note contracts", () => {
 
     await expect(getDayEndSummary("2026-08-27")).resolves.toEqual(outage);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://backend.test/day-end/summary?date=2026-08-27",
+      "https://backend.test/day-end/summary?date=2026-08-27&team=all",
       expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
     );
   });

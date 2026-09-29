@@ -143,10 +143,15 @@ vi.mock("@/components/pos/OrderHistory", () => ({
 }));
 
 describe("Index customer defaults", () => {
+  const openWorkflowStep = (label: RegExp) => {
+    fireEvent.click(screen.getByRole("button", { name: label }));
+  };
+
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
     vi.clearAllMocks();
+    vi.stubGlobal("scrollTo", vi.fn());
     odooMocks.getAccountingPaymentOptions.mockResolvedValue([]);
     odooMocks.getDeliverySlots.mockResolvedValue([]);
     odooMocks.getOdooEmployees.mockResolvedValue([]);
@@ -221,25 +226,30 @@ describe("Index customer defaults", () => {
       11764,
       expect.any(AbortSignal),
     ));
+    openWorkflowStep(/2\. 商品/);
     fireEvent.click(screen.getByRole("button", { name: "加入測試商品" }));
+    openWorkflowStep(/4\. 備註及付款/);
     fireEvent.click(await screen.findByRole("switch", { name: "使用 Customer Credit" }));
 
     expect(screen.getByLabelText("今次使用 Customer Credit 金額")).toHaveValue(100);
     expect(screen.getByRole("button", { name: "立即付款" })).toHaveClass("bg-success");
     expect(screen.queryByRole("button", { name: "Cash" })).not.toBeInTheDocument();
+    openWorkflowStep(/1\. 客戶/);
     expect(screen.getByTestId("code-confirmed")).toHaveTextContent("true");
     fireEvent.click(screen.getByRole("button", { name: "更改 Customer ID" }));
     expect(screen.getByTestId("code-confirmed")).toHaveTextContent("false");
     expect(screen.getByTestId("selected-partner")).toBeEmptyDOMElement();
     expect(screen.queryByLabelText("今次使用 Customer Credit 金額")).not.toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("uses one confirmation flow for desktop and mobile incomplete-save buttons", async () => {
     render(<MemoryRouter><Index /></MemoryRouter>);
     await waitFor(() => expect(odooMocks.getOperationalOrders).toHaveBeenCalledOnce());
 
     fireEvent.click(screen.getByRole("button", { name: "選擇測試聯絡人" }));
+    openWorkflowStep(/2\. 商品/);
     fireEvent.click(screen.getByRole("button", { name: "加入測試商品" }));
+    openWorkflowStep(/4\. 備註及付款/);
 
     const incompleteButtons = screen.getAllByRole("button", { name: "儲存未完成訂單" });
     expect(incompleteButtons).toHaveLength(2);

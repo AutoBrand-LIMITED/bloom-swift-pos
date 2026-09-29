@@ -8,41 +8,41 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 40 20% 97%;
-    --foreground: 30 10% 15%;
+    --background: 240 11% 96%;
+    --foreground: 240 3% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 30 10% 15%;
+    --card-foreground: 240 3% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 30 10% 15%;
+    --popover-foreground: 240 3% 12%;
 
-    --primary: 152 45% 38%;
+    --primary: 210 100% 40%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 35 30% 92%;
-    --secondary-foreground: 30 10% 20%;
+    --secondary: 240 11% 96%;
+    --secondary-foreground: 240 3% 12%;
 
-    --muted: 40 15% 93%;
-    --muted-foreground: 30 8% 50%;
+    --muted: 240 11% 96%;
+    --muted-foreground: 240 3% 45%;
 
-    --accent: 35 50% 92%;
-    --accent-foreground: 30 15% 20%;
+    --accent: 210 100% 96%;
+    --accent-foreground: 210 100% 32%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 3 100% 59%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 55% 42%;
+    --success: 135 59% 49%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 30 10% 15%;
+    --warning: 35 100% 52%;
+    --warning-foreground: 240 3% 12%;
 
-    --border: 30 15% 88%;
-    --input: 30 15% 88%;
-    --ring: 152 45% 38%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 210 100% 45%;
 
-    --radius: 0.75rem;
+    --radius: 0.6875rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -55,29 +55,29 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 30 10% 10%;
-    --foreground: 40 15% 92%;
-    --card: 30 10% 13%;
-    --card-foreground: 40 15% 92%;
-    --popover: 30 10% 13%;
-    --popover-foreground: 40 15% 92%;
-    --primary: 152 45% 45%;
+    --background: 240 2% 15%;
+    --foreground: 0 0% 100%;
+    --card: 240 2% 17%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 2% 17%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 210 100% 58%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 30 10% 18%;
-    --secondary-foreground: 40 15% 90%;
-    --muted: 30 8% 18%;
-    --muted-foreground: 30 8% 55%;
-    --accent: 30 12% 20%;
-    --accent-foreground: 40 15% 90%;
+    --secondary: 240 2% 20%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 2% 20%;
+    --muted-foreground: 0 0% 80%;
+    --accent: 210 30% 22%;
+    --accent-foreground: 210 100% 72%;
     --destructive: 0 62% 40%;
     --destructive-foreground: 0 0% 100%;
     --success: 152 50% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 38 85% 45%;
     --warning-foreground: 30 10% 15%;
-    --border: 30 8% 22%;
-    --input: 30 8% 22%;
-    --ring: 152 45% 45%;
+    --border: 240 2% 28%;
+    --input: 240 2% 28%;
+    --ring: 210 100% 58%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -169,5 +169,9 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 }

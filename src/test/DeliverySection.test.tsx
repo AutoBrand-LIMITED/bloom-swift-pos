@@ -57,6 +57,7 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof DeliverySe
     onTimeChange: vi.fn(),
     onSlotChange: vi.fn(),
     onSpecifiedTimeSelect: vi.fn(),
+    onClearTimeSelection: vi.fn(),
     onRetryDeliverySlots: vi.fn(),
     onRegionChange: vi.fn(),
     onDistrictChange: vi.fn(),
@@ -93,11 +94,14 @@ describe("DeliverySection delivery time controls", () => {
     recipientSearchMocks.searchOdooRecipients.mockResolvedValue([]);
   });
 
-  it("renders backend slots as touch choices and returns the selected slot", () => {
+  it("groups delivery slots by morning and afternoon", () => {
     const props = renderSection({ deliveryTimeMode: "slot", deliverySlotId: 11 });
 
-    expect(screen.getByRole("radio", { name: "上午 09:00-13:00" })).toHaveAttribute("aria-checked", "true");
-    fireEvent.click(screen.getByRole("radio", { name: "下午 13:00-18:00" }));
+    expect(screen.getByRole("combobox", { name: "上午送貨時間" })).toHaveTextContent("上午 09:00-13:00");
+    fireEvent.click(screen.getByRole("combobox", { name: "送貨時段" }));
+    fireEvent.click(screen.getByRole("option", { name: "下午" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "下午送貨時間" }));
+    fireEvent.click(screen.getByRole("option", { name: "下午 13:00-18:00" }));
 
     expect(props.onSlotChange).toHaveBeenCalledWith(slots[1]);
   });
@@ -111,6 +115,39 @@ describe("DeliverySection delivery time controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /送貨/ }));
     expect(props.onFulfillmentTypeChange).toHaveBeenCalledWith("delivery");
+  });
+
+  it("reveals pickup times only after choosing morning or afternoon", () => {
+    const props = renderSection({ fulfillmentType: "pickup" });
+
+    expect(screen.queryByRole("combobox", { name: "上午取貨時間" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "下午取貨時間" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "取貨時段" }));
+    fireEvent.click(screen.getByRole("option", { name: "上午" }));
+
+    fireEvent.click(screen.getByRole("combobox", { name: "上午取貨時間" }));
+    expect(screen.getByRole("option", { name: "上午 09:00-13:00" })).toBeVisible();
+    expect(screen.queryByRole("option", { name: "下午 13:00-18:00" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "上午 09:00-13:00" }));
+
+    expect(props.onSlotChange).toHaveBeenCalledWith(slots[0]);
+  });
+
+  it("clears an incompatible pickup time when switching period", () => {
+    const props = renderSection({
+      fulfillmentType: "pickup",
+      deliveryTime: "上午 09:00-13:00",
+      deliveryTimeMode: "slot",
+      deliverySlotId: 11,
+    });
+
+    expect(screen.getByRole("combobox", { name: "上午取貨時間" })).toBeVisible();
+    fireEvent.click(screen.getByRole("combobox", { name: "取貨時段" }));
+    fireEvent.click(screen.getByRole("option", { name: "下午" }));
+
+    expect(props.onClearTimeSelection).toHaveBeenCalledOnce();
+    expect(screen.getByRole("combobox", { name: "下午取貨時間" })).toBeVisible();
   });
 
   it("offers grab-and-go and hides all delivery requirements", () => {
@@ -141,6 +178,7 @@ describe("DeliverySection delivery time controls", () => {
     expect(props.onRecipientCompanyNameChange).toHaveBeenCalledWith("Sender Limited");
     expect(props.onRecipientNameChange).toHaveBeenCalledWith("Ms Chan");
     expect(props.onRecipientPhoneChange).toHaveBeenCalledWith("+852 6123 4567");
+    expect(screen.queryByText("一鍵套用送花人姓名、電話及公司資料。")).not.toBeInTheDocument();
   });
 
   it("copies all sender fields through one atomic recipient update when provided", () => {
@@ -413,20 +451,14 @@ describe("DeliverySection delivery time controls", () => {
     expect(recipientSearchMocks.searchOdooRecipients).toHaveBeenCalledTimes(1);
   });
 
-  it("uses roving focus and arrow keys to select the next delivery choice", async () => {
+  it("clears an incompatible delivery time when switching period", () => {
     const props = renderSection({ deliveryTimeMode: "slot", deliverySlotId: 11 });
-    const morning = screen.getByRole("radio", { name: "上午 09:00-13:00" });
-    const afternoon = screen.getByRole("radio", { name: "下午 13:00-18:00" });
 
-    await act(async () => {
-      morning.focus();
-      fireEvent.keyDown(morning, { key: "ArrowRight", code: "ArrowRight" });
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      fireEvent.keyUp(afternoon, { key: "ArrowRight", code: "ArrowRight" });
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "送貨時段" }));
+    fireEvent.click(screen.getByRole("option", { name: "下午" }));
 
-    expect(afternoon).toHaveFocus();
-    expect(props.onSlotChange).toHaveBeenCalledWith(slots[1]);
+    expect(props.onClearTimeSelection).toHaveBeenCalledOnce();
+    expect(screen.getByRole("combobox", { name: "下午送貨時間" })).toBeVisible();
   });
 
   it("shows the frozen pending snapshot when the live slot keeps its ID but changes label", () => {
@@ -438,12 +470,13 @@ describe("DeliverySection delivery time controls", () => {
       deliverySlots: [{ ...slots[0], displayLabel: "早上 09:00-13:00（新）" }, slots[1]],
     });
 
-    expect(screen.getByRole("radio", { name: "上午 09:00-13:00" })).toBeChecked();
+    expect(screen.getByRole("combobox", { name: "上午送貨時間" })).toHaveTextContent("上午 09:00-13:00");
     expect(screen.queryByText("早上 09:00-13:00（新）")).not.toBeInTheDocument();
   });
 
   it("shows a specified-time selector in 15-minute intervals", () => {
     const props = renderSection({
+      deliveryTime: "10:00-11:15",
       deliveryTimeMode: "specified",
       deliveryTimeError: "請輸入指定送貨時間",
     });
@@ -480,8 +513,11 @@ describe("DeliverySection delivery time controls", () => {
     expect(retry).toHaveBeenCalledOnce();
 
     rerender(<DeliverySection {...renderSectionProps({ deliverySlots: [] })} />);
-    expect(screen.getByText("目前沒有標準時段")).toBeVisible();
-    expect(screen.getByRole("radio", { name: "指定時間" })).toBeVisible();
+    fireEvent.click(screen.getByRole("combobox", { name: "送貨時段" }));
+    fireEvent.click(screen.getByRole("option", { name: "上午" }));
+    expect(screen.getByText(/呢個時段暫時未有標準送貨時間/)).toBeVisible();
+    fireEvent.click(screen.getByRole("combobox", { name: "上午送貨時間" }));
+    expect(screen.getByRole("option", { name: "指定時間" })).toBeVisible();
   });
 
   it("shows legacy pending time as read-only and requires a new mode selection", () => {
@@ -489,7 +525,11 @@ describe("DeliverySection delivery time controls", () => {
 
     expect(screen.getByRole("textbox", { name: "舊格式送貨時間" })).toHaveValue("14:00");
     expect(screen.getByRole("textbox", { name: "舊格式送貨時間" })).toHaveAttribute("readonly");
-    expect(screen.getByRole("radio", { name: "指定時間" })).toBeVisible();
+    fireEvent.click(screen.getByRole("combobox", { name: "送貨時段" }));
+    fireEvent.click(screen.getByRole("option", { name: "下午" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "下午送貨時間" }));
+    expect(screen.getByRole("option", { name: "指定時間" })).toBeVisible();
+    fireEvent.click(screen.getByRole("option", { name: "指定時間" }));
     expect(screen.getByRole("alert")).toHaveTextContent("請重新選擇");
   });
 

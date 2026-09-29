@@ -58,7 +58,9 @@ describe("ProductCatalogDialog", () => {
 
     const dialog = screen.getByRole("dialog", { name: "商品 Full View" });
     expect(dialog).toHaveClass("h-[92dvh]", "max-w-[1500px]");
-    expect(screen.getByText("訂單已有 2 項")).toBeVisible();
+    expect(screen.queryByText("搜尋或按分類揀商品；撳商品後可以繼續加入其他商品。")).not.toBeInTheDocument();
+    expect(screen.queryByText("訂單已有 2 項")).not.toBeInTheDocument();
+    expect(screen.queryByText("撳商品即可加入訂單")).not.toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "已選商品" })).toBeVisible();
     expect(screen.getByText("$1,480")).toBeVisible();
     expect(screen.queryByRole("button", { name: "管理" })).not.toBeInTheDocument();

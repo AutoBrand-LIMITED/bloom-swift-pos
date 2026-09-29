@@ -89,8 +89,8 @@ const OrderNotesSection = ({
   ].filter((value) => value.trim()).length;
 
   return (
-    <section className="rounded-xl border border-border bg-card" aria-labelledby="order-notes-title">
-      <div className="flex flex-wrap items-center gap-2 px-4 py-2">
+    <section className="bg-transparent" aria-labelledby="order-notes-title">
+      <div className="flex flex-wrap items-center gap-2 px-5 py-3 sm:px-6">
         <button
           type="button"
           className="flex min-h-11 min-w-0 flex-1 touch-manipulation items-center gap-2 text-left"
@@ -118,7 +118,7 @@ const OrderNotesSection = ({
       </div>
 
       {isExpanded && (
-        <div id="order-notes-content" className="space-y-4 border-t border-border p-4">
+        <div id="order-notes-content" className="space-y-4 border-t border-border/60 px-5 py-4 sm:px-6">
           {conflict && (
             <Alert variant="destructive" className="py-3">
               <AlertTriangle className="h-4 w-4" />

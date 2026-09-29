@@ -93,7 +93,7 @@ const OrderSummaryPanel = ({
       : "收貨及送貨";
 
   return (
-    <aside aria-label="訂單摘要" className="rounded-2xl border border-border bg-card shadow-sm">
+    <aside aria-label="訂單摘要" className="rounded-[18px] border border-border bg-card">
       <div className="border-b border-border p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -195,7 +195,7 @@ const OrderSummaryPanel = ({
           variant={isOrderComplete ? "default" : hasDraftContent ? "warning" : "secondary"}
           onClick={isOrderComplete ? onSubmit : onSaveIncomplete}
           disabled={isSaving || (!isOrderComplete && !hasDraftContent)}
-          className="mt-4 min-h-12 w-full touch-manipulation text-base font-semibold shadow-md"
+          className="mt-4 min-h-12 w-full touch-manipulation text-base font-semibold"
         >
           {isSaving
             ? "儲存中"
