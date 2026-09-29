@@ -20,11 +20,13 @@ import {
   getCustomerCodeTransferOptions,
   OdooConflictError,
   previewCustomerCodeChange,
+  searchOdooCustomers,
   type CustomerCodeChangePreview,
   type CustomerCodeChangeResult,
   type CustomerCodeTransferOptions,
 } from "@/lib/odoo-api";
 import { formatHkd } from "@/lib/money";
+import type { DemoCustomer } from "@/data/demo-customers";
 
 export interface CustomerCodeManagementContentProps {
   active: boolean;
@@ -60,6 +62,10 @@ export const CustomerCodeManagementContent = ({
   onSavingChange,
 }: CustomerCodeManagementContentProps) => {
   const [targetCode, setTargetCode] = useState("");
+  const [targetMatches, setTargetMatches] = useState<DemoCustomer[]>([]);
+  const [targetSearchOpen, setTargetSearchOpen] = useState(false);
+  const [targetSearchError, setTargetSearchError] = useState(false);
+  const [activeMatchIndex, setActiveMatchIndex] = useState(-1);
   const [scope, setScope] = useState<"all" | "selected">("all");
   const [transferOptions, setTransferOptions] = useState<CustomerCodeTransferOptions | null>(null);
   const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
@@ -75,6 +81,10 @@ export const CustomerCodeManagementContent = ({
   useEffect(() => {
     if (!active) return;
     setTargetCode("");
+    setTargetMatches([]);
+    setTargetSearchOpen(false);
+    setTargetSearchError(false);
+    setActiveMatchIndex(-1);
     setScope("all");
     setTransferOptions(null);
     setSelectedContactIds([]);
@@ -88,6 +98,48 @@ export const CustomerCodeManagementContent = ({
     onSavingChange?.(false);
     requestKeyRef.current = newRequestKey();
   }, [active, onSavingChange, sourceCode]);
+
+  useEffect(() => {
+    const query = targetCode.trim();
+    if (!active || query.length < 2 || preview || loading || saving) {
+      setTargetMatches([]);
+      setTargetSearchError(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      const searches = await Promise.allSettled([
+        searchOdooCustomers(query, controller.signal, "customer_code", "prefix"),
+        searchOdooCustomers(query, controller.signal, "general"),
+      ]);
+      if (controller.signal.aborted) return;
+
+      const successful = searches.filter((result) => result.status === "fulfilled");
+      if (successful.length === 0) {
+        setTargetMatches([]);
+        setTargetSearchError(true);
+        return;
+      }
+
+      const seen = new Set<string>();
+      const matches = successful.flatMap((result) => result.value).filter((customer) => {
+        const code = customer.customerCode?.trim();
+        const key = code?.toLocaleLowerCase();
+        if (!key || key === sourceCode.trim().toLocaleLowerCase() || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setTargetMatches(matches.slice(0, 8));
+      setTargetSearchError(false);
+      setActiveMatchIndex(-1);
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [active, targetCode, sourceCode, preview, loading, saving]);
 
   useEffect(() => {
     if (!active || scope !== "selected") return undefined;
@@ -211,7 +263,12 @@ export const CustomerCodeManagementContent = ({
               />
             </div>
             <ArrowRight className="mb-3 hidden h-5 w-5 text-muted-foreground sm:block" aria-hidden="true" />
-            <div className="space-y-1.5">
+            <div
+              className="relative space-y-1.5"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setTargetSearchOpen(false);
+              }}
+            >
               <Label htmlFor="customer-code-target">新／目標 Customer ID</Label>
               <Input
                 id="customer-code-target"
@@ -220,12 +277,75 @@ export const CustomerCodeManagementContent = ({
                 className="font-mono"
                 maxLength={100}
                 autoComplete="off"
+                aria-autocomplete="list"
+                aria-expanded={targetSearchOpen && (targetMatches.length > 0 || targetSearchError)}
+                aria-controls="customer-code-target-options"
+                aria-activedescendant={activeMatchIndex >= 0 && targetSearchOpen
+                  ? `customer-code-target-option-${activeMatchIndex}`
+                  : undefined}
+                onFocus={() => setTargetSearchOpen(true)}
                 onChange={(event) => {
                   setTargetCode(event.target.value);
+                  setTargetMatches([]);
+                  setTargetSearchOpen(true);
+                  setTargetSearchError(false);
+                  setActiveMatchIndex(-1);
                   setPreview(null);
                   setError(null);
                 }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setTargetSearchOpen(false);
+                  } else if (targetSearchOpen && targetMatches.length > 0 && event.key === "ArrowDown") {
+                    event.preventDefault();
+                    setActiveMatchIndex((index) => (index + 1) % targetMatches.length);
+                  } else if (targetSearchOpen && targetMatches.length > 0 && event.key === "ArrowUp") {
+                    event.preventDefault();
+                    setActiveMatchIndex((index) => (index - 1 + targetMatches.length) % targetMatches.length);
+                  } else if (targetSearchOpen && activeMatchIndex >= 0 && event.key === "Enter") {
+                    event.preventDefault();
+                    const code = targetMatches[activeMatchIndex]?.customerCode;
+                    if (code) {
+                      setTargetCode(code);
+                      setTargetSearchOpen(false);
+                      setTargetMatches([]);
+                      setPreview(null);
+                      setError(null);
+                    }
+                  }
+                }}
               />
+              {targetSearchOpen && (targetMatches.length > 0 || targetSearchError) && (
+                <div
+                  id="customer-code-target-options"
+                  role="listbox"
+                  aria-label="現有 Customer ID"
+                  className="absolute left-0 right-0 z-50 max-h-64 overflow-y-auto rounded-lg border bg-popover p-1 shadow-lg"
+                >
+                  {targetSearchError ? (
+                    <p className="px-3 py-2 text-sm text-muted-foreground">暫時無法搜尋，仍可輸入完整 ID。</p>
+                  ) : targetMatches.map((customer, index) => (
+                    <button
+                      key={customer.customerCode}
+                      id={`customer-code-target-option-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={activeMatchIndex === index}
+                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none"
+                      onClick={() => {
+                        setTargetCode(customer.customerCode ?? "");
+                        setTargetSearchOpen(false);
+                        setTargetMatches([]);
+                        setPreview(null);
+                        setError(null);
+                      }}
+                    >
+                      <span className="font-mono font-medium">{customer.customerCode}</span>
+                      <span className="truncate text-muted-foreground">{customer.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

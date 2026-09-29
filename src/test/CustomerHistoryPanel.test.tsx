@@ -81,6 +81,7 @@ describe("CustomerHistoryPanel resizable history", () => {
     odooApiMocks.getOdooCustomerHistory.mockReset();
     odooApiMocks.searchOdooCustomerAccount.mockReset();
     odooApiMocks.searchOdooCustomers.mockReset();
+    odooApiMocks.searchOdooCustomers.mockResolvedValue([]);
     odooApiMocks.getCustomerCodeTransferOptions.mockReset();
     odooApiMocks.previewCustomerCodeChange.mockReset();
     odooApiMocks.applyCustomerCodeChange.mockReset();
@@ -464,6 +465,96 @@ describe("CustomerHistoryPanel resizable history", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("請重新預覽再確認");
     expect(screen.getByRole("button", { name: "預覽更改" })).toBeVisible();
+  });
+
+  it("finds existing target Customer IDs by partial ID or contact name without duplicating accounts", async () => {
+    const profileCustomer: DemoCustomer = {
+      ...customer,
+      id: "odoo-52",
+      odooPartnerId: 52,
+      customerCode: "OLD-52",
+    };
+    odooApiMocks.getOdooCustomerHistory.mockResolvedValue({
+      history: [],
+      historyCount: 0,
+      totalSpent: 0,
+    });
+    odooApiMocks.searchOdooCustomers.mockImplementation(
+      (_query: string, _signal: AbortSignal, searchType: string) => Promise.resolve(
+        searchType === "customer_code"
+          ? [
+              { ...customer, id: "odoo-60", name: "Alex", customerCode: "EXISTING-60" },
+              { ...customer, id: "odoo-61", name: "另一聯絡人", customerCode: "EXISTING-60" },
+              profileCustomer,
+            ]
+          : [{ ...customer, id: "odoo-70", name: "Chris", customerCode: "CHRIS-70" }],
+      ),
+    );
+    odooApiMocks.previewCustomerCodeChange.mockResolvedValue({
+      operationType: "merge",
+      sourceCode: "OLD-52",
+      targetCode: "EXISTING-60",
+      sourceContactCount: 1,
+      targetContactCount: 2,
+      contactsAfterCount: 3,
+      targetWasAlias: false,
+      previewToken: "e".repeat(64),
+    });
+
+    render(
+      <CustomerHistoryPanel
+        customer={profileCustomer}
+        onClose={vi.fn()}
+        customerCodeManager={{ onCompleted: vi.fn() }}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("button", { name: "測試客人 聯絡人設定" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "管理 Customer ID" }));
+    fireEvent.change(screen.getByLabelText("新／目標 Customer ID"), { target: { value: "EX" } });
+
+    const match = await screen.findByRole("option", { name: /EXISTING-60/ });
+    expect(screen.getAllByRole("option")).toHaveLength(2);
+    expect(screen.queryByRole("option", { name: /OLD-52/ })).not.toBeInTheDocument();
+    expect(odooApiMocks.searchOdooCustomers).toHaveBeenCalledWith(
+      "EX", expect.any(AbortSignal), "customer_code", "prefix",
+    );
+    fireEvent.click(match);
+    expect(screen.getByLabelText("新／目標 Customer ID")).toHaveValue("EXISTING-60");
+    fireEvent.click(screen.getByRole("button", { name: "預覽更改" }));
+    expect(await screen.findByText("合併 Customer ID")).toBeVisible();
+    expect(odooApiMocks.previewCustomerCodeChange).toHaveBeenCalledWith("OLD-52", "EXISTING-60");
+  });
+
+  it("ignores an older Customer ID search after the operator types a new query", async () => {
+    const oldResolvers: Array<(customers: DemoCustomer[]) => void> = [];
+    odooApiMocks.getOdooCustomerHistory.mockResolvedValue({ history: [], historyCount: 0, totalSpent: 0 });
+    odooApiMocks.searchOdooCustomers.mockImplementation((query: string) => (
+      query === "EX"
+        ? new Promise<DemoCustomer[]>((resolve) => oldResolvers.push(resolve))
+        : Promise.resolve([{ ...customer, id: "odoo-70", name: "Chris", customerCode: "CHRIS-70" }])
+    ));
+
+    render(
+      <CustomerHistoryPanel
+        customer={{ ...customer, id: "odoo-52", odooPartnerId: 52, customerCode: "OLD-52" }}
+        onClose={vi.fn()}
+        customerCodeManager={{ onCompleted: vi.fn() }}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("button", { name: "測試客人 聯絡人設定" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "管理 Customer ID" }));
+    const target = screen.getByLabelText("新／目標 Customer ID");
+    fireEvent.change(target, { target: { value: "EX" } });
+    await waitFor(() => expect(oldResolvers).toHaveLength(2));
+    fireEvent.change(target, { target: { value: "CH" } });
+    expect(await screen.findByRole("option", { name: /CHRIS-70/ })).toBeVisible();
+    oldResolvers.forEach((resolve) => resolve([
+      { ...customer, id: "odoo-60", name: "Alex", customerCode: "EXISTING-60" },
+    ]));
+    await waitFor(() => {
+      expect(screen.getAllByRole("option")).toHaveLength(1);
+      expect(screen.queryByRole("option", { name: /EXISTING-60/ })).not.toBeInTheDocument();
+    });
   });
 
   it("lets a manager transfer selected contacts and Sales History without merging the account", async () => {
