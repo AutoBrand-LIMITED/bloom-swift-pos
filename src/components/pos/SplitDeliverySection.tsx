@@ -262,6 +262,11 @@ const SplitDeliverySection = (props: SplitDeliverySectionProps) => {
               deliverySlotId: undefined,
               deliveryTime: "",
             })}
+            onClearTimeSelection={() => update(split.id, {
+              deliveryTimeMode: undefined,
+              deliverySlotId: undefined,
+              deliveryTime: "",
+            })}
             onRetryDeliverySlots={props.onRetryDeliverySlots}
             onRegionChange={(deliveryRegion) => update(split.id, {
               deliveryRegion,

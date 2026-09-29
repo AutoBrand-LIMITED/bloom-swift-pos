@@ -65,7 +65,7 @@ const PaymentSection = ({
     || customerCreditAmount > 0;
 
   return (
-  <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+  <div className="space-y-4 bg-transparent px-5 py-5 sm:px-6 sm:py-6">
     <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
       <CreditCard className="w-4 h-4" />
       付款

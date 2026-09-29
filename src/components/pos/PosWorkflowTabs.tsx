@@ -44,8 +44,8 @@ const statusLabel = (section: WorkflowSection): string => {
 };
 
 const PosWorkflowTabs = ({ sections, activeSection, onSelect }: PosWorkflowTabsProps) => (
-  <nav aria-label="訂單填寫進度" className="border-t border-border/80 bg-card/95 px-3 py-2">
-    <div className="mx-auto flex max-w-[1320px] gap-2 overflow-x-auto pb-0.5">
+  <nav aria-label="訂單填寫進度" className="sticky top-[65px] z-30 border-b border-border bg-background/90 px-4 backdrop-blur-xl sm:px-6">
+    <div className="mx-auto flex max-w-[1320px] overflow-x-auto">
       {sections.map((section, index) => {
         const Icon = sectionIcons[section.id];
         const active = activeSection === section.id;
@@ -63,16 +63,16 @@ const PosWorkflowTabs = ({ sections, activeSection, onSelect }: PosWorkflowTabsP
             aria-label={`${index + 1}. ${section.label}，${statusLabel(section)}`}
             onClick={() => onSelect(section.id)}
             className={cn(
-              "group flex min-h-12 min-w-[150px] flex-1 touch-manipulation items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
+              "group flex min-h-14 min-w-[150px] flex-1 touch-manipulation items-center gap-2 border-b-2 px-3 py-2 text-left transition-colors",
               active
-                ? "border-primary bg-primary/10 text-foreground shadow-sm"
-                : "border-transparent bg-background/60 text-muted-foreground hover:border-border hover:bg-background",
-              section.status === "error" && "border-destructive/40 bg-destructive/5",
+                ? "border-primary bg-card text-foreground"
+                : "border-transparent text-muted-foreground hover:bg-muted/30",
+              section.status === "error" && "border-destructive bg-destructive/5",
             )}
           >
             <span
               className={cn(
-                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold",
                 active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
                 section.status === "error" && "bg-destructive text-destructive-foreground",
               )}

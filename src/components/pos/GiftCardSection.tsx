@@ -23,7 +23,7 @@ const GiftCardSection = ({
   const [preview, setPreview] = useState(false);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="space-y-3 border-t border-border/60 bg-transparent px-5 py-4 sm:px-6">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
           <Gift className="w-4 h-4" />

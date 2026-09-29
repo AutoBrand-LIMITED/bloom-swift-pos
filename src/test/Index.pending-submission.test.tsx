@@ -97,9 +97,14 @@ const pendingSubmission = (): PendingOrderSubmission => ({
 });
 
 describe("Index pending recovery without POS authentication", () => {
+  const openWorkflowStep = (label: RegExp) => {
+    fireEvent.click(screen.getByRole("button", { name: label }));
+  };
+
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    vi.stubGlobal("scrollTo", vi.fn());
   });
 
   it("hydrates the raw local pending order when authentication is disabled", async () => {
@@ -107,6 +112,7 @@ describe("Index pending recovery without POS authentication", () => {
 
     render(<MemoryRouter><Index /></MemoryRouter>);
 
+    openWorkflowStep(/3\. 收貨及送貨/);
     expect(await screen.findByDisplayValue("Private Recipient Limited")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Private Contact")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Private delivery address")).toBeInTheDocument();
@@ -126,6 +132,7 @@ describe("Index pending recovery without POS authentication", () => {
 
     render(<MemoryRouter><Index /></MemoryRouter>);
 
+    openWorkflowStep(/3\. 收貨及送貨/);
     expect(await screen.findByDisplayValue("Private Recipient Limited")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {
       name: "核對 Odoo 後解除鎖定（保留資料）",
@@ -145,12 +152,15 @@ describe("Index pending recovery without POS authentication", () => {
 
     render(<MemoryRouter><Index /></MemoryRouter>);
 
+    openWorkflowStep(/4\. 備註及付款/);
     fireEvent.click(await screen.findByRole("button", { name: /訂單備註/ }));
     expect(await screen.findByRole("button", {
       name: "重新載入收花人長期備註",
     })).toBeVisible();
+    openWorkflowStep(/3\. 收貨及送貨/);
     fireEvent.click(screen.getByRole("combobox", { name: "收貨方式 收花人重要日子 1 類型" }));
     fireEvent.click(screen.getByRole("option", { name: "週年" }));
+    openWorkflowStep(/4\. 備註及付款/);
     expect(screen.getByRole("button", {
       name: "重新載入收花人長期備註",
     })).toBeVisible();
@@ -170,13 +180,14 @@ describe("Index pending recovery without POS authentication", () => {
 
     render(<MemoryRouter><Index /></MemoryRouter>);
 
-    expect(await screen.findByText("Legacy Team")).toBeInTheDocument();
+    expect((await screen.findAllByText("Legacy Team")).length).toBeGreaterThan(0);
     expect(screen.queryByRole("textbox", { name: /Sales Team/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {
       name: "核對 Odoo 後解除鎖定（保留資料）",
     }));
     await waitFor(() => expect(localStorage.getItem(PENDING_SUBMISSION_KEY)).toBeNull());
 
+    openWorkflowStep(/4\. 備註及付款/);
     fireEvent.click(screen.getAllByRole("button", { name: "儲存訂單" })[0]);
 
     await waitFor(() => expect(localStorage.getItem(UNSYNCED_ORDERS_KEY)).not.toBeNull());
@@ -201,6 +212,7 @@ describe("Index pending recovery without POS authentication", () => {
 
     render(<MemoryRouter><Index /></MemoryRouter>);
 
+    openWorkflowStep(/3\. 收貨及送貨/);
     expect(await screen.findByDisplayValue("Private Contact")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {
       name: "核對 Odoo 後解除鎖定（保留資料）",
@@ -209,6 +221,7 @@ describe("Index pending recovery without POS authentication", () => {
     fireEvent.change(screen.getByLabelText(/收貨人姓名／聯絡人姓名/), {
       target: { value: "Changed Recipient" },
     });
+    openWorkflowStep(/4\. 備註及付款/);
     fireEvent.click(screen.getAllByRole("button", { name: "儲存訂單" })[0]);
 
     await waitFor(() => expect(localStorage.getItem(UNSYNCED_ORDERS_KEY)).not.toBeNull());

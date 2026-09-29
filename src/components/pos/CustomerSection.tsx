@@ -874,7 +874,7 @@ const CustomerSection = ({
   );
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="space-y-4 bg-transparent px-5 py-5 sm:px-6 sm:py-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
           <User className="w-4 h-4" />
@@ -1217,7 +1217,7 @@ const CustomerSection = ({
           <Collapsible
             open={alternatePhoneExpanded}
             onOpenChange={setAlternatePhoneExpanded}
-            className="overflow-hidden rounded-lg border border-border bg-muted/15 sm:col-span-2"
+            className="overflow-hidden border-y border-border/60 bg-transparent sm:col-span-2"
           >
             <CollapsibleTrigger asChild>
               <button

@@ -34,7 +34,10 @@ import OrderHistory from "@/components/pos/OrderHistory";
 import CustomerHistoryDock from "@/components/pos/CustomerHistoryDock";
 import OrderNotesSection, { type NotesConflictTarget } from "@/components/pos/OrderNotesSection";
 import OrderSummaryPanel from "@/components/pos/OrderSummaryPanel";
-import type { WorkflowSectionId } from "@/components/pos/PosWorkflowTabs";
+import PosWorkflowTabs, {
+  type WorkflowSection,
+  type WorkflowSectionId,
+} from "@/components/pos/PosWorkflowTabs";
 import type {
   DeliveryTimeMode,
   DeliverySplit,
@@ -45,6 +48,7 @@ import type {
   PaymentStatus,
   RecipientOccasion,
   RecipientType,
+  SalesStaff,
 } from "@/types/order";
 import SalesIdSection from "@/components/pos/SalesIdSection";
 import {
@@ -201,20 +205,37 @@ const orderCreatedOnHongKongDate = (
 };
 
 const ORDER_HISTORY_PAGE_SIZE = 50;
+const uiPreviewEnabled = import.meta.env.DEV && import.meta.env.VITE_UI_PREVIEW === "true";
+const UI_PREVIEW_STAFF: SalesStaff[] = [{
+  id: "ui-preview",
+  name: "UI Preview",
+  code: "DEMO",
+  odooEmployeeId: -1,
+  salesTeamId: -1,
+  salesTeamName: "Testing",
+}];
 
 const Index = () => {
   const navigate = useNavigate();
   const { employee, logout } = usePosAuth();
   const {
-    staff,
-    loading: staffLoading,
-    error: staffError,
+    staff: loadedStaff,
+    loading: loadedStaffLoading,
+    error: loadedStaffError,
   } = useOdooEmployees();
   const {
-    teams: salesTeams,
-    loading: salesTeamsLoading,
-    error: salesTeamsError,
+    teams: loadedSalesTeams,
+    loading: loadedSalesTeamsLoading,
+    error: loadedSalesTeamsError,
   } = useOdooSalesTeams(employee?.role === "manager");
+  const staff = uiPreviewEnabled ? UI_PREVIEW_STAFF : loadedStaff;
+  const staffLoading = uiPreviewEnabled ? false : loadedStaffLoading;
+  const staffError = uiPreviewEnabled ? null : loadedStaffError;
+  const salesTeams = uiPreviewEnabled
+    ? [{ id: -1, name: "Testing" }]
+    : loadedSalesTeams;
+  const salesTeamsLoading = uiPreviewEnabled ? false : loadedSalesTeamsLoading;
+  const salesTeamsError = uiPreviewEnabled ? null : loadedSalesTeamsError;
   const {
     groups: customerGroups,
     loading: customerGroupsLoading,
@@ -252,8 +273,8 @@ const Index = () => {
   const [senderDoNumber, setSenderDoNumber] = useState("");
   const [recipientDoNumber, setRecipientDoNumber] = useState("");
   const [sourceReference, setSourceReference] = useState("");
-  const [department, setDepartment] = useState("");
-  const [salesTeamId, setSalesTeamId] = useState<number>();
+  const [department, setDepartment] = useState(uiPreviewEnabled ? "Testing" : "");
+  const [salesTeamId, setSalesTeamId] = useState<number | undefined>(uiPreviewEnabled ? -1 : undefined);
   const [terms, setTerms] = useState("");
   const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({});
   const [customerResolution, setCustomerResolution] = useState<CustomerResolutionState>({
@@ -366,9 +387,11 @@ const Index = () => {
   const [paymentOptions, setPaymentOptions] = useState<AccountingPaymentOption[]>(loadCachedPaymentOptions);
   const [paymentOptionsLoading, setPaymentOptionsLoading] = useState(false);
   const [paymentOptionsError, setPaymentOptionsError] = useState<string | null>(null);
-  const [salesId, setSalesId] = useState(employee?.salesLabel || "");
+  const [salesId, setSalesId] = useState(employee?.salesLabel || (uiPreviewEnabled ? "DEMO — UI Preview" : ""));
   const [operatorEmployeeId, setOperatorEmployeeId] = useState<number | undefined>(employee?.id);
-  const [salespersonEmployeeId, setSalespersonEmployeeId] = useState<number | undefined>(employee?.id);
+  const [salespersonEmployeeId, setSalespersonEmployeeId] = useState<number | undefined>(
+    employee?.id ?? (uiPreviewEnabled ? -1 : undefined),
+  );
   const [priceOverridden, setPriceOverridden] = useState(false);
   const [manualPrice, setManualPrice] = useState<number | null>(null);
 
@@ -405,6 +428,7 @@ const Index = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingIncomplete, setIsSavingIncomplete] = useState(false);
   const [incompleteSaveConfirmationOpen, setIncompleteSaveConfirmationOpen] = useState(false);
+  const [activeWorkflowSection, setActiveWorkflowSection] = useState<WorkflowSectionId>("customer");
   const workflowHeaderRef = useRef<HTMLElement | null>(null);
   const workflowSectionRefs = useRef<Record<WorkflowSectionId, HTMLElement | null>>({
     customer: null,
@@ -778,6 +802,28 @@ const Index = () => {
     paymentSectionComplete,
   ].filter(Boolean).length;
   const isOrderComplete = completedRequiredSectionCount === 4;
+  const workflowSections: WorkflowSection[] = [
+    {
+      id: "customer",
+      label: "客戶",
+      status: customerSectionComplete ? "complete" : "pending",
+    },
+    {
+      id: "items",
+      label: "商品",
+      status: itemsSectionComplete ? "complete" : "pending",
+    },
+    {
+      id: "delivery",
+      label: "收貨及送貨",
+      status: deliverySectionComplete ? "complete" : "pending",
+    },
+    {
+      id: "payment",
+      label: "備註及付款",
+      status: paymentSectionComplete ? "complete" : "pending",
+    },
+  ];
   const hasOrderDraftContent = Boolean(
     pendingSubmission
       || selectedCustomer
@@ -836,13 +882,17 @@ const Index = () => {
   const hasSalesperson = salesId.trim().length > 0;
 
   const scrollToWorkflowSection = useCallback((sectionId: WorkflowSectionId) => {
-    const target = workflowSectionRefs.current[sectionId];
-    if (!target) return;
-    const stickyHeaderHeight = workflowHeaderRef.current?.offsetHeight || 128;
-    window.scrollTo({
-      top: window.scrollY + target.getBoundingClientRect().top - stickyHeaderHeight - 16,
-      behavior: "smooth",
-    });
+    const targetSectionId = sectionId === "notes" ? "payment" : sectionId;
+    setActiveWorkflowSection(targetSectionId);
+    window.setTimeout(() => {
+      const target = workflowSectionRefs.current[targetSectionId];
+      if (!target) return;
+      const stickyHeaderHeight = workflowHeaderRef.current?.offsetHeight || 128;
+      window.scrollTo({
+        top: window.scrollY + target.getBoundingClientRect().top - stickyHeaderHeight - 76,
+        behavior: "smooth",
+      });
+    }, 0);
   }, []);
   const frozenDeliverySlotSelection = employeePendingSubmission?.order.deliveryTimeMode === "slot"
     && employeePendingSubmission.order.deliverySlotId !== undefined
@@ -2676,9 +2726,9 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-muted/20 flex flex-col">
       {/* Header */}
-      <header ref={workflowHeaderRef} className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
+      <header ref={workflowHeaderRef} className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-full flex-col items-stretch gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <h1 className="flex min-w-0 items-center" aria-label="中西花店 POS">
             <img
@@ -2813,8 +2863,8 @@ const Index = () => {
 
         {/* Main form + desktop summary */}
         <div className="min-w-0 flex-1">
-          <div className="mx-auto flex max-w-[1320px] items-start gap-5 px-4 py-5 pb-28 xl:pb-6">
-        <main className="min-w-0 max-w-4xl flex-1 space-y-4">
+          <div className="mx-auto flex max-w-[1320px] items-start gap-6 px-4 py-5 pb-28 xl:pb-6">
+        <main className="min-w-0 max-w-4xl flex-1 divide-y divide-border overflow-visible rounded-[18px] border border-border bg-card">
         <SalesIdSection
           salesId={salesId}
           salespersonEmployeeId={salespersonEmployeeId}
@@ -2861,6 +2911,11 @@ const Index = () => {
 
         {hasSalesperson ? (
           <>
+        <PosWorkflowTabs
+          sections={workflowSections}
+          activeSection={activeWorkflowSection}
+          onSelect={scrollToWorkflowSection}
+        />
         {Object.keys(checkoutErrors).length > 0 && (
           <div
             role="alert"
@@ -2878,9 +2933,10 @@ const Index = () => {
           </div>
         )}
         <section
+          hidden={activeWorkflowSection !== "customer"}
           ref={(node) => { workflowSectionRefs.current.customer = node; }}
           aria-label="下單人資料"
-          className="scroll-mt-40 space-y-4"
+          className="scroll-mt-40"
         >
         <CustomerSection
           key={checkoutId}
@@ -3024,10 +3080,15 @@ const Index = () => {
           onResolutionStateChange={setCustomerResolution}
           refreshKey={customerRefreshKey}
         />
-
+        <div className="flex justify-end px-5 pb-5 sm:px-6 sm:pb-6">
+          <Button type="button" onClick={() => scrollToWorkflowSection("items")}>
+            下一步：商品
+          </Button>
+        </div>
         </section>
 
         <section
+          hidden={activeWorkflowSection !== "items"}
           ref={(node) => { workflowSectionRefs.current.items = node; }}
           aria-label="商品資料"
           className="scroll-mt-40"
@@ -3055,9 +3116,18 @@ const Index = () => {
           onBudgetChange={setBudget}
           subtotal={subtotal}
         />
+        <div className="flex items-center justify-between px-5 pb-5 sm:px-6 sm:pb-6">
+          <Button type="button" variant="ghost" onClick={() => scrollToWorkflowSection("customer")}>
+            返回客戶
+          </Button>
+          <Button type="button" onClick={() => scrollToWorkflowSection("delivery")}>
+            下一步：收貨及送貨
+          </Button>
+        </div>
         </section>
 
         <section
+          hidden={activeWorkflowSection !== "delivery"}
           ref={(node) => { workflowSectionRefs.current.delivery = node; }}
           aria-label="收貨及送貨資料"
           className="scroll-mt-40"
@@ -3137,6 +3207,11 @@ const Index = () => {
           }}
           onSlotChange={handleDeliverySlotChange}
           onSpecifiedTimeSelect={handleSpecifiedTimeSelect}
+          onClearTimeSelection={() => {
+            setDeliveryTimeMode(undefined);
+            setDeliverySlotId(undefined);
+            setDeliveryTime("");
+          }}
           onRetryDeliverySlots={() => setDeliverySlotsRefreshKey((key) => key + 1)}
           onRegionChange={(value) => {
             setDeliveryRegion(value);
@@ -3254,12 +3329,21 @@ const Index = () => {
           }
           onHistoryAddressTargetChange={setActiveHistoryAddressSplitId}
         />}
+        <div className="flex items-center justify-between px-5 pb-5 sm:px-6 sm:pb-6">
+          <Button type="button" variant="ghost" onClick={() => scrollToWorkflowSection("items")}>
+            返回商品
+          </Button>
+          <Button type="button" onClick={() => scrollToWorkflowSection("payment")}>
+            下一步：備註及付款
+          </Button>
+        </div>
         </section>
 
         <section
+          hidden={activeWorkflowSection !== "payment"}
           ref={(node) => { workflowSectionRefs.current.notes = node; }}
           aria-label="備註"
-          className="scroll-mt-40 space-y-4"
+          className="scroll-mt-40"
         >
         <OrderNotesSection
           senderNote={senderNote}
@@ -3293,6 +3377,7 @@ const Index = () => {
         </section>
 
         <section
+          hidden={activeWorkflowSection !== "payment"}
           ref={(node) => { workflowSectionRefs.current.payment = node; }}
           aria-label="付款及確認"
           className="scroll-mt-40"
@@ -3342,6 +3427,11 @@ const Index = () => {
           priceWarning={finalPrice <= 0 && items.length > 0}
         />
         </section>
+        <div className={activeWorkflowSection === "payment" ? "flex px-5 pb-5 sm:px-6 sm:pb-6" : "hidden"}>
+          <Button type="button" variant="ghost" onClick={() => scrollToWorkflowSection("delivery")}>
+            返回收貨及送貨
+          </Button>
+        </div>
 
           </>
         ) : (
@@ -3398,7 +3488,7 @@ const Index = () => {
             disabled={isSubmitting || isSavingIncomplete || (!isOrderComplete && !hasOrderDraftContent)}
             size="lg"
             variant={isOrderComplete ? "default" : hasOrderDraftContent ? "warning" : "secondary"}
-            className="shrink-0 px-4 text-base font-semibold shadow-lg sm:px-8"
+            className="shrink-0 px-4 text-base font-semibold sm:px-8"
           >
             {isSubmitting || isSavingIncomplete
               ? "儲存中"

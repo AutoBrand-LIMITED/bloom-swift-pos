@@ -239,7 +239,7 @@ const OrderItemsSection = ({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+    <div className="space-y-4 bg-transparent px-5 py-5 sm:px-6 sm:py-6">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
           <Package className="w-4 h-4" />
@@ -293,7 +293,7 @@ const OrderItemsSection = ({
       />
 
       {/* Budget */}
-      <div className="rounded-lg border border-border bg-secondary/30">
+      <div className="border-y border-border/60 bg-transparent">
         <button
           type="button"
           className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left"
@@ -350,7 +350,7 @@ const OrderItemsSection = ({
       </div>
 
       {/* Odoo product catalog */}
-      <div className="space-y-2 rounded-lg border border-border bg-background p-3">
+      <div className="space-y-3 border-y border-border/60 py-3">
         <div className="flex items-center justify-between gap-2">
           <Label className="text-xs font-medium">Odoo 商品</Label>
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -481,7 +481,7 @@ const OrderItemsSection = ({
             const remarksExpanded = expandedItemRemarks.has(item.id);
             const hasRemarks = Boolean(item.remarks?.trim());
             return (
-              <div key={item.id} className="space-y-2 rounded-lg bg-secondary/50 p-3">
+              <div key={item.id} className="space-y-2 border-b border-border/60 bg-transparent px-1 py-3 last:border-b-0">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_112px_104px_112px_72px_40px] sm:items-end">
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">商品名稱</Label>
@@ -598,7 +598,7 @@ const OrderItemsSection = ({
                   <span className="font-mono font-semibold">小計 ${formatMoney(orderItemTotal(item))}</span>
                 </div>
 
-                <div className="rounded-lg border border-border bg-card/60">
+                <div className="border-y border-border/60 bg-transparent">
                   <button
                     type="button"
                     className="flex min-h-10 w-full items-center gap-2 px-3 py-2 text-left"
@@ -656,7 +656,7 @@ const OrderItemsSection = ({
       )}
 
       {/* Add new item */}
-      <div className="rounded-lg border border-border bg-secondary/20">
+      <div className="border-y border-border/60 bg-transparent">
         <button
           type="button"
           className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left"
