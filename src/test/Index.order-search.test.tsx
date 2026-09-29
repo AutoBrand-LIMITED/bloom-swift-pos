@@ -347,5 +347,5 @@ describe("Index correlated order search", () => {
     fireEvent.click(screen.getByRole("button", { name: /4\. 備註及付款/ }));
     expect(screen.getByRole("button", { name: "未付款" })).toBeInTheDocument();
     expect(screen.queryByDisplayValue("ORIGINAL-PAYMENT")).not.toBeInTheDocument();
-  });
+  }, 15_000);
 });

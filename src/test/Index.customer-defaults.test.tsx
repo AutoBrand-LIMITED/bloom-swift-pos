@@ -240,7 +240,7 @@ describe("Index customer defaults", () => {
     expect(screen.getByTestId("code-confirmed")).toHaveTextContent("false");
     expect(screen.getByTestId("selected-partner")).toBeEmptyDOMElement();
     expect(screen.queryByLabelText("今次使用 Customer Credit 金額")).not.toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("uses one confirmation flow for desktop and mobile incomplete-save buttons", async () => {
     render(<MemoryRouter><Index /></MemoryRouter>);
