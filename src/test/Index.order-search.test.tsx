@@ -336,9 +336,15 @@ describe("Index correlated order search", () => {
 
     await waitFor(() => expect(odooMocks.getOdooCustomer).toHaveBeenCalledWith(42));
     expect(await screen.findByLabelText("Customer ID／客戶編號")).toHaveValue("REPEAT-42");
+
+    fireEvent.click(screen.getByRole("button", { name: /2\. 商品/ }));
     expect(screen.getByLabelText("Copy Bouquet 商品名稱（不可修改）")).toHaveValue("Copy Bouquet");
-    expect(screen.getByRole("combobox", { name: "送貨費" })).toHaveTextContent("香港島第 3 區");
+    expect(screen.getByRole("combobox", { name: "送貨費" })).toHaveTextContent("舊有送貨費 — 120");
+
+    fireEvent.click(screen.getByRole("button", { name: /3\. 收貨及送貨/ }));
     expect(screen.getByPlaceholderText("收貨人姓名")).toHaveValue("Copy Recipient");
+
+    fireEvent.click(screen.getByRole("button", { name: /4\. 備註及付款/ }));
     expect(screen.getByRole("button", { name: "未付款" })).toBeInTheDocument();
     expect(screen.queryByDisplayValue("ORIGINAL-PAYMENT")).not.toBeInTheDocument();
   });
